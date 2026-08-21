@@ -30,3 +30,4 @@ jobs:
           node scripts/legacy-student-link-check.mjs
           node scripts/trainer-student-list-check.mjs
           node scripts/workflow-controls-check.mjs
+          node scripts/report-usability-audit-check.mjs
