@@ -13,9 +13,10 @@ const syntax=spawnSync(process.execPath,['--check',moduleFile],{encoding:'utf8'}
 assert(syntax.status===0,`Módulo de relatórios enviados possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
 
 const moduleUrl='./modules/trainer-sent-reports-v10_10_33.js?v=10.10.33-sentreports1';
+const trainerModuleEntry="MODULE_ROOT+'trainer-sent-reports-v10_10_33.js?v=10.10.33-sentreports1'";
 assert(config.includes(`'${moduleUrl}'`),'Loader não inclui o arquivo de relatórios enviados com URL versionada.');
 const trainerOnly=config.match(/const trainerOnlyModules=new Set\(\[([\s\S]*?)\n  \]\);/)?.[1]||'';
-assert(trainerOnly.includes(moduleUrl),'Arquivo de relatórios enviados precisa ser exclusivo do runtime do treinador.');
+assert(trainerOnly.includes(trainerModuleEntry),'Arquivo de relatórios enviados precisa ser exclusivo do runtime do treinador.');
 const priority=config.match(/const studentPriorityModules=\[([\s\S]*?)\n  \];/)?.[1]||'';
 assert(!priority.includes('trainer-sent-reports'),'Aluno não pode baixar o arquivo administrativo no runtime prioritário.');
 
