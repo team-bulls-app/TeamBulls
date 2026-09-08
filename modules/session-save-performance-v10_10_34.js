@@ -99,7 +99,7 @@
         try{if(await syncEntry(entry))synced++;}catch(error){if(!silent)console.warn('[Team Bulls] Registro ainda aguardando sincronização',error);break;}
       }
       if((synced||deleted)&&typeof runWhenIdle==='function')try{runWhenIdle(()=>saveCloudBackup(),3500);}catch(error){}
-      if(!silent&&(synced||deleted)&&typeof showToast==='function')showToast(`✓ Sincronização concluída${synced?` · ${synced} registro${synced===1?'':'s'}`:''}${deleted?` · ${deleted} exclusão${deleted===1?'':'ões'}`:''}`);
+      if(!silent&&(synced||deleted)&&typeof showToast==='function')showToast(`✓ Sincronização concluída${synced?` · ${synced} registro${synced===1?'':'s'}`:''}${deleted?` · ${deleted} ${deleted===1?'exclusão':'exclusões'}`:''}`);
       return readQueue(uidValue).length===0&&readDeletes(uidValue).length===0;
     })().finally(()=>{flushing=null;});
     return flushing;
@@ -190,7 +190,9 @@
         removeLocalSession(sessionId,uidValue);showToast(navigator.onLine===false?'Registro excluído. A remoção será confirmada quando a internet voltar.':'Registro excluído. Confirmando remoção na nuvem...');scheduleFlush(0);return true;
       }finally{if(typeof endAction==='function')endAction(actionKey);}
     };
-    wrapped.__tbPendingDeleteV101034=true;wrapped.__tbBase=base;performDeleteSession=wrapped;return true;
+    wrapped.__tbPendingDeleteV101034=true;
+    wrapped.__tbQueueSafeDelete101029=true;
+    wrapped.__tbBase=base;performDeleteSession=wrapped;return true;
   }
 
   function installFlushBridge(){
@@ -208,5 +210,5 @@
   if(!install())window.addEventListener('team-bulls-v107-ready',()=>install(),{once:true});
   window.addEventListener('online',()=>scheduleFlush(250));
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleFlush(350);});
-  [700,1800,4200].forEach(delay=>setTimeout(()=>{install();scheduleFlush(0);},delay));
+  setTimeout(()=>{install();scheduleFlush(0);},700);
 })();
