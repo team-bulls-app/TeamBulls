@@ -77,7 +77,7 @@ if('caches' in window){
     MODULE_ROOT+'diet-calculation-math-v10_10_9.js?v=10.10.10-dietmath1',
     MODULE_ROOT+'diet-calculation-evolution-v10_10_9.js?v=10.10.10-dietcalc1',
     MODULE_ROOT+'diet-portion-presets-v10_10_9.js?v=10.10.10-portions1',
-    MODULE_ROOT+'diet-live-calories-v10_10_11.js?v=10.10.10-dietcalories2',
+    MODULE_ROOT+'diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2',
     MODULE_ROOT+'custom-food-calorie-bridge-v10_10_12.js?v=10.10.12-customfood2'
   ]);
   const loadedModules=new Set(),failedModules=new Set();let readyResolve=null;const ready=new Promise(resolve=>{readyResolve=resolve;});
