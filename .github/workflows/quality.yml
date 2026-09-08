@@ -25,7 +25,7 @@ jobs:
           node scripts/diet-deletion-check.mjs
           node scripts/student-guidance-check.mjs
           node scripts/session-performance-check.mjs
-          node scripts/week-selection-check.mjs
+          node scripts/week-selection-fix-v10_10_9.js
           node scripts/usability-check.mjs
           node scripts/legacy-student-link-check.mjs
           node scripts/trainer-student-list-check.mjs
@@ -38,6 +38,7 @@ jobs:
           node scripts/destructive-actions-supply-check.mjs
           node scripts/startup-runtime-light-check.mjs
           node scripts/session-recovery-home-dates-check.mjs
+          node scripts/student-request-realtime-check.mjs
           node scripts/loader-retry-check.mjs
           node scripts/production-audit-check.mjs
           node scripts/trainer-workflow-v10_10_11-check.mjs
