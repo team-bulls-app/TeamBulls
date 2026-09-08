@@ -43,11 +43,18 @@ assert(sw.includes("'/modules/student-home-layout-v10_10_15.js'"),'Layout do alu
 assert(sw.includes("'/modules/student-home-layout-runtime-v10_10_16.js'"),'Ponte legada da Home não está no caminho mutável.');
 assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4"),'Shell não prepara a Home otimizada atual.');
 
-assert(sw.includes('async function navigationNetworkFirst'),'Navegação ainda não prioriza uma cópia fresca da rede.');
-assert(!sw.includes('navigationCacheFirst(request,event)'),'Estratégia cache-first antiga reapareceu na navegação.');
+assert(sw.includes('async function navigationFastStart'),'Navegação não usa o novo cold start por cache local com revalidação.');
+assert(sw.includes('if(cached){event.waitUntil(refreshNavigation(request,event,fallback));return secureResponse(cached.clone(),{html:true});}'),'Navegação ainda espera a rede mesmo quando já existe HTML válido no cache.');
+assert(sw.includes('async function refreshNavigation'),'Navegação rápida não revalida o HTML em segundo plano.');
+assert(!sw.includes('navigationCacheFirst(request,event)'),'Estratégia cache-first antiga sem revalidação reapareceu na navegação.');
+assert(sw.includes('const MUTABLE_CACHE_GRACE_MS=650;'),'Arquivos críticos não têm janela curta de rede antes do fallback local.');
+assert(sw.includes('const FAST_STARTUP_PATHS=new Set(['),'Lista explícita de arquivos do primeiro frame está ausente.');
+assert(sw.includes('async function networkFirstWithCacheGrace'),'Primeiro frame não possui fallback rápido para cache conhecido.');
+const fastCheck=sw.indexOf('if(FAST_STARTUP_PATHS.has(relativePath))');
 const mutableCheck=sw.indexOf('if(MUTABLE_PATHS.has(relativePath))');
 const genericVersioned=sw.indexOf("if(VERSIONED_PATH_PATTERN.test(fileName)||url.searchParams.has('v'))");
-assert(mutableCheck>=0&&genericVersioned>=0&&mutableCheck<genericVersioned,'Arquivos mutáveis continuam caindo no cache-first por causa de ?v=.');
+assert(fastCheck>=0&&mutableCheck>=0&&genericVersioned>=0&&fastCheck<mutableCheck&&mutableCheck<genericVersioned,'Ordem de cache do primeiro frame/mutáveis/versionados ficou insegura.');
+assert(sw.includes("if(relativePath==='/version.json'){event.respondWith(networkFirst"),'version.json deixou de ser network-first e pode esconder uma atualização publicada.');
 assert(sw.includes('const stale=keys.filter'),'Ativação não identifica caches antigos.');
 assert(sw.includes('await Promise.all(stale.map(key=>caches.delete(key)))'),'Ativação não remove caches antigos.');
 assert(sw.includes('await self.clients.claim()'),'Novo Service Worker não assume imediatamente os clientes abertos.');
@@ -68,4 +75,4 @@ if(fail.length){
   console.error('FALHA — update fail-open/startup recovery\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log(`Update fail-open/startup recovery OK — build ${BUILD} coerente, atualização visível mais rápida e overlay legado sem bloqueio.`);
+console.log(`Update fail-open/startup recovery OK — build ${BUILD} coerente, cold start usa cache revalidado e overlay legado segue sem bloqueio.`);
