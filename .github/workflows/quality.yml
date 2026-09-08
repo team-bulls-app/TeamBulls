@@ -40,6 +40,7 @@ jobs:
           node scripts/session-recovery-home-dates-check.mjs
           node scripts/student-request-realtime-check.mjs
           node scripts/trainer-sent-reports-check.mjs
+          node scripts/trainer-overdue-report-status-check.mjs
           node scripts/loader-retry-check.mjs
           node scripts/production-audit-check.mjs
           node scripts/trainer-workflow-v10_10_11-check.mjs
