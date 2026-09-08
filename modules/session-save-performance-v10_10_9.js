@@ -1,22 +1,30 @@
-/* Team Bulls v10.10.9 — registro de séries imediato com fila persistente de sincronização. */
+/* Team Bulls v10.10.34 — registro de séries imediato com fila persistente e mutável de sincronização. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.9-sessionperf1';
+  const VERSION='10.10.34-sessionperf2';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   const MAX_PENDING=160;
+  const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
   let flushing=null;
   let retryTimer=null;
 
   function safeUid(value){return String(value||'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,160);}
   function queueKey(uidValue){return QUEUE_PREFIX+safeUid(uidValue);}
+  function normalizeQueuedEntry(item){
+    if(!item||!item.id||!item.userId)return null;
+    const queuedAt=Math.max(1,Math.trunc(Number(item.queuedAt)||Date.now()));
+    const createdAtMs=Math.max(1,Math.trunc(Number(item.createdAtMs)||queuedAt));
+    const revision=Math.max(0,Math.trunc(Number(item.revision)||0));
+    return{...item,queuedAt,createdAtMs,revision};
+  }
   function readQueue(uidValue){
     if(!uidValue)return[];
     try{
       const parsed=JSON.parse(storageGet(queueKey(uidValue))||'[]');
-      return Array.isArray(parsed)?parsed.filter(item=>item&&item.id&&item.userId===uidValue):[];
+      return Array.isArray(parsed)?parsed.map(normalizeQueuedEntry).filter(item=>item&&item.userId===uidValue):[];
     }catch(error){return[];}
   }
   function writeQueue(uidValue,items){
@@ -24,30 +32,59 @@
     try{return storageSet(queueKey(uidValue),JSON.stringify(items));}catch(error){return false;}
   }
   function enqueue(entry){
-    const uidValue=String(entry?.userId||'');if(!uidValue||!entry?.id)return false;
-    const queue=readQueue(uidValue),index=queue.findIndex(item=>item.id===entry.id);
+    const normalized=normalizeQueuedEntry(entry),uidValue=String(normalized?.userId||'');if(!uidValue||!normalized?.id)return false;
+    const queue=readQueue(uidValue),index=queue.findIndex(item=>item.id===normalized.id);
     if(index<0&&queue.length>=MAX_PENDING)return false;
-    if(index>=0)queue[index]=entry;else queue.push(entry);
+    if(index>=0)queue[index]=normalized;else queue.push(normalized);
     return writeQueue(uidValue,queue);
   }
   function removeQueued(uidValue,id){
-    const queue=readQueue(uidValue),next=queue.filter(item=>item.id!==id);
+    const queue=readQueue(uidValue),next=queue.filter(item=>String(item.id)!==String(id));
     return next.length===queue.length||writeQueue(uidValue,next);
   }
+  function queuedEntry(id,uidValue=String(CURRENT_USER?.uid||'')){
+    if(!uidValue||!id)return null;
+    return readQueue(uidValue).find(item=>String(item.id)===String(id))||null;
+  }
   function pendingCount(uidValue=String(CURRENT_USER?.uid||'')){return readQueue(uidValue).length;}
+  function pendingSession(id,uidValue=String(CURRENT_USER?.uid||'')){return !!queuedEntry(id,uidValue);}
+  function updatePending(id,patch={},uidValue=String(CURRENT_USER?.uid||'')){
+    const current=queuedEntry(id,uidValue);if(!current)return null;
+    const safePatch={};for(const [key,value] of Object.entries(patch||{}))if(MUTABLE_FIELDS.has(key))safePatch[key]=value;
+    const next=normalizeQueuedEntry({...current,...safePatch,id:current.id,userId:current.userId,workoutId:current.workoutId,exerciseId:current.exerciseId,queuedAt:current.queuedAt,createdAtMs:current.createdAtMs,revision:current.revision+1});
+    if(!enqueue(next))return null;
+    scheduleFlush(120);return next;
+  }
+  function discardPending(id,uidValue=String(CURRENT_USER?.uid||'')){
+    if(!queuedEntry(id,uidValue))return true;
+    return removeQueued(uidValue,id)&&!queuedEntry(id,uidValue);
+  }
   function networkReady(){return navigator.onLine!==false&&MODE==='cloud'&&CURRENT_USER?.role==='student'&&CURRENT_USER?.uid&&db;}
+  function stableCreatedAt(entry){
+    const ms=Math.max(1,Math.trunc(Number(entry?.createdAtMs)||Number(entry?.queuedAt)||Date.now()));
+    try{return firebase.firestore.Timestamp.fromMillis(ms);}catch(error){return new Date(ms);}
+  }
   function firestorePayload(entry){
     return{
       userId:entry.userId,workoutId:entry.workoutId,exerciseId:entry.exerciseId,exerciseName:entry.exerciseName,
       date:entry.date,week:entry.week,note:entry.note,sets:entry.sets,performedTechniqueMode:entry.performedTechniqueMode||'',
       performedExerciseItemId:entry.performedExerciseItemId||'',performedExerciseName:entry.performedExerciseName||entry.exerciseName||'',
-      createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      createdAt:stableCreatedAt(entry)
     };
+  }
+  function markLocalSynced(entry){
+    try{
+      const owner=typeof findSessionOwner==='function'?findSessionOwner(entry.id):null;
+      if(owner?.session){owner.session.pendingSync=false;syncSessionToHistory?.(owner.session);saveSessionArchive?.(entry.userId,[owner.session]);}
+    }catch(error){}
   }
   async function syncEntry(entry){
     if(!networkReady()||CURRENT_USER.uid!==entry.userId)return false;
     await cloudWrite(db.collection('sessions').doc(entry.id).set(firestorePayload(entry)),'sincronizar registro de série');
-    removeQueued(entry.userId,entry.id);
+    const latest=queuedEntry(entry.id,entry.userId);
+    if(latest&&latest.revision!==entry.revision){scheduleFlush(30);return true;}
+    if(latest&&!removeQueued(entry.userId,entry.id))throw new Error('O registro chegou ao servidor, mas a fila local não pôde ser finalizada.');
+    markLocalSynced(entry);
     return true;
   }
   async function flushPending({silent=true}={}){
@@ -112,14 +149,11 @@
       LAST_SESSION_WEEK=week;
       if(!beginAction('save-session','modal-session'))return;
       try{
-        const sessionId=SESSION_CREATE_ID||(SESSION_CREATE_ID=draftId('sessions'));
+        const sessionId=SESSION_CREATE_ID||(SESSION_CREATE_ID=draftId('sessions')),stamp=Date.now();
         const entry={
           id:sessionId,userId:CURRENT_USER.uid,workoutId:wid,exerciseId:eid,exerciseName:exercise.name,date,week,note,sets,
-          performedTechniqueMode,...variant,queuedAt:Date.now()
+          performedTechniqueMode,...variant,queuedAt:stamp,createdAtMs:stamp,revision:0
         };
-        // Só libera a interface instantaneamente depois de garantir uma cópia
-        // persistente pequena no aparelho. Se a fila local falhar, usa o fluxo
-        // original (mais lento) para nunca trocar velocidade por perda de dados.
         if(!enqueue(entry)){
           endAction('save-session','modal-session');
           return base.apply(this,arguments);
@@ -162,12 +196,21 @@
     TB.flushPendingMutationSync=combined;
     return true;
   }
+  function exposeApi(){
+    window.TeamBullsSessionPerformance=Object.freeze({
+      version:VERSION,
+      pending:pendingCount,
+      hasPending:pendingSession,
+      getPending:queuedEntry,
+      updatePending,
+      discardPending,
+      flush:()=>flushPending({silent:false}),
+      schedule:()=>scheduleFlush(80)
+    });
+  }
   function install(){
     const saveOk=installSavePatch(),flushOk=installFlushBridge();
-    if(saveOk&&flushOk){
-      window.TeamBullsSessionPerformance=Object.freeze({version:VERSION,pending:pendingCount,flush:()=>flushPending({silent:false})});
-      return true;
-    }
+    if(saveOk&&flushOk){exposeApi();return true;}
     return false;
   }
 
