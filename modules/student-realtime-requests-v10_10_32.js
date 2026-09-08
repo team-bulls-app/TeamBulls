@@ -13,7 +13,6 @@
   };
   let badgeObserver=null;
   let wrappedHome=null;
-  let wrappedLogout=null;
 
   const currentUser=()=>{try{return typeof CURRENT_USER!=='undefined'?CURRENT_USER:null;}catch(error){return null;}};
   const mode=()=>{try{return typeof MODE!=='undefined'?String(MODE||''):'';}catch(error){return'';}};
@@ -40,9 +39,10 @@
     showToast(message);
   }
 
+  function weeklyCheckinItems(){return(live.weeklyCheckins||[]).map(doc=>({...doc.data,id:doc.id}));}
   function weeklyRequest(){
     const schedule=live.weeklySchedule;if(!schedule||schedule.enabled===false)return null;
-    try{if(typeof computeCheckinRequest==='function')return computeCheckinRequest(schedule,live.weeklyCheckins||[]);}catch(error){}
+    try{if(typeof computeCheckinRequest==='function')return computeCheckinRequest(schedule,weeklyCheckinItems());}catch(error){}
     const due=String(schedule.nextDueDate||''),extra=String(schedule.extraRequestId||'');
     if(extra)return{kind:'manual',requestId:extra,dueDate:String(schedule.extraRequestedAt||todayIso()),requestKey:'manual:'+extra,pending:true};
     return validIso(due)?{kind:'scheduled',requestId:'',dueDate:due,requestKey:'scheduled:'+due,pending:due<=todayIso()}:null;
@@ -90,7 +90,7 @@
     if(!live.ready.has('weeklySchedule')||!live.ready.has('weeklyCheckins'))return false;
     try{
       WEEKLY_CHECKIN_SCHEDULE=live.weeklySchedule?{...live.weeklySchedule,studentId:live.uid}:null;
-      WEEKLY_CHECKINS=(live.weeklyCheckins||[]).map(doc=>({...doc.data,id:doc.id})).sort((a,b)=>String(b.submittedDate||'').localeCompare(String(a.submittedDate||''))||String(b.id).localeCompare(String(a.id)));
+      WEEKLY_CHECKINS=weeklyCheckinItems().sort((a,b)=>String(b.submittedDate||'').localeCompare(String(a.submittedDate||''))||String(b.id).localeCompare(String(a.id)));
       WEEKLY_CHECKIN_REQUEST=weeklyRequest();WEEKLY_CHECKIN_STATE_UID=live.uid;
       if(typeof renderWeeklyCheckinCard==='function')renderWeeklyCheckinCard();
       if(live.weeklySchedule?.enabled===false){const card=document.getElementById('weekly-checkin-card'),banner=document.getElementById('weekly-checkin-home-banner');if(card)card.style.display='none';if(banner)banner.style.display='none';}
@@ -115,8 +115,8 @@
 
   async function openRealtimeCenter(){
     if(!cloudStudent())return wrappedHome?.openNotifications?.();
-    const ensureScreen=()=>{if(document.getElementById('screen-student-notifications'))return;wrappedHome?.openNotifications?.();};
-    ensureScreen();try{if(typeof showScreen==='function')showScreen('screen-student-notifications');}catch(error){}
+    if(!document.getElementById('screen-student-notifications'))return wrappedHome?.openNotifications?.();
+    try{if(typeof showScreen==='function')showScreen('screen-student-notifications');}catch(error){}
     renderCenter();applyBadge();return true;
   }
   async function handleCenterAction(action,id,source){
@@ -139,7 +139,7 @@
     if(typeof checkFeedback==='function'&&!checkFeedback.__tbRealtimeRequests){const base=checkFeedback;const wrapped=async function(){if(live.uid===studentUid()&&live.ready.has('feedback')){applyFeedbackCore();return true;}return base.apply(this,arguments);};wrapped.__tbRealtimeRequests=true;wrapped.__tbBase=base;checkFeedback=wrapped;}
     if(typeof loadWeeklyCheckinState==='function'&&!loadWeeklyCheckinState.__tbRealtimeRequests){const base=loadWeeklyCheckinState;const wrapped=async function(){if(live.uid===studentUid()&&live.ready.has('weeklySchedule')&&live.ready.has('weeklyCheckins')){applyWeeklyCore();return WEEKLY_CHECKIN_REQUEST;}return base.apply(this,arguments);};wrapped.__tbRealtimeRequests=true;wrapped.__tbBase=base;loadWeeklyCheckinState=wrapped;}
     if(typeof loadStudentProtocolReview==='function'&&!loadStudentProtocolReview.__tbRealtimeRequests){const base=loadStudentProtocolReview;const wrapped=async function(){if(live.uid===studentUid()&&live.ready.has('protocol')){applyProtocolCore();return live.protocol;}return base.apply(this,arguments);};wrapped.__tbRealtimeRequests=true;wrapped.__tbBase=base;loadStudentProtocolReview=wrapped;}
-    if(typeof confirmLogout==='function'&&!confirmLogout.__tbRealtimeRequests){const base=confirmLogout;const wrapped=function(){stop();return base.apply(this,arguments);};wrapped.__tbRealtimeRequests=true;wrapped.__tbBase=base;confirmLogout=wrapped;wrappedLogout=wrapped;}
+    if(typeof confirmLogout==='function'&&!confirmLogout.__tbRealtimeRequests){const base=confirmLogout;const wrapped=function(){stop();return base.apply(this,arguments);};wrapped.__tbRealtimeRequests=true;wrapped.__tbBase=base;confirmLogout=wrapped;}
   }
 
   function sourceDocs(snapshot){return snapshot.docs.map(doc=>({id:doc.id,data:doc.data()}));}
