@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026090401,
-  "revision": "cold-start-session-persistence-2",
-  "publishedAt": "2026-09-04T14:05:00Z",
+  "build": 2026090801,
+  "revision": "session-restore-home-fastdates-1",
+  "publishedAt": "2026-09-08T12:25:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Corrige a restauração de sessão após fechar completamente o PWA, reforça o preenchimento de contas salvas no cold start e publica a revisão como hotfix detectável pelo atualizador."
+  "message": "Evita falso aviso de correção durante restauração reconhecida da sessão e mostra as próximas datas da Home imediatamente a partir do estado conhecido, mantendo a atualização remota em segundo plano."
 }
