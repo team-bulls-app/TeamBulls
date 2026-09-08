@@ -40,7 +40,7 @@ if('caches' in window){
 })();
 
 (()=>{
-  let requested=false,deferredStarted=false,deferredComplete=false,completedRole='',studentPriorityStarted=false,healing=false,healTimer=null,readyResolved=false,hadFailures=false,screenObserver=null,deferredPhase=false,deferredBatchIndex=0,deferredEligible=[];
+  let requested=false,deferredStarted=false,deferredComplete=false,completedRole='',studentPriorityStarted=false,healing=false,healTimer=null,readyResolved=false,hadFailures=false,screenObserver=null,deferredPhase=false,deferredBatchCount=0,deferredEligible=[];
   const PRELOAD_WINDOW=8;
   const DEFERRED_YIELD_EVERY=4;
   const STUDENT_YIELD_EVERY=2;
@@ -127,8 +127,8 @@ if('caches' in window){
     if(!ok&&navigator.onLine){await wait(250);ok=await loadScriptOnce(src,Math.max(6500,Number(timeoutMs)||3200));}
     if(!ok)console.warn('[Team Bulls] Módulo colocado na fila de autorreparo:',src);
     if(deferredPhase&&deferredEligible.includes(src)){
-      deferredBatchIndex++;
-      if(deferredBatchIndex%DEFERRED_YIELD_EVERY===0)await yieldUi();
+      deferredBatchCount++;
+      if(deferredBatchCount%4===0)await yieldUi();
     }
     return ok;
   };
@@ -152,7 +152,7 @@ if('caches' in window){
     deferredStarted=true;document.documentElement.dataset.teamBullsRuntime='loading';
     try{
       if(studentHomeActive())await loadStudentPriority();
-      deferredEligible=modules.filter(roleAllowsModule);deferredBatchIndex=0;
+      deferredEligible=modules.filter(roleAllowsModule);deferredBatchCount=0;
       preloadAhead(deferredEligible,0);
       deferredPhase=true;
       try{for(const src of modules)await loadScript(src);}finally{deferredPhase=false;deferredEligible=[];}
