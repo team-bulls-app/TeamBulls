@@ -50,6 +50,9 @@ has(session,'if(!removeQueued(uidValue,sessionId))','Exclusão pendente não can
 has(session,'removeLocalSession(sessionId,uidValue)','Exclusão pendente não remove o registro da interface/histórico local.');
 has(session,"const ref=db.collection('sessions').doc(entry.id),existing=await cloudGet(ref,'reconciliar exclusão de registro')",'Tombstone não reconcilia existência no servidor antes do delete.');
 has(session,"if(!existing.exists){removeDelete(entry.userId,entry.id);return true;}",'Exclusão de registro nunca criado não é concluída de forma idempotente.');
+has(session,'wrapped.__tbQueueSafeDelete101029=true;','Runtime novo não impede o hotfix legado de reinstalar o bloqueio antigo de exclusão.');
+has(session,"setTimeout(()=>{install();scheduleFlush(0);},700);",'Reconciliação inicial única da fila não está instalada.');
+lacks(session,'[700,1800,4200]','Sincronização voltou a repetir writes por vários timers no startup.');
 
 lacks(session,'setInterval(','Fila de sessões não deve usar polling contínuo.');
 const syncEntryStart=session.indexOf('async function syncEntry(entry)');
