@@ -17,7 +17,8 @@
     if(!item||!item.id||!item.userId)return null;
     const queuedAt=Math.max(1,Math.trunc(Number(item.queuedAt)||Date.now()));
     const createdAtMs=Math.max(1,Math.trunc(Number(item.createdAtMs)||queuedAt));
-    return{...item,queuedAt,createdAtMs};
+    const revision=Math.max(0,Math.trunc(Number(item.revision)||0));
+    return{...item,queuedAt,createdAtMs,revision};
   }
   function readQueue(uidValue){
     if(!uidValue)return[];
@@ -50,7 +51,7 @@
   function updatePending(id,patch={},uidValue=String(CURRENT_USER?.uid||'')){
     const current=queuedEntry(id,uidValue);if(!current)return null;
     const safePatch={};for(const [key,value] of Object.entries(patch||{}))if(MUTABLE_FIELDS.has(key))safePatch[key]=value;
-    const next=normalizeQueuedEntry({...current,...safePatch,id:current.id,userId:current.userId,workoutId:current.workoutId,exerciseId:current.exerciseId,queuedAt:current.queuedAt,createdAtMs:current.createdAtMs});
+    const next=normalizeQueuedEntry({...current,...safePatch,id:current.id,userId:current.userId,workoutId:current.workoutId,exerciseId:current.exerciseId,queuedAt:current.queuedAt,createdAtMs:current.createdAtMs,revision:current.revision+1});
     if(!enqueue(next))return null;
     scheduleFlush(120);return next;
   }
@@ -80,7 +81,9 @@
   async function syncEntry(entry){
     if(!networkReady()||CURRENT_USER.uid!==entry.userId)return false;
     await cloudWrite(db.collection('sessions').doc(entry.id).set(firestorePayload(entry)),'sincronizar registro de série');
-    if(!removeQueued(entry.userId,entry.id))throw new Error('O registro chegou ao servidor, mas a fila local não pôde ser finalizada.');
+    const latest=queuedEntry(entry.id,entry.userId);
+    if(latest&&latest.revision!==entry.revision){scheduleFlush(30);return true;}
+    if(latest&&!removeQueued(entry.userId,entry.id))throw new Error('O registro chegou ao servidor, mas a fila local não pôde ser finalizada.');
     markLocalSynced(entry);
     return true;
   }
@@ -149,7 +152,7 @@
         const sessionId=SESSION_CREATE_ID||(SESSION_CREATE_ID=draftId('sessions')),stamp=Date.now();
         const entry={
           id:sessionId,userId:CURRENT_USER.uid,workoutId:wid,exerciseId:eid,exerciseName:exercise.name,date,week,note,sets,
-          performedTechniqueMode,...variant,queuedAt:stamp,createdAtMs:stamp
+          performedTechniqueMode,...variant,queuedAt:stamp,createdAtMs:stamp,revision:0
         };
         if(!enqueue(entry)){
           endAction('save-session','modal-session');
