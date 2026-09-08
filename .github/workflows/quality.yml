@@ -36,6 +36,7 @@ jobs:
           node scripts/diet-portion-presets-check.mjs
           node scripts/diet-copy-check.mjs
           node scripts/destructive-actions-supply-check.mjs
+          node scripts/pending-session-mutations-check.mjs
           node scripts/startup-runtime-light-check.mjs
           node scripts/session-recovery-home-dates-check.mjs
           node scripts/student-request-realtime-check.mjs
