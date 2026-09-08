@@ -32,8 +32,9 @@ if(yieldBlock){
   assert(!yieldBlock[1].includes('requestIdleCallback'),'Yield por módulo não pode esperar idle callback de até centenas de ms.');
 }
 
-assert(config.includes('preloadAhead(eligible,index+1);'),'Loader deve adiantar downloads enquanto preserva ordem de execução.');
-assert(config.includes("if((index+1)%DEFERRED_YIELD_EVERY===0)await yieldUi();"),'Módulos adiados devem ceder a UI por lote.');
+assert(config.includes('for(const src of modules)await loadScript(src);'),'Execução dos módulos deve continuar estritamente sequencial.');
+assert(config.includes('preloadAhead(deferredEligible,index+1);'),'Loader deve adiantar downloads enquanto preserva a execução sequencial.');
+assert(config.includes('deferredBatchIndex%DEFERRED_YIELD_EVERY===0'),'Módulos adiados devem ceder a UI por lote.');
 assert(!config.includes("for(const src of modules)await loadScript(src).then(()=>yieldUi())"),'Loader antigo serial + idle após cada módulo não pode voltar.');
 assert(config.includes('requestAnimationFrame(()=>setTimeout(queue,60));'),'Carga pós-sessão deve iniciar logo após o primeiro frame, sem aguardar idle indefinidamente.');
 
