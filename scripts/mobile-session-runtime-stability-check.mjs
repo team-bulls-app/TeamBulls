@@ -4,12 +4,15 @@ import {spawnSync} from 'node:child_process';
 const fail=[];
 const assert=(ok,message)=>{if(!ok)fail.push(message);};
 const read=file=>fs.readFileSync(file,'utf8');
+const SESSION_PERSISTENCE_BASELINE_BUILD=2026090401;
 const viewport=read('viewport_v10_10_9.js');
 const core=read('app_v10_10_9_core.js');
 const boot=read('boot_v10.js');
 const sw=read('sw.js');
+const sw47=read('sw_47.js');
 const updater=read('update_v10_10_9.js');
 const version=JSON.parse(read('version.json'));
+const publishedBuild=Number(version.build);
 
 for(const file of ['viewport_v10_10_9.js','boot_v10.js','update_v10_10_9.js']){
   const syntax=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});
@@ -42,8 +45,11 @@ assert(core.includes("auth.signOut(),4000,'saída da conta'"),'Logout explícito
 assert(!/localStorage[^\n]*(?:password|login-pass|tb_access_secret)/i.test(earlyBoot),'Guard antecipado não pode persistir senha no localStorage.');
 assert(!/sessionStorage[^\n]*(?:password|login-pass|tb_access_secret)/i.test(earlyBoot),'Guard antecipado não pode persistir senha no sessionStorage.');
 
-assert(Number(version.build)===2026090401,'version.json precisa publicar o hotfix de sessão como novo build 2026090401.');
-assert(updater.includes("const CURRENT_BUILD=2026090401;"),'Atualizador local precisa reconhecer o mesmo build publicado no version.json.');
+assert(Number.isInteger(publishedBuild)&&publishedBuild>=SESSION_PERSISTENCE_BASELINE_BUILD,'version.json regrediu para antes do hotfix que publicou a persistência de sessão.');
+assert(updater.includes(`const CURRENT_BUILD=${publishedBuild};`),'Atualizador local precisa reconhecer o mesmo build publicado no version.json.');
+assert(sw.includes(`const BUILD_REVISION=${publishedBuild};`),'Service Worker principal precisa reconhecer o mesmo build publicado no version.json.');
+assert(sw47.includes(`const BUILD_REVISION=${publishedBuild};`),'Service Worker legado precisa reconhecer o mesmo build publicado no version.json.');
+assert(sw===sw47,'Service Workers precisam permanecer idênticos após um hotfix de sessão.');
 assert(updater.includes("fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:'no-store'"),'Verificação de versão precisa continuar ignorando cache HTTP.');
 assert(updater.includes("'./boot_v10.js?v=10.10.9'"),'Atualizador precisa renovar boot_v10.js entre os arquivos críticos do PWA.');
 
@@ -97,4 +103,4 @@ if(fail.length){
   console.error('FALHA — estabilidade de login/sessão/runtime móvel\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — cold start publica build novo, prepara contas salvas, força Firebase LOCAL antes do listener/login e mantém logout explícito; restauração online não cai em offline provisório.');
+console.log(`APROVADO — cold start preserva persistência LOCAL desde o build ${SESSION_PERSISTENCE_BASELINE_BUILD}; build publicado ${publishedBuild} segue coerente entre atualizador e Service Workers.`);
