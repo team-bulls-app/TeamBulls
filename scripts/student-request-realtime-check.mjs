@@ -11,7 +11,7 @@ const rules=read('firebase/firestore_28_compacto.rules');
 const syntax=spawnSync(process.execPath,['--check','modules/student-request-realtime-v10_10_32.js'],{encoding:'utf8'});
 assert(syntax.status===0,`Módulo realtime possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
 
-const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime2';
+const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3';
 assert(config.includes(`'${moduleUrl}'`),'Loader prioritário do aluno não inclui a sincronização realtime atual.');
 const priority=config.match(/const studentPriorityModules=\[([\s\S]*?)\n  \];/)?.[1]||'';
 assert(priority.includes(moduleUrl),'Sincronização realtime precisa estar no runtime prioritário do aluno.');
@@ -34,6 +34,15 @@ assert(realtime.includes("screen-student-notifications"),'Central aberta não é
 assert(realtime.includes('badgeObserver.observe(badge'),'Proteção do contador precisa observar somente o badge local da Home.');
 assert(!realtime.includes('observer.observe(document.body'),'Módulo realtime não pode instalar observer global no body.');
 
+assert(realtime.includes("const MAX_DUE_TIMER_MS=2000000000"),'Vencimentos futuros não possuem timer seguro para fronteira de data.');
+assert(realtime.includes('localMidnightMs'),'Vencimentos não são ancorados na meia-noite local da data programada.');
+assert(realtime.includes("weeklyFutureDue=request&&!request.pending"),'Relatório semanal futuro não agenda a própria virada para pendente.');
+assert(realtime.includes("protocolFutureDue=state&&!state.pending"),'Atualização de protocolo futura não agenda a própria virada para pendente.');
+assert(realtime.includes("recomputeDueStates('timer')"),'Passagem automática da data não recalcula relatório/protocolo sem write no Firestore.');
+assert(realtime.includes("if(activeUid===uid&&unsubs.length){recomputeDueStates('resume')"),'Retorno do background não recalcula vencimentos que passaram com o PWA suspenso.');
+assert(realtime.includes('clearTimeout(dueTimer)'),'Timer de vencimento não é desmontado/reprogramado com segurança.');
+assert(realtime.includes('TeamBullsStudentHomeFastProtocolDate?.sync?.()'),'Data rápida da Home não é atualizada quando o vencimento passa localmente.');
+
 assert(realtime.includes('unsubs.splice(0).forEach'),'Listeners Firestore não são desmontados ao trocar/sair da conta.');
 assert(realtime.includes('firebase.auth().onAuthStateChanged'),'Troca/encerramento da autenticação não encerra os listeners.');
 assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explícito não possui proteção de desmontagem.');
@@ -55,4 +64,4 @@ if(fail.length){
   console.error('FALHA — entrega realtime de relatórios e atualizações\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — relatórios, semanal, atualização de protocolo, feedback e notificações chegam por snapshots somente leitura; sino/central atualizam sem polling e listeners são desmontados no logout.');
+console.log('APROVADO — relatórios e atualizações chegam por snapshots somente leitura; datas vencidas viram pendência automaticamente sem write/polling; sino/central atualizam e listeners são desmontados no logout.');

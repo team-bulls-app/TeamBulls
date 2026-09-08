@@ -2,14 +2,16 @@
   'use strict';
   if(window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__)return;
   window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__=true;
-  const VERSION='10.10.32-studentrealtime2';
+  const VERSION='10.10.32-studentrealtime3';
+  const MAX_DUE_TIMER_MS=2000000000;
   let activeUid='';
   let unsubs=[];
   let authUnsub=null;
-  let badgeObserver=null,badgeTarget=null,badgeWriting=false,centerRefreshTimer=0;
+  let badgeObserver=null,badgeTarget=null,badgeWriting=false,centerRefreshTimer=0,dueTimer=0;
   let questionnairePrimed=false,weeklyPrimed=false,protocolPrimed=false,feedbackPrimed=false,notificationPrimed=false;
   let lastQuestionnaireSignature='',lastWeeklySignature='',lastProtocolKey='',lastFeedbackSignature='',lastNotificationSignature='';
-  let liveSchedule=null,liveCheckins=[],scheduleReady=false,checkinsReady=false;
+  let liveSchedule=null,liveCheckins=[],scheduleReady=false,checkinsReady=false,liveProtocolSchedule=null;
+  let weeklyFutureDue='',protocolFutureDue='';
   const counts={questionnaires:0,weekly:0,protocol:0,feedback:0,notifications:0};
 
   const studentCloud=()=>{
@@ -20,6 +22,8 @@
   const toast=(message,error=false)=>{try{if(typeof showToast==='function')showToast(message,error);}catch(error){}};
   const createdMs=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.seconds)return Number(value.seconds)*1000;const n=Number(value);return Number.isFinite(n)?n:0;}catch(error){return 0;}};
   const formatDate=value=>{try{return typeof fmt==='function'?fmt(value):String(value||'');}catch(error){return String(value||'');}};
+  const validIso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
+  const localMidnightMs=value=>{if(!validIso(value))return 0;const [y,m,d]=String(value).split('-').map(Number);const ms=new Date(y,m-1,d,0,0,0,0).getTime();return Number.isFinite(ms)?ms:0;};
 
   function realtimeCount(){return Object.values(counts).reduce((sum,value)=>sum+Math.max(0,Number(value)||0),0);}
   function applyBadge(){
@@ -41,13 +45,30 @@
   }
   function changedAfterPrime(primed,previous,next){return primed&&previous!==next;}
 
+  function scheduleDueBoundary(){
+    clearTimeout(dueTimer);dueTimer=0;
+    if(!activeUid||!isCurrent(activeUid))return;
+    const now=Date.now(),candidates=[weeklyFutureDue,protocolFutureDue].map(localMidnightMs).filter(ms=>ms>now+250);
+    if(!candidates.length)return;
+    const delay=Math.min(MAX_DUE_TIMER_MS,Math.max(500,Math.min(...candidates)-now+900));
+    dueTimer=setTimeout(()=>{dueTimer=0;recomputeDueStates('timer');},delay);
+  }
+  function recomputeDueStates(reason='runtime'){
+    const uid=currentUid();if(!uid||uid!==activeUid)return false;
+    if(scheduleReady&&checkinsReady)applyWeekly(uid);
+    if(liveProtocolSchedule)renderProtocol(liveProtocolSchedule,uid);
+    try{window.TeamBullsStudentHomeFastProtocolDate?.sync?.();}catch(error){}
+    updateBadge();scheduleDueBoundary();
+    return true;
+  }
+
   function stopFirestore(){
     unsubs.splice(0).forEach(unsub=>{try{unsub?.();}catch(error){}});
     activeUid='';questionnairePrimed=false;weeklyPrimed=false;protocolPrimed=false;feedbackPrimed=false;notificationPrimed=false;
     lastQuestionnaireSignature='';lastWeeklySignature='';lastProtocolKey='';lastFeedbackSignature='';lastNotificationSignature='';
-    liveSchedule=null;liveCheckins=[];scheduleReady=false;checkinsReady=false;
+    liveSchedule=null;liveCheckins=[];scheduleReady=false;checkinsReady=false;liveProtocolSchedule=null;weeklyFutureDue='';protocolFutureDue='';
     Object.keys(counts).forEach(key=>{counts[key]=0;});
-    clearTimeout(centerRefreshTimer);
+    clearTimeout(centerRefreshTimer);clearTimeout(dueTimer);dueTimer=0;
     try{badgeObserver?.disconnect();}catch(error){}badgeObserver=null;badgeTarget=null;updateBadge();
   }
 
@@ -86,7 +107,9 @@
     const signature=request?[request.kind||'',request.requestKey||'',request.dueDate||'',request.pending?'1':'0'].join('|'):'';
     const changed=changedAfterPrime(weeklyPrimed,lastWeeklySignature,signature),nextCount=request?.pending?1:0;
     if(changed&&nextCount>counts.weekly)toast(request?.kind==='manual'?'Seu treinador solicitou um relatório semanal extra.':'Seu relatório semanal está pendente.');
-    counts.weekly=nextCount;lastWeeklySignature=signature;weeklyPrimed=true;updateBadge();if(changed)refreshOpenCenter();
+    counts.weekly=nextCount;lastWeeklySignature=signature;weeklyPrimed=true;
+    weeklyFutureDue=request&&!request.pending&&validIso(request.dueDate)?String(request.dueDate):'';
+    updateBadge();scheduleDueBoundary();if(changed)refreshOpenCenter();
   }
   function attachWeekly(uid){
     const scheduleUnsub=db.collection('checkinSchedules').doc(uid).onSnapshot(doc=>{
@@ -106,17 +129,19 @@
 
   function renderProtocol(schedule,uid){
     if(!isCurrent(uid))return;
+    liveProtocolSchedule=schedule;
     try{
       V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=uid;
       const state=typeof v109ProtocolState==='function'?v109ProtocolState(schedule):null;
+      protocolFutureDue=state&&!state.pending&&validIso(state.nextDueDate)?String(state.nextDueDate):'';
       const banner=document.getElementById('protocol-review-home-banner'),label=document.getElementById('protocol-review-home-label'),text=document.getElementById('protocol-review-home-text');
-      if(!banner||!state){if(banner)banner.style.display='none';counts.protocol=0;updateBadge();return;}
+      if(!banner||!state){if(banner)banner.style.display='none';counts.protocol=0;updateBadge();scheduleDueBoundary();return;}
       banner.style.display='block';banner.classList.toggle('is-due',!!state.pending);
       if(label)label.textContent=state.pending?'Atualização completa pendente':'Cronograma dos protocolos';
       if(text)text.textContent=state.pending?`A atualização completa de treino e dieta está pendente desde ${formatDate(state.nextDueDate)}. Relatórios e ajustes semanais não alteram esse ciclo.`:`${state.weekNumber?`Semana ${state.weekNumber} do protocolo.`:'O protocolo ainda não começou.'} Próxima atualização completa em ${formatDate(state.nextDueDate)}, a cada ${state.intervalWeeks} semanas.`;
       const key=[schedule?.startDate||'',schedule?.intervalWeeks||'',schedule?.lastCompletedCycle||0,state.nextDueDate||'',state.pending?'1':'0'].join('|'),changed=changedAfterPrime(protocolPrimed,lastProtocolKey,key),nextCount=state.pending?1:0;
       if(changed&&nextCount>counts.protocol)toast('Há uma atualização completa de treino e dieta pendente.');
-      counts.protocol=nextCount;lastProtocolKey=key;protocolPrimed=true;updateBadge();if(changed)refreshOpenCenter();
+      counts.protocol=nextCount;lastProtocolKey=key;protocolPrimed=true;updateBadge();scheduleDueBoundary();if(changed)refreshOpenCenter();
     }catch(error){console.warn('[Team Bulls] atualização de protocolo em tempo real',error);}
   }
   function attachProtocol(uid){
@@ -162,7 +187,7 @@
 
   function start(){
     const uid=currentUid();if(!uid)return false;
-    if(activeUid===uid&&unsubs.length){updateBadge();return true;}
+    if(activeUid===uid&&unsubs.length){recomputeDueStates('resume');return true;}
     stopFirestore();activeUid=uid;
     try{attachQuestionnaires(uid);attachWeekly(uid);attachProtocol(uid);attachFeedback(uid);attachNotifications(uid);return true;}
     catch(error){console.warn('[Team Bulls] sincronização em tempo real não iniciada',error);stopFirestore();return false;}
@@ -179,7 +204,7 @@
       const base=confirmLogout;const wrapped=function(){stopFirestore();return base.apply(this,arguments);};wrapped.__tbStudentRealtimeStop=true;wrapped.__tbBase=base;confirmLogout=wrapped;
     }catch(error){}
   }
-  function install(){installAuthLifecycle();installLogoutGuard();sync();updateBadge();}
+  function install(){installAuthLifecycle();installLogoutGuard();sync();updateBadge();scheduleDueBoundary();}
 
   install();
   window.addEventListener('team-bulls-runtime-ready',install);
@@ -189,5 +214,5 @@
   window.addEventListener('pageshow',install,{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')install();});
 
-  window.TeamBullsStudentRequestRealtime=Object.freeze({version:VERSION,start,stop:stopFirestore,sync,status:()=>({uid:activeUid,listeners:unsubs.length,cloud:studentCloud(),counts:{...counts},total:realtimeCount()})});
+  window.TeamBullsStudentRequestRealtime=Object.freeze({version:VERSION,start,stop:stopFirestore,sync,recompute:recomputeDueStates,status:()=>({uid:activeUid,listeners:unsubs.length,cloud:studentCloud(),counts:{...counts},total:realtimeCount(),weeklyFutureDue,protocolFutureDue})});
 })();
