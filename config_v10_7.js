@@ -57,7 +57,7 @@ if('caches' in window){
     './modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3',
     './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4',
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
-    './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime2',
+    './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3',
     './modules/student-workout-library-v10_10_24.js?v=10.10.24-workoutlibrary1',
     './modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1',
     './modules/student-diet-layout-v10_10_24.js?v=10.10.24-dietlayout1',
