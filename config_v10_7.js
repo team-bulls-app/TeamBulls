@@ -40,7 +40,7 @@ if('caches' in window){
 })();
 
 (()=>{
-  let requested=false,deferredStarted=false,deferredComplete=false,completedRole='',studentPriorityStarted=false,healing=false,healTimer=null,readyResolved=false,hadFailures=false,screenObserver=null;
+  let requested=false,deferredStarted=false,deferredComplete=false,completedRole='',studentPriorityStarted=false,healing=false,healTimer=null,readyResolved=false,hadFailures=false,screenObserver=null,deferredPhase=false,deferredBatchIndex=0,deferredEligible=[];
   const PRELOAD_WINDOW=8;
   const DEFERRED_YIELD_EVERY=4;
   const STUDENT_YIELD_EVERY=2;
@@ -119,7 +119,19 @@ if('caches' in window){
     if(hadFailures&&typeof showToast==='function')showToast('✓ Recursos do aplicativo sincronizados');
   };
   const loadScriptOnce=(src,timeoutMs=3200)=>{if(loadedModules.has(src))return Promise.resolve(true);return new Promise(resolve=>{const script=document.createElement('script');let settled=false;const finish=(ok,reason='')=>{if(settled)return;settled=true;clearTimeout(timer);script.onload=null;script.onerror=null;if(ok){loadedModules.add(src);failedModules.delete(src);script.dataset.tbModuleReady='1';}else{failedModules.add(src);hadFailures=true;if(script.isConnected)script.remove();}if(reason)console.warn('[Team Bulls] Extensão temporariamente indisponível:',src,reason);emitRuntimeState('team-bulls-runtime-state');resolve(ok);};script.src=src;script.async=false;script.onload=()=>finish(true);script.onerror=()=>finish(false,'erro de carregamento');const timer=setTimeout(()=>finish(false,'tempo limite'),Math.max(1200,Number(timeoutMs)||3200));document.head.appendChild(script);});};
-  const loadScript=async(src,timeoutMs=3200)=>{if(!roleAllowsModule(src))return true;if(loadedModules.has(src))return true;let ok=await loadScriptOnce(src,timeoutMs);if(!ok&&navigator.onLine){await wait(250);ok=await loadScriptOnce(src,Math.max(6500,Number(timeoutMs)||3200));}if(!ok)console.warn('[Team Bulls] Módulo colocado na fila de autorreparo:',src);return ok;};
+  const loadScript=async(src,timeoutMs=3200)=>{
+    if(!roleAllowsModule(src))return true;
+    if(deferredPhase){const index=deferredEligible.indexOf(src);if(index>=0)preloadAhead(deferredEligible,index+1);}
+    if(loadedModules.has(src))return true;
+    let ok=await loadScriptOnce(src,timeoutMs);
+    if(!ok&&navigator.onLine){await wait(250);ok=await loadScriptOnce(src,Math.max(6500,Number(timeoutMs)||3200));}
+    if(!ok)console.warn('[Team Bulls] Módulo colocado na fila de autorreparo:',src);
+    if(deferredPhase&&deferredEligible.includes(src)){
+      deferredBatchIndex++;
+      if(deferredBatchIndex%DEFERRED_YIELD_EVERY===0)await yieldUi();
+    }
+    return ok;
+  };
   const scheduleHeal=(delay=1800)=>{clearTimeout(healTimer);if(!activeFailures().length)return;healTimer=setTimeout(()=>healFailedModules(),Math.max(400,delay));};
   const healFailedModules=async()=>{if(healing||navigator.onLine===false)return false;const pending=activeFailures();if(!pending.length){markReady();return true;}healing=true;preloadModules(pending.slice(0,PRELOAD_WINDOW));try{for(let index=0;index<pending.length;index++){await loadScript(pending[index],9000);if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();}}finally{healing=false;}if(activeFailures().length)scheduleHeal(5000);else markReady();return activeFailures().length===0;};
   const loadStudentPriority=async()=>{
@@ -140,13 +152,10 @@ if('caches' in window){
     deferredStarted=true;document.documentElement.dataset.teamBullsRuntime='loading';
     try{
       if(studentHomeActive())await loadStudentPriority();
-      const eligible=modules.filter(roleAllowsModule);
-      preloadAhead(eligible,0);
-      for(let index=0;index<eligible.length;index++){
-        preloadAhead(eligible,index+1);
-        await loadScript(eligible[index]);
-        if((index+1)%DEFERRED_YIELD_EVERY===0)await yieldUi();
-      }
+      deferredEligible=modules.filter(roleAllowsModule);deferredBatchIndex=0;
+      preloadAhead(deferredEligible,0);
+      deferredPhase=true;
+      try{for(const src of modules)await loadScript(src);}finally{deferredPhase=false;deferredEligible=[];}
       await yieldUi();
     }finally{deferredStarted=false;}
     if(activeFailures().length){if(typeof showToast==='function')showToast('Conexão instável: alguns recursos continuam sendo finalizados automaticamente.',true);scheduleHeal(1200);}else markReady();
