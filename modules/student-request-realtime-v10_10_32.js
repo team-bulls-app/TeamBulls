@@ -12,6 +12,7 @@
   let lastQuestionnaireSignature='',lastWeeklySignature='',lastProtocolKey='',lastFeedbackSignature='',lastNotificationSignature='';
   let liveSchedule=null,liveCheckins=[],scheduleReady=false,checkinsReady=false,liveProtocolSchedule=null;
   let weeklyFutureDue='',protocolFutureDue='';
+  let legacyBadgePollSuppressed=false;
   const counts={questionnaires:0,weekly:0,protocol:0,feedback:0,notifications:0};
 
   const studentCloud=()=>{
@@ -44,6 +45,33 @@
     clearTimeout(centerRefreshTimer);centerRefreshTimer=setTimeout(()=>{try{window.TeamBullsStudentHome.openNotifications();}catch(error){}},140);
   }
   function changedAfterPrime(primed,previous,next){return primed&&previous!==next;}
+
+  /*
+   * A Home antiga ainda instala uma leitura periódica do badge a cada 5 minutos.
+   * Depois que a central passou a usar snapshots em tempo real, esse polling ficou
+   * redundante: repetia consultas de notifications/feedback/questionnaires e podia
+   * disputar o contador com o estado realtime. Reexecutamos apenas o init da Home
+   * sob um interceptor extremamente restrito para que ele limpe o timer antigo e
+   * não recrie especificamente esse intervalo. O setInterval global é restaurado
+   * imediatamente e nenhum outro timer da aplicação é afetado.
+   */
+  function suppressLegacyBadgePolling(){
+    if(legacyBadgePollSuppressed)return true;
+    const home=window.TeamBullsStudentHome;
+    if(!home?.init||typeof window.setInterval!=='function')return false;
+    const nativeSetInterval=window.setInterval;let intercepted=false;
+    window.setInterval=function(handler,delay,...args){
+      let source='';
+      try{source=typeof handler==='function'?Function.prototype.toString.call(handler):String(handler||'');}catch(error){}
+      if(Number(delay)===300000&&source.includes('refreshNoticeBadge')){intercepted=true;return 0;}
+      return nativeSetInterval.call(window,handler,delay,...args);
+    };
+    try{home.init();}
+    catch(error){console.warn('[Team Bulls] não foi possível neutralizar o polling legado da central',error);}
+    finally{window.setInterval=nativeSetInterval;}
+    legacyBadgePollSuppressed=intercepted;
+    return intercepted;
+  }
 
   function scheduleDueBoundary(){
     clearTimeout(dueTimer);dueTimer=0;
@@ -204,7 +232,7 @@
       const base=confirmLogout;const wrapped=function(){stopFirestore();return base.apply(this,arguments);};wrapped.__tbStudentRealtimeStop=true;wrapped.__tbBase=base;confirmLogout=wrapped;
     }catch(error){}
   }
-  function install(){installAuthLifecycle();installLogoutGuard();sync();updateBadge();scheduleDueBoundary();}
+  function install(){installAuthLifecycle();installLogoutGuard();suppressLegacyBadgePolling();sync();updateBadge();scheduleDueBoundary();}
 
   install();
   window.addEventListener('team-bulls-runtime-ready',install);
@@ -214,5 +242,5 @@
   window.addEventListener('pageshow',install,{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')install();});
 
-  window.TeamBullsStudentRequestRealtime=Object.freeze({version:VERSION,start,stop:stopFirestore,sync,recompute:recomputeDueStates,status:()=>({uid:activeUid,listeners:unsubs.length,cloud:studentCloud(),counts:{...counts},total:realtimeCount(),weeklyFutureDue,protocolFutureDue})});
+  window.TeamBullsStudentRequestRealtime=Object.freeze({version:VERSION,start,stop:stopFirestore,sync,recompute:recomputeDueStates,status:()=>({uid:activeUid,listeners:unsubs.length,cloud:studentCloud(),counts:{...counts},total:realtimeCount(),weeklyFutureDue,protocolFutureDue,legacyBadgePollSuppressed})});
 })();
