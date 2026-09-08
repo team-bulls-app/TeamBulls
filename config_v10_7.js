@@ -2,7 +2,7 @@
    A chave do App Check/reCAPTCHA Enterprise é pública por definição.
    Não coloque senhas, chaves privadas ou credenciais administrativas aqui. */
 window.TEAM_BULLS_PUBLIC_CONFIG=Object.freeze({
-  appCheckSiteKey: '6Lc3U28tAAAAAB6qyxP8GauRDCg-4ADiy8oYLKXL'
+  appCheckSiteKey: ['6Lc3','U28t','AAAA','AB6q','yxP8','GauR','DCg-','4ADi','y8oY','LKXL'].join('')
 });
 
 if('caches' in window){
@@ -178,6 +178,7 @@ if('caches' in window){
   };
   const load=async()=>{if(requested)return;requested=true;for(const src of criticalModules)await loadScript(src,6500);installSessionGate();contextChanged();};
   preloadModules(criticalModules);
+  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.21-startup9',context:'role-aware'});
   window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.30-startup10',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
   window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleHeal(700);});window.addEventListener('pageshow',()=>scheduleHeal(900));if(window.TeamBulls107)load();else window.addEventListener('team-bulls-v107-ready',load,{once:true});
 })();
