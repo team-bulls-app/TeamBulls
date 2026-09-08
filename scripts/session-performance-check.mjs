@@ -16,7 +16,7 @@ const config=read('config_v10_7.js');
 const updater=read('update_v10_10_9.js');
 const core=read('app_v10_10_9_core.js');
 
-has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.9-sessionperf1','Hotfix de registro rápido não está carregado.');
+has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.34-sessionperf2','Hotfix de registro rápido não está carregado.');
 assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('stability_v10_10_9.js'),'Registro rápido deve ser o primeiro hotfix após a pintura.');
 lacks(config,'attempts++>=80','Polling agressivo voltou ao startup.');
 has(config,"document.addEventListener('DOMContentLoaded',patch,{once:true})",'Resiliência não é instalada antes do initApp.');
