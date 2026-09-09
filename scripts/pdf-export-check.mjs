@@ -21,7 +21,7 @@ const bridge=fs.existsSync(bridgePath)?fs.readFileSync(bridgePath,'utf8'):'';
 const config=fs.existsSync(configPath)?fs.readFileSync(configPath,'utf8'):'';
 const index=fs.existsSync(indexPath)?fs.readFileSync(indexPath,'utf8'):'';
 const studentPdfUrl='./modules/pdf-export-v10_10_12.js?v=10.10.12-pdf1&fix=student1';
-has(pdf,"const VERSION='10.10.12-pdf1'",'Gerador PDF não está na revisão esperada.');
+has(pdf,"const VERSION='10.10.36-pdf2'",'Gerador PDF mobile não está na revisão esperada.');
 has(pdf,"new Blob([bytes],{type:'application/pdf'})",'PDF não é gerado como application/pdf local.');
 has(pdf,"window.exportWorkoutPdf=exportWorkout",'Exportação de treino não substitui o fluxo antigo.');
 has(pdf,"window.exportCurrentDietPdf",'Exportação de dieta do aluno não foi exposta.');
@@ -29,6 +29,11 @@ has(pdf,"window.exportTrainerDietPdf",'Exportação de dieta pelo treinador não
 has(pdf,"TEAM BULLS",'Layout PDF não preserva a identidade Team Bulls.');
 has(pdf,"// SURVIVAL FITNESS SYSTEM",'Layout PDF não contém assinatura visual do app.');
 has(pdf,"data-tb-pdf-diet",'Botão PDF da dieta não é instalado.');
+has(pdf,'function appleMobile()','Exportador não identifica iPhone/iPad para entrega compatível.');
+has(pdf,"new File([blob],filename,{type:'application/pdf'})",'Entrega mobile não prepara um arquivo PDF compartilhável.');
+has(pdf,'navigator.canShare(payload)','Entrega mobile não valida compartilhamento de arquivo.');
+has(pdf,'await navigator.share(payload)','iPhone/iPad não recebe fallback pelo compartilhamento nativo.');
+has(pdf,"a.download=filename",'Android/desktop não preservam download direto do PDF.');
 lacks(pdf,'window.open(','PDF nativo voltou a depender de pop-up.');
 lacks(pdf,'.print()','PDF nativo voltou a depender da impressão do navegador.');
 lacks(pdf,"db.collection(",'Gerador PDF não deve criar leituras/escritas Firestore.');
@@ -42,4 +47,4 @@ assert(priorityStart>=0&&priorityEnd>priorityStart&&pdfAt>priorityStart&&pdfAt<p
 assert(pdfAt>=0&&workoutAt>=0&&pdfAt<workoutAt,'Exportador PDF deve ficar pronto antes da biblioteca de treinos do aluno.');
 has(index,'onclick="exportCurrentWorkoutPdf()"','Botão PDF do treino do aluno não está ligado ao exportador.');
 if(fail.length){console.error('FALHA — PDF nativo Team Bulls\n- '+fail.join('\n- '));process.exit(1);}
-console.log('APROVADO — PDFs de treino/dieta carregam no runtime prioritário do aluno, usam Blob nativo sem pop-up/print e não adicionam Firestore.');
+console.log('APROVADO — PDFs de treino/dieta carregam no runtime prioritário do aluno; iPhone/iPad usam arquivo compartilhável, Android/desktop mantêm download direto, sem pop-up/print/Firestore.');
