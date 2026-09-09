@@ -40,6 +40,7 @@ jobs:
           node scripts/startup-runtime-light-check.mjs
           node scripts/session-recovery-home-dates-check.mjs
           node scripts/student-request-realtime-check.mjs
+          node scripts/student-weekly-report-entry-check.mjs
           node scripts/trainer-sent-reports-check.mjs
           node scripts/trainer-overdue-report-status-check.mjs
           node scripts/loader-retry-check.mjs
