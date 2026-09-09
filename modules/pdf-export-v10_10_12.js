@@ -1,9 +1,9 @@
-/* Team Bulls v10.10.12 — exportação PDF nativa, sem pop-up e compatível com mobile/PWA. */
+/* Team Bulls v10.10.36 — exportação PDF nativa, sem pop-up e compatível com mobile/PWA. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_PDF_EXPORT_101012__)return;
   window.__TEAM_BULLS_PDF_EXPORT_101012__=true;
-  const VERSION='10.10.12-pdf1';
+  const VERSION='10.10.36-pdf2';
   const W=595.28,H=841.89,M=42,CONTENT_W=W-M*2,ACC=[0.70,0.04,0.08],DARK=[0.045,0.045,0.045],INK=[0.10,0.10,0.10],MUTED=[0.38,0.38,0.38],LIGHT=[0.96,0.95,0.94];
   const cp1252={0x2013:0x96,0x2014:0x97,0x2018:0x91,0x2019:0x92,0x201c:0x93,0x201d:0x94,0x2022:0x95,0x2026:0x85,0x20ac:0x80};
   const byteText=value=>{let out='';for(const ch of String(value??'')){const code=ch.codePointAt(0);if(code<=255)out+=String.fromCharCode(code);else if(cp1252[code])out+=String.fromCharCode(cp1252[code]);else out+=({0x2192:'>',0x2713:'OK',0x00d7:'x'}[code]||'?');}return out;};
@@ -44,8 +44,15 @@
     const xref=pdf.length;pdf+=`xref\n0 ${objects.length}\n0000000000 65535 f \n`;for(let i=1;i<objects.length;i++)pdf+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';pdf+=`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
     const bytes=new Uint8Array(pdf.length);for(let i=0;i<pdf.length;i++)bytes[i]=pdf.charCodeAt(i)&255;return new Blob([bytes],{type:'application/pdf'});
   }
-  function deliver(blob,name){
-    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safeFile(name)+'.pdf';a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);if(typeof showToast==='function')showToast('✓ PDF preparado para salvar ou compartilhar');
+  function appleMobile(){const ua=String(navigator.userAgent||''),platform=String(navigator.platform||'');return /iPad|iPhone|iPod/i.test(ua)||(platform==='MacIntel'&&Number(navigator.maxTouchPoints)>1);}
+  function directDownload(blob,filename,{openViewer=false}={}){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.rel='noopener';if(openViewer)a.target='_blank';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);return true;}
+  async function deliver(blob,name){
+    const filename=safeFile(name)+'.pdf',apple=appleMobile();
+    if(apple&&typeof File==='function'&&typeof navigator.share==='function'){
+      try{const file=new File([blob],filename,{type:'application/pdf'}),payload={files:[file],title:filename};if(typeof navigator.canShare!=='function'||navigator.canShare(payload)){await navigator.share(payload);if(typeof showToast==='function')showToast('✓ PDF pronto para salvar em Arquivos ou compartilhar');return true;}}
+      catch(error){if(error?.name==='AbortError')return false;console.warn('[Team Bulls PDF] compartilhamento nativo indisponível; usando visualizador/download',error);}
+    }
+    directDownload(blob,filename,{openViewer:apple});if(typeof showToast==='function')showToast(apple?'✓ PDF aberto para salvar ou compartilhar':'✓ PDF enviado para Downloads');return true;
   }
   function setLabel(set,index,exercise){
     const min=clean(set?.targetMin),max=clean(set?.targetMax),ger=clean(set?.ger),backoff=set?.backoff===true?' · -20% carga':'';let unit='reps';try{if(typeof exerciseUsesResistedTime==='function'&&exerciseUsesResistedTime(exercise))unit='seg';}catch(error){}

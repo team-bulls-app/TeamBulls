@@ -35,6 +35,7 @@ jobs:
           node scripts/diet-calculation-evolution-check.mjs
           node scripts/diet-portion-presets-check.mjs
           node scripts/diet-copy-check.mjs
+          node scripts/pdf-export-check.mjs
           node scripts/destructive-actions-supply-check.mjs
           node scripts/pending-session-mutations-check.mjs
           node scripts/startup-runtime-light-check.mjs
