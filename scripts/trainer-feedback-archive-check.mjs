@@ -1,0 +1,52 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+
+const fail=[];
+const assert=(ok,message)=>{if(!ok)fail.push(message);};
+const has=(text,needle,message)=>assert(text.includes(needle),message);
+const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
+const modulePath='modules/trainer-feedback-archive-v10_10_37.js';
+const configPath='config_v10_7.js';
+const corePath='app_v10_10_9_core.js';
+const rulesPath='firebase/firestore_28_compacto.rules';
+const workflowPath='.github/workflows/quality.yml';
+for(const file of [modulePath,configPath,corePath,rulesPath,workflowPath])assert(fs.existsSync(file),`Arquivo ausente: ${file}`);
+if(fs.existsSync(modulePath)){
+  const syntax=spawnSync(process.execPath,['--check',modulePath],{encoding:'utf8'});
+  assert(syntax.status===0,`Módulo de histórico possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
+}
+const mod=fs.existsSync(modulePath)?fs.readFileSync(modulePath,'utf8'):'';
+const config=fs.existsSync(configPath)?fs.readFileSync(configPath,'utf8'):'';
+const core=fs.existsSync(corePath)?fs.readFileSync(corePath,'utf8'):'';
+const rules=fs.existsSync(rulesPath)?fs.readFileSync(rulesPath,'utf8'):'';
+const workflow=fs.existsSync(workflowPath)?fs.readFileSync(workflowPath,'utf8'):'';
+const url='./modules/trainer-feedback-archive-v10_10_37.js?v=10.10.37-feedbackarchive1';
+has(mod,"const VERSION='10.10.37-feedbackarchive1'",'Revisão do arquivo de feedbacks está incorreta.');
+has(mod,"db.collection('users').where('trainerId','==',uid)",'Histórico deve resolver primeiro somente alunos vinculados ao treinador.');
+has(mod,"db.collection('feedback').where('studentId','==',student.uid)",'Histórico deve consultar feedbacks por aluno para permanecer compatível com Rules 28.');
+has(mod,"filter(item=>String(item.trainerId||'')===uid)",'Histórico deve mostrar estritamente feedbacks enviados pelo treinador atual.');
+has(mod,"millis(b.createdAt)-millis(a.createdAt)",'Feedbacks devem aparecer do mais recente para o mais antigo.');
+has(mod,"data-tb-feedback-filter=\"unread\"",'Filtro de feedbacks não lidos está ausente.');
+has(mod,"data-tb-feedback-filter=\"read\"",'Filtro de feedbacks lidos está ausente.');
+has(mod,'Histórico completo de feedbacks','Tela de histórico completo está ausente.');
+has(mod,'item.message','Histórico não exibe o conteúdo enviado.');
+has(mod,'openStudent','Histórico não permite abrir o aluno relacionado.');
+has(mod,'load(true)','Ao abrir/atualizar, o histórico deve reler dados para incluir novos feedbacks.');
+lacks(mod,"db.collection('feedback').where('trainerId','==',uid)",'Não usar consulta global por trainerId, que não é comprovável pelas Rules 28.');
+lacks(mod,'.limit(','Histórico completo não pode cortar feedbacks antigos com limit.');
+lacks(mod,'.onSnapshot(','Arquivo do treinador deve carregar sob demanda, sem listeners permanentes.');
+lacks(mod,'setInterval(','Arquivo do treinador não deve usar polling.');
+lacks(mod,'cloudWrite(','Arquivo é somente leitura e não deve criar writes.');
+lacks(mod,'.set(','Arquivo é somente leitura e não deve criar documentos.');
+lacks(mod,'.update(','Arquivo é somente leitura e não deve alterar feedbacks.');
+lacks(mod,'.delete(','Arquivo é somente leitura e não deve excluir feedbacks.');
+has(config,url,'Config não carrega o arquivo de feedbacks enviados.');
+has(config,"MODULE_ROOT+'trainer-feedback-archive-v10_10_37.js?v=10.10.37-feedbackarchive1'",'Arquivo de feedbacks precisa ser exclusivo do runtime do treinador.');
+has(core,"db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid",'Próximos feedbacks precisam continuar sendo gravados na coleção histórica existente.');
+has(core,'createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false','Feedback novo precisa manter data e status de leitura.');
+has(rules,'match /feedback/{id}','Rules 28 não contêm a coleção feedback.');
+has(rules,'allow read: if trainerOwns(resource.data.studentId) || activeOwner(resource.data.studentId);','Treinador/aluno perderam acesso seguro aos feedbacks.');
+has(rules,'allow delete: if false;','Feedbacks históricos não devem ser excluídos pelo cliente.');
+has(workflow,'node scripts/trainer-feedback-archive-check.mjs','Quality não executa a regressão do arquivo de feedbacks.');
+if(fail.length){console.error('FALHA — histórico de feedbacks enviados\n- '+fail.join('\n- '));process.exit(1);}
+console.log('APROVADO — treinador vê todos os feedbacks próprios já enviados e os próximos no mesmo histórico, com aluno, data, tipo, conteúdo e status de leitura; sem writes, polling ou corte de registros antigos.');
