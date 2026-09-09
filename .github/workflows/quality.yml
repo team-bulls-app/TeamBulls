@@ -43,6 +43,7 @@ jobs:
           node scripts/student-request-realtime-check.mjs
           node scripts/student-weekly-report-entry-check.mjs
           node scripts/trainer-sent-reports-check.mjs
+          node scripts/trainer-feedback-archive-check.mjs
           node scripts/trainer-overdue-report-status-check.mjs
           node scripts/loader-retry-check.mjs
           node scripts/production-audit-check.mjs
