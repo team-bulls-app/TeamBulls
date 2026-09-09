@@ -59,6 +59,7 @@ if('caches' in window){
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
     './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3',
     './modules/student-weekly-report-entry-v10_10_35.js?v=10.10.35-weeklyentry1',
+    './modules/pdf-export-v10_10_12.js?v=10.10.12-pdf1&fix=student1',
     './modules/student-workout-library-v10_10_24.js?v=10.10.24-workoutlibrary1',
     './modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1',
     './modules/student-diet-layout-v10_10_24.js?v=10.10.24-dietlayout1',
