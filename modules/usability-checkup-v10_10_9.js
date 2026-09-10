@@ -35,22 +35,6 @@
     return true;
   }
 
-  function installHistoryScroll(){
-    const app=appScroller();
-    if(!app||app.dataset.tbHistoryScroll==='1')return;
-    app.dataset.tbHistoryScroll='1';
-    app.addEventListener('scroll',()=>{
-      if(scrollFrame)return;
-      scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;rememberScroll();});
-    },{passive:true});
-    window.addEventListener('popstate',event=>{
-      if(!event.state?.teamBulls)return;
-      requestAnimationFrame(()=>restoreScrollForState(event.state));
-    },{passive:true});
-    window.addEventListener('pagehide',rememberScroll,{passive:true});
-    document.addEventListener('visibilitychange',()=>{if(document.hidden)rememberScroll();},{passive:true});
-  }
-
   function scrollActiveWeekIntoView(root=document.querySelector('.screen.active')){
     const board=root?.querySelector?.('.weekly-plan-scroll');
     const active=board?.querySelector?.('thead .active-week');
@@ -198,4 +182,44 @@
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});
   else install();
+})();
+
+/* Carrega o novo quadro semanal por uma camada network-first já existente. */
+(()=>{
+  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout1';
+  let loading=null;
+  const studentContext=()=>{
+    try{
+      if(CURRENT_USER?.role==='trainer'||document.body?.classList.contains('trainer-desktop'))return false;
+      return CURRENT_USER?.role==='student'||MODE==='local'||document.body?.classList.contains('student-desktop');
+    }catch(error){return document.body?.classList.contains('student-desktop')===true;}
+  };
+  function loadWeekWorkoutLayout(){
+    if(!studentContext())return Promise.resolve(false);
+    if(window.TeamBullsStudentWeekWorkoutLayout)return Promise.resolve(true);
+    if(loading)return loading;
+    loading=new Promise(resolve=>{
+      let settled=false;
+      const finish=ok=>{if(settled)return;settled=true;clearTimeout(timer);if(!ok)loading=null;resolve(!!ok);};
+      const existing=[...document.scripts].find(script=>{try{return new URL(script.src,location.href).pathname.endsWith('/modules/student-week-workout-layout-v10_10_40.js');}catch(error){return false;}});
+      if(existing){
+        if(window.TeamBullsStudentWeekWorkoutLayout){finish(true);return;}
+        existing.addEventListener('load',()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),{once:true});
+        existing.addEventListener('error',()=>finish(false),{once:true});
+        const timer=setTimeout(()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),7000);
+        return;
+      }
+      const script=document.createElement('script');
+      script.src=SRC;script.async=false;script.dataset.teamBullsWeekWorkoutLayout='1';
+      script.onload=()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout);
+      script.onerror=()=>finish(false);
+      const timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},7000);
+      document.head.appendChild(script);
+    });
+    return loading;
+  }
+  loadWeekWorkoutLayout().catch(()=>{});
+  window.addEventListener('team-bulls-student-runtime-ready',()=>loadWeekWorkoutLayout().catch(()=>{}));
+  window.addEventListener('pageshow',()=>loadWeekWorkoutLayout().catch(()=>{}),{passive:true});
+  window.TeamBullsWeekWorkoutLayoutLoader=Object.freeze({src:SRC,load:loadWeekWorkoutLayout});
 })();
