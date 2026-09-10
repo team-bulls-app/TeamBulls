@@ -30,29 +30,45 @@ assert(usability.includes('function loadWeekWorkoutLayout()'),'Loader dedicado d
 assert(usability.includes('window.TeamBullsStudentWeekWorkoutLayout'),'Loader não confirma que o layout realmente terminou de instalar.');
 assert(usability.includes("CURRENT_USER?.role==='trainer'"),'Loader não impede carregamento desnecessário no contexto do treinador.');
 assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Arquivo ponte deixou de ser tratado como mutável/network-first pelo Service Worker.');
+
 assert(source.includes("const VERSION='10.10.40-weeklayout1'"),'Layout semanal não possui revisão própria.');
-assert(source.includes("host.id='tb-student-week-sheet'"),'Planilha semanal principal não é criada na tela do treino.');
-assert(source.includes("summary.insertAdjacentElement('afterend',host)"),'Planilha semanal não entra logo após o resumo do protocolo.');
+assert(source.includes("document.getElementById('screen-day')"),'Layout novo não está limitado à tela DIA // pasta.');
+assert(source.includes("document.getElementById('student-day-weekly-board')"),'Layout novo não usa o quadro semanal da pasta aberta.');
+assert(source.includes("host.id='tb-student-day-week-sheet'"),'Planilha semanal da pasta não é criada dentro da tela do dia.');
+assert(source.includes("legacy.insertAdjacentElement('beforebegin',host)"),'Planilha semanal não substitui visualmente o quadro horizontal da pasta.');
+assert(source.includes('typeof renderDay')&&source.includes('renderDay=wrapped'),'Layout semanal não acompanha o render canônico da página da pasta.');
+assert(!source.includes('renderWorkout=wrapped'),'Layout semanal voltou a interceptar a página geral de treino.');
+assert(!source.includes("document.querySelector('#screen-workout"),'Layout semanal voltou a inserir conteúdo na página geral de treino.');
+assert(source.includes('CUR_DAY')&&source.includes('exercisesForDay'),'Layout não filtra os exercícios pela pasta/dia atualmente aberta.');
+assert(source.includes("normal(item?.name)===normal(dayName)"),'Pasta aberta não é resolvida pelo mesmo nome normalizado do core.');
+assert(source.includes('context.items.map(exercise=>rowHtml'),'Planilha não é composta exclusivamente pelos exercícios da pasta atual.');
+assert(source.includes("context.items.some(item=>String(item?.id||'')===String(exerciseId))"),'Abertura de exercício não valida que o item pertence à pasta atual.');
+
 assert(source.includes('EXERCÍCIO')&&source.includes('PRESCRIÇÃO'),'Cabeçalho Exercício | Prescrição não está presente.');
 assert(source.includes('data-week-delta="-1"')&&source.includes('data-week-delta="1"'),'Navegação anterior/próxima semana não está presente.');
 assert(source.includes('Math.max(1,Math.min(8'),'Navegação semanal não está limitada às oito semanas do ciclo.');
 assert(source.includes('prescriptionCompactSummary'),'Nova visualização não reutiliza a prescrição canônica.');
-assert(source.includes('groupExercisesByDay')&&source.includes('getWorkoutDays'),'Exercícios deixaram de respeitar as pastas/dias já existentes.');
 assert(source.includes('openStudentWeekExercise'),'Toque na linha não reutiliza o fluxo canônico de abertura do exercício por semana.');
 assert(source.includes('window.TeamBullsSessionIntegrity'),'Contagem de conclusão não reutiliza a separação segura do ciclo atual.');
-assert(source.includes("toggle.textContent=panel?.classList.contains('open')?'▦ OCULTAR COMPARAÇÃO DAS 8 SEMANAS':'▦ COMPARAR AS 8 SEMANAS'"),'Comparação completa das oito semanas não foi preservada como opção secundária.');
-assert(source.includes("label.textContent='Acessar treino por dia'"),'Pastas dos dias não foram preservadas como navegação secundária.');
+assert(source.includes('data-day-week-compare'),'Comparação completa das oito semanas não foi preservada como opção secundária.');
+assert(source.includes("legacy.hidden=true"),'Grade horizontal antiga não fica recolhida por padrão.');
+assert(source.includes("scheduleWeeklyBoardRender(context.dayWorkout,'student-day-weekly-board',false)"),'Comparação antiga não continua usando somente os exercícios da pasta.');
 assert(source.includes("currentUser()?.role==='trainer'")&&source.includes("document.body?.classList.contains('trainer-desktop')"),'Layout novo não exclui explicitamente o contexto do treinador.');
-assert(source.includes("#tb-student-week-sheet{margin:14px 0 16px")&&source.includes('grid-template-columns:minmax(0,1.15fr) minmax(128px,.85fr) 18px'),'Layout principal não usa a grade compacta Exercício | Prescrição.');
+assert(source.includes('#screen-day #tb-student-day-week-sheet')&&source.includes('grid-template-columns:minmax(0,1.15fr) minmax(128px,.85fr) 18px'),'Layout da pasta não usa a grade compacta Exercício | Prescrição.');
 assert(!source.includes('min-width:870px'),'Novo layout não pode repetir a largura mínima de 870 px da grade antiga.');
 assert(!source.includes('weekly-plan-scroll"><table'),'Novo layout principal não pode recriar a tabela horizontal das oito semanas.');
+
 assert(!source.includes('db.collection'),'Layout visual não deve consultar Firestore.');
 assert(!source.includes('cloudGet(')&&!source.includes('cloudWrite('),'Layout visual não deve criar caminho de leitura/escrita cloud.');
 assert(!source.includes('fetch('),'Layout visual não deve criar caminho de rede próprio.');
 assert(!source.includes('MutationObserver'),'Layout semanal não deve adicionar observer global.');
 assert(!source.includes('setInterval'),'Layout semanal não deve adicionar polling.');
-assert(core.includes('function buildWeeklyBoard('),'Grade canônica das oito semanas foi removida do core.');
-assert(index.includes('id="student-workout-overview"')&&index.includes('id="student-weekly-board"'),'Painel legado de comparação das oito semanas deixou de existir.');
 
-if(failures.length){console.error('\nFALHA — layout semanal do treino\n- '+failures.join('\n- '));process.exit(1);}
-console.log('APROVADO — aluno vê uma semana por vez em Exercício | Prescrição, navega entre 8 semanas, mantém dias/comparação completa e reutiliza os fluxos canônicos sem Firebase extra.');
+assert(core.includes('function openDay(dayName)')&&core.includes('CUR_DAY=day.name;renderDay();showScreen(\'screen-day\')'),'Fluxo canônico de abertura da pasta foi removido do core.');
+assert(core.includes("dayWorkout={...w,exercises:items}")&&core.includes("'student-day-weekly-board'"),'Core deixou de construir o quadro semanal filtrado da pasta.');
+assert(index.includes('id="screen-workout"')&&index.includes('id="day-folder-list"'),'Página geral de treino deixou de manter a navegação por pastas.');
+assert(index.includes('id="screen-day"')&&index.includes('id="student-day-summary"')&&index.includes('id="student-day-weekly-board"'),'Página DIA // pasta deixou de conter resumo e quadro semanal próprios.');
+assert(index.includes('somente os exercícios desta pasta'),'Escopo visual da página da pasta foi perdido.');
+
+if(failures.length){console.error('\nFALHA — layout semanal dentro da pasta do treino\n- '+failures.join('\n- '));process.exit(1);}
+console.log('APROVADO — página geral mantém somente a navegação dos treinos; o novo Exercício | Prescrição aparece em DIA // pasta, filtra CUR_DAY, navega 8 semanas e preserva a comparação completa sem Firebase extra.');
