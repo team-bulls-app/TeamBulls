@@ -6,26 +6,30 @@ const assert=(condition,message)=>{if(!condition)failures.push(message);};
 const read=file=>fs.readFileSync(file,'utf8');
 
 const modulePath='modules/student-week-workout-layout-v10_10_40.js';
-const configPath='config_v10_7.js';
+const usabilityPath='modules/usability-checkup-v10_10_9.js';
+const workerPath='sw.js';
 const corePath='app_v10_10_9_core.js';
 const indexPath='index.html';
 
-for(const file of [modulePath,configPath,corePath,indexPath])assert(fs.existsSync(file),`Arquivo obrigatório ausente: ${file}`);
-for(const file of [modulePath,configPath]){
+for(const file of [modulePath,usabilityPath,workerPath,corePath,indexPath])assert(fs.existsSync(file),`Arquivo obrigatório ausente: ${file}`);
+for(const file of [modulePath,usabilityPath,workerPath]){
   if(!fs.existsSync(file))continue;
   const result=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});
   assert(result.status===0,`${file} possui JavaScript inválido: ${String(result.stderr||'').trim()}`);
 }
 
 const source=fs.existsSync(modulePath)?read(modulePath):'';
-const config=fs.existsSync(configPath)?read(configPath):'';
+const usability=fs.existsSync(usabilityPath)?read(usabilityPath):'';
+const worker=fs.existsSync(workerPath)?read(workerPath):'';
 const core=fs.existsSync(corePath)?read(corePath):'';
 const index=fs.existsSync(indexPath)?read(indexPath):'';
 const src='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout1';
 
-assert(config.includes(src),'Novo layout semanal não está no runtime prioritário do aluno.');
-assert(config.indexOf(src)>config.indexOf('session-integrity-v10_10_39.js'),'Layout semanal precisa executar depois da proteção estrutural dos registros.');
-assert(config.indexOf(src)<config.indexOf('student-workout-library-v10_10_24.js'),'Layout semanal deve estar pronto antes da biblioteca de treinos ficar disponível.');
+assert(usability.includes(src),'Camada network-first de usabilidade não carrega o novo layout semanal.');
+assert(usability.includes('function loadWeekWorkoutLayout()'),'Loader dedicado do layout semanal está ausente.');
+assert(usability.includes('window.TeamBullsStudentWeekWorkoutLayout'),'Loader não confirma que o layout realmente terminou de instalar.');
+assert(usability.includes("CURRENT_USER?.role==='trainer'"),'Loader não impede carregamento desnecessário no contexto do treinador.');
+assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Arquivo ponte deixou de ser tratado como mutável/network-first pelo Service Worker.');
 assert(source.includes("const VERSION='10.10.40-weeklayout1'"),'Layout semanal não possui revisão própria.');
 assert(source.includes("host.id='tb-student-week-sheet'"),'Planilha semanal principal não é criada na tela do treino.');
 assert(source.includes("summary.insertAdjacentElement('afterend',host)"),'Planilha semanal não entra logo após o resumo do protocolo.');
@@ -44,7 +48,7 @@ assert(!source.includes('min-width:870px'),'Novo layout não pode repetir a larg
 assert(!source.includes('weekly-plan-scroll"><table'),'Novo layout principal não pode recriar a tabela horizontal das oito semanas.');
 assert(!source.includes('db.collection'),'Layout visual não deve consultar Firestore.');
 assert(!source.includes('cloudGet(')&&!source.includes('cloudWrite('),'Layout visual não deve criar caminho de leitura/escrita cloud.');
-assert(!source.includes('fetch('),'Layout visual não deve criar caminho de rede.');
+assert(!source.includes('fetch('),'Layout visual não deve criar caminho de rede próprio.');
 assert(!source.includes('MutationObserver'),'Layout semanal não deve adicionar observer global.');
 assert(!source.includes('setInterval'),'Layout semanal não deve adicionar polling.');
 assert(core.includes('function buildWeeklyBoard('),'Grade canônica das oito semanas foi removida do core.');
