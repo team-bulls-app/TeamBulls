@@ -56,6 +56,7 @@ if('caches' in window){
   const studentPriorityModules=[
     './modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3',
     './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4',
+    './modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity1',
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
     './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3',
     './modules/student-weekly-report-entry-v10_10_35.js?v=10.10.35-weeklyentry1',
