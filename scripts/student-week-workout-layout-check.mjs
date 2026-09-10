@@ -23,15 +23,18 @@ const usability=fs.existsSync(usabilityPath)?read(usabilityPath):'';
 const worker=fs.existsSync(workerPath)?read(workerPath):'';
 const core=fs.existsSync(corePath)?read(corePath):'';
 const index=fs.existsSync(indexPath)?read(indexPath):'';
-const src='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout1';
+const src='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout2';
 
-assert(usability.includes(src),'Camada network-first de usabilidade não carrega o novo layout semanal.');
+assert(usability.includes(src),'Camada network-first de usabilidade não carrega a revisão corrigida do layout semanal.');
+assert(usability.includes("const EXPECTED_VERSION='10.10.40-weeklayout2'"),'Loader não valida explicitamente a revisão corrigida.');
+assert(usability.includes("window.TeamBullsStudentWeekWorkoutLayout?.version===EXPECTED_VERSION"),'Loader aceita uma versão antiga já carregada no PWA.');
+assert(usability.includes("String(script.src||'')===expectedUrl"),'Loader pode confundir o script antigo em cache com a revisão corrigida.');
+assert(!usability.includes("?v=10.10.40-weeklayout1'"),'Loader ainda referencia a revisão antiga do layout semanal.');
 assert(usability.includes('function loadWeekWorkoutLayout()'),'Loader dedicado do layout semanal está ausente.');
-assert(usability.includes('window.TeamBullsStudentWeekWorkoutLayout'),'Loader não confirma que o layout realmente terminou de instalar.');
 assert(usability.includes("CURRENT_USER?.role==='trainer'"),'Loader não impede carregamento desnecessário no contexto do treinador.');
 assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Arquivo ponte deixou de ser tratado como mutável/network-first pelo Service Worker.');
 
-assert(source.includes("const VERSION='10.10.40-weeklayout1'"),'Layout semanal não possui revisão própria.');
+assert(source.includes("const VERSION='10.10.40-weeklayout2'"),'Layout semanal não possui a revisão corrigida.');
 assert(source.includes("document.getElementById('screen-day')"),'Layout novo não está limitado à tela DIA // pasta.');
 assert(source.includes("document.getElementById('student-day-weekly-board')"),'Layout novo não usa o quadro semanal da pasta aberta.');
 assert(source.includes("host.id='tb-student-day-week-sheet'"),'Planilha semanal da pasta não é criada dentro da tela do dia.');
@@ -39,6 +42,8 @@ assert(source.includes("legacy.insertAdjacentElement('beforebegin',host)"),'Plan
 assert(source.includes('typeof renderDay')&&source.includes('renderDay=wrapped'),'Layout semanal não acompanha o render canônico da página da pasta.');
 assert(!source.includes('renderWorkout=wrapped'),'Layout semanal voltou a interceptar a página geral de treino.');
 assert(!source.includes("document.querySelector('#screen-workout"),'Layout semanal voltou a inserir conteúdo na página geral de treino.');
+assert(source.includes("document.getElementById('tb-student-week-sheet')?.remove()"),'Migração não remove o quadro incorreto já criado na página geral por uma versão antiga em memória.');
+assert(source.includes('renderWorkout.__tbStudentWeekWorkoutLayout')&&source.includes('renderWorkout=renderWorkout.__tbBase'),'Migração não desmonta o wrapper antigo da página geral.');
 assert(source.includes('CUR_DAY')&&source.includes('exercisesForDay'),'Layout não filtra os exercícios pela pasta/dia atualmente aberta.');
 assert(source.includes("normal(item?.name)===normal(dayName)"),'Pasta aberta não é resolvida pelo mesmo nome normalizado do core.');
 assert(source.includes('context.items.map(exercise=>rowHtml'),'Planilha não é composta exclusivamente pelos exercícios da pasta atual.');
@@ -51,7 +56,7 @@ assert(source.includes('prescriptionCompactSummary'),'Nova visualização não r
 assert(source.includes('openStudentWeekExercise'),'Toque na linha não reutiliza o fluxo canônico de abertura do exercício por semana.');
 assert(source.includes('window.TeamBullsSessionIntegrity'),'Contagem de conclusão não reutiliza a separação segura do ciclo atual.');
 assert(source.includes('data-day-week-compare'),'Comparação completa das oito semanas não foi preservada como opção secundária.');
-assert(source.includes("legacy.hidden=true"),'Grade horizontal antiga não fica recolhida por padrão.');
+assert(source.includes('legacy.hidden=true'),'Grade horizontal antiga não fica recolhida por padrão.');
 assert(source.includes("scheduleWeeklyBoardRender(context.dayWorkout,'student-day-weekly-board',false)"),'Comparação antiga não continua usando somente os exercícios da pasta.');
 assert(source.includes("currentUser()?.role==='trainer'")&&source.includes("document.body?.classList.contains('trainer-desktop')"),'Layout novo não exclui explicitamente o contexto do treinador.');
 assert(source.includes('#screen-day #tb-student-day-week-sheet')&&source.includes('grid-template-columns:minmax(0,1.15fr) minmax(128px,.85fr) 18px'),'Layout da pasta não usa a grade compacta Exercício | Prescrição.');
@@ -64,11 +69,11 @@ assert(!source.includes('fetch('),'Layout visual não deve criar caminho de rede
 assert(!source.includes('MutationObserver'),'Layout semanal não deve adicionar observer global.');
 assert(!source.includes('setInterval'),'Layout semanal não deve adicionar polling.');
 
-assert(core.includes('function openDay(dayName)')&&core.includes('CUR_DAY=day.name;renderDay();showScreen(\'screen-day\')'),'Fluxo canônico de abertura da pasta foi removido do core.');
-assert(core.includes("dayWorkout={...w,exercises:items}")&&core.includes("'student-day-weekly-board'"),'Core deixou de construir o quadro semanal filtrado da pasta.');
+assert(core.includes('function openDay(dayName)')&&core.includes("CUR_DAY=day.name;renderDay();showScreen('screen-day')"),'Fluxo canônico de abertura da pasta foi removido do core.');
+assert(core.includes('dayWorkout={...w,exercises:items}')&&core.includes("'student-day-weekly-board'"),'Core deixou de construir o quadro semanal filtrado da pasta.');
 assert(index.includes('id="screen-workout"')&&index.includes('id="day-folder-list"'),'Página geral de treino deixou de manter a navegação por pastas.');
 assert(index.includes('id="screen-day"')&&index.includes('id="student-day-summary"')&&index.includes('id="student-day-weekly-board"'),'Página DIA // pasta deixou de conter resumo e quadro semanal próprios.');
 assert(index.includes('somente os exercícios desta pasta'),'Escopo visual da página da pasta foi perdido.');
 
 if(failures.length){console.error('\nFALHA — layout semanal dentro da pasta do treino\n- '+failures.join('\n- '));process.exit(1);}
-console.log('APROVADO — página geral mantém somente a navegação dos treinos; o novo Exercício | Prescrição aparece em DIA // pasta, filtra CUR_DAY, navega 8 semanas e preserva a comparação completa sem Firebase extra.');
+console.log('APROVADO — página geral mantém somente a navegação dos treinos; o novo Exercício | Prescrição aparece em DIA // pasta, filtra CUR_DAY, navega 8 semanas, migra cache antigo e preserva a comparação completa sem Firebase extra.');
