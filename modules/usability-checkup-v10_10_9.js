@@ -199,21 +199,21 @@
     if(window.TeamBullsStudentWeekWorkoutLayout)return Promise.resolve(true);
     if(loading)return loading;
     loading=new Promise(resolve=>{
-      let settled=false;
-      const finish=ok=>{if(settled)return;settled=true;clearTimeout(timer);if(!ok)loading=null;resolve(!!ok);};
+      let settled=false,timer=0;
+      const finish=ok=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);if(!ok)loading=null;resolve(!!ok);};
       const existing=[...document.scripts].find(script=>{try{return new URL(script.src,location.href).pathname.endsWith('/modules/student-week-workout-layout-v10_10_40.js');}catch(error){return false;}});
       if(existing){
         if(window.TeamBullsStudentWeekWorkoutLayout){finish(true);return;}
         existing.addEventListener('load',()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),{once:true});
         existing.addEventListener('error',()=>finish(false),{once:true});
-        const timer=setTimeout(()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),7000);
+        timer=setTimeout(()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),7000);
         return;
       }
       const script=document.createElement('script');
       script.src=SRC;script.async=false;script.dataset.teamBullsWeekWorkoutLayout='1';
       script.onload=()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout);
       script.onerror=()=>finish(false);
-      const timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},7000);
+      timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},7000);
       document.head.appendChild(script);
     });
     return loading;
