@@ -60,6 +60,7 @@ jobs:
           node scripts/student-diet-compact-live-check.mjs
           node scripts/student-diet-layout-check.mjs
           node scripts/student-workout-library-check.mjs
+          node scripts/student-week-workout-layout-check.mjs
           node scripts/weekly-report-access-check.mjs
           node scripts/startup-cache-recovery-check.mjs
           node scripts/mobile-touch-freeze-check.mjs
