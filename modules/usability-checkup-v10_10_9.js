@@ -200,9 +200,10 @@
   else install();
 })();
 
-/* Carrega o novo quadro semanal por uma camada network-first já existente. */
+/* Carrega o quadro semanal corrigido por uma camada network-first já existente. */
 (()=>{
-  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout1';
+  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout2';
+  const EXPECTED_VERSION='10.10.40-weeklayout2';
   let loading=null;
   const studentContext=()=>{
     try{
@@ -210,24 +211,26 @@
       return CURRENT_USER?.role==='student'||MODE==='local'||document.body?.classList.contains('student-desktop');
     }catch(error){return document.body?.classList.contains('student-desktop')===true;}
   };
+  const ready=()=>window.TeamBullsStudentWeekWorkoutLayout?.version===EXPECTED_VERSION;
   function loadWeekWorkoutLayout(){
     if(!studentContext())return Promise.resolve(false);
-    if(window.TeamBullsStudentWeekWorkoutLayout)return Promise.resolve(true);
+    if(ready())return Promise.resolve(true);
     if(loading)return loading;
     loading=new Promise(resolve=>{
       let settled=false,timer=0;
       const finish=ok=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);if(!ok)loading=null;resolve(!!ok);};
-      const existing=[...document.scripts].find(script=>{try{return new URL(script.src,location.href).pathname.endsWith('/modules/student-week-workout-layout-v10_10_40.js');}catch(error){return false;}});
+      const expectedUrl=new URL(SRC,location.href).href;
+      const existing=[...document.scripts].find(script=>String(script.src||'')===expectedUrl);
       if(existing){
-        if(window.TeamBullsStudentWeekWorkoutLayout){finish(true);return;}
-        existing.addEventListener('load',()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),{once:true});
+        if(ready()){finish(true);return;}
+        existing.addEventListener('load',()=>finish(ready()),{once:true});
         existing.addEventListener('error',()=>finish(false),{once:true});
-        timer=setTimeout(()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout),7000);
+        timer=setTimeout(()=>finish(ready()),7000);
         return;
       }
       const script=document.createElement('script');
-      script.src=SRC;script.async=false;script.dataset.teamBullsWeekWorkoutLayout='1';
-      script.onload=()=>finish(!!window.TeamBullsStudentWeekWorkoutLayout);
+      script.src=SRC;script.async=false;script.dataset.teamBullsWeekWorkoutLayout='2';
+      script.onload=()=>finish(ready());
       script.onerror=()=>finish(false);
       timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},7000);
       document.head.appendChild(script);
@@ -237,5 +240,5 @@
   loadWeekWorkoutLayout().catch(()=>{});
   window.addEventListener('team-bulls-student-runtime-ready',()=>loadWeekWorkoutLayout().catch(()=>{}));
   window.addEventListener('pageshow',()=>loadWeekWorkoutLayout().catch(()=>{}),{passive:true});
-  window.TeamBullsWeekWorkoutLayoutLoader=Object.freeze({src:SRC,load:loadWeekWorkoutLayout});
+  window.TeamBullsWeekWorkoutLayoutLoader=Object.freeze({src:SRC,version:EXPECTED_VERSION,load:loadWeekWorkoutLayout});
 })();
