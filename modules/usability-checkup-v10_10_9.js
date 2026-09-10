@@ -35,6 +35,22 @@
     return true;
   }
 
+  function installHistoryScroll(){
+    const app=appScroller();
+    if(!app||app.dataset.tbHistoryScroll==='1')return;
+    app.dataset.tbHistoryScroll='1';
+    app.addEventListener('scroll',()=>{
+      if(scrollFrame)return;
+      scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;rememberScroll();});
+    },{passive:true});
+    window.addEventListener('popstate',event=>{
+      if(!event.state?.teamBulls)return;
+      requestAnimationFrame(()=>restoreScrollForState(event.state));
+    },{passive:true});
+    window.addEventListener('pagehide',rememberScroll,{passive:true});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)rememberScroll();},{passive:true});
+  }
+
   function scrollActiveWeekIntoView(root=document.querySelector('.screen.active')){
     const board=root?.querySelector?.('.weekly-plan-scroll');
     const active=board?.querySelector?.('thead .active-week');
