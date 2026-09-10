@@ -31,7 +31,9 @@ assert(source.includes('ensureStudentDietLabel();patchSupplyOptionsHeader();'),'
 
 const labelSrc='./modules/supply-options-label-v10_10_24.js?v=10.10.24-supplylabel1';
 assert(config.includes(labelSrc),'Runtime compartilhado não carrega a correção do título de Opções de suprimentos.');
-assert(config.indexOf(labelSrc)<config.indexOf('./modules/session-save-performance-v10_10_9.js'),'Correção leve do título deve entrar no início da fila compartilhada.');
+const sharedStart=config.indexOf('const modules=['),sharedEnd=config.indexOf('];',sharedStart);
+const sharedQueue=sharedStart>=0&&sharedEnd>sharedStart?config.slice(sharedStart,sharedEnd):'';
+assert(sharedQueue.indexOf(labelSrc)>=0&&sharedQueue.indexOf(labelSrc)<sharedQueue.indexOf('./modules/stability_v10_10_9.js'),'Correção leve do título deve entrar no início da fila compartilhada.');
 assert(labelSource.includes("const VERSION='10.10.24-supplylabel1'"),'Módulo do título não possui revisão própria.');
 assert(labelSource.includes("document.querySelector('#screen-food-options .options-intro-title')"),'Correção do título não está restrita à tela de opções.');
 assert(labelSource.includes("title.textContent='Opções de suprimentos'"),'Título visível não é normalizado para Opções de suprimentos.');
