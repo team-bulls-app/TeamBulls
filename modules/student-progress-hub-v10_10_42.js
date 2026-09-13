@@ -4,11 +4,13 @@
   if(window.__TEAM_BULLS_STUDENT_PROGRESS_HUB_101042__)return;
   window.__TEAM_BULLS_STUDENT_PROGRESS_HUB_101042__=true;
 
-  const VERSION='10.10.42-studentprogress1';
+  const VERSION='10.10.42-studentprogress2';
   const SCREEN_ID='screen-student-progress-hub';
   const STYLE_ID='tb-student-progress-style';
   const ENTRY_ID='tb-student-progress-entry';
-  let loading=false,serial=0,state=null;
+  const CACHE_TTL_MS=120000;
+  let loading=false,loadingUid='',serial=0,state=null,cache={uid:'',at:0,state:null};
+
   const cloudStudent=()=>{try{return CURRENT_USER?.role==='student'&&MODE==='cloud'&&!!db;}catch(error){return false;}};
   const uid=()=>cloudStudent()?String(CURRENT_USER.uid||''):'';
   const h=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -20,53 +22,156 @@
   const getRef=(reference,label)=>typeof cloudGet==='function'?cloudGet(reference,label):reference.get();
 
   function injectStyles(){
-    if(document.getElementById(STYLE_ID))return;const style=document.createElement('style');style.id=STYLE_ID;style.textContent=`
+    if(document.getElementById(STYLE_ID))return;
+    const style=document.createElement('style');style.id=STYLE_ID;style.textContent=`
       #${SCREEN_ID}{padding-bottom:94px}.tb-progress-content{padding-top:14px}.tb-progress-hero{padding:15px;border:1px solid rgba(255,255,255,.08);border-radius:12px;background:linear-gradient(145deg,rgba(225,29,72,.065),#111);margin-bottom:12px}.tb-progress-hero span{display:block;color:#e35c72;font:800 8px 'DM Mono',monospace;letter-spacing:.8px}.tb-progress-hero strong{display:block;margin-top:4px;color:#eee;font:900 25px 'Barlow Condensed',sans-serif}.tb-progress-hero p{margin:5px 0 0;color:#817770;font:500 10px/1.5 'DM Mono',monospace}.tb-cycle-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.tb-cycle-meta i{font-style:normal;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:5px 7px;color:#8c817b;font:700 7px 'DM Mono',monospace}.tb-progress-section{margin:14px 0}.tb-progress-section-title{display:flex;justify-content:space-between;align-items:end;margin-bottom:8px}.tb-progress-section-title strong{color:#eee;font:900 19px 'Barlow Condensed',sans-serif}.tb-progress-section-title span{color:#706761;font:700 8px 'DM Mono',monospace}.tb-student-goals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.tb-student-goal{padding:12px;border:1px solid rgba(255,255,255,.075);border-radius:10px;background:#111}.tb-student-goal span{display:block;color:#756c66;font:700 8px 'DM Mono',monospace}.tb-student-goal strong{display:block;margin-top:5px;color:#eee;font:900 21px 'Barlow Condensed',sans-serif}.tb-student-goal p{margin:4px 0 0;color:#7f756e;font-size:9px;line-height:1.4}.tb-student-goal-bar{height:6px;border-radius:999px;background:#262020;overflow:hidden;margin-top:8px}.tb-student-goal-bar i{display:block;height:100%;background:#a51736;border-radius:999px}.tb-cycle-focus{padding:12px;border-left:2px solid #a51736;background:rgba(225,29,72,.04);border-radius:0 8px 8px 0;color:#aa9e97;font-size:10px;line-height:1.5;margin-top:9px}.tb-achievements{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.tb-achievement{display:grid;grid-template-columns:42px minmax(0,1fr);gap:10px;align-items:center;padding:11px;border:1px solid rgba(255,255,255,.065);border-radius:10px;background:#101010;opacity:.5}.tb-achievement.unlocked{opacity:1;border-color:rgba(34,197,94,.16)}.tb-achievement-icon{width:42px;height:42px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#141414;display:flex;align-items:center;justify-content:center;font-size:19px}.tb-achievement.unlocked .tb-achievement-icon{border-color:rgba(34,197,94,.25);background:rgba(34,197,94,.055)}.tb-achievement strong{display:block;color:#dcd5d0;font:900 15px 'Barlow Condensed',sans-serif}.tb-achievement span{display:block;margin-top:3px;color:#746b65;font-size:9px;line-height:1.35}.tb-achievement-status{margin-top:4px!important;color:#69b783!important;font:800 7px 'DM Mono',monospace!important}.tb-achievement:not(.unlocked) .tb-achievement-status{color:#675f5b!important}.tb-progress-loading,.tb-progress-empty{padding:28px 15px;border:1px dashed rgba(255,255,255,.1);border-radius:10px;text-align:center;color:#786e68;font:500 10px/1.5 'DM Mono',monospace}@media(max-width:620px){.tb-student-goals{grid-template-columns:1fr}.tb-achievements{grid-template-columns:1fr}}`;
     document.head.appendChild(style);
   }
 
   function ensureUi(){
     injectStyles();const app=document.getElementById('app');if(!app)return;
-    if(!document.getElementById(SCREEN_ID)){const screen=document.createElement('div');screen.className='screen';screen.id=SCREEN_ID;screen.innerHTML=`<div class="header"><button class="btn-icon" type="button" data-tb-progress-back>←</button><div class="header-title">METAS & CONQUISTAS</div><button class="btn-icon ghost" type="button" data-tb-progress-refresh>↻</button></div><div class="content tb-progress-content"><div id="tb-progress-body"></div></div>`;app.appendChild(screen);screen.querySelector('[data-tb-progress-back]')?.addEventListener('click',()=>typeof goHome==='function'&&goHome());screen.querySelector('[data-tb-progress-refresh]')?.addEventListener('click',()=>load(true));}
+    if(!document.getElementById(SCREEN_ID)){
+      const screen=document.createElement('div');screen.className='screen';screen.id=SCREEN_ID;
+      screen.innerHTML=`<div class="header"><button class="btn-icon" type="button" data-tb-progress-back>←</button><div class="header-title">METAS & CONQUISTAS</div><button class="btn-icon ghost" type="button" data-tb-progress-refresh>↻</button></div><div class="content tb-progress-content"><div id="tb-progress-body"></div></div>`;
+      app.appendChild(screen);
+      screen.querySelector('[data-tb-progress-back]')?.addEventListener('click',()=>typeof goHome==='function'&&goHome());
+      screen.querySelector('[data-tb-progress-refresh]')?.addEventListener('click',()=>load(true));
+    }
   }
 
   function ensureEntry(){
-    if(!cloudStudent())return false;ensureUi();if(!document.getElementById(ENTRY_ID)){const quick=document.querySelector('#screen-home .quick-nav');if(quick){const button=document.createElement('button');button.className='quick-nav-btn';button.id=ENTRY_ID;button.type='button';button.setAttribute('aria-label','Metas e conquistas');button.innerHTML='<svg class="quick-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v4a4 4 0 0 1-8 0Z"/><path d="M6 4H3v2a5 5 0 0 0 5 5"/><path d="M18 4h3v2a5 5 0 0 1-5 5"/><path d="M12 11v6"/><path d="M8 21h8"/><path d="M9 17h6"/></svg><span class="quick-nav-label">Metas & Conquistas</span>';button.addEventListener('click',open);quick.appendChild(button);}}
-    const nav=document.getElementById('student-desktop-nav');if(nav&&!document.getElementById('tb-student-nav-progress')){const button=document.createElement('button');button.id='tb-student-nav-progress';button.dataset.navPrepared='1';button.innerHTML='<span aria-hidden="true" class="nav-icon">★</span><span class="nav-label">METAS & CONQUISTAS</span>';button.addEventListener('click',open);const settings=[...nav.querySelectorAll(':scope > button')].find(item=>item.textContent.includes('CONFIGURAÇÕES'));if(settings)settings.insertAdjacentElement('beforebegin',button);else nav.appendChild(button);}return true;
+    if(!cloudStudent())return false;ensureUi();
+    if(!document.getElementById(ENTRY_ID)){
+      const quick=document.querySelector('#screen-home .quick-nav');
+      if(quick){
+        const button=document.createElement('button');button.className='quick-nav-btn';button.id=ENTRY_ID;button.type='button';button.setAttribute('aria-label','Metas e conquistas');button.innerHTML='<svg class="quick-nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v4a4 4 0 0 1-8 0Z"/><path d="M6 4H3v2a5 5 0 0 0 5 5"/><path d="M18 4h3v2a5 5 0 0 1-5 5"/><path d="M12 11v6"/><path d="M8 21h8"/><path d="M9 17h6"/></svg><span class="quick-nav-label">Metas & Conquistas</span>';button.addEventListener('click',open);quick.appendChild(button);
+      }
+    }
+    const nav=document.getElementById('student-desktop-nav');
+    if(nav&&!document.getElementById('tb-student-nav-progress')){
+      const button=document.createElement('button');button.id='tb-student-nav-progress';button.dataset.navPrepared='1';button.innerHTML='<span aria-hidden="true" class="nav-icon">★</span><span class="nav-label">METAS & CONQUISTAS</span>';button.addEventListener('click',open);
+      const settings=[...nav.querySelectorAll(':scope > button')].find(item=>item.textContent.includes('CONFIGURAÇÕES'));if(settings)settings.insertAdjacentElement('beforebegin',button);else nav.appendChild(button);
+    }
+    return true;
   }
 
-  function cycleBounds(schedule){if(!schedule||!iso(schedule.startDate))return null;const weeks=Math.max(1,Math.min(52,Math.trunc(Number(schedule.intervalWeeks)||4))),days=weeks*7,elapsed=Math.max(0,dayDiff(schedule.startDate,todayIso())),cycle=Math.floor(elapsed/days)+1,start=addDays(schedule.startDate,(cycle-1)*days),end=addDays(start,days-1);return{cycle,start,end,weeks};}
-  function weekKey(date){if(!iso(date))return'';const[y,m,d]=date.split('-').map(Number),dt=new Date(y,m-1,d,12),day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day);return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;}
-  function consecutiveTrainingWeeks(sessions=[]){const weeks=[...new Set(sessions.map(item=>weekKey(item.date)).filter(Boolean))].sort().reverse();if(!weeks.length)return 0;let count=1;for(let i=1;i<weeks.length;i++){if(dayDiff(weeks[i],weeks[i-1])===7)count++;else break;}return count;}
-  function hasLoadProgress(sessions=[]){const byExercise=new Map();[...sessions].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).forEach(session=>{const key=String(session.exerciseName||session.exerciseId||'');if(!key)return;const max=Math.max(0,...(session.sets||[]).map(set=>Number(set.weight)||0));if(!max)return;const row=byExercise.get(key)||{first:max,last:max};row.last=max;byExercise.set(key,row);});return[...byExercise.values()].some(row=>row.last>row.first);}
-  function achievements(){const sessions=state?.sessions||[],checkins=state?.checkins||[],schedule=state?.schedule||{},weeks=consecutiveTrainingWeeks(sessions),count=sessions.length,reports=checkins.length,progress=hasLoadProgress(sessions);return[
-    {icon:'✓',title:'Primeiro registro',text:'Primeira sessão registrada no Team Bulls.',ok:count>=1},
-    {icon:'10',title:'10 sessões',text:'Dez sessões de treino registradas.',ok:count>=10},
-    {icon:'25',title:'25 sessões',text:'Vinte e cinco sessões registradas.',ok:count>=25},
-    {icon:'50',title:'50 sessões',text:'Cinquenta sessões registradas.',ok:count>=50},
-    {icon:'★',title:'Progressão registrada',text:'Algum exercício apresentou aumento de carga máxima registrada.',ok:progress},
-    {icon:'4S',title:'4 semanas consistentes',text:'Treino registrado em quatro semanas consecutivas.',ok:weeks>=4},
-    {icon:'8S',title:'8 semanas consistentes',text:'Treino registrado em oito semanas consecutivas.',ok:weeks>=8},
-    {icon:'4R',title:'4 relatórios',text:'Quatro relatórios semanais completos enviados.',ok:reports>=4},
-    {icon:'8R',title:'8 relatórios',text:'Oito relatórios semanais completos enviados.',ok:reports>=8},
-    {icon:'C',title:'Ciclo concluído',text:'Ao menos uma atualização completa do protocolo foi concluída.',ok:Number(schedule.lastCompletedCycle)>=1}
-  ];}
+  function protocolState(schedule){
+    if(!schedule||schedule._exists===false||!iso(schedule.startDate))return null;
+    try{if(typeof v109ProtocolState==='function')return v109ProtocolState({...schedule,_exists:true});}catch(error){}
+    const intervalWeeks=Math.max(1,Math.min(52,Math.trunc(Number(schedule.intervalWeeks)||4))),intervalDays=intervalWeeks*7,rawDays=dayDiff(schedule.startDate,todayIso()),days=Math.max(0,rawDays),elapsedCycle=rawDays<0?0:Math.floor(days/intervalDays),lastCompletedCycle=Math.max(0,Math.trunc(Number(schedule.lastCompletedCycle)||0)),pendingCycle=elapsedCycle>lastCompletedCycle?elapsedCycle:0,nextCycle=pendingCycle||Math.max(lastCompletedCycle+1,elapsedCycle+1);
+    return{intervalWeeks,intervalDays,elapsedCycle,lastCompletedCycle,pendingCycle,pending:pendingCycle>0,nextCycle};
+  }
+
+  function cycleBounds(schedule){
+    const status=protocolState(schedule);if(!status)return null;
+    const days=status.intervalDays||status.intervalWeeks*7,cycle=Math.max(1,Number(status.nextCycle)||Number(status.pendingCycle)||Number(status.lastCompletedCycle)+1||1),start=addDays(schedule.startDate,(cycle-1)*days),end=addDays(start,days-1);
+    return{cycle,start,end,weeks:status.intervalWeeks,key:`${schedule.startDate}:${cycle}`};
+  }
+
+  function workoutSessionKey(session){
+    const date=iso(session?.date);if(!date)return'';
+    const workout=String(session?.workoutId||session?._wid||session?.workoutName||'workout');
+    return`${date}|${workout}`;
+  }
+  function trainingSessionCount(sessions=[]){return new Set(sessions.map(workoutSessionKey).filter(Boolean)).size;}
+
+  function weekKey(date){
+    if(!iso(date))return'';const[y,m,d]=date.split('-').map(Number),dt=new Date(y,m-1,d,12),day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day);
+    return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  }
+
+  function longestTrainingStreak(sessions=[]){
+    const weeks=[...new Set(sessions.map(item=>weekKey(item.date)).filter(Boolean))].sort();if(!weeks.length)return 0;
+    let longest=1,current=1;
+    for(let index=1;index<weeks.length;index++){
+      if(dayDiff(weeks[index-1],weeks[index])===7)current++;else current=1;
+      if(current>longest)longest=current;
+    }
+    return longest;
+  }
+
+  function hasHistoricalLoadProgress(sessions=[]){
+    const byExercise=new Map();
+    [...sessions].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))).forEach(session=>{
+      const key=String(session.performedExerciseItemId||session.exerciseId||session.performedExerciseName||session.exerciseName||'');if(!key)return;
+      const max=Math.max(0,...(session.sets||[]).map(set=>Number(set.weight)||0));if(!max)return;
+      const row=byExercise.get(key)||{first:max,peak:max};row.peak=Math.max(row.peak,max);byExercise.set(key,row);
+    });
+    return[...byExercise.values()].some(row=>row.peak>row.first);
+  }
+
+  function achievements(){
+    const sessions=state?.sessions||[],checkins=state?.checkins||[],schedule=state?.schedule||{},weeks=longestTrainingStreak(sessions),count=trainingSessionCount(sessions),reports=checkins.length,progress=hasHistoricalLoadProgress(sessions);
+    return[
+      {icon:'✓',title:'Primeiro registro',text:'Primeira sessão registrada no Team Bulls.',ok:count>=1},
+      {icon:'10',title:'10 sessões',text:'Dez sessões de treino registradas.',ok:count>=10},
+      {icon:'25',title:'25 sessões',text:'Vinte e cinco sessões registradas.',ok:count>=25},
+      {icon:'50',title:'50 sessões',text:'Cinquenta sessões registradas.',ok:count>=50},
+      {icon:'★',title:'Progressão registrada',text:'Algum exercício apresentou aumento de carga máxima registrada.',ok:progress},
+      {icon:'4S',title:'4 semanas consistentes',text:'Treino registrado em quatro semanas consecutivas.',ok:weeks>=4},
+      {icon:'8S',title:'8 semanas consistentes',text:'Treino registrado em oito semanas consecutivas.',ok:weeks>=8},
+      {icon:'4R',title:'4 relatórios',text:'Quatro relatórios semanais completos enviados.',ok:reports>=4},
+      {icon:'8R',title:'8 relatórios',text:'Oito relatórios semanais completos enviados.',ok:reports>=8},
+      {icon:'C',title:'Ciclo concluído',text:'Ao menos uma atualização completa do protocolo foi concluída.',ok:Number(schedule.lastCompletedCycle)>=1}
+    ];
+  }
   const pct=(value,target)=>target>0?Math.max(0,Math.min(100,Math.round(value/target*100))):0;
 
   function render(){
-    ensureUi();const body=document.getElementById('tb-progress-body');if(!body)return;if(loading){body.innerHTML='<div class="tb-progress-loading">Carregando seus próprios registros para montar metas e conquistas...</div>';return;}if(!state){body.innerHTML='<div class="tb-progress-empty">Não foi possível carregar o progresso agora.</div>';return;}
-    const schedule=state.schedule,bounds=cycleBounds(schedule),goals=schedule?.cycleGoals&&typeof schedule.cycleGoals==='object'?schedule.cycleGoals:{},currentSessions=bounds?state.sessions.filter(item=>iso(item.date)&&item.date>=bounds.start&&item.date<=bounds.end).length:0,currentReports=bounds?state.checkins.filter(item=>{const d=iso(item.submittedDate||item.dueDate);return d&&d>=bounds.start&&d<=bounds.end;}).length:0,currentWeight=Number(state.checkins[0]?.weight||0),targetWeight=Number(goals.weightTargetKg)||0,startWeight=Number(goals.weightStartKg)||0;let weightPct=0;if(targetWeight&&startWeight&&currentWeight&&targetWeight!==startWeight){weightPct=Math.max(0,Math.min(100,Math.round((currentWeight-startWeight)/(targetWeight-startWeight)*100)));}
-    const goalCards=`<div class="tb-student-goals"><div class="tb-student-goal"><span>PESO-ALVO</span><strong>${targetWeight?targetWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'—'}</strong><p>${currentWeight?'Atual: '+currentWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'Aguardando relatório com peso.'}</p><div class="tb-student-goal-bar"><i style="width:${weightPct}%"></i></div></div><div class="tb-student-goal"><span>SESSÕES NO CICLO</span><strong>${currentSessions}${Number(goals.sessionsTarget)>0?' / '+Number(goals.sessionsTarget):''}</strong><p>Registros feitos dentro do ciclo atual.</p><div class="tb-student-goal-bar"><i style="width:${pct(currentSessions,Number(goals.sessionsTarget)||0)}%"></i></div></div><div class="tb-student-goal"><span>RELATÓRIOS NO CICLO</span><strong>${currentReports}${Number(goals.reportsTarget)>0?' / '+Number(goals.reportsTarget):''}</strong><p>Relatórios enviados durante o ciclo atual.</p><div class="tb-student-goal-bar"><i style="width:${pct(currentReports,Number(goals.reportsTarget)||0)}%"></i></div></div></div>`;
-    const badges=achievements();body.innerHTML=`<section class="tb-progress-hero"><span>PROGRESSO DO CICLO</span><strong>${h(CURRENT_USER?.name||'Seu progresso')}</strong><p>Metas definidas pelo treinador e conquistas calculadas somente a partir dos registros reais do app.</p>${bounds?`<div class="tb-cycle-meta"><i>CICLO ${bounds.cycle}</i><i>${h(fmtDate(bounds.start))} → ${h(fmtDate(bounds.end))}</i><i>${bounds.weeks} SEMANAS</i></div>`:''}</section><section class="tb-progress-section"><div class="tb-progress-section-title"><strong>Metas atuais</strong><span>${Object.keys(goals).length?'DEFINIDAS PELO TREINADOR':'SEM METAS PERSONALIZADAS'}</span></div>${goalCards}${goals.note?`<div class="tb-cycle-focus"><b>FOCO DO CICLO:</b> ${h(goals.note)}</div>`:''}</section><section class="tb-progress-section"><div class="tb-progress-section-title"><strong>Conquistas</strong><span>${badges.filter(item=>item.ok).length} / ${badges.length} DESBLOQUEADAS</span></div><div class="tb-achievements">${badges.map(item=>`<article class="tb-achievement ${item.ok?'unlocked':''}"><div class="tb-achievement-icon">${h(item.icon)}</div><div><strong>${h(item.title)}</strong><span>${h(item.text)}</span><span class="tb-achievement-status">${item.ok?'CONQUISTA DESBLOQUEADA':'AINDA NÃO DESBLOQUEADA'}</span></div></article>`).join('')}</div></section>`;
+    ensureUi();const body=document.getElementById('tb-progress-body');if(!body)return;
+    if(loading){body.innerHTML='<div class="tb-progress-loading">Carregando seus próprios registros para montar metas e conquistas...</div>';return;}
+    if(!state){body.innerHTML='<div class="tb-progress-empty">Não foi possível carregar o progresso agora.</div>';return;}
+    const schedule=state.schedule,bounds=cycleBounds(schedule),rawGoals=schedule?.cycleGoals&&typeof schedule.cycleGoals==='object'?schedule.cycleGoals:{},goalCycleMatches=!rawGoals.cycleKey||!bounds?.key||String(rawGoals.cycleKey)===bounds.key,goals=goalCycleMatches?rawGoals:{};
+    const cycleSessions=bounds?state.sessions.filter(item=>iso(item.date)&&item.date>=bounds.start&&item.date<=bounds.end):[],currentSessions=trainingSessionCount(cycleSessions),currentReports=bounds?state.checkins.filter(item=>{const d=iso(item.submittedDate||item.dueDate);return d&&d>=bounds.start&&d<=bounds.end;}).length:0,currentWeight=Number(state.checkins[0]?.weight||0),targetWeight=Number(goals.weightTargetKg)||0,startWeight=Number(goals.weightStartKg)||0;
+    let weightPct=0;if(targetWeight&&startWeight&&currentWeight)weightPct=targetWeight===startWeight?(currentWeight===targetWeight?100:0):Math.max(0,Math.min(100,Math.round((currentWeight-startWeight)/(targetWeight-startWeight)*100)));
+    const goalCards=`<div class="tb-student-goals"><div class="tb-student-goal"><span>PESO-ALVO</span><strong>${targetWeight?targetWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'—'}</strong><p>${currentWeight?'Atual: '+currentWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'Aguardando relatório com peso.'}</p><div class="tb-student-goal-bar"><i style="width:${weightPct}%"></i></div></div><div class="tb-student-goal"><span>SESSÕES NO CICLO</span><strong>${currentSessions}${Number(goals.sessionsTarget)>0?' / '+Number(goals.sessionsTarget):''}</strong><p>Sessões de treino distintas feitas dentro do ciclo atual.</p><div class="tb-student-goal-bar"><i style="width:${pct(currentSessions,Number(goals.sessionsTarget)||0)}%"></i></div></div><div class="tb-student-goal"><span>RELATÓRIOS NO CICLO</span><strong>${currentReports}${Number(goals.reportsTarget)>0?' / '+Number(goals.reportsTarget):''}</strong><p>Relatórios enviados durante o ciclo atual.</p><div class="tb-student-goal-bar"><i style="width:${pct(currentReports,Number(goals.reportsTarget)||0)}%"></i></div></div></div>`;
+    const configured=targetWeight>0||Number(goals.sessionsTarget)>0||Number(goals.reportsTarget)>0||String(goals.note||'').trim().length>0,badges=achievements(),staleGoals=!goalCycleMatches&&Object.keys(rawGoals).length>0;
+    body.innerHTML=`<section class="tb-progress-hero"><span>PROGRESSO DO CICLO</span><strong>${h(CURRENT_USER?.name||'Seu progresso')}</strong><p>Metas definidas pelo treinador e conquistas calculadas somente a partir dos registros reais do app.</p>${bounds?`<div class="tb-cycle-meta"><i>CICLO ${bounds.cycle}</i><i>${h(fmtDate(bounds.start))} → ${h(fmtDate(bounds.end))}</i><i>${bounds.weeks} SEMANAS</i></div>`:''}</section><section class="tb-progress-section"><div class="tb-progress-section-title"><strong>Metas atuais</strong><span>${configured?'DEFINIDAS PELO TREINADOR':staleGoals?'NOVO CICLO · AGUARDANDO METAS':'SEM METAS PERSONALIZADAS'}</span></div>${goalCards}${staleGoals?'<div class="tb-cycle-focus"><b>NOVO CICLO:</b> as metas anteriores não são usadas para calcular o progresso atual até o treinador revisar este ciclo.</div>':''}${goals.note?`<div class="tb-cycle-focus"><b>FOCO DO CICLO:</b> ${h(goals.note)}</div>`:''}</section><section class="tb-progress-section"><div class="tb-progress-section-title"><strong>Conquistas</strong><span>${badges.filter(item=>item.ok).length} / ${badges.length} DESBLOQUEADAS</span></div><div class="tb-achievements">${badges.map(item=>`<article class="tb-achievement ${item.ok?'unlocked':''}"><div class="tb-achievement-icon">${h(item.icon)}</div><div><strong>${h(item.title)}</strong><span>${h(item.text)}</span><span class="tb-achievement-status">${item.ok?'CONQUISTA DESBLOQUEADA':'AINDA NÃO DESBLOQUEADA'}</span></div></article>`).join('')}</div></section>`;
   }
 
-  async function load(force=false){if(!cloudStudent()||loading)return;const run=++serial;loading=true;render();try{const id=uid(),[scheduleDoc,sessionsSnap,checkinsSnap]=await Promise.all([getRef(db.collection('protocolReviewSchedules').doc(id),'metas do ciclo'),getRef(db.collection('sessions').where('userId','==',id),'sessões para conquistas'),getRef(db.collection('weeklyCheckins').where('studentId','==',id),'relatórios para conquistas')]);if(run!==serial)return;const sessions=(sessionsSnap.docs||[]).map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))),checkins=(checkinsSnap.docs||[]).map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>String(b.submittedDate||b.dueDate||'').localeCompare(String(a.submittedDate||a.dueDate||'')));state={schedule:scheduleDoc.exists?{...scheduleDoc.data(),studentId:id}:null,sessions,checkins};}catch(error){console.error('student progress hub',error);state=null;}finally{if(run===serial){loading=false;render();}}}
-  async function open(){if(!cloudStudent()){showToast?.('Metas e conquistas sincronizadas exigem acesso à conta online.',true);return;}ensureEntry();showScreen(SCREEN_ID);await load(false);}
+  async function load(force=false){
+    if(!cloudStudent())return;
+    const id=uid();if(!id)return;
+    if(!force&&cache.uid===id&&cache.state&&Date.now()-cache.at<CACHE_TTL_MS){state=cache.state;loading=false;loadingUid='';render();return;}
+    if(loading&&loadingUid===id)return;
+    const run=++serial;loading=true;loadingUid=id;render();
+    try{
+      const [scheduleDoc,sessionsSnap,checkinsSnap]=await Promise.all([
+        getRef(db.collection('protocolReviewSchedules').doc(id),'metas do ciclo'),
+        getRef(db.collection('sessions').where('userId','==',id),'sessões para conquistas'),
+        getRef(db.collection('weeklyCheckins').where('studentId','==',id),'relatórios para conquistas')
+      ]);
+      if(run!==serial||uid()!==id)return;
+      const sessions=(sessionsSnap.docs||[]).map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))),checkins=(checkinsSnap.docs||[]).map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>String(b.submittedDate||b.dueDate||'').localeCompare(String(a.submittedDate||a.dueDate||'')));
+      state={schedule:scheduleDoc.exists?{...scheduleDoc.data(),studentId:id}:null,sessions,checkins};cache={uid:id,at:Date.now(),state};
+    }catch(error){if(run===serial&&uid()===id){console.error('student progress hub',error);state=null;}}
+    finally{if(run===serial&&uid()===id){loading=false;loadingUid='';render();}}
+  }
 
-  function patchHome(){if(typeof renderHome!=='function'||renderHome.__tbStudentProgress)return;const base=renderHome;const wrapped=function(){const result=base.apply(this,arguments);queueMicrotask(()=>{if(cloudStudent())ensureEntry();});return result;};wrapped.__tbStudentProgress=true;wrapped.__tbBase=base;renderHome=wrapped;}
-  function patchLogout(){if(typeof confirmLogout!=='function'||confirmLogout.__tbStudentProgress)return;const base=confirmLogout;const wrapped=function(){state=null;serial++;return base.apply(this,arguments);};wrapped.__tbStudentProgress=true;wrapped.__tbBase=base;confirmLogout=wrapped;}
+  async function open(){
+    if(!cloudStudent()){showToast?.('Metas e conquistas sincronizadas exigem acesso à conta online.',true);return;}
+    ensureEntry();showScreen(SCREEN_ID);await load(false);
+  }
+
+  function patchHome(){
+    if(typeof renderHome!=='function'||renderHome.__tbStudentProgress)return;
+    const base=renderHome;
+    const wrapped=function(){const result=base.apply(this,arguments);queueMicrotask(()=>{if(cloudStudent())ensureEntry();});return result;};
+    wrapped.__tbStudentProgress=true;wrapped.__tbBase=base;renderHome=wrapped;
+  }
+
+  function patchLogout(){
+    if(typeof confirmLogout!=='function'||confirmLogout.__tbStudentProgress)return;
+    const base=confirmLogout;
+    const wrapped=function(){state=null;cache={uid:'',at:0,state:null};loading=false;loadingUid='';serial++;return base.apply(this,arguments);};
+    wrapped.__tbStudentProgress=true;wrapped.__tbBase=base;confirmLogout=wrapped;
+  }
+
   function install(){ensureUi();patchHome();patchLogout();if(cloudStudent())ensureEntry();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();window.addEventListener('team-bulls-student-runtime-ready',install);window.addEventListener('team-bulls-runtime-ready',install);window.addEventListener('pageshow',()=>{if(cloudStudent())ensureEntry();},{passive:true});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  window.addEventListener('team-bulls-student-runtime-ready',install);
+  window.addEventListener('team-bulls-runtime-ready',install);
+  window.addEventListener('pageshow',()=>{if(cloudStudent())ensureEntry();},{passive:true});
 
   window.TeamBullsStudentProgressHub=Object.freeze({version:VERSION,open,refresh:()=>load(true)});
 })();
