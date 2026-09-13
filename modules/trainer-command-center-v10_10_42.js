@@ -49,109 +49,25 @@
   }
 
   function rowFor(studentId){return dashboard?.rows?.find(row=>String(row.student?.uid)===String(studentId))||null;}
-  function recompute(){
-    if(!dashboard||!api())return;
-    analyses=dashboard.rows.map(row=>api().analyze(row,{activity:dashboard.activity,payments:dashboard.payments},deepByStudent.get(String(row.student.uid))||null)).sort((a,b)=>b.score-a.score||String(a.student?.name||'').localeCompare(String(b.student?.name||''),'pt-BR'));
-  }
-
-  function decorateStudentCards(){
-    const lookup=new Map(analyses.map(item=>[String(item.studentId),item]));
-    document.querySelectorAll('.student-card[data-student-uid]').forEach(card=>{
-      card.querySelector('.tb-insight-light')?.remove();card.querySelector('.tb-insight-label')?.remove();
-      const item=lookup.get(String(card.dataset.studentUid||''));if(!item)return;
-      const name=card.querySelector('.student-name');if(!name)return;
-      const light=document.createElement('i');light.className='tb-insight-light '+item.light;light.title=`Radar: ${item.score}/100 · ${item.nextAction}`;name.prepend(light);
-      const label=document.createElement('span');label.className='tb-insight-label';label.textContent=item.light==='red'?'URGENTE':item.light==='yellow'?'ATENÇÃO':item.light==='blue'?'NOVO':'EM DIA';name.appendChild(label);
-    });
-  }
-
-  function summaryHtml(){
-    if(!dashboard||!api())return'';
-    const s=api().summary(dashboard.rows,{activity:dashboard.activity,payments:dashboard.payments}),delta=s.reportsDelta===0?'igual à semana anterior':s.reportsDelta>0?`+${s.reportsDelta} vs. semana anterior`:`${s.reportsDelta} vs. semana anterior`;
-    return`<div class="tb-command-stat"><span>ALUNOS ATIVOS</span><strong>${s.active}</strong></div><div class="tb-command-stat red"><span>URGENTES</span><strong>${analyses.filter(item=>item.light==='red').length}</strong></div><div class="tb-command-stat yellow"><span>ATENÇÃO</span><strong>${analyses.filter(item=>item.light==='yellow').length}</strong></div><div class="tb-command-stat blue"><span>RELATÓRIOS NA SEMANA</span><strong>${s.reportsNow}</strong><small style="color:#706761;font-size:7px">${h(delta)}</small></div>`;
-  }
-
-  function radarHtml(item){
-    const student=item.student||{},signals=item.signals.slice(0,4),deep=deepByStudent.has(String(item.studentId));
-    return`<article class="tb-radar-card"><i class="tb-radar-light ${item.light}" aria-hidden="true"></i><div class="tb-radar-main"><div class="tb-radar-kicker"><span class="tb-radar-score">RISCO ${item.score}/100</span>${deep?'<span>ANÁLISE PROFUNDA ✓</span>':'<span>ANÁLISE LEVE</span>'}</div><strong>${h(student.name||'Aluno')}</strong><div class="tb-signal-list">${signals.length?signals.map(signal=>`<span class="tb-signal">${h(signal.label)}</span>`).join(''):'<span class="tb-signal">Sem pendências relevantes</span>'}</div><div class="tb-next-action"><b>PRÓXIMA AÇÃO:</b> ${h(item.nextAction)}</div></div><div class="tb-radar-side"><button class="primary" type="button" data-tb-command-open="${h(item.studentId)}">ABRIR ALUNO</button><button type="button" data-tb-command-deep="${h(item.studentId)}">${deep?'REANALISAR':'ANALISAR TREINO'}</button></div></article>`;
-  }
-
-  function renderWeekSummary(){
-    const host=document.getElementById('tb-week-summary');if(!host||!dashboard||!api())return;
-    const s=api().summary(dashboard.rows,{activity:dashboard.activity,payments:dashboard.payments});
-    host.innerHTML=`<div class="tb-week-card"><span>RELATÓRIOS RECEBIDOS</span><strong>${s.reportsNow}</strong><p>Semana anterior: ${s.reportsPrev}. Diferença: ${s.reportsDelta>0?'+':''}${s.reportsDelta}.</p></div><div class="tb-week-card"><span>ATUALIZAÇÕES ATRASADAS</span><strong>${s.weeklyOverdue+s.monthlyOverdue}</strong><p>${s.weeklyOverdue} semanais · ${s.monthlyOverdue} completas.</p></div><div class="tb-week-card"><span>PAGAMENTOS ATRASADOS</span><strong>${s.paymentsLate}</strong><p>Somente registros financeiros já cadastrados no Team Bulls.</p></div><div class="tb-week-card"><span>CARTEIRA EM DIA</span><strong>${analyses.filter(item=>item.light==='green').length}</strong><p>Sem sinais de atenção detectados pelos dados atualmente disponíveis.</p></div>`;
-  }
-
-  function render(){
-    ensureScreen();const summary=document.getElementById('tb-command-summary'),list=document.getElementById('tb-radar-list');if(!summary||!list)return;
-    document.querySelectorAll('[data-tb-command-filter]').forEach(button=>button.classList.toggle('active',button.dataset.tbCommandFilter===filter));
-    if(loading){summary.innerHTML='';list.innerHTML='<div class="tb-command-loading">Analisando agenda, relatórios e pagamentos sem carregar históricos pesados...</div>';const week=document.getElementById('tb-week-summary');if(week)week.innerHTML='';return;}
-    summary.innerHTML=summaryHtml();
-    const visible=filter==='all'?analyses:analyses.filter(item=>item.light===filter);
-    list.innerHTML=visible.length?visible.map(radarHtml).join(''):'<div class="tb-command-empty">Nenhum aluno neste nível de prioridade.</div>';
-    list.querySelectorAll('[data-tb-command-open]').forEach(button=>button.addEventListener('click',()=>openStudent(button.dataset.tbCommandOpen)));
-    list.querySelectorAll('[data-tb-command-deep]').forEach(button=>button.addEventListener('click',()=>deepAnalyze(button.dataset.tbCommandDeep)));
-    renderWeekSummary();decorateStudentCards();
-  }
-
-  function replaceStudentSlice(items,studentId,replacement){
-    const sid=String(studentId||''),rest=(items||[]).filter(item=>String(item.studentId||'')!==sid),next=Array.isArray(replacement)?replacement:[];
-    return rest.concat(next);
-  }
-
-  async function openStudent(studentId){
-    const row=rowFor(studentId),student=row?.student;if(!student)return;
-    if(typeof viewStudent==='function')await viewStudent(student.uid,student.name||'Aluno',student.email||'',student.status||'active');
-  }
-
+  function recompute(){if(!dashboard||!api())return;analyses=dashboard.rows.map(row=>api().analyze(row,{activity:dashboard.activity,payments:dashboard.payments},deepByStudent.get(String(row.student.uid))||null)).sort((a,b)=>b.score-a.score||String(a.student?.name||'').localeCompare(String(b.student?.name||''),'pt-BR'));}
+  function decorateStudentCards(){const lookup=new Map(analyses.map(item=>[String(item.studentId),item]));document.querySelectorAll('.student-card[data-student-uid]').forEach(card=>{card.querySelector('.tb-insight-light')?.remove();card.querySelector('.tb-insight-label')?.remove();const item=lookup.get(String(card.dataset.studentUid||''));if(!item)return;const name=card.querySelector('.student-name');if(!name)return;const light=document.createElement('i');light.className='tb-insight-light '+item.light;light.title=`Radar: ${item.score}/100 · ${item.nextAction}`;name.prepend(light);const label=document.createElement('span');label.className='tb-insight-label';label.textContent=item.light==='red'?'URGENTE':item.light==='yellow'?'ATENÇÃO':item.light==='blue'?'NOVO':'EM DIA';name.appendChild(label);});}
+  function summaryHtml(){if(!dashboard||!api())return'';const s=api().summary(dashboard.rows,{activity:dashboard.activity,payments:dashboard.payments}),delta=s.reportsDelta===0?'igual à semana anterior':s.reportsDelta>0?`+${s.reportsDelta} vs. semana anterior`:`${s.reportsDelta} vs. semana anterior`;return`<div class="tb-command-stat"><span>ALUNOS ATIVOS</span><strong>${s.active}</strong></div><div class="tb-command-stat red"><span>URGENTES</span><strong>${analyses.filter(item=>item.light==='red').length}</strong></div><div class="tb-command-stat yellow"><span>ATENÇÃO</span><strong>${analyses.filter(item=>item.light==='yellow').length}</strong></div><div class="tb-command-stat blue"><span>RELATÓRIOS NA SEMANA</span><strong>${s.reportsNow}</strong><small style="color:#706761;font-size:7px">${h(delta)}</small></div>`;}
+  function radarHtml(item){const student=item.student||{},signals=item.signals.slice(0,4),deep=deepByStudent.has(String(item.studentId));return`<article class="tb-radar-card"><i class="tb-radar-light ${item.light}" aria-hidden="true"></i><div class="tb-radar-main"><div class="tb-radar-kicker"><span class="tb-radar-score">RISCO ${item.score}/100</span>${deep?'<span>ANÁLISE PROFUNDA ✓</span>':'<span>ANÁLISE LEVE</span>'}</div><strong>${h(student.name||'Aluno')}</strong><div class="tb-signal-list">${signals.length?signals.map(signal=>`<span class="tb-signal">${h(signal.label)}</span>`).join(''):'<span class="tb-signal">Sem pendências relevantes</span>'}</div><div class="tb-next-action"><b>PRÓXIMA AÇÃO:</b> ${h(item.nextAction)}</div></div><div class="tb-radar-side"><button class="primary" type="button" data-tb-command-open="${h(item.studentId)}">ABRIR ALUNO</button><button type="button" data-tb-command-deep="${h(item.studentId)}">${deep?'REANALISAR':'ANALISAR TREINO'}</button></div></article>`;}
+  function renderWeekSummary(){const host=document.getElementById('tb-week-summary');if(!host||!dashboard||!api())return;const s=api().summary(dashboard.rows,{activity:dashboard.activity,payments:dashboard.payments});host.innerHTML=`<div class="tb-week-card"><span>RELATÓRIOS RECEBIDOS</span><strong>${s.reportsNow}</strong><p>Semana anterior: ${s.reportsPrev}. Diferença: ${s.reportsDelta>0?'+':''}${s.reportsDelta}.</p></div><div class="tb-week-card"><span>ATUALIZAÇÕES ATRASADAS</span><strong>${s.weeklyOverdue+s.monthlyOverdue}</strong><p>${s.weeklyOverdue} semanais · ${s.monthlyOverdue} completas.</p></div><div class="tb-week-card"><span>PAGAMENTOS ATRASADOS</span><strong>${s.paymentsLate}</strong><p>Somente registros financeiros já cadastrados no Team Bulls.</p></div><div class="tb-week-card"><span>CARTEIRA EM DIA</span><strong>${analyses.filter(item=>item.light==='green').length}</strong><p>Sem sinais de atenção detectados pelos dados atualmente disponíveis.</p></div>`;}
+  function render(){ensureScreen();const summary=document.getElementById('tb-command-summary'),list=document.getElementById('tb-radar-list');if(!summary||!list)return;document.querySelectorAll('[data-tb-command-filter]').forEach(button=>button.classList.toggle('active',button.dataset.tbCommandFilter===filter));if(loading){summary.innerHTML='';list.innerHTML='<div class="tb-command-loading">Analisando agenda, relatórios e pagamentos sem carregar históricos pesados...</div>';const week=document.getElementById('tb-week-summary');if(week)week.innerHTML='';return;}summary.innerHTML=summaryHtml();const visible=filter==='all'?analyses:analyses.filter(item=>item.light===filter);list.innerHTML=visible.length?visible.map(radarHtml).join(''):'<div class="tb-command-empty">Nenhum aluno neste nível de prioridade.</div>';list.querySelectorAll('[data-tb-command-open]').forEach(button=>button.addEventListener('click',()=>openStudent(button.dataset.tbCommandOpen)));list.querySelectorAll('[data-tb-command-deep]').forEach(button=>button.addEventListener('click',()=>deepAnalyze(button.dataset.tbCommandDeep)));renderWeekSummary();decorateStudentCards();}
+  function replaceStudentSlice(items,studentId,replacement){const sid=String(studentId||''),rest=(items||[]).filter(item=>String(item.studentId||'')!==sid),next=Array.isArray(replacement)?replacement:[];return rest.concat(next);}
+  async function openStudent(studentId){const row=rowFor(studentId),student=row?.student;if(!student)return;if(typeof viewStudent==='function')await viewStudent(student.uid,student.name||'Aluno',student.email||'',student.status||'active');}
   async function deepAnalyze(studentId){
-    if(!api()||loading)return;
-    const sid=String(studentId||''),button=document.querySelector(`[data-tb-command-deep="${CSS.escape(sid)}"]`),run=serial;
-    if(button){button.disabled=true;button.textContent='ANALISANDO...';}
-    try{
-      const deep=await api().loadDeepStudent(sid,true);
-      if(!deep||!trainer()||run!==serial||!dashboard)return;
-      deepByStudent.set(sid,deep);
-      const row=rowFor(sid);
-      if(row){row.checkinSchedule=deep.checkinSchedule||null;row.protocolSchedule=deep.protocolSchedule||null;}
-      dashboard.activity=replaceStudentSlice(dashboard.activity,sid,deep.activity);
-      dashboard.payments=replaceStudentSlice(dashboard.payments,sid,deep.payments);
-      recompute();render();
-      if(typeof showToast==='function')showToast('✓ Análise profunda atualizada');
-    }catch(error){
-      console.error('deepAnalyze',error);
-      if(typeof showToast==='function')showToast('Não foi possível carregar o histórico deste aluno.',true);
-    }finally{if(button?.isConnected)button.disabled=false;}
+    if(!api()||loading)return;const sid=String(studentId||''),button=document.querySelector(`[data-tb-command-deep="${CSS.escape(sid)}"]`),run=serial;if(button){button.disabled=true;button.textContent='ANALISANDO...';}
+    try{const deep=await api().loadDeepStudent(sid,true);if(!deep||!trainer()||run!==serial||!dashboard)return;deepByStudent.set(sid,deep);const row=rowFor(sid);if(row){row.checkinSchedule=deep.checkinSchedule||null;row.protocolSchedule=deep.protocolSchedule||null;}dashboard.activity=replaceStudentSlice(dashboard.activity,sid,deep.activity);dashboard.payments=replaceStudentSlice(dashboard.payments,sid,deep.payments);recompute();render();if(typeof showToast==='function')showToast('✓ Análise profunda atualizada');}
+    catch(error){console.error('deepAnalyze',error);if(typeof showToast==='function')showToast('Não foi possível carregar o histórico deste aluno.',true);}
+    finally{if(button?.isConnected){button.disabled=false;button.textContent=deepByStudent.has(sid)?'REANALISAR':'ANALISAR TREINO';}}
   }
-
-  async function load(force=false){
-    if(!trainer()||!api()||loading)return;
-    const run=++serial;loading=true;render();
-    try{dashboard=await api().loadDashboard(force);if(run!==serial)return;recompute();}
-    catch(error){if(run===serial){console.error('Trainer command center',error);dashboard=null;analyses=[];if(typeof showToast==='function')showToast('Não foi possível atualizar o radar.',true);}}
-    finally{if(run===serial){loading=false;render();}}
-  }
-
+  async function load(force=false){if(!trainer()||!api()||loading)return;const run=++serial;loading=true;render();try{dashboard=await api().loadDashboard(force);if(run!==serial)return;recompute();}catch(error){if(run===serial){console.error('Trainer command center',error);dashboard=null;analyses=[];if(typeof showToast==='function')showToast('Não foi possível atualizar o radar.',true);}}finally{if(run===serial){loading=false;render();}}}
   async function open(){if(!trainer())return;ensureEntry();if(typeof showScreen==='function')showScreen(SCREEN_ID);await load(false);}
-
-  function patchTrainerRender(){
-    if(typeof renderTrainer!=='function'||renderTrainer.__tbCommandCenter)return;
-    const base=renderTrainer;
-    const wrapped=async function(){const result=await base.apply(this,arguments);if(trainer()){ensureEntry();decorateStudentCards();}return result;};
-    wrapped.__tbCommandCenter=true;wrapped.__tbBase=base;renderTrainer=wrapped;
-  }
-
-  function patchLogout(){
-    if(typeof confirmLogout!=='function'||confirmLogout.__tbCommandCenter)return;
-    const base=confirmLogout;
-    const wrapped=function(){dashboard=null;analyses=[];deepByStudent.clear();filter='all';loading=false;serial++;return base.apply(this,arguments);};
-    wrapped.__tbCommandCenter=true;wrapped.__tbBase=base;confirmLogout=wrapped;
-  }
-
+  function patchTrainerRender(){if(typeof renderTrainer!=='function'||renderTrainer.__tbCommandCenter)return;const base=renderTrainer;const wrapped=async function(){const result=await base.apply(this,arguments);if(trainer()){ensureEntry();decorateStudentCards();}return result;};wrapped.__tbCommandCenter=true;wrapped.__tbBase=base;renderTrainer=wrapped;}
+  function patchLogout(){if(typeof confirmLogout!=='function'||confirmLogout.__tbCommandCenter)return;const base=confirmLogout;const wrapped=function(){dashboard=null;analyses=[];deepByStudent.clear();filter='all';loading=false;serial++;return base.apply(this,arguments);};wrapped.__tbCommandCenter=true;wrapped.__tbBase=base;confirmLogout=wrapped;}
   function install(){injectStyles();ensureScreen();patchTrainerRender();patchLogout();if(trainer())ensureEntry();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-  window.addEventListener('team-bulls-runtime-ready',install);
-  window.addEventListener('pageshow',()=>{if(trainer())ensureEntry();},{passive:true});
-
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();window.addEventListener('team-bulls-runtime-ready',install);window.addEventListener('pageshow',()=>{if(trainer())ensureEntry();},{passive:true});
   window.TeamBullsTrainerCommandCenter=Object.freeze({version:VERSION,open,refresh:()=>load(true),deepAnalyze,snapshot:()=>({analyses:analyses.map(item=>({...item})),loaded:!!dashboard})});
 })();
