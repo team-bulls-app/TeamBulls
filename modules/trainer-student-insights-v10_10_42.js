@@ -60,6 +60,8 @@
     for(const item of sessions){const date=iso(item.date);if(!date)continue;const row=map.get(date)||{date,count:0,sets:0,names:new Set()};row.count++;row.sets+=(item.sets||[]).length;if(item.exerciseName)row.names.add(String(item.exerciseName));map.set(date,row);}
     return[...map.values()].sort((a,b)=>b.date.localeCompare(a.date));
   }
+  function workoutSessionKey(session){const date=iso(session?.date);if(!date)return'';return`${date}|${String(session?.workoutId||session?._wid||session?.workoutName||'workout')}`;}
+  function trainingSessionCount(sessions=[]){return new Set(sessions.map(workoutSessionKey).filter(Boolean)).size;}
 
   function timelineEvents(){
     if(!bundle)return[];const events=[];
@@ -74,70 +76,26 @@
     return events.filter(item=>iso(item.date)).sort((a,b)=>b.date.localeCompare(a.date)||a.title.localeCompare(b.title,'pt-BR'));
   }
 
-  function timelineHtml(){
-    const items=timelineEvents();
-    return`<section class="tb-insights-card"><h3>Linha do tempo completa</h3><p>Treinos registrados, relatórios, feedbacks, ciclos e pagamentos reunidos em ordem cronológica.</p></section>${items.length?`<div class="tb-timeline">${items.map(item=>`<div class="tb-timeline-event"><span>${h(fmtDate(item.date))} · ${h(item.type.toUpperCase())}</span><strong>${h(item.title)}</strong>${item.text?`<p>${h(item.text)}</p>`:''}</div>`).join('')}</div>`:'<div class="tb-insights-empty">Ainda não há eventos suficientes para montar a linha do tempo.</div>'}`;
-  }
+  function timelineHtml(){const items=timelineEvents();return`<section class="tb-insights-card"><h3>Linha do tempo completa</h3><p>Treinos registrados, relatórios, feedbacks, ciclos e pagamentos reunidos em ordem cronológica.</p></section>${items.length?`<div class="tb-timeline">${items.map(item=>`<div class="tb-timeline-event"><span>${h(fmtDate(item.date))} · ${h(item.type.toUpperCase())}</span><strong>${h(item.title)}</strong>${item.text?`<p>${h(item.text)}</p>`:''}</div>`).join('')}</div>`:'<div class="tb-insights-empty">Ainda não há eventos suficientes para montar a linha do tempo.</div>'}`;}
 
-  function periodStats(start,end){
-    const list=(bundle?.sessions||[]).filter(item=>iso(item.date)&&item.date>start&&item.date<=end),sets=list.reduce((sum,item)=>sum+(Array.isArray(item.sets)?item.sets.length:0),0),volume=list.reduce((sum,item)=>sum+(item.sets||[]).reduce((s,set)=>s+(Number(set.weight)||0)*(Number(set.reps)||0),0),0);
-    return{list,count:list.length,sets,volume};
-  }
+  function periodStats(start,end){const list=(bundle?.sessions||[]).filter(item=>iso(item.date)&&item.date>start&&item.date<=end),sets=list.reduce((sum,item)=>sum+(Array.isArray(item.sets)?item.sets.length:0),0),volume=list.reduce((sum,item)=>sum+(item.sets||[]).reduce((s,set)=>s+(Number(set.weight)||0)*(Number(set.reps)||0),0),0);return{list,count:list.length,sets,volume};}
   function maxLoads(list=[]){const out=new Map();for(const session of list){const name=String(session.exerciseName||session.exerciseId||'Exercício'),max=Math.max(0,...(session.sets||[]).map(set=>Number(set.weight)||0));if(max>Number(out.get(name)||0))out.set(name,max);}return out;}
-
   function comparison(){
-    const current=bundle?.checkins?.[0],previous=bundle?.checkins?.[1];if(!current||!previous)return null;
-    const currentDate=iso(current.submittedDate||current.dueDate),previousDate=iso(previous.submittedDate||previous.dueDate);if(!currentDate||!previousDate)return null;
-    const span=Math.max(1,dataApi().dayDiff(previousDate,currentDate)),previousStart=dataApi().addDays(previousDate,-span),currentStats=periodStats(previousDate,currentDate),previousStats=periodStats(previousStart,previousDate),currentLoads=maxLoads(currentStats.list),previousLoads=maxLoads(previousStats.list),progress=[];
-    currentLoads.forEach((value,name)=>{if(!previousLoads.has(name))return;const before=previousLoads.get(name),delta=value-before;if(delta!==0)progress.push({name,before,after:value,delta});});
-    progress.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
-    return{current,previous,currentDate,previousDate,span,currentStats,previousStats,progress,weightDelta:Number(current.weight||0)-Number(previous.weight||0)};
+    const current=bundle?.checkins?.[0],previous=bundle?.checkins?.[1];if(!current||!previous)return null;const currentDate=iso(current.submittedDate||current.dueDate),previousDate=iso(previous.submittedDate||previous.dueDate);if(!currentDate||!previousDate)return null;const span=Math.max(1,dataApi().dayDiff(previousDate,currentDate)),previousStart=dataApi().addDays(previousDate,-span),currentStats=periodStats(previousDate,currentDate),previousStats=periodStats(previousStart,previousDate),currentLoads=maxLoads(currentStats.list),previousLoads=maxLoads(previousStats.list),progress=[];
+    currentLoads.forEach((value,name)=>{if(!previousLoads.has(name))return;const before=previousLoads.get(name),delta=value-before;if(delta!==0)progress.push({name,before,after:value,delta});});progress.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));return{current,previous,currentDate,previousDate,span,currentStats,previousStats,progress,weightDelta:Number(current.weight||0)-Number(previous.weight||0)};
   }
-
-  function compareHtml(){
-    const c=comparison();if(!c)return'<div class="tb-insights-empty">São necessários pelo menos dois relatórios semanais para montar a comparação automática.</div>';
-    return`<section class="tb-insights-card"><h3>Antes × Agora</h3><p>Comparação entre os dois relatórios mais recentes e dois períodos de mesma duração (${c.span} dias).</p><div class="tb-compare-grid"><div class="tb-compare-box"><span>RELATÓRIO ANTERIOR · ${h(fmtDate(c.previousDate))}</span><strong>${Number(c.previous.weight||0).toLocaleString('pt-BR',{maximumFractionDigits:1})} kg</strong><p>${c.previousStats.count} registros de treino · ${c.previousStats.sets} séries</p></div><div class="tb-compare-box"><span>RELATÓRIO ATUAL · ${h(fmtDate(c.currentDate))}</span><strong>${Number(c.current.weight||0).toLocaleString('pt-BR',{maximumFractionDigits:1})} kg</strong><p>${c.currentStats.count} registros de treino · ${c.currentStats.sets} séries · peso ${c.weightDelta>0?'+':''}${c.weightDelta.toLocaleString('pt-BR',{maximumFractionDigits:1})} kg</p></div></div>${c.progress.length?`<table class="tb-progress-table"><thead><tr><th>EXERCÍCIO</th><th>ANTES</th><th>AGORA</th><th>Δ CARGA</th></tr></thead><tbody>${c.progress.slice(0,8).map(item=>`<tr><td><strong>${h(item.name)}</strong></td><td>${item.before} kg</td><td>${item.after} kg</td><td>${item.delta>0?'+':''}${item.delta} kg</td></tr>`).join('')}</tbody></table>`:'<p style="margin-top:9px">Ainda não há exercícios comparáveis com mudança de carga entre os períodos.</p>'}<div class="tb-review-actions"><button type="button" data-tb-open-checkin="${h(c.current.id)}">ABRIR RELATÓRIO ATUAL</button><button type="button" data-tb-open-checkin="${h(c.previous.id)}">ABRIR RELATÓRIO ANTERIOR</button></div></section>`;
-  }
+  function compareHtml(){const c=comparison();if(!c)return'<div class="tb-insights-empty">São necessários pelo menos dois relatórios semanais para montar a comparação automática.</div>';return`<section class="tb-insights-card"><h3>Antes × Agora</h3><p>Comparação entre os dois relatórios mais recentes e dois períodos de mesma duração (${c.span} dias).</p><div class="tb-compare-grid"><div class="tb-compare-box"><span>RELATÓRIO ANTERIOR · ${h(fmtDate(c.previousDate))}</span><strong>${Number(c.previous.weight||0).toLocaleString('pt-BR',{maximumFractionDigits:1})} kg</strong><p>${c.previousStats.count} registros de treino · ${c.previousStats.sets} séries</p></div><div class="tb-compare-box"><span>RELATÓRIO ATUAL · ${h(fmtDate(c.currentDate))}</span><strong>${Number(c.current.weight||0).toLocaleString('pt-BR',{maximumFractionDigits:1})} kg</strong><p>${c.currentStats.count} registros de treino · ${c.currentStats.sets} séries · peso ${c.weightDelta>0?'+':''}${c.weightDelta.toLocaleString('pt-BR',{maximumFractionDigits:1})} kg</p></div></div>${c.progress.length?`<table class="tb-progress-table"><thead><tr><th>EXERCÍCIO</th><th>ANTES</th><th>AGORA</th><th>Δ CARGA</th></tr></thead><tbody>${c.progress.slice(0,8).map(item=>`<tr><td><strong>${h(item.name)}</strong></td><td>${item.before} kg</td><td>${item.after} kg</td><td>${item.delta>0?'+':''}${item.delta} kg</td></tr>`).join('')}</tbody></table>`:'<p style="margin-top:9px">Ainda não há exercícios comparáveis com mudança de carga entre os períodos.</p>'}<div class="tb-review-actions"><button type="button" data-tb-open-checkin="${h(c.current.id)}">ABRIR RELATÓRIO ATUAL</button><button type="button" data-tb-open-checkin="${h(c.previous.id)}">ABRIR RELATÓRIO ANTERIOR</button></div></section>`;}
 
   function generatedActions(){
-    if(!bundle||!dataApi())return[];
-    const row={student:student()||{uid:studentId},checkinSchedule:bundle.checkinSchedule,protocolSchedule:bundle.protocolSchedule},analysis=dataApi().analyze(row,{activity:bundle.activity||[],payments:bundle.payments||[]},bundle),actions=[];
-    analysis.signals.slice(0,4).forEach(signal=>actions.push(signal.action));
-    const c=comparison();
-    if(c){if(c.currentStats.count<c.previousStats.count)actions.push('Revisar queda na frequência de registros de treino');if(c.weightDelta!==0&&Math.abs(c.weightDelta)>=2)actions.push('Contextualizar a mudança de peso com adesão, fotos e objetivo do ciclo');if(c.progress.filter(item=>item.delta>0).length>=2)actions.push('Confirmar se a progressão de carga está compatível com técnica e GER');}
-    if(bundle.feedbacks?.some(item=>item.read!==true))actions.push('Checar feedbacks ainda não lidos pelo aluno antes de enviar nova orientação');
-    return[...new Set(actions)].slice(0,6);
+    if(!bundle||!dataApi())return[];const row={student:student()||{uid:studentId},checkinSchedule:bundle.checkinSchedule,protocolSchedule:bundle.protocolSchedule},analysis=dataApi().analyze(row,{activity:bundle.activity||[],payments:bundle.payments||[]},bundle),actions=[];analysis.signals.slice(0,4).forEach(signal=>actions.push(signal.action));const c=comparison();if(c){if(c.currentStats.count<c.previousStats.count)actions.push('Revisar queda na frequência de registros de treino');if(c.weightDelta!==0&&Math.abs(c.weightDelta)>=2)actions.push('Contextualizar a mudança de peso com adesão, fotos e objetivo do ciclo');if(c.progress.filter(item=>item.delta>0).length>=2)actions.push('Confirmar se a progressão de carga está compatível com técnica e GER');}if(bundle.feedbacks?.some(item=>item.read!==true))actions.push('Checar feedbacks ainda não lidos pelo aluno antes de enviar nova orientação');return[...new Set(actions)].slice(0,6);
   }
+  function actionsHtml(){const actions=generatedActions();return`<section class="tb-insights-card"><h3>Gerador de próxima ação</h3><p>Checklist determinístico baseado nos dados do próprio aluno. Ele organiza os pontos para revisão; a decisão continua sendo do treinador.</p>${actions.length?actions.map((item,index)=>`<div class="tb-action-suggestion"><b>${index+1}</b><div>${h(item)}</div></div>`).join(''):'<div class="tb-action-suggestion"><b>✓</b><div>Nenhuma pendência relevante detectada. Manter acompanhamento normal.</div></div>'}</section>`;}
 
-  function actionsHtml(){
-    const actions=generatedActions();
-    return`<section class="tb-insights-card"><h3>Gerador de próxima ação</h3><p>Checklist determinístico baseado nos dados do próprio aluno. Ele organiza os pontos para revisão; a decisão continua sendo do treinador.</p>${actions.length?actions.map((item,index)=>`<div class="tb-action-suggestion"><b>${index+1}</b><div>${h(item)}</div></div>`).join(''):'<div class="tb-action-suggestion"><b>✓</b><div>Nenhuma pendência relevante detectada. Manter acompanhamento normal.</div></div>'}</section>`;
-  }
-
-  function goalContext(){
-    const schedule=bundle?.protocolSchedule,bounds=schedule&&dataApi()?.currentCycleBounds(schedule),raw=schedule?.cycleGoals&&typeof schedule.cycleGoals==='object'?schedule.cycleGoals:{};
-    const key=bounds?.key||'',legacy=!raw.cycleKey,current=!raw.cycleKey||!key||String(raw.cycleKey)===key;
-    return{schedule,bounds,key,raw,goals:current?raw:{},current,legacy};
-  }
+  function goalContext(){const schedule=bundle?.protocolSchedule,bounds=schedule&&dataApi()?.currentCycleBounds(schedule),raw=schedule?.cycleGoals&&typeof schedule.cycleGoals==='object'?schedule.cycleGoals:{},key=bounds?.key||'',current=!raw.cycleKey||!key||String(raw.cycleKey)===key;return{schedule,bounds,key,raw,goals:current?raw:{},current};}
   function goals(){return goalContext().goals;}
-
-  function goalProgress(){
-    const context=goalContext(),bounds=context.bounds,g=context.goals;
-    if(!bounds)return{g,bounds:null,sessions:0,reports:0,currentWeight:bundle?.checkins?.[0]?.weight||0};
-    const sessions=(bundle.sessions||[]).filter(item=>iso(item.date)&&item.date>=bounds.start&&item.date<=bounds.end).length,reports=(bundle.checkins||[]).filter(item=>{const date=iso(item.submittedDate||item.dueDate);return date&&date>=bounds.start&&date<=bounds.end;}).length;
-    return{g,bounds,sessions,reports,currentWeight:Number(bundle?.checkins?.[0]?.weight||0)};
-  }
+  function goalProgress(){const context=goalContext(),bounds=context.bounds,g=context.goals;if(!bounds)return{g,bounds:null,sessions:0,reports:0,currentWeight:bundle?.checkins?.[0]?.weight||0};const cycleSessions=(bundle.sessions||[]).filter(item=>iso(item.date)&&item.date>=bounds.start&&item.date<=bounds.end),sessions=trainingSessionCount(cycleSessions),reports=(bundle.checkins||[]).filter(item=>{const date=iso(item.submittedDate||item.dueDate);return date&&date>=bounds.start&&date<=bounds.end;}).length;return{g,bounds,sessions,reports,currentWeight:Number(bundle?.checkins?.[0]?.weight||0)};}
   const pct=(value,target)=>target>0?Math.max(0,Math.min(100,Math.round(value/target*100))):0;
-
-  function goalsHtml(){
-    const context=goalContext(),p=goalProgress(),g=p.g||{};
-    if(!bundle?.protocolSchedule)return'<div class="tb-insights-empty">Configure primeiro o ciclo de atualização completa deste aluno para usar metas de ciclo.</div>';
-    const weightTarget=Number(g.weightTargetKg)||0,startWeight=Number(g.weightStartKg)||0,currentWeight=Number(p.currentWeight)||0;
-    let weightText=weightTarget?`${currentWeight?currentWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' → ':''}${weightTarget.toLocaleString('pt-BR',{maximumFractionDigits:1})} kg`:'Não definida',weightPct=0;
-    if(weightTarget&&startWeight&&currentWeight){weightPct=weightTarget===startWeight?(currentWeight===weightTarget?100:0):Math.max(0,Math.min(100,Math.round((currentWeight-startWeight)/(weightTarget-startWeight)*100)));}
-    const stale=!context.current&&Object.keys(context.raw).length?'<p><b>NOVO CICLO:</b> as metas do ciclo anterior foram arquivadas. Defina as metas atuais antes de usar o progresso.</p>':'';
-    return`<section class="tb-insights-card"><h3>Metas do ciclo</h3><p>${p.bounds?`Ciclo ${p.bounds.cycle} · ${fmtDate(p.bounds.start)} a ${fmtDate(p.bounds.end)}.`:'Metas vinculadas ao cronograma atual.'}</p>${stale}<div class="tb-goal-grid"><div class="tb-goal"><span>PESO-ALVO</span><strong>${h(weightText)}</strong><div class="tb-goal-bar"><i style="width:${weightPct}%"></i></div></div><div class="tb-goal"><span>SESSÕES</span><strong>${p.sessions}${Number(g.sessionsTarget)>0?' / '+Number(g.sessionsTarget):''}</strong><div class="tb-goal-bar"><i style="width:${pct(p.sessions,Number(g.sessionsTarget)||0)}%"></i></div></div><div class="tb-goal"><span>RELATÓRIOS</span><strong>${p.reports}${Number(g.reportsTarget)>0?' / '+Number(g.reportsTarget):''}</strong><div class="tb-goal-bar"><i style="width:${pct(p.reports,Number(g.reportsTarget)||0)}%"></i></div></div></div>${g.note?`<p><b>FOCO:</b> ${h(g.note)}</p>`:''}<div class="tb-review-actions"><button class="primary" type="button" data-tb-edit-goals>EDITAR METAS</button></div></section>`;
-  }
+  function goalsHtml(){const context=goalContext(),p=goalProgress(),g=p.g||{};if(!bundle?.protocolSchedule)return'<div class="tb-insights-empty">Configure primeiro o ciclo de atualização completa deste aluno para usar metas de ciclo.</div>';const weightTarget=Number(g.weightTargetKg)||0,startWeight=Number(g.weightStartKg)||0,currentWeight=Number(p.currentWeight)||0;let weightText=weightTarget?`${currentWeight?currentWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' → ':''}${weightTarget.toLocaleString('pt-BR',{maximumFractionDigits:1})} kg`:'Não definida',weightPct=0;if(weightTarget&&startWeight&&currentWeight)weightPct=weightTarget===startWeight?(currentWeight===weightTarget?100:0):Math.max(0,Math.min(100,Math.round((currentWeight-startWeight)/(weightTarget-startWeight)*100)));const stale=!context.current&&Object.keys(context.raw).length?'<p><b>NOVO CICLO:</b> as metas do ciclo anterior foram arquivadas. Defina as metas atuais antes de usar o progresso.</p>':'';return`<section class="tb-insights-card"><h3>Metas do ciclo</h3><p>${p.bounds?`Ciclo ${p.bounds.cycle} · ${fmtDate(p.bounds.start)} a ${fmtDate(p.bounds.end)}.`:'Metas vinculadas ao cronograma atual.'}</p>${stale}<div class="tb-goal-grid"><div class="tb-goal"><span>PESO-ALVO</span><strong>${h(weightText)}</strong><div class="tb-goal-bar"><i style="width:${weightPct}%"></i></div></div><div class="tb-goal"><span>SESSÕES</span><strong>${p.sessions}${Number(g.sessionsTarget)>0?' / '+Number(g.sessionsTarget):''}</strong><div class="tb-goal-bar"><i style="width:${pct(p.sessions,Number(g.sessionsTarget)||0)}%"></i></div></div><div class="tb-goal"><span>RELATÓRIOS</span><strong>${p.reports}${Number(g.reportsTarget)>0?' / '+Number(g.reportsTarget):''}</strong><div class="tb-goal-bar"><i style="width:${pct(p.reports,Number(g.reportsTarget)||0)}%"></i></div></div></div>${g.note?`<p><b>FOCO:</b> ${h(g.note)}</p>`:''}<div class="tb-review-actions"><button class="primary" type="button" data-tb-edit-goals>EDITAR METAS</button></div></section>`;}
 
   const reviewSteps=[
     {title:'Fotos e relatório',render:()=>{const item=bundle?.checkins?.[0];return item?`Último relatório: <b>${h(fmtDate(item.submittedDate||item.dueDate))}</b> · ${Array.isArray(item.photoIds)?item.photoIds.length:0} fotos. Abra o relatório e confira as evidências antes de avançar.`:'Nenhum relatório semanal disponível ainda.';}},
@@ -149,101 +107,24 @@
     {title:'Metas e próxima ação',render:()=>{const actions=generatedActions();return actions.length?`Prioridade sugerida: <b>${h(actions[0])}</b>. Confira também as metas do ciclo antes de fechar a revisão.`:'Metas e sinais atuais não indicam uma ação corretiva específica.';}},
     {title:'Feedback e conclusão',render:()=>`Registre o feedback detalhado e só então conclua a atualização completa. A conclusão usa o ciclo oficial do Team Bulls e não cria um estado paralelo.`}
   ];
+  function reviewHtml(){const step=reviewSteps[Math.max(0,Math.min(reviewSteps.length-1,reviewStep))],pending=dataApi()?.protocolState(bundle?.protocolSchedule)?.pending===true;return`<div class="tb-review-progress">${reviewSteps.map((_,index)=>`<i class="${index<=reviewStep?'done':''}"></i>`).join('')}</div><section class="tb-review-step"><div class="kicker">ETAPA ${reviewStep+1} / ${reviewSteps.length}</div><h3>${h(step.title)}</h3><p>${step.render()}</p><div class="tb-review-actions">${reviewStep>0?'<button type="button" data-tb-review-prev>← ANTERIOR</button>':''}${reviewStep<reviewSteps.length-1?'<button class="primary" type="button" data-tb-review-next>PRÓXIMA →</button>':`<button type="button" data-tb-review-feedback>ENVIAR FEEDBACK</button><button class="primary" type="button" data-tb-review-complete ${pending?'':'disabled'}>CONCLUIR ATUALIZAÇÃO</button>`}</div></section>`;}
 
-  function reviewHtml(){
-    const step=reviewSteps[Math.max(0,Math.min(reviewSteps.length-1,reviewStep))],pending=dataApi()?.protocolState(bundle?.protocolSchedule)?.pending===true;
-    return`<div class="tb-review-progress">${reviewSteps.map((_,index)=>`<i class="${index<=reviewStep?'done':''}"></i>`).join('')}</div><section class="tb-review-step"><div class="kicker">ETAPA ${reviewStep+1} / ${reviewSteps.length}</div><h3>${h(step.title)}</h3><p>${step.render()}</p><div class="tb-review-actions">${reviewStep>0?'<button type="button" data-tb-review-prev>← ANTERIOR</button>':''}${reviewStep<reviewSteps.length-1?'<button class="primary" type="button" data-tb-review-next>PRÓXIMA →</button>':`<button type="button" data-tb-review-feedback>ENVIAR FEEDBACK</button><button class="primary" type="button" data-tb-review-complete ${pending?'':'disabled'}>CONCLUIR ATUALIZAÇÃO</button>`}</div></section>`;
-  }
+  function render(){ensureUi();const head=document.getElementById('tb-insights-head'),body=document.getElementById('tb-insights-body');if(!head||!body)return;document.querySelectorAll('[data-tb-insights-tab]').forEach(button=>button.classList.toggle('active',button.dataset.tbInsightsTab===tab));const s=student();head.innerHTML=`<span>ARQUIVO INTELIGENTE</span><strong>${h(s?.name||'Aluno')}</strong><p>Dados reunidos somente quando esta análise é aberta. Nenhuma decisão é tomada automaticamente.</p>`;if(loading){body.innerHTML='<div class="tb-insights-loading">Carregando histórico deste aluno para análise...</div>';return;}if(!bundle){body.innerHTML='<div class="tb-insights-empty">Não foi possível carregar os dados deste aluno.</div>';return;}body.innerHTML=tab==='timeline'?timelineHtml():tab==='compare'?compareHtml():tab==='actions'?actionsHtml():tab==='goals'?goalsHtml():reviewHtml();body.querySelectorAll('[data-tb-open-checkin]').forEach(button=>button.addEventListener('click',()=>{if(typeof viewWeeklyCheckin==='function')viewWeeklyCheckin(button.dataset.tbOpenCheckin);}));body.querySelector('[data-tb-edit-goals]')?.addEventListener('click',openGoalEditor);body.querySelector('[data-tb-review-prev]')?.addEventListener('click',()=>{reviewStep=Math.max(0,reviewStep-1);render();});body.querySelector('[data-tb-review-next]')?.addEventListener('click',()=>{reviewStep=Math.min(reviewSteps.length-1,reviewStep+1);render();});body.querySelector('[data-tb-review-feedback]')?.addEventListener('click',()=>{if(typeof openFeedbackModal==='function')openFeedbackModal('protocol_update');});body.querySelector('[data-tb-review-complete]')?.addEventListener('click',()=>{if(typeof markProtocolReviewCompleted==='function')markProtocolReviewCompleted();});}
 
-  function render(){
-    ensureUi();const head=document.getElementById('tb-insights-head'),body=document.getElementById('tb-insights-body');if(!head||!body)return;
-    document.querySelectorAll('[data-tb-insights-tab]').forEach(button=>button.classList.toggle('active',button.dataset.tbInsightsTab===tab));
-    const s=student();head.innerHTML=`<span>ARQUIVO INTELIGENTE</span><strong>${h(s?.name||'Aluno')}</strong><p>Dados reunidos somente quando esta análise é aberta. Nenhuma decisão é tomada automaticamente.</p>`;
-    if(loading){body.innerHTML='<div class="tb-insights-loading">Carregando histórico deste aluno para análise...</div>';return;}
-    if(!bundle){body.innerHTML='<div class="tb-insights-empty">Não foi possível carregar os dados deste aluno.</div>';return;}
-    body.innerHTML=tab==='timeline'?timelineHtml():tab==='compare'?compareHtml():tab==='actions'?actionsHtml():tab==='goals'?goalsHtml():reviewHtml();
-    body.querySelectorAll('[data-tb-open-checkin]').forEach(button=>button.addEventListener('click',()=>{if(typeof viewWeeklyCheckin==='function')viewWeeklyCheckin(button.dataset.tbOpenCheckin);}));
-    body.querySelector('[data-tb-edit-goals]')?.addEventListener('click',openGoalEditor);
-    body.querySelector('[data-tb-review-prev]')?.addEventListener('click',()=>{reviewStep=Math.max(0,reviewStep-1);render();});
-    body.querySelector('[data-tb-review-next]')?.addEventListener('click',()=>{reviewStep=Math.min(reviewSteps.length-1,reviewStep+1);render();});
-    body.querySelector('[data-tb-review-feedback]')?.addEventListener('click',()=>{if(typeof openFeedbackModal==='function')openFeedbackModal('protocol_update');});
-    body.querySelector('[data-tb-review-complete]')?.addEventListener('click',()=>{if(typeof markProtocolReviewCompleted==='function')markProtocolReviewCompleted();});
-  }
+  async function load(force=false){if(!trainer()||!studentId||!dataApi())return;const target=String(studentId);if(loading&&loadingStudentId===target)return;const run=++serial;loading=true;loadingStudentId=target;render();try{const next=await dataApi().loadDeepStudent(target,force);if(run!==serial||studentId!==target||String(VIEW_STUDENT?.uid||'')!==target)return;bundle=next;}catch(error){if(run===serial&&studentId===target){console.error('Student insights',error);bundle=null;}}finally{if(run===serial&&studentId===target){loading=false;loadingStudentId='';render();}}}
+  async function open(nextTab='timeline'){if(!trainer()||!VIEW_STUDENT)return;const target=String(VIEW_STUDENT.uid||'');if(!target)return;if(studentId!==target){serial++;studentId=target;bundle=null;loading=false;loadingStudentId='';}tab=['timeline','compare','actions','goals','review'].includes(nextTab)?nextTab:'timeline';reviewStep=0;ensureEntry();showScreen(SCREEN_ID);await load(false);}
 
-  async function load(force=false){
-    if(!trainer()||!studentId||!dataApi())return;
-    const target=String(studentId);
-    if(loading&&loadingStudentId===target)return;
-    const run=++serial;loading=true;loadingStudentId=target;render();
-    try{
-      const next=await dataApi().loadDeepStudent(target,force);
-      if(run!==serial||studentId!==target||String(VIEW_STUDENT?.uid||'')!==target)return;
-      bundle=next;
-    }catch(error){
-      if(run===serial&&studentId===target){console.error('Student insights',error);bundle=null;}
-    }finally{
-      if(run===serial&&studentId===target){loading=false;loadingStudentId='';render();}
-    }
-  }
-
-  async function open(nextTab='timeline'){
-    if(!trainer()||!VIEW_STUDENT)return;
-    const target=String(VIEW_STUDENT.uid||'');if(!target)return;
-    if(studentId!==target){serial++;studentId=target;bundle=null;loading=false;loadingStudentId='';}
-    tab=['timeline','compare','actions','goals','review'].includes(nextTab)?nextTab:'timeline';reviewStep=0;
-    ensureEntry();showScreen(SCREEN_ID);await load(false);
-  }
-
-  function openGoalEditor(){
-    if(!bundle?.protocolSchedule||String(bundle.studentId||'')!==studentId){showToast?.('Configure primeiro o ciclo de atualização completa deste aluno.',true);return;}
-    const g=goals();
-    document.getElementById('tb-goal-weight').value=Number(g.weightTargetKg)>0?String(g.weightTargetKg):'';
-    document.getElementById('tb-goal-sessions').value=Number(g.sessionsTarget)>0?String(g.sessionsTarget):'';
-    document.getElementById('tb-goal-reports').value=Number(g.reportsTarget)>0?String(g.reportsTarget):'';
-    document.getElementById('tb-goal-note').value=String(g.note||'');
-    openModal(GOAL_MODAL);
-  }
-
+  function openGoalEditor(){if(!bundle?.protocolSchedule||String(bundle.studentId||'')!==studentId){showToast?.('Configure primeiro o ciclo de atualização completa deste aluno.',true);return;}const g=goals();document.getElementById('tb-goal-weight').value=Number(g.weightTargetKg)>0?String(g.weightTargetKg):'';document.getElementById('tb-goal-sessions').value=Number(g.sessionsTarget)>0?String(g.sessionsTarget):'';document.getElementById('tb-goal-reports').value=Number(g.reportsTarget)>0?String(g.reportsTarget):'';document.getElementById('tb-goal-note').value=String(g.note||'');openModal(GOAL_MODAL);}
   async function saveGoals(){
-    if(!trainer()||!studentId||!bundle?.protocolSchedule)return;
-    const target=String(studentId),context=goalContext();if(String(VIEW_STUDENT?.uid||'')!==target)return;
-    const weightRaw=document.getElementById('tb-goal-weight').value.trim(),sessionsRaw=document.getElementById('tb-goal-sessions').value.trim(),reportsRaw=document.getElementById('tb-goal-reports').value.trim(),note=document.getElementById('tb-goal-note').value.normalize('NFKC').trim();
-    const weight=weightRaw?Number(weightRaw):0,sessions=sessionsRaw?Math.trunc(Number(sessionsRaw)):0,reports=reportsRaw?Math.trunc(Number(reportsRaw)):0;
-    if(weightRaw&&(!Number.isFinite(weight)||weight<20||weight>500)){alert('Informe um peso-alvo entre 20 e 500 kg.');return;}
-    if(sessionsRaw&&(!Number.isInteger(sessions)||sessions<0||sessions>300)){alert('Informe uma meta de 0 a 300 sessões.');return;}
-    if(reportsRaw&&(!Number.isInteger(reports)||reports<0||reports>60)){alert('Informe uma meta de 0 a 60 relatórios.');return;}
-    if(note.length>500){alert('O foco do ciclo deve ter até 500 caracteres.');return;}
-    if(!beginAction?.('save-cycle-goals',GOAL_MODAL))return;
-    try{
-      const previous=context.raw||{},sameCycle=!previous.cycleKey||!context.key||String(previous.cycleKey)===context.key,currentWeight=Number(bundle.checkins?.[0]?.weight||0);
-      const cycleGoals={weightTargetKg:weight,weightStartKg:sameCycle?(Number(previous.weightStartKg)||currentWeight||0):(currentWeight||0),sessionsTarget:sessions,reportsTarget:reports,note,cycleAnchor:String(bundle.protocolSchedule.startDate||''),cycleKey:context.key||String(bundle.protocolSchedule.startDate||''),cycleStartDate:String(context.bounds?.start||bundle.protocolSchedule.startDate||''),cycleNumber:Number(context.bounds?.cycle)||1};
-      const payload={cycleGoals,cycleGoalsUpdatedBy:CURRENT_USER.uid,cycleGoalsUpdatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-      await cloudWrite(db.collection('protocolReviewSchedules').doc(target).set(payload,{merge:true}),'salvar metas do ciclo');
-      dataApi().invalidateStudent(target);closeModal(GOAL_MODAL);
-      if(studentId===target&&String(VIEW_STUDENT?.uid||'')===target&&bundle){bundle.protocolSchedule={...bundle.protocolSchedule,...payload,cycleGoals};render();}
-      showToast?.('✓ Metas do ciclo atualizadas');
-    }catch(error){alert(typeof cloudWriteError==='function'?cloudWriteError(error,'salvar metas do ciclo'):String(error?.message||error));}
-    finally{endAction?.('save-cycle-goals',GOAL_MODAL);}
+    if(!trainer()||!studentId||!bundle?.protocolSchedule)return;const target=String(studentId),context=goalContext();if(String(VIEW_STUDENT?.uid||'')!==target)return;const weightRaw=document.getElementById('tb-goal-weight').value.trim(),sessionsRaw=document.getElementById('tb-goal-sessions').value.trim(),reportsRaw=document.getElementById('tb-goal-reports').value.trim(),note=document.getElementById('tb-goal-note').value.normalize('NFKC').trim(),weight=weightRaw?Number(weightRaw):0,sessions=sessionsRaw?Math.trunc(Number(sessionsRaw)):0,reports=reportsRaw?Math.trunc(Number(reportsRaw)):0;
+    if(weightRaw&&(!Number.isFinite(weight)||weight<20||weight>500)){alert('Informe um peso-alvo entre 20 e 500 kg.');return;}if(sessionsRaw&&(!Number.isInteger(sessions)||sessions<0||sessions>300)){alert('Informe uma meta de 0 a 300 sessões.');return;}if(reportsRaw&&(!Number.isInteger(reports)||reports<0||reports>60)){alert('Informe uma meta de 0 a 60 relatórios.');return;}if(note.length>500){alert('O foco do ciclo deve ter até 500 caracteres.');return;}if(!beginAction?.('save-cycle-goals',GOAL_MODAL))return;
+    try{const previous=context.raw||{},sameCycle=previous.cycleKey?(!context.key||String(previous.cycleKey)===context.key):Number(context.bounds?.cycle||1)<=1,currentWeight=Number(bundle.checkins?.[0]?.weight||0),cycleGoals={weightTargetKg:weight,weightStartKg:sameCycle?(Number(previous.weightStartKg)||currentWeight||0):(currentWeight||0),sessionsTarget:sessions,reportsTarget:reports,note,cycleAnchor:String(bundle.protocolSchedule.startDate||''),cycleKey:context.key||String(bundle.protocolSchedule.startDate||''),cycleStartDate:String(context.bounds?.start||bundle.protocolSchedule.startDate||''),cycleNumber:Number(context.bounds?.cycle)||1},payload={cycleGoals,cycleGoalsUpdatedBy:CURRENT_USER.uid,cycleGoalsUpdatedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};await cloudWrite(db.collection('protocolReviewSchedules').doc(target).set(payload,{merge:true}),'salvar metas do ciclo');dataApi().invalidateStudent(target);closeModal(GOAL_MODAL);if(studentId===target&&String(VIEW_STUDENT?.uid||'')===target&&bundle){bundle.protocolSchedule={...bundle.protocolSchedule,...payload,cycleGoals};render();}showToast?.('✓ Metas do ciclo atualizadas');}catch(error){alert(typeof cloudWriteError==='function'?cloudWriteError(error,'salvar metas do ciclo'):String(error?.message||error));}finally{endAction?.('save-cycle-goals',GOAL_MODAL);}
   }
 
-  function patchStudentRender(){
-    if(typeof renderTrainerStudent!=='function'||renderTrainerStudent.__tbStudentInsights)return;
-    const base=renderTrainerStudent;
-    const wrapped=async function(){const result=await base.apply(this,arguments);if(trainer()&&VIEW_STUDENT)ensureEntry();return result;};
-    wrapped.__tbStudentInsights=true;wrapped.__tbBase=base;renderTrainerStudent=wrapped;
-  }
-
-  function patchLogout(){
-    if(typeof confirmLogout!=='function'||confirmLogout.__tbStudentInsights)return;
-    const base=confirmLogout;
-    const wrapped=function(){studentId='';bundle=null;loading=false;loadingStudentId='';serial++;reviewStep=0;return base.apply(this,arguments);};
-    wrapped.__tbStudentInsights=true;wrapped.__tbBase=base;confirmLogout=wrapped;
-  }
-
+  function patchStudentRender(){if(typeof renderTrainerStudent!=='function'||renderTrainerStudent.__tbStudentInsights)return;const base=renderTrainerStudent;const wrapped=async function(){const result=await base.apply(this,arguments);if(trainer()&&VIEW_STUDENT)ensureEntry();return result;};wrapped.__tbStudentInsights=true;wrapped.__tbBase=base;renderTrainerStudent=wrapped;}
+  function patchLogout(){if(typeof confirmLogout!=='function'||confirmLogout.__tbStudentInsights)return;const base=confirmLogout;const wrapped=function(){studentId='';bundle=null;loading=false;loadingStudentId='';serial++;reviewStep=0;return base.apply(this,arguments);};wrapped.__tbStudentInsights=true;wrapped.__tbBase=base;confirmLogout=wrapped;}
   function install(){ensureUi();patchStudentRender();patchLogout();if(trainer()&&VIEW_STUDENT)ensureEntry();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
-  window.addEventListener('team-bulls-runtime-ready',install);
-  window.addEventListener('pageshow',()=>{if(trainer()&&VIEW_STUDENT)ensureEntry();},{passive:true});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();window.addEventListener('team-bulls-runtime-ready',install);window.addEventListener('pageshow',()=>{if(trainer()&&VIEW_STUDENT)ensureEntry();},{passive:true});
 
   window.TeamBullsTrainerStudentInsights=Object.freeze({version:VERSION,open,refresh:()=>load(true),openGoals:()=>open('goals'),openReview:()=>open('review')});
 })();
