@@ -44,7 +44,7 @@ has(config,url,'Config não carrega o arquivo de feedbacks enviados.');
 has(config,"MODULE_ROOT+'trainer-feedback-archive-v10_10_37.js?v=10.10.37-feedbackarchive1'",'Arquivo de feedbacks precisa ser exclusivo do runtime do treinador.');
 has(core,"db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid",'Próximos feedbacks precisam continuar sendo gravados na coleção histórica existente.');
 has(core,'createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false','Feedback novo precisa manter data e status de leitura.');
-has(rules,"resource.data.role == 'student' && resource.data.trainerId == request.auth.uid",'Rules 28 exigem que listagens de alunos do treinador restrinjam também role=student.');
+assert(/resource\.data\.role\s*==\s*'student'[\s\S]{0,120}resource\.data\.trainerId\s*==\s*request\.auth\.uid/.test(rules),'Rules 28 exigem que listagens de alunos do treinador restrinjam também role=student.');
 has(rules,'match /feedback/{id}','Rules 28 não contêm a coleção feedback.');
 has(rules,'allow read: if trainerOwns(resource.data.studentId) || activeOwner(resource.data.studentId);','Treinador/aluno perderam acesso seguro aos feedbacks.');
 has(rules,'allow delete: if false;','Feedbacks históricos não devem ser excluídos pelo cliente.');
