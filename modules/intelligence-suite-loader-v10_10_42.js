@@ -3,16 +3,16 @@
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
-  const VERSION='10.10.42-intelsuite1';
+  const VERSION='10.10.42-intelsuite2';
   const specs={
     trainer:[
-      ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.42-inteldata1',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
-      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.42-contextguard1',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.42-contextguard1'],
-      ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command1',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command1'],
-      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.42-studentinsights1',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.42-studentinsights1']
+      ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.42-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata2'],
+      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.42-contextguard2',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.42-contextguard2'],
+      ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command2',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command2'],
+      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.42-studentinsights2',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.42-studentinsights2']
     ],
     student:[
-      ['./modules/student-progress-hub-v10_10_42.js?v=10.10.42-studentprogress1',()=>window.TeamBullsStudentProgressHub?.version==='10.10.42-studentprogress1']
+      ['./modules/student-progress-hub-v10_10_42.js?v=10.10.42-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.42-studentprogress2']
     ]
   };
   const loading=new Map();let completedRole='';
