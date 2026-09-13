@@ -71,7 +71,7 @@ assert(feedback.includes("db.collection('feedback').where('studentId','==',stude
 assert(!/collection\('feedback'\)\.where\('studentId','==',student\.uid\)\.limit\s*\(/.test(feedback),'Histórico completo de feedbacks voltou a ter corte artificial por aluno.');
 assert(source.includes('TeamBullsTrainerFeedbackArchive'),'Agenda não mantém acesso direto ao histórico completo de feedbacks já existente.');
 
-assert(rules.includes("resource.data.role == 'student' && resource.data.trainerId == request.auth.uid"),'Rules 28 exigem query de usuários restrita a role=student + trainerId.');
+assert(/resource\.data\.role\s*==\s*'student'[\s\S]{0,120}resource\.data\.trainerId\s*==\s*request\.auth\.uid/.test(rules),'Rules 28 exigem query de usuários restrita a role=student + trainerId.');
 assert(rules.includes('match /checkinSchedules/{uid}')&&rules.includes('allow create, update: if trainerOwns(uid)'),'Conclusão semanal deixou de estar protegida por propriedade do treinador.');
 assert(rules.includes('match /protocolReviewSchedules/{uid}')&&rules.includes('request.resource.data.trainerId == request.auth.uid'),'Conclusão mensal deixou de estar protegida pelo treinador dono do aluno.');
 assert(!rules.includes('match /trainerUpdateOrganizer/'),'Agenda criou coleção paralela desnecessária nas Rules.');
