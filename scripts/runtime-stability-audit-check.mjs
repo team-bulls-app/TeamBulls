@@ -42,7 +42,10 @@ assert(src.data.includes('trainingSessionCount')&&src.progress.includes('session
 assert(src.insights.includes('weightComparable')&&src.insights.includes('completeReview'),'Insights: peso ausente/conclusão com estado obsoleto não estão protegidos.');
 assert(src.loader.includes('10.10.44-contextguard3'),'Modo Revisão: loader precisa exigir a guarda com sincronização pós-confirmação.');
 assert(src.guard.includes("PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-completed'"),'Modo Revisão: evento de conclusão canônica está ausente.');
-assert(src.guard.includes('const result=await callback.apply(this,arguments)')&&src.guard.indexOf('notifyProtocolCompleted(studentId,beforeCycle)')>src.guard.indexOf('const result=await callback.apply(this,arguments)'),'Modo Revisão: refresh não pode ocorrer antes de a confirmação canônica terminar.');
+const interceptStart=src.guard.indexOf('const intercepted=function');
+const interceptEnd=src.guard.indexOf('showConfirm=intercepted',interceptStart);
+const interceptBody=interceptStart>=0&&interceptEnd>interceptStart?src.guard.slice(interceptStart,interceptEnd):'';
+assert(interceptBody.includes('const result=await callback.apply(this,arguments)')&&interceptBody.indexOf('notifyProtocolCompleted(studentId,beforeCycle)')>interceptBody.indexOf('const result=await callback.apply(this,arguments)'),'Modo Revisão: refresh não pode ocorrer antes de a confirmação canônica terminar.');
 assert(src.guard.includes('cycle<=beforeCycle'),'Modo Revisão: cancelamento ou falha não podem ser tratados como conclusão.');
 assert(src.guard.includes('TeamBullsTrainerStudentInsights?.refresh?.()'),'Modo Revisão: tela aberta precisa atualizar depois da conclusão real.');
 
