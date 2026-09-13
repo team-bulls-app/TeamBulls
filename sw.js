@@ -2,9 +2,9 @@
 'use strict';
 
 const APP_VERSION='10.10.9';
-const BUILD_REVISION=2026091301;
+const BUILD_REVISION=2026090801;
 const CACHE_REVISION='guidance2';
-const CACHE_HOTFIX='runtime-stability1';
+const CACHE_HOTFIX='update-unblock1';
 const CACHE_TAG=`${APP_VERSION.replace(/\./g,'-')}-${CACHE_REVISION}-${CACHE_HOTFIX}`;
 const SHELL_CACHE=`team-bulls-shell-${CACHE_TAG}`;
 const RUNTIME_CACHE=`team-bulls-runtime-${CACHE_TAG}`;
@@ -111,7 +111,7 @@ self.addEventListener('message',event=>{
   const name=url.pathname.split('/').pop()||'';
   if(url.origin!==self.location.origin||!AUDIO_NAME_PATTERN.test(name))return;
   const asset=scopedUrl('./'+name);
-  event.waitUntil((async()=>{const cache=await caches.open(AUDIO_CACHE_NAME);if(await cache.match(asset))return;try{const response=await fetch(asset,{cache:'no-cache'});if(response.ok)await cache.put(url.href,response.clone());}catch(error){}})());
+  event.waitUntil((async()=>{const cache=await caches.open(AUDIO_CACHE_NAME);if(await cache.match(asset))return;try{const response=await fetch(asset,{cache:'no-cache'});if(response.ok)await cache.put(asset,response.clone());}catch(error){}})());
 });
 
 async function cacheHtml(response,cacheKey){if(!response?.ok)return response;const type=(response.headers.get('Content-Type')||'').toLowerCase();if(!type.includes('text/html'))return response;const cache=await caches.open(SHELL_CACHE);await cache.put(cacheKey,response.clone());return response;}
