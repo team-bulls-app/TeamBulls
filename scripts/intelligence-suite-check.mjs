@@ -24,8 +24,10 @@ assert(src.loader.includes('trainer-intelligence-data-v10_10_42.js')&&src.loader
 assert(src.loader.includes('trainer-canonical-context-guard-v10_10_42.js')&&src.loader.indexOf('trainer-canonical-context-guard-v10_10_42.js')<src.loader.indexOf('trainer-student-insights-v10_10_42.js'),'loader: guarda canônica deve carregar antes das telas do treinador');
 assert(src.loader.includes('student-progress-hub-v10_10_42.js'),'loader: módulo de progresso do aluno ausente');
 assert(src.loader.includes("MODE==='cloud'"),'loader: recursos sincronizados devem exigir cloud');
+assert(src.loader.includes('10.10.43-contextguard2')&&src.loader.includes('10.10.43-studentinsights2')&&src.loader.includes('10.10.43-studentprogress2'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
 
 assert(src.data.includes('trainerActivity')&&src.data.includes('trainerBilling'),'dados: deve reaproveitar índices globais já existentes');
+assert(src.data.includes("db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)"),'dados: roster do radar deve restringir trainerId + role=student para respeitar Rules 28');
 assert(src.data.includes('checkinSchedules')&&src.data.includes('protocolReviewSchedules'),'dados: radar deve reutilizar agendas canônicas');
 assert(src.data.includes('loadDeepStudent')&&src.data.includes("collection('sessions')"),'dados: análise profunda do aluno ausente');
 const dashboardBody=src.data.slice(src.data.indexOf('async function loadDashboard'),src.data.indexOf('async function loadDeepStudent'));
@@ -33,10 +35,14 @@ assert(!dashboardBody.includes("collection('sessions')"),'dados: dashboard não 
 assert(!dashboardBody.includes("collection('feedback')"),'dados: dashboard não pode varrer feedbacks de todos os alunos');
 assert(src.data.includes('TTL_MS=120000'),'dados: cache TTL compartilhado deve permanecer ativo');
 assert(src.data.includes('CONCURRENCY=5'),'dados: concorrência de leituras por aluno deve permanecer limitada');
+assert(src.data.includes('trainingSessionCount'),'dados: métricas não podem confundir um documento por exercício com uma sessão de treino');
+assert(src.data.includes("['weekly_checkin','questionnaire'].includes"),'dados: sinal de novo relatório não pode considerar qualquer atividade não lida');
 
 assert(src.guard.includes('ensureWeeklyCheckinContext')&&src.guard.includes('ensureProtocolContext'),'guarda: sincronização canônica de relatório/ciclo ausente');
 assert(src.guard.includes('fetchWeeklyCheckins')&&src.guard.includes('loadTrainerProtocolReview'),'guarda: deve reaproveitar os loaders canônicos');
 assert(src.guard.includes('viewWeeklyCheckin=wrapped')&&src.guard.includes('markProtocolReviewCompleted=wrapped'),'guarda: ações canônicas precisam ser protegidas');
+assert(src.guard.includes('checkinLoad.studentId!==studentId')&&src.guard.includes('protocolLoad.studentId!==studentId'),'guarda: cargas concorrentes precisam permanecer separadas por aluno');
+assert(src.guard.includes('currentStudentId()!==studentId'),'guarda: resposta atrasada de outro aluno precisa ser descartada');
 assert(!/collection\(['"]weeklyCheckins['"]\)/.test(src.guard),'guarda: não deve reimplementar consulta de relatório; usar fetchWeeklyCheckins');
 
 for(const text of ['Radar diário','Prioridades de hoje','Resumo semanal','SEMÁFORO OPERACIONAL','PRÓXIMA AÇÃO'])assert(src.command.includes(text),`central: recurso ausente — ${text}`);
@@ -48,13 +54,17 @@ for(const text of ['LINHA DO TEMPO','COMPARAR','PRÓXIMAS AÇÕES','METAS','MODO
 assert(src.insights.includes('timelineEvents')&&src.insights.includes('comparison()'),'insights: timeline/comparador ausentes');
 assert(src.insights.includes("openFeedbackModal('protocol_update')"),'insights: revisão deve reutilizar feedback canônico');
 assert(src.insights.includes('markProtocolReviewCompleted'),'insights: revisão deve reutilizar conclusão mensal canônica');
+assert(src.insights.includes('completeReview')&&src.insights.includes('invalidateStudent')&&src.insights.includes('await load(true)'),'insights: conclusão da revisão precisa atualizar o estado local após o fluxo canônico');
+assert(src.insights.includes('weightComparable')&&src.insights.includes('weightDelta!==null'),'insights: peso ausente não pode ser convertido em falsa variação de 0 kg');
+assert(src.insights.includes('countTrainingSessions'),'insights: comparador e metas devem contar sessões reais, não documentos de exercícios');
 assert(src.insights.includes("collection('protocolReviewSchedules')")&&src.insights.includes('cycleGoals'),'insights: metas devem permanecer vinculadas ao ciclo oficial');
 assert(!/collection\(['"](?:studentGoals|achievements|trainerRadar|riskScores)['"]\)/.test(src.insights+src.command+src.data+src.student),'suíte: não criar coleções paralelas para estado derivado');
 assert(!src.insights.includes("collection('weeklyCheckins').doc")&&!src.insights.includes("collection('weeklyCheckins').add"),'insights: treinador não pode simular relatório semanal do aluno');
 
 for(const text of ['Metas & Conquistas','Progressão registrada','4 semanas consistentes','8 semanas consistentes','Ciclo concluído'])assert(src.student.includes(text),`aluno: conquista/meta ausente — ${text}`);
 assert(src.student.includes("collection('sessions')")&&src.student.includes("collection('weeklyCheckins')"),'aluno: progresso precisa derivar dos registros reais');
+assert(src.student.includes('sessionCount(sessions)')&&src.student.includes('sessionCount(cycleSessions)'),'aluno: conquistas/metas devem contar treinos reais agrupados, não cada exercício salvo');
 assert(!/cloudWrite/.test(src.student),'aluno: tela de conquistas não pode usar cloudWrite');
 assert(!/collection\([^\n]+\)\.(?:add|doc\([^\n]+\)\.(?:set|update|delete))\s*\(/.test(src.student),'aluno: tela de conquistas não pode gravar no Firestore');
 
-console.log('APROVADO — 10 ideias protegidas por arquitetura modular: radar, timeline, comparação, prioridades, próximas ações, metas, semáforo, resumo semanal, conquistas e modo revisão; leituras pesadas ficam sob demanda, ações críticas usam contexto canônico e não há polling/coleções paralelas.');
+console.log('APROVADO — suíte de inteligência mantém as 10 ideias, roster compatível com Rules 28, contexto isolado por aluno, sessões reais nas métricas, peso ausente sem falsa variação e conclusão da revisão sincronizada; sem polling ou coleções paralelas.');
