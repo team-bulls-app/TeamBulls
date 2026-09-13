@@ -1,4 +1,4 @@
-/* Team Bulls v10.10.43 — carregador isolado da suíte de inteligência e progresso. */
+/* Team Bulls v10.10.44 — carregador isolado da suíte de inteligência e progresso. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
@@ -7,7 +7,7 @@
   const specs={
     trainer:[
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
-      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.43-contextguard2',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.43-contextguard2'],
+      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.44-contextguard3',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.44-contextguard3'],
       ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command1',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command1'],
       ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.43-studentinsights2',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.43-studentinsights2']
     ],
