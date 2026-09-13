@@ -40,6 +40,11 @@ assert(src.storageRules.includes('match /studentProfiles/{uid}/profile.json')&&s
 assert(src.guard.includes('checkinLoad.studentId!==studentId')&&src.guard.includes('protocolLoad.studentId!==studentId'),'Contexto: cargas concorrentes de alunos distintos podem voltar a se misturar.');
 assert(src.data.includes('trainingSessionCount')&&src.progress.includes('sessionCount(sessions)')&&src.insights.includes('countTrainingSessions'),'Métricas: documentos por exercício podem voltar a ser contados como sessões completas.');
 assert(src.insights.includes('weightComparable')&&src.insights.includes('completeReview'),'Insights: peso ausente/conclusão com estado obsoleto não estão protegidos.');
+assert(src.loader.includes('10.10.44-contextguard3'),'Modo Revisão: loader precisa exigir a guarda com sincronização pós-confirmação.');
+assert(src.guard.includes("PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-completed'"),'Modo Revisão: evento de conclusão canônica está ausente.');
+assert(src.guard.includes('const result=await callback.apply(this,arguments)')&&src.guard.indexOf('notifyProtocolCompleted(studentId,beforeCycle)')>src.guard.indexOf('const result=await callback.apply(this,arguments)'),'Modo Revisão: refresh não pode ocorrer antes de a confirmação canônica terminar.');
+assert(src.guard.includes('cycle<=beforeCycle'),'Modo Revisão: cancelamento ou falha não podem ser tratados como conclusão.');
+assert(src.guard.includes('TeamBullsTrainerStudentInsights?.refresh?.()'),'Modo Revisão: tela aberta precisa atualizar depois da conclusão real.');
 
 for(const path of [
   '/modules/trainer-feedback-archive-v10_10_37.js',
@@ -56,4 +61,4 @@ const published=JSON.parse(src.version);
 assert(src.worker.includes(`const BUILD_REVISION=${Number(published.build)};`),'PWA: correção não pode quebrar a coerência com o build publicado.');
 assert(src.worker.includes("CACHE_HOTFIX='update-unblock1'"),'PWA: correção pontual não deve reativar uma navegação forçada de cache.');
 
-console.log('APROVADO — regressões reproduzem os bugs reportados: feedbacks/agenda usam queries compatíveis com Rules 28, Storage do perfil é carregado de forma lazy, contexto é isolado por aluno, métricas contam sessões reais e os módulos corrigidos são network-first sem romper o build publicado.');
+console.log('APROVADO — feedbacks/agenda/Storage/contexto/métricas continuam estáveis e o Modo Revisão agora sincroniza somente depois da confirmação canônica, sem polling nem romper o build publicado.');
