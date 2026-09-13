@@ -7,6 +7,7 @@
   const specs={
     trainer:[
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.42-inteldata1',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
+      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.42-contextguard1',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.42-contextguard1'],
       ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command1',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command1'],
       ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.42-studentinsights1',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.42-studentinsights1']
     ],
