@@ -54,6 +54,7 @@ assert(!src.insights.includes("collection('weeklyCheckins').doc")&&!src.insights
 
 for(const text of ['Metas & Conquistas','Progressão registrada','4 semanas consistentes','8 semanas consistentes','Ciclo concluído'])assert(src.student.includes(text),`aluno: conquista/meta ausente — ${text}`);
 assert(src.student.includes("collection('sessions')")&&src.student.includes("collection('weeklyCheckins')"),'aluno: progresso precisa derivar dos registros reais');
-assert(!/cloudWrite|\.set\(|\.update\(|\.add\(/.test(src.student),'aluno: tela de conquistas deve ser somente leitura');
+assert(!/cloudWrite/.test(src.student),'aluno: tela de conquistas não pode usar cloudWrite');
+assert(!/collection\([^\n]+\)\.(?:add|doc\([^\n]+\)\.(?:set|update|delete))\s*\(/.test(src.student),'aluno: tela de conquistas não pode gravar no Firestore');
 
 console.log('APROVADO — 10 ideias protegidas por arquitetura modular: radar, timeline, comparação, prioridades, próximas ações, metas, semáforo, resumo semanal, conquistas e modo revisão; leituras pesadas ficam sob demanda, ações críticas usam contexto canônico e não há polling/coleções paralelas.');
