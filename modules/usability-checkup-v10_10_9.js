@@ -277,3 +277,39 @@
   window.addEventListener('pageshow',()=>loadTrainerUpdateOrganizer().catch(()=>{}),{passive:true});
   window.TeamBullsTrainerUpdateOrganizerLoader=Object.freeze({src:SRC,version:EXPECTED_VERSION,load:loadTrainerUpdateOrganizer});
 })();
+
+/* Carrega a suíte de inteligência somente depois que o papel do usuário já é conhecido. */
+(()=>{
+  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.42-intelsuite1';
+  const EXPECTED_VERSION='10.10.42-intelsuite1';
+  let loading=null;
+  const supportedContext=()=>{try{return MODE==='cloud'&&(CURRENT_USER?.role==='trainer'||CURRENT_USER?.role==='student');}catch(error){return false;}};
+  const ready=()=>window.TeamBullsIntelligenceSuiteLoader?.version===EXPECTED_VERSION;
+  function loadIntelligenceSuite(){
+    if(!supportedContext())return Promise.resolve(false);
+    if(ready())return window.TeamBullsIntelligenceSuiteLoader.load?.()||Promise.resolve(true);
+    if(loading)return loading;
+    loading=new Promise(resolve=>{
+      let settled=false,timer=0;
+      const finish=ok=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);if(!ok)loading=null;resolve(!!ok);};
+      const expectedUrl=new URL(SRC,location.href).href;
+      const existing=[...document.scripts].find(script=>String(script.src||'')===expectedUrl);
+      if(existing){
+        if(ready()){Promise.resolve(window.TeamBullsIntelligenceSuiteLoader.load?.()).finally(()=>finish(true));return;}
+        existing.addEventListener('load',()=>{Promise.resolve(window.TeamBullsIntelligenceSuiteLoader?.load?.()).finally(()=>finish(ready()));},{once:true});
+        existing.addEventListener('error',()=>finish(false),{once:true});
+        timer=setTimeout(()=>finish(ready()),8000);return;
+      }
+      const script=document.createElement('script');script.src=SRC;script.async=false;script.dataset.teamBullsIntelligenceSuiteLoader='1';
+      script.onload=()=>{Promise.resolve(window.TeamBullsIntelligenceSuiteLoader?.load?.()).finally(()=>finish(ready()));};script.onerror=()=>finish(false);
+      timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},8000);document.head.appendChild(script);
+    });
+    return loading;
+  }
+  loadIntelligenceSuite().catch(()=>{});
+  window.addEventListener('team-bulls-runtime-ready',()=>loadIntelligenceSuite().catch(()=>{}));
+  window.addEventListener('team-bulls-runtime-state',()=>loadIntelligenceSuite().catch(()=>{}));
+  window.addEventListener('team-bulls-student-runtime-ready',()=>loadIntelligenceSuite().catch(()=>{}));
+  window.addEventListener('pageshow',()=>loadIntelligenceSuite().catch(()=>{}),{passive:true});
+  window.TeamBullsIntelligenceBootstrap=Object.freeze({src:SRC,version:EXPECTED_VERSION,load:loadIntelligenceSuite});
+})();
