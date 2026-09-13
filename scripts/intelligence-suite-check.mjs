@@ -57,6 +57,7 @@ assert(src.command.includes('deepAnalyze'),'central: análise profunda sob deman
 assert(src.command.includes('replaceStudentSlice'),'central: reanálise deve substituir os dados atuais do aluno em vez de reutilizar snapshot antigo');
 assert(src.command.includes('row.checkinSchedule=deep.checkinSchedule')&&src.command.includes('row.protocolSchedule=deep.protocolSchedule'),'central: reanálise precisa atualizar agendas do aluno antes de recalcular sinais');
 assert(src.command.includes("loading=false;serial++"),'central: logout durante carregamento precisa liberar o estado de loading');
+assert(src.command.includes("button.textContent=deepByStudent.has(sid)?'REANALISAR':'ANALISAR TREINO'"),'central: falha na análise profunda precisa restaurar o rótulo acionável do botão');
 assert(!src.command.includes("collection('sessions')"),'central: UI não deve consultar sessões diretamente; usar camada de dados');
 
 for(const text of ['LINHA DO TEMPO','COMPARAR','PRÓXIMAS AÇÕES','METAS','MODO REVISÃO'])assert(src.insights.includes(text),`insights: aba ausente — ${text}`);
@@ -67,6 +68,7 @@ assert(src.insights.includes('loadingStudentId')&&src.insights.includes('student
 assert(src.insights.includes("String(VIEW_STUDENT?.uid||'')!==target"),'insights: resposta profunda não pode ser aplicada a outro aluno atualmente aberto');
 assert(src.insights.includes("loading=false;loadingStudentId='';serial++"),'insights: logout precisa limpar o carregamento pendente');
 assert(src.insights.includes('cycleKey')&&src.insights.includes('cycleStartDate'),'insights: metas precisam ser vinculadas ao ciclo real em que foram definidas');
+assert(src.insights.includes('trainingSessionCount')&&src.insights.includes('cycleSessions'),'insights: a meta de sessões do treinador precisa usar a mesma contagem de treinos reais exibida ao aluno');
 assert(src.insights.includes("openFeedbackModal('protocol_update')"),'insights: revisão deve reutilizar feedback canônico');
 assert(src.insights.includes('markProtocolReviewCompleted'),'insights: revisão deve reutilizar conclusão mensal canônica');
 assert(src.insights.includes("collection('protocolReviewSchedules')")&&src.insights.includes('cycleGoals'),'insights: metas devem permanecer vinculadas ao ciclo oficial');
@@ -84,4 +86,4 @@ assert(src.student.includes("loading=false;loadingUid='';serial++"),'aluno: logo
 assert(!/cloudWrite/.test(src.student),'aluno: tela de conquistas não pode usar cloudWrite');
 assert(!/collection\([^\n]+\)\.(?:add|doc\([^\n]+\)\.(?:set|update|delete))\s*\(/.test(src.student),'aluno: tela de conquistas não pode gravar no Firestore');
 
-console.log('APROVADO — auditoria da suíte de inteligência cobre cache-busting, modal de metas, corridas de troca de aluno/logout, reanálise fresca, ciclo canônico, sessões reais e conquistas históricas permanentes; sem polling, coleções paralelas ou escrita pelo aluno.');
+console.log('APROVADO — auditoria da suíte de inteligência cobre cache-busting, modal de metas, corridas de troca de aluno/logout, reanálise fresca, ciclo canônico, sessões reais nos dois perfis e conquistas históricas permanentes; sem polling, coleções paralelas ou escrita pelo aluno.');
