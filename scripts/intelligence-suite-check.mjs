@@ -23,9 +23,9 @@ assert(src.loader.includes("trainer-intelligence-data-v10_10_42.js")&&src.loader
 assert(src.loader.includes("student-progress-hub-v10_10_42.js"),'loader: módulo de progresso do aluno ausente');
 assert(src.loader.includes("MODE==='cloud'"),'loader: recursos sincronizados devem exigir cloud');
 
-assert(src.data.includes("trainerActivity")&&src.data.includes("trainerBilling"),'dados: deve reaproveitar índices globais já existentes');
-assert(src.data.includes("checkinSchedules")&&src.data.includes("protocolReviewSchedules"),'dados: radar deve reutilizar agendas canônicas');
-assert(src.data.includes("loadDeepStudent")&&src.data.includes("sessions").toString(),'dados: análise profunda do aluno ausente');
+assert(src.data.includes('trainerActivity')&&src.data.includes('trainerBilling'),'dados: deve reaproveitar índices globais já existentes');
+assert(src.data.includes('checkinSchedules')&&src.data.includes('protocolReviewSchedules'),'dados: radar deve reutilizar agendas canônicas');
+assert(src.data.includes('loadDeepStudent')&&src.data.includes("collection('sessions')"),'dados: análise profunda do aluno ausente');
 const dashboardBody=src.data.slice(src.data.indexOf('async function loadDashboard'),src.data.indexOf('async function loadDeepStudent'));
 assert(!dashboardBody.includes("collection('sessions')"),'dados: dashboard não pode varrer sessões de todos os alunos');
 assert(!dashboardBody.includes("collection('feedback')"),'dados: dashboard não pode varrer feedbacks de todos os alunos');
@@ -41,9 +41,10 @@ for(const text of ['LINHA DO TEMPO','COMPARAR','PRÓXIMAS AÇÕES','METAS','MODO
 assert(src.insights.includes('timelineEvents')&&src.insights.includes('comparison()'),'insights: timeline/comparador ausentes');
 assert(src.insights.includes("openFeedbackModal('protocol_update')"),'insights: revisão deve reutilizar feedback canônico');
 assert(src.insights.includes('markProtocolReviewCompleted'),'insights: revisão deve reutilizar conclusão mensal canônica');
+assert(src.insights.includes('syncCanonicalCheckinContext')&&src.insights.includes('syncCanonicalProtocolContext'),'insights: bridges canônicas de relatório/ciclo devem existir');
 assert(src.insights.includes("collection('protocolReviewSchedules')")&&src.insights.includes('cycleGoals'),'insights: metas devem permanecer vinculadas ao ciclo oficial');
 assert(!/collection\(['"](?:studentGoals|achievements|trainerRadar|riskScores)['"]\)/.test(src.insights+src.command+src.data+src.student),'suíte: não criar coleções paralelas para estado derivado');
-assert(!src.insights.includes("collection('weeklyCheckins').doc")||!src.insights.includes('.set({studentId'),'insights: treinador não pode simular relatório semanal do aluno');
+assert(!src.insights.includes("collection('weeklyCheckins').doc")&&!src.insights.includes("collection('weeklyCheckins').add"),'insights: treinador não pode simular relatório semanal do aluno');
 
 for(const text of ['Metas & Conquistas','Progressão registrada','4 semanas consistentes','8 semanas consistentes','Ciclo concluído'])assert(src.student.includes(text),`aluno: conquista/meta ausente — ${text}`);
 assert(src.student.includes("collection('sessions')")&&src.student.includes("collection('weeklyCheckins')"),'aluno: progresso precisa derivar dos registros reais');
