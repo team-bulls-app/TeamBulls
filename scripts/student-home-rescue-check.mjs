@@ -136,7 +136,7 @@ for(const [collection,orderField] of [['feedback','createdAt'],['weeklyCheckins'
   assert(fields.some(field=>field.fieldPath===orderField&&field.order==='DESCENDING'),`Índice ${collection} não ordena ${orderField} desc.`);
 }
 
-assert(profile.includes("const VERSION='10.10.20-studenthome3'"),'Perfil do aluno não está na revisão estabilizada.');
+assert(profile.includes("const VERSION='10.10.43-studenthome4'"),'Perfil do aluno não está na revisão de Storage lazy estabilizada.');
 assert(profile.includes('body.student-desktop .student-desktop-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a sidebar antiga.');
 assert(profile.includes('#screen-home.tb-home-v2 .quick-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a grade antiga.');
 assert(profile.includes('data-tb-profile-logout="1"'),'Perfil não cria o logout diretamente.');
