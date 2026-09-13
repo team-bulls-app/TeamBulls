@@ -108,7 +108,7 @@
     if(loadedTrainerUid&&loadedTrainerUid!==uid){feedbacks=[];studentsById=new Map();}
     const serial=++loadSerial;loading=true;render();
     try{
-      const studentsSnap=await cloudGet(db.collection('users').where('trainerId','==',uid),'alunos vinculados para histórico de feedbacks');
+      const studentsSnap=await cloudGet(db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500),'alunos vinculados para histórico de feedbacks');
       if(serial!==loadSerial||trainerUid()!==uid)return false;
       const students=(studentsSnap.docs||[]).map(doc=>({...doc.data(),uid:doc.id})).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid);
       studentsById=new Map(students.map(item=>[String(item.uid),item]));

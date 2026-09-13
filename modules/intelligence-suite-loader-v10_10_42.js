@@ -1,4 +1,4 @@
-/* Team Bulls v10.10.42 — carregador isolado da suíte de inteligência e progresso. */
+/* Team Bulls v10.10.43 — carregador isolado da suíte de inteligência e progresso. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
@@ -6,13 +6,13 @@
   const VERSION='10.10.42-intelsuite1';
   const specs={
     trainer:[
-      ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.42-inteldata1',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
-      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.42-contextguard1',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.42-contextguard1'],
+      ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
+      ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.43-contextguard2',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.43-contextguard2'],
       ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command1',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command1'],
-      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.42-studentinsights1',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.42-studentinsights1']
+      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.43-studentinsights2',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.43-studentinsights2']
     ],
     student:[
-      ['./modules/student-progress-hub-v10_10_42.js?v=10.10.42-studentprogress1',()=>window.TeamBullsStudentProgressHub?.version==='10.10.42-studentprogress1']
+      ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
     ]
   };
   const loading=new Map();let completedRole='';

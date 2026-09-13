@@ -22,6 +22,8 @@
   const stamp=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.seconds)return Number(value.seconds)*1000;const n=Number(value);return Number.isFinite(n)?n:0;}catch(error){return 0;}};
   const clone=value=>{try{return structuredClone(value);}catch(error){try{return JSON.parse(JSON.stringify(value));}catch(inner){return value;}}};
   const fresh=entry=>entry&&now()-Number(entry.at||0)<TTL_MS;
+  const trainingSessionKey=session=>{const date=iso(session?.date);if(!date)return'';const workout=String(session?.workoutId||'').trim();return`${date}|${workout||'unknown'}`;};
+  const trainingSessionCount=sessions=>new Set((Array.isArray(sessions)?sessions:[]).map(trainingSessionKey).filter(Boolean)).size;
 
   async function mapLimit(items,limit,worker){
     const out=new Array(items.length);let cursor=0;
@@ -35,7 +37,7 @@
   async function loadRoster(force=false){
     const uid=trainerUid();if(!uid)return[];
     if(!force&&rosterCache.uid===uid&&fresh(rosterCache))return clone(rosterCache.items);
-    const snap=await getRef(db.collection('users').where('trainerId','==',uid),'alunos para central inteligente');
+    const snap=await getRef(db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500),'alunos para central inteligente');
     const items=(snap.docs||[]).map(doc=>({...doc.data(),uid:doc.id})).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
     rosterCache={uid,at:now(),items};return clone(items);
   }
@@ -44,8 +46,8 @@
     const uid=trainerUid();if(!uid)return{activity:[],payments:[]};
     if(!force&&globalCache.uid===uid&&fresh(globalCache))return clone(globalCache);
     const [activitySnap,paymentSnap]=await Promise.all([
-      getRef(db.collection('trainerActivity').doc(uid).collection('events').limit(200),'eventos recentes do treinador').catch(()=>null),
-      getRef(db.collection('trainerBilling').doc(uid).collection('payments').limit(500),'pagamentos para radar').catch(()=>null)
+      getRef(db.collection('trainerActivity').doc(uid).collection('events').orderBy('createdAt','desc').limit(200),'eventos recentes do treinador').catch(()=>null),
+      getRef(db.collection('trainerBilling').doc(uid).collection('payments').orderBy('createdAt','desc').limit(500),'pagamentos para radar').catch(()=>null)
     ]);
     const activity=(activitySnap?.docs||[]).map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>stamp(b.createdAt)-stamp(a.createdAt)||String(b.submittedDate||'').localeCompare(String(a.submittedDate||'')));
     const payments=(paymentSnap?.docs||[]).map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>stamp(b.createdAt)-stamp(a.createdAt));
@@ -118,7 +120,7 @@
     if(pay.kind==='late')signals.push({key:'payment_late',points:20,label:`Pagamento atrasado ${Math.abs(pay.days)}d`,action:'Verificar pagamento'});
     else if(pay.kind==='today'||pay.kind==='soon')signals.push({key:'payment_soon',points:5,label:pay.kind==='today'?'Pagamento vence hoje':`Pagamento vence em ${pay.days}d`,action:'Acompanhar pagamento'});
     if(reportAge!==null&&reportAge>10)signals.push({key:'report_gap',points:15,label:`Último relatório há ${reportAge}d`,action:'Verificar adesão e contato'});
-    const newReport=global.activity.some(item=>String(item.studentId)===sid&&item.read!==true);
+    const newReport=global.activity.some(item=>String(item.studentId)===sid&&['weekly_checkin','questionnaire'].includes(String(item.type||''))&&item.read!==true);
     if(newReport)signals.push({key:'new_report',points:6,label:'Novo relatório aguardando leitura',action:'Ler relatório recebido'});
     if(deep){
       const lastSession=deep.sessions?.[0]?.date&&iso(deep.sessions[0].date)?deep.sessions[0].date:'',sessionAge=lastSession?dayDiff(lastSession,todayDate):null,unread=deep.feedbacks?.filter(item=>item.read!==true).length||0;
@@ -146,5 +148,5 @@
   function installLogout(){if(typeof confirmLogout!=='function'||confirmLogout.__tbIntelligenceData)return;const base=confirmLogout;const wrapped=function(){clear();return base.apply(this,arguments);};wrapped.__tbIntelligenceData=true;wrapped.__tbBase=base;confirmLogout=wrapped;}
   installLogout();window.addEventListener('team-bulls-runtime-ready',installLogout);
 
-  window.TeamBullsTrainerIntelligenceData=Object.freeze({version:VERSION,loadRoster,loadGlobal,loadShallow,loadDashboard,loadDeepStudent,analyze,summary,weeklyDue,protocolState,currentCycleBounds,latestPaymentFor,latestActivityFor,dayDiff,addDays,todayIso,invalidateStudent,clear});
+  window.TeamBullsTrainerIntelligenceData=Object.freeze({version:VERSION,loadRoster,loadGlobal,loadShallow,loadDashboard,loadDeepStudent,analyze,summary,weeklyDue,protocolState,currentCycleBounds,latestPaymentFor,latestActivityFor,trainingSessionKey,trainingSessionCount,dayDiff,addDays,todayIso,invalidateStudent,clear});
 })();

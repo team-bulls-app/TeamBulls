@@ -46,7 +46,9 @@ const MUTABLE_PATHS=new Set([
   '/interaction_v10_10_9.js','/styles_v10_10_9.css',
   '/recovery_v10.js','/recovery_v10.css',
   '/modules/v107-core.js','/modules/v107-invites.js','/modules/v107-operations.js',
-  '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js'
+  '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js',
+  '/modules/trainer-feedback-archive-v10_10_37.js','/modules/trainer-update-organizer-v10_10_41.js','/modules/intelligence-suite-loader-v10_10_42.js',
+  '/modules/trainer-intelligence-data-v10_10_42.js','/modules/trainer-canonical-context-guard-v10_10_42.js','/modules/trainer-command-center-v10_10_42.js','/modules/trainer-student-insights-v10_10_42.js','/modules/student-progress-hub-v10_10_42.js'
 ]);
 
 const CSP="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com https://www.google.com https://www.recaptcha.net; script-src-elem 'self' https://cdn.jsdelivr.net https://www.gstatic.com https://www.google.com https://www.recaptcha.net; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://firebasestorage.googleapis.com https://*.googleusercontent.com; media-src 'self' blob: https://firebasestorage.googleapis.com; connect-src 'self' https://www.gstatic.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://firebasestorage.googleapis.com https://firebaseappcheck.googleapis.com https://www.google.com https://www.recaptcha.net; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.google.com https://www.recaptcha.net; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests";

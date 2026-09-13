@@ -48,6 +48,7 @@ jobs:
           node scripts/trainer-feedback-archive-check.mjs
           node scripts/trainer-update-organizer-check.mjs
           node scripts/intelligence-suite-check.mjs
+          node scripts/runtime-stability-audit-check.mjs
           node scripts/trainer-overdue-report-status-check.mjs
           node scripts/loader-retry-check.mjs
           node scripts/production-audit-check.mjs
