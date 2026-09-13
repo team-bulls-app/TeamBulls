@@ -242,3 +242,38 @@
   window.addEventListener('pageshow',()=>loadWeekWorkoutLayout().catch(()=>{}),{passive:true});
   window.TeamBullsWeekWorkoutLayoutLoader=Object.freeze({src:SRC,version:EXPECTED_VERSION,load:loadWeekWorkoutLayout});
 })();
+
+/* Carrega a agenda administrativa apenas no perfil do treinador. */
+(()=>{
+  const SRC='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer1';
+  const EXPECTED_VERSION='10.10.41-updateorganizer1';
+  let loading=null;
+  const trainerContext=()=>{try{return CURRENT_USER?.role==='trainer'&&MODE==='cloud';}catch(error){return document.body?.classList.contains('trainer-desktop')===true;}};
+  const ready=()=>window.TeamBullsTrainerUpdateOrganizer?.version===EXPECTED_VERSION;
+  function loadTrainerUpdateOrganizer(){
+    if(!trainerContext())return Promise.resolve(false);
+    if(ready())return Promise.resolve(true);
+    if(loading)return loading;
+    loading=new Promise(resolve=>{
+      let settled=false,timer=0;
+      const finish=ok=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);if(!ok)loading=null;resolve(!!ok);};
+      const expectedUrl=new URL(SRC,location.href).href;
+      const existing=[...document.scripts].find(script=>String(script.src||'')===expectedUrl);
+      if(existing){
+        if(ready()){finish(true);return;}
+        existing.addEventListener('load',()=>finish(ready()),{once:true});
+        existing.addEventListener('error',()=>finish(false),{once:true});
+        timer=setTimeout(()=>finish(ready()),7000);return;
+      }
+      const script=document.createElement('script');script.src=SRC;script.async=false;script.dataset.teamBullsTrainerUpdateOrganizer='1';
+      script.onload=()=>finish(ready());script.onerror=()=>finish(false);
+      timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},7000);document.head.appendChild(script);
+    });
+    return loading;
+  }
+  loadTrainerUpdateOrganizer().catch(()=>{});
+  window.addEventListener('team-bulls-runtime-ready',()=>loadTrainerUpdateOrganizer().catch(()=>{}));
+  window.addEventListener('team-bulls-runtime-state',()=>loadTrainerUpdateOrganizer().catch(()=>{}));
+  window.addEventListener('pageshow',()=>loadTrainerUpdateOrganizer().catch(()=>{}),{passive:true});
+  window.TeamBullsTrainerUpdateOrganizerLoader=Object.freeze({src:SRC,version:EXPECTED_VERSION,load:loadTrainerUpdateOrganizer});
+})();
