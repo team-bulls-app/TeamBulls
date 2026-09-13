@@ -2,9 +2,9 @@
 'use strict';
 
 const APP_VERSION='10.10.9';
-const BUILD_REVISION=2026090801;
+const BUILD_REVISION=2026091301;
 const CACHE_REVISION='guidance2';
-const CACHE_HOTFIX='update-unblock1';
+const CACHE_HOTFIX='runtime-stability1';
 const CACHE_TAG=`${APP_VERSION.replace(/\./g,'-')}-${CACHE_REVISION}-${CACHE_HOTFIX}`;
 const SHELL_CACHE=`team-bulls-shell-${CACHE_TAG}`;
 const RUNTIME_CACHE=`team-bulls-runtime-${CACHE_TAG}`;
@@ -46,7 +46,9 @@ const MUTABLE_PATHS=new Set([
   '/interaction_v10_10_9.js','/styles_v10_10_9.css',
   '/recovery_v10.js','/recovery_v10.css',
   '/modules/v107-core.js','/modules/v107-invites.js','/modules/v107-operations.js',
-  '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js'
+  '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js',
+  '/modules/trainer-feedback-archive-v10_10_37.js','/modules/trainer-update-organizer-v10_10_41.js','/modules/intelligence-suite-loader-v10_10_42.js',
+  '/modules/trainer-intelligence-data-v10_10_42.js','/modules/trainer-canonical-context-guard-v10_10_42.js','/modules/trainer-command-center-v10_10_42.js','/modules/trainer-student-insights-v10_10_42.js','/modules/student-progress-hub-v10_10_42.js'
 ]);
 
 const CSP="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com https://www.google.com https://www.recaptcha.net; script-src-elem 'self' https://cdn.jsdelivr.net https://www.gstatic.com https://www.google.com https://www.recaptcha.net; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://firebasestorage.googleapis.com https://*.googleusercontent.com; media-src 'self' blob: https://firebasestorage.googleapis.com; connect-src 'self' https://www.gstatic.com https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://firebasestorage.googleapis.com https://firebaseappcheck.googleapis.com https://www.google.com https://www.recaptcha.net; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.google.com https://www.recaptcha.net; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests";
@@ -109,7 +111,7 @@ self.addEventListener('message',event=>{
   const name=url.pathname.split('/').pop()||'';
   if(url.origin!==self.location.origin||!AUDIO_NAME_PATTERN.test(name))return;
   const asset=scopedUrl('./'+name);
-  event.waitUntil((async()=>{const cache=await caches.open(AUDIO_CACHE_NAME);if(await cache.match(asset))return;try{const response=await fetch(asset,{cache:'no-cache'});if(response.ok)await cache.put(asset,response.clone());}catch(error){}})());
+  event.waitUntil((async()=>{const cache=await caches.open(AUDIO_CACHE_NAME);if(await cache.match(asset))return;try{const response=await fetch(asset,{cache:'no-cache'});if(response.ok)await cache.put(url.href,response.clone());}catch(error){}})());
 });
 
 async function cacheHtml(response,cacheKey){if(!response?.ok)return response;const type=(response.headers.get('Content-Type')||'').toLowerCase();if(!type.includes('text/html'))return response;const cache=await caches.open(SHELL_CACHE);await cache.put(cacheKey,response.clone());return response;}
