@@ -13,12 +13,14 @@ const files={
   progress:'modules/student-progress-hub-v10_10_42.js',
   loader:'modules/intelligence-suite-loader-v10_10_42.js',
   worker:'sw.js',
+  workerLegacy:'sw_47.js',
+  version:'version.json',
   rules:'firebase/firestore_28_compacto.rules',
   storageRules:'firebase/storage_6.rules'
 };
 for(const path of Object.values(files))assert(fs.existsSync(path),`Arquivo ausente: ${path}`);
 const src=Object.fromEntries(Object.entries(files).map(([name,path])=>[name,read(path)]));
-for(const name of ['feedback','organizer','data','profile','guard','insights','progress','loader','worker'])new vm.Script(src[name],{filename:files[name]});
+for(const name of ['feedback','organizer','data','profile','guard','insights','progress','loader','worker','workerLegacy'])new vm.Script(src[name],{filename:files[name]});
 
 const safeRoster="where('trainerId','==',uid).where('role','==','student')";
 assert(src.feedback.includes(safeRoster),'Feedbacks enviados: listagem de alunos ainda pode receber permission-denied pelas Rules 28.');
@@ -49,7 +51,9 @@ for(const path of [
   '/modules/student-progress-hub-v10_10_42.js',
   '/modules/student-home-profile-v10_10_12.js'
 ])assert(src.worker.includes(`'${path}'`),`PWA: ${path} precisa ser network-first para receber correções sem cache antigo.`);
-assert(src.worker.includes("CACHE_HOTFIX='runtime-stability1'"),'PWA: hotfix de cache não foi avançado para a revisão de estabilidade.');
-assert(src.worker.includes('BUILD_REVISION=2026091301'),'PWA: build revision da estabilização não foi atualizada.');
+assert(src.worker===src.workerLegacy,'PWA: sw.js e sw_47.js precisam permanecer idênticos.');
+const published=JSON.parse(src.version);
+assert(src.worker.includes(`const BUILD_REVISION=${Number(published.build)};`),'PWA: correção não pode quebrar a coerência com o build publicado.');
+assert(src.worker.includes("CACHE_HOTFIX='update-unblock1'"),'PWA: correção pontual não deve reativar uma navegação forçada de cache.');
 
-console.log('APROVADO — regressões reproduzem os bugs reportados: feedbacks/agenda usam queries compatíveis com Rules 28, Storage do perfil é carregado de forma lazy, contexto é isolado por aluno, métricas contam sessões reais e os módulos corrigidos são network-first no PWA.');
+console.log('APROVADO — regressões reproduzem os bugs reportados: feedbacks/agenda usam queries compatíveis com Rules 28, Storage do perfil é carregado de forma lazy, contexto é isolado por aluno, métricas contam sessões reais e os módulos corrigidos são network-first sem romper o build publicado.');
