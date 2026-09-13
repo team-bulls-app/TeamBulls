@@ -1,10 +1,10 @@
-/* Team Bulls v10.10.20 — perfil visual do aluno, central de notificações e Home resiliente. */
+/* Team Bulls v10.10.43 — perfil visual do aluno, central de notificações e Home resiliente. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__)return;
   window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__=true;
 
-  const VERSION='10.10.20-studenthome3';
+  const VERSION='10.10.43-studenthome4';
   const PROFILE_PREFIX='studentProfiles';
   const NICK_MAX=24;
   const BADGE_REFRESH_TTL=120000;
@@ -20,9 +20,18 @@
   const student=()=>CURRENT_USER?.role==='student'?CURRENT_USER:null;
   const uidOf=value=>String(value?.uid||value?.id||'');
   const studentUid=()=>uidOf(student());
-  const storageRoot=()=>{try{return typeof storage!=='undefined'&&storage?storage:firebase.storage();}catch(error){return null;}};
-  const profileRef=uid=>storageRoot()?.ref(`${PROFILE_PREFIX}/${uid}/profile.json`);
-  const avatarRef=uid=>storageRoot()?.ref(`${PROFILE_PREFIX}/${uid}/avatar.jpg`);
+  async function storageRoot(){
+    try{
+      if(typeof ensureStorageService==='function'){
+        const service=await ensureStorageService();
+        if(service)return service;
+      }
+      if(typeof firebase!=='undefined'&&typeof firebase.storage==='function')return firebase.storage();
+    }catch(error){console.warn('[Team Bulls] armazenamento do perfil ainda não está disponível',error?.code||error?.message||error);}
+    return null;
+  }
+  const profileRef=(root,uid)=>root?.ref(`${PROFILE_PREFIX}/${uid}/profile.json`);
+  const avatarRef=(root,uid)=>root?.ref(`${PROFILE_PREFIX}/${uid}/avatar.jpg`);
   const cleanNickname=value=>String(value||'').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,NICK_MAX);
   const timestamp=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.toDate)return value.toDate().getTime();return new Date(value||0).getTime()||0;}catch(error){return 0;}};
   const fmt=value=>{const ms=timestamp(value);return ms?new Date(ms).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';};
@@ -52,22 +61,22 @@
     if(!uid)return{nickname:'',avatarUrl:''};
     if(!fresh&&profileCache.has(uid))return profileCache.get(uid);
     const result={nickname:'',avatarUrl:''};
-    const root=storageRoot();
-    if(!root){profileCache.set(uid,result);return result;}
+    const root=await storageRoot();
+    if(!root)return result;
     try{
-      const ref=profileRef(uid),url=ref?await ref.getDownloadURL():'';
+      const ref=profileRef(root,uid),url=ref?await ref.getDownloadURL():'';
       if(url){const response=await fetch(url,{cache:'no-store'});if(response.ok){const data=await response.json();result.nickname=cleanNickname(data?.nickname||'');}}
     }catch(error){}
-    try{const ref=avatarRef(uid);if(ref)result.avatarUrl=await ref.getDownloadURL();}catch(error){}
+    try{const ref=avatarRef(root,uid);if(ref)result.avatarUrl=await ref.getDownloadURL();}catch(error){}
     profileCache.set(uid,result);
     return result;
   }
 
   async function writeNickname(uid,nickname){
-    const root=storageRoot();
-    if(!root)throw new Error('Armazenamento indisponível.');
     await ensureProfileIdentity(uid);
-    const ref=profileRef(uid);if(!ref)throw new Error('Perfil do aluno indisponível.');
+    const root=await storageRoot();
+    if(!root)throw new Error('Não foi possível carregar o armazenamento do perfil agora. Tente novamente em instantes.');
+    const ref=profileRef(root,uid);if(!ref)throw new Error('Perfil do aluno indisponível.');
     const body=JSON.stringify({nickname:cleanNickname(nickname)});
     try{await ref.put(new Blob([body],{type:'application/json'}),{contentType:'application/json',cacheControl:'no-store'});}
     catch(error){throw profileError(error,'alterar o nome de exibição');}
@@ -105,7 +114,9 @@
     const user=student(),uid=uidOf(user);
     if(!user||!uid)throw new Error('Perfil do aluno indisponível. Entre novamente no app.');
     await ensureProfileIdentity(uid);
-    const ref=avatarRef(uid);if(!ref)throw new Error('Armazenamento da foto indisponível.');
+    const root=await storageRoot();
+    if(!root)throw new Error('Não foi possível carregar o armazenamento da foto agora. Tente novamente em instantes.');
+    const ref=avatarRef(root,uid);if(!ref)throw new Error('Armazenamento da foto indisponível.');
     const blob=await squareAvatar(file);
     try{await ref.put(blob,{contentType:'image/jpeg',cacheControl:'public,max-age=3600'});}
     catch(error){throw profileError(error,'atualizar a foto');}
@@ -114,7 +125,7 @@
   }
 
   async function removeAvatar(uid){
-    try{const ref=avatarRef(uid);if(!ref)throw new Error('Armazenamento indisponível.');await ref.delete();}
+    try{const root=await storageRoot();if(!root)throw new Error('Armazenamento indisponível.');const ref=avatarRef(root,uid);if(!ref)throw new Error('Armazenamento indisponível.');await ref.delete();}
     catch(error){if(!/object-not-found/i.test(String(error?.code||error?.message||'')))throw error;}
     profileCache.delete(uid);
   }
