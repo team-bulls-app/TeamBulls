@@ -33,7 +33,7 @@ assert(source.includes('Atualizações semanais e mensais')||source.includes('at
 assert(source.includes("data-tb-update-filter=\"weekly\"")&&source.includes("data-tb-update-filter=\"monthly\""),'Filtros semanal/mensal não estão presentes.');
 assert(source.includes("data-tb-update-filter=\"completed\""),'Histórico recente de concluídas não está acessível.');
 assert(source.includes("currentItems.sort((a,b)=>a.dueDate.localeCompare(b.dueDate)"),'Próximas atualizações deixaram de ser ordenadas por data.');
-assert(source.includes("students.filter(item=>item.status==='active')"),'Alunos pausados voltaram a entrar nas próximas atualizações.');
+assert(source.includes("students.filter(item=>item.status!=='inactive')"),'Alunos explicitamente pausados/inativos voltaram a entrar nas próximas atualizações.');
 assert(source.includes('Programação incompleta')&&source.includes("kind:'weekly'")&&source.includes("kind:'monthly'"),'Agenda não alerta alunos ativos sem cronograma semanal/mensal.');
 
 assert(source.includes('function weeklyDue(schedule)'),'Cálculo independente da próxima atualização semanal está ausente.');
@@ -50,9 +50,11 @@ assert(source.includes('v109SyncActiveProtocolDates')&&source.includes('v109Sync
 assert(source.includes("item.dueDate>todayIso()"),'Atualizações futuras podem ser concluídas antes da data.');
 assert(source.includes("future?'Disponível para conclusão na data programada'"),'Checkbox futuro não explica por que está bloqueado.');
 
-assert(source.includes("db.collection('users').where('trainerId','==',uid)"),'Agenda não limita a lista aos alunos vinculados ao treinador.');
-assert(source.includes("db.collection('protocolReviewSchedules').where('trainerId','==',uid)"),'Agenda mensal não usa consulta global já compatível com o treinador.');
-assert(source.includes("db.collection('checkinSchedules').doc(student.uid)"),'Agenda semanal não lê apenas o cronograma do aluno vinculado.');
+assert(source.includes("db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)"),'Agenda deve restringir a query de usuários ao trainerId e role=student para ser compatível com Rules 28.');
+assert(source.includes('mapWithLimit(activeStudents,CONCURRENCY'),'Agenda deve limitar a concorrência das leituras por aluno.');
+assert(source.includes("db.collection('protocolReviewSchedules').doc(sid)"),'Agenda mensal deve ler o documento canônico pelo uid de cada aluno vinculado.');
+assert(source.includes("db.collection('checkinSchedules').doc(sid)"),'Agenda semanal deve ler apenas o cronograma do aluno vinculado.');
+assert(!source.includes("db.collection('protocolReviewSchedules').where('trainerId','==',uid)"),'Agenda não deve usar listagem global de cronogramas mensais que não é comprovável pelas Rules 28.');
 assert(!source.includes('setInterval'),'Agenda não deve adicionar polling.');
 assert(!source.includes('MutationObserver'),'Agenda não deve adicionar observer global.');
 assert(!source.includes('onSnapshot'),'Agenda não deve manter listeners globais apenas para organização.');
@@ -61,16 +63,18 @@ assert(usability.includes(src),'Camada network-first não carrega a agenda do tr
 assert(usability.includes("EXPECTED_VERSION='10.10.41-updateorganizer1'"),'Loader não exige a revisão correta da agenda.');
 assert(usability.includes("CURRENT_USER?.role==='trainer'&&MODE==='cloud'"),'Loader não restringe download/instalação ao treinador cloud.');
 assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Ponte de carregamento deixou de ser mutável/network-first no Service Worker.');
+assert(worker.includes("'/modules/trainer-update-organizer-v10_10_41.js'"),'Agenda corrigida precisa ser network-first para não ficar presa no cache antigo.');
 
 assert(feedback.includes("SCREEN_ID='screen-trainer-feedback-archive'"),'Histórico completo de feedbacks do treinador foi removido.');
 assert(feedback.includes("ENTRY_ID='tb-trainer-feedback-archive-entry'"),'Atalho de FEEDBACKS ENVIADOS foi removido.');
 assert(feedback.includes("db.collection('feedback').where('studentId','==',student.uid)"),'Histórico deixou de buscar todos os feedbacks vinculados ao aluno.');
-assert(!feedback.includes('.limit('),'Histórico completo de feedbacks voltou a ter corte artificial de quantidade.');
+assert(!/collection\('feedback'\)\.where\('studentId','==',student\.uid\)\.limit\s*\(/.test(feedback),'Histórico completo de feedbacks voltou a ter corte artificial por aluno.');
 assert(source.includes('TeamBullsTrainerFeedbackArchive'),'Agenda não mantém acesso direto ao histórico completo de feedbacks já existente.');
 
+assert(rules.includes("resource.data.role == 'student' && resource.data.trainerId == request.auth.uid"),'Rules 28 exigem query de usuários restrita a role=student + trainerId.');
 assert(rules.includes('match /checkinSchedules/{uid}')&&rules.includes('allow create, update: if trainerOwns(uid)'),'Conclusão semanal deixou de estar protegida por propriedade do treinador.');
 assert(rules.includes('match /protocolReviewSchedules/{uid}')&&rules.includes('request.resource.data.trainerId == request.auth.uid'),'Conclusão mensal deixou de estar protegida pelo treinador dono do aluno.');
 assert(!rules.includes('match /trainerUpdateOrganizer/'),'Agenda criou coleção paralela desnecessária nas Rules.');
 
 if(failures.length){console.error('\nFALHA — agenda de atualizações do treinador\n- '+failures.join('\n- '));process.exit(1);}
-console.log('APROVADO — agenda lista próximas atualizações semanais/mensais por data, alerta cronogramas ausentes, usa conclusão semanal administrativa separada, mantém o ciclo mensal canônico e preserva o histórico completo de feedbacks sem polling ou nova coleção.');
+console.log('APROVADO — agenda usa listagem de alunos compatível com Rules 28 e leituras diretas dos cronogramas canônicos, mantendo ordem por data, conclusão semanal administrativa, ciclo mensal oficial e histórico de feedbacks sem polling.');
