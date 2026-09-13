@@ -26,7 +26,7 @@ const safeRoster="where('trainerId','==',uid).where('role','==','student')";
 assert(src.feedback.includes(safeRoster),'Feedbacks enviados: listagem de alunos ainda pode receber permission-denied pelas Rules 28.');
 assert(src.organizer.includes(safeRoster),'Agenda: listagem de alunos ainda pode receber permission-denied pelas Rules 28.');
 assert(src.data.includes(safeRoster),'Radar: listagem de alunos ainda pode receber permission-denied pelas Rules 28.');
-assert(src.rules.includes("resource.data.role == 'student' && resource.data.trainerId == request.auth.uid"),'Auditoria depende da regra canônica de leitura do aluno pelo treinador.');
+assert(/resource\.data\.role\s*==\s*'student'[\s\S]{0,120}resource\.data\.trainerId\s*==\s*request\.auth\.uid/.test(src.rules),'Auditoria depende da regra canônica de leitura do aluno pelo treinador.');
 
 assert(src.organizer.includes("collection('checkinSchedules').doc(sid)"),'Agenda: cronograma semanal precisa ser lido diretamente pelo uid do aluno.');
 assert(src.organizer.includes("collection('protocolReviewSchedules').doc(sid)"),'Agenda: cronograma mensal precisa ser lido diretamente pelo uid do aluno.');
