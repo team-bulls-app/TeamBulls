@@ -170,17 +170,25 @@
     if(!force&&loadedTrainerUid===uid&&currentItems.length){render();return true;}
     const serial=++loadSerial;loading=true;render();
     try{
-      const studentSnap=await cloudGet(db.collection('users').where('trainerId','==',uid),'alunos da agenda de atualizações');
+      const studentSnap=await cloudGet(db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500),'alunos da agenda de atualizações');
       if(serial!==loadSerial||trainerUid()!==uid)return false;
       students=(studentSnap.docs||[]).map(doc=>({...doc.data(),uid:doc.id})).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid);
       studentsById=new Map(students.map(item=>[String(item.uid),item]));
-      const activeStudents=students.filter(item=>item.status==='active');
-      const protocolPromise=cloudGet(db.collection('protocolReviewSchedules').where('trainerId','==',uid).limit(500),'cronogramas mensais da agenda').catch(error=>{console.warn('[Team Bulls] Cronogramas mensais indisponíveis na agenda.',error);return null;});
-      const weeklyPromise=mapWithLimit(activeStudents,CONCURRENCY,async student=>{try{return await cloudGet(db.collection('checkinSchedules').doc(student.uid),'cronograma semanal de '+String(student.name||'aluno').slice(0,60));}catch(error){console.warn('[Team Bulls] Cronograma semanal indisponível para',student.uid,error);return null;}});
-      const [protocolSnap,weeklyDocs]=await Promise.all([protocolPromise,weeklyPromise]);
+      const activeStudents=students.filter(item=>item.status!=='inactive');
+      const scheduleDocs=await mapWithLimit(activeStudents,CONCURRENCY,async student=>{
+        const sid=String(student.uid),label=String(student.name||'aluno').slice(0,60);
+        const [weekly,protocol]=await Promise.all([
+          cloudGet(db.collection('checkinSchedules').doc(sid),'cronograma semanal de '+label).catch(error=>{console.warn('[Team Bulls] Cronograma semanal indisponível para',sid,error?.code||error?.message||error);return null;}),
+          cloudGet(db.collection('protocolReviewSchedules').doc(sid),'cronograma mensal de '+label).catch(error=>{console.warn('[Team Bulls] Cronograma mensal indisponível para',sid,error?.code||error?.message||error);return null;})
+        ]);
+        return{studentId:sid,weekly,protocol};
+      });
       if(serial!==loadSerial||trainerUid()!==uid)return false;
-      protocolByStudent=new Map();(protocolSnap?.docs||[]).forEach(doc=>{const data=doc.data();if(String(data?.trainerId||'')===uid)protocolByStudent.set(String(doc.id),{...data,_exists:true});});
-      schedulesByStudent=new Map();weeklyDocs.forEach((doc,index)=>{if(doc?.exists)schedulesByStudent.set(String(activeStudents[index].uid),{...doc.data(),studentId:activeStudents[index].uid,_exists:true});});
+      schedulesByStudent=new Map();protocolByStudent=new Map();
+      scheduleDocs.forEach(row=>{
+        if(row?.weekly?.exists)schedulesByStudent.set(row.studentId,{...row.weekly.data(),studentId:row.studentId,_exists:true});
+        if(row?.protocol?.exists){const data=row.protocol.data();if(String(data?.trainerId||'')===uid)protocolByStudent.set(row.studentId,{...data,studentId:row.studentId,_exists:true});}
+      });
       buildItems(activeStudents);loadedTrainerUid=uid;return true;
     }catch(error){console.error('[Team Bulls] Agenda de atualizações indisponível.',error);if(typeof showToast==='function')showToast('Não foi possível carregar a agenda de atualizações.',true);return false;}
     finally{if(serial===loadSerial){loading=false;render();}}
