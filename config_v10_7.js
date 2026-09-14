@@ -1,4 +1,4 @@
-/* Configuração pública Team Bulls v10.10.30 — bootstrap móvel resiliente e runtime leve.
+/* Configuração pública Team Bulls v10.10.45 — bootstrap móvel resiliente e runtime leve.
    A chave do App Check/reCAPTCHA Enterprise é pública por definição.
    Não coloque senhas, chaves privadas ou credenciais administrativas aqui. */
 window.TEAM_BULLS_PUBLIC_CONFIG=Object.freeze({
@@ -41,8 +41,8 @@ if('caches' in window){
 
 (()=>{
   let requested=false,deferredStarted=false,deferredComplete=false,completedRole='',studentPriorityStarted=false,healing=false,healTimer=null,readyResolved=false,hadFailures=false,screenObserver=null,deferredPhase=false,deferredBatchCount=0,deferredEligible=[];
-  const PRELOAD_WINDOW=8;
-  const DEFERRED_YIELD_EVERY=4;
+  const PRELOAD_WINDOW=3;
+  const DEFERRED_YIELD_EVERY=2;
   const STUDENT_YIELD_EVERY=2;
   const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const yieldUi=()=>new Promise(resolve=>{
@@ -51,7 +51,8 @@ if('caches' in window){
   });
   const criticalModules=[
     './modules/security-hardening-v10_10_9.js?v=10.10.10-security8',
-    './modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1'
+    './modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1',
+    './modules/exercise-video-resilience-v10_10_45.js?v=10.10.45-video1'
   ];
   const studentPriorityModules=[
     './modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3',
@@ -143,7 +144,7 @@ if('caches' in window){
     if(!ok)console.warn('[Team Bulls] Módulo colocado na fila de autorreparo:',src);
     if(deferredPhase&&deferredEligible.includes(src)){
       deferredBatchCount++;
-      if(deferredBatchCount%4===0)await yieldUi();
+      if(deferredBatchCount%DEFERRED_YIELD_EVERY===0)await yieldUi();
     }
     return ok;
   };
@@ -151,7 +152,7 @@ if('caches' in window){
   const healFailedModules=async()=>{if(healing||navigator.onLine===false)return false;const pending=activeFailures();if(!pending.length){markReady();return true;}healing=true;preloadModules(pending.slice(0,PRELOAD_WINDOW));try{for(let index=0;index<pending.length;index++){await loadScript(pending[index],9000);if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();}}finally{healing=false;}if(activeFailures().length)scheduleHeal(5000);else markReady();return activeFailures().length===0;};
   const loadStudentPriority=async()=>{
     if(studentPriorityStarted||!studentHomeActive())return !!window.TeamBullsStudentHomeLayout;
-    studentPriorityStarted=true;document.documentElement.dataset.teamBullsStudentRuntime='loading';preloadModules(studentPriorityModules);
+    studentPriorityStarted=true;document.documentElement.dataset.teamBullsStudentRuntime='loading';preloadModules(studentPriorityModules.slice(0,PRELOAD_WINDOW));
     for(let index=0;index<studentPriorityModules.length;index++){
       await loadScript(studentPriorityModules[index],6500);
       if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();
@@ -178,7 +179,7 @@ if('caches' in window){
   const scheduleDeferred=()=>{
     if(!sessionUiReady()||runtimeComplete())return;
     const queue=()=>{if(!sessionUiReady()||runtimeComplete())return;if(studentHomeActive())loadStudentPriority().finally(()=>{if(!deferredStarted)loadDeferred();});else loadDeferred();};
-    requestAnimationFrame(()=>setTimeout(queue,60));
+    requestAnimationFrame(()=>setTimeout(queue,240));
   };
   const contextChanged=()=>{
     if(studentHomeActive()){loadStudentPriority().finally(scheduleDeferred);return;}
@@ -193,7 +194,7 @@ if('caches' in window){
   };
   const load=async()=>{if(requested)return;requested=true;for(const src of criticalModules)await loadScript(src,6500);installSessionGate();contextChanged();};
   preloadModules(criticalModules);
-  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.21-startup9',context:'role-aware'});
-  window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.30-startup10',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
+  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.45-startup11',context:'role-aware-low-contention'});
+  window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.45-startup11',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
   window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleHeal(700);});window.addEventListener('pageshow',()=>scheduleHeal(900));if(window.TeamBulls107)load();else window.addEventListener('team-bulls-v107-ready',load,{once:true});
 })();
