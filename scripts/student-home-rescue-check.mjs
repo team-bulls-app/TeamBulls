@@ -84,7 +84,7 @@ assert(config.includes('if(!sessionUiReady()||runtimeComplete())return;'),'Agend
 assert(config.includes("activeScreen()!=='screen-home'"),'Prioridade do aluno não está condicionada à Home realmente ativa.');
 assert(config.includes("screen!=='screen-loading'&&screen!=='screen-auth'"),'Fila pesada pode voltar a iniciar durante loading/auth.');
 assert(config.includes('await yieldUi();'),'Fila diferida não devolve o thread principal entre módulos.');
-assert(config.includes("version:'10.10.21-startup9'"),'Loader não expõe a revisão de performance por contexto.');
+assert(config.includes("version:'10.10.45-startup11'")&&config.includes("context:'role-aware-low-contention'"),'Loader não expõe a revisão de baixa contenção por contexto.');
 
 assert(sw.includes("./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3"),'Perfil estabilizado não está no shell PWA.');
 assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4"),'Home otimizada não está no shell PWA.');
