@@ -9,7 +9,7 @@ const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
 const paths=[
   'modules/student-trainer-activity-bridge-v10_10_47.js',
-  'modules/trainer-activity-reconciliation-v10_10_47.js',
+  'modules/trainer-canonical-inbox-v10_10_48.js',
   'modules/intelligence-suite-loader-v10_10_42.js'
 ];
 for(const path of paths){
@@ -21,7 +21,7 @@ for(const path of paths){
 }
 
 const bridge=read(paths[0]);
-const reconcile=read(paths[1]);
+const canonical=read(paths[1]);
 const loader=read(paths[2]);
 const oldInbox=read('modules/trainer-inbox-payments-v10_10_12.js');
 const config=read('config_v10_7.js');
@@ -29,13 +29,14 @@ const rules=read('firebase/firestore_28_compacto.rules');
 const firebase=JSON.parse(read('firebase.json'));
 const sw=read('sw.js');
 
-/* Reproduz a causa original: o módulo antigo contém hooks de aluno, mas é trainer-only. */
+/* Causa original: os hooks de aluno seguem no módulo antigo, que continua trainer-only. */
 has(oldInbox,'function installSubmissionHooks()','Central antiga deixou de conter o caminho cuja regressão estamos cobrindo.');
 has(config,"MODULE_ROOT+'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2'",'Loader antigo mudou; revisar a regressão da Central.');
 
-/* Entrega do hotfix por arquivo network-first já existente. */
+/* Entrega atual: aluno cria índice futuro; treinador não depende mais desse índice para enxergar o relatório. */
 has(loader,'student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge1','Loader não entrega a ponte ao aluno.');
-has(loader,'trainer-activity-reconciliation-v10_10_47.js?v=10.10.47-activityreconcile1','Loader não entrega a reconciliação ao treinador.');
+has(loader,'trainer-canonical-inbox-v10_10_48.js?v=10.10.48-canonicalinbox1','Loader não entrega a Central canônica ao treinador.');
+lacks(loader,'trainer-activity-reconciliation-v10_10_47.js?v=10.10.47-activityreconcile1','Visibilidade do treinador ainda depende da reconciliação secundária antiga.');
 has(loader,"student:[",'Loader perdeu o ramo do aluno.');
 has(loader,"trainer:[",'Loader perdeu o ramo do treinador.');
 has(sw,"'/modules/intelligence-suite-loader-v10_10_42.js'",'Loader de recuperação não está protegido como arquivo mutável/network-first.');
@@ -45,32 +46,30 @@ has(bridge,"const result=await base.apply(this,arguments);",'Ponte do aluno prec
 has(bridge,"indexWeekly(sourceId)",'Relatório semanal não agenda o índice da Central.');
 has(bridge,"indexQuestionnaire(sourceId)",'Questionário/atualização não agenda o índice da Central.');
 has(bridge,"db.collection('trainerActivity').doc(trainerId).collection('events').doc(eventId(type,sourceId)).set(payload)",'Ponte não usa o índice privado existente do treinador.');
-has(bridge,"(type==='weekly_checkin'?'w-':'q-')+cleanId(sourceId)",'Ponte não usa IDs determinísticos compatíveis com o índice antigo.');
-has(bridge,'Falha neste índice secundário nunca pode invalidá-lo','Ponte não documenta/preserva a independência do envio canônico.');
+has(bridge,"(type==='weekly_checkin'?'w-':'q-')+cleanId(sourceId)",'Ponte não usa IDs determinísticos.');
+has(bridge,'Falha neste índice secundário nunca pode invalidá-lo','Ponte não preserva explicitamente a independência do envio canônico.');
 lacks(bridge,"collection('questionnaires').doc(sourceId).update",'Ponte não pode reescrever a resposta canônica.');
 lacks(bridge,"collection('weeklyCheckins').doc(sourceId).update",'Ponte não pode reescrever o relatório semanal canônico.');
 lacks(bridge,'.delete(','Ponte não pode excluir documentos.');
-lacks(bridge,'setInterval(','Ponte não pode usar polling.');
-lacks(bridge,'MutationObserver','Ponte não pode observar globalmente o DOM.');
 
-/* Envios anteriores: o treinador relê a fonte canônica por aluno e cria só eventos ausentes. */
-has(reconcile,"where('trainerId','==',uid).where('role','==','student').limit(500)",'Reconciliação não usa roster compatível com Rules 28.');
-has(reconcile,"db.collection('questionnaires').where('studentId','==',sid).get()",'Reconciliação voltou a consultar questionários globalmente por trainerId.');
-has(reconcile,"if(data.answered!==true)return;",'Reconciliação pode indexar questionário ainda não respondido.');
-has(reconcile,"db.collection('weeklyCheckins').where('studentId','==',sid).get()",'Reconciliação semanal não está isolada pelo aluno vinculado.');
-has(reconcile,'const existing=new Set','Reconciliação não preserva eventos existentes/lidos.');
-has(reconcile,"filter(item=>!existing.has(item.id))",'Reconciliação não limita gravações aos índices ausentes.');
-has(reconcile,'db.runTransaction(async transaction=>','Criação ausente não está protegida contra corrida/overwrite.');
-has(reconcile,'if(current.exists)return false','Transação pode sobrescrever evento que já existe.');
-has(reconcile,"read:false",'Atualização recuperada não reaparece como não lida.');
-has(reconcile,"data?.answeredAt?.toDate",'Atualização recuperada não preserva o timestamp da resposta quando disponível.');
-has(reconcile,'reconcile(true)','Atualizar Central não força uma nova reconciliação canônica.');
-has(reconcile,'setTimeout(()=>reconcile(false).catch(()=>{}),900)','Treinador não recupera índices ausentes automaticamente após entrar.');
-lacks(reconcile,"collection('questionnaires').doc",'Reconciliação não pode gravar no questionário canônico.');
-lacks(reconcile,"collection('weeklyCheckins').doc",'Reconciliação não pode gravar no relatório semanal canônico.');
-lacks(reconcile,'.delete(','Reconciliação não pode excluir dados.');
-lacks(reconcile,'setInterval(','Reconciliação não pode usar polling.');
-lacks(reconcile,'MutationObserver','Reconciliação não pode observar globalmente o DOM.');
+/* Envios anteriores e atuais: a UI nasce da fonte canônica e só depois tenta reparar trainerActivity. */
+has(canonical,"where('trainerId','==',uid).where('role','==','student').limit(500)",'Central canônica não usa roster compatível com Rules 28.');
+has(canonical,"db.collection('questionnaires').where('studentId','==',sid).get()",'Central canônica não lê questionários por aluno.');
+has(canonical,"if(data.answered!==true",'Central pode exibir questionário ainda não respondido.');
+has(canonical,"db.collection('weeklyCheckins').where('studentId','==',sid).get()",'Central semanal não está isolada pelo aluno vinculado.');
+has(canonical,'items=mergeRows(canonicalRows,indexRows)','trainerActivity ainda é tratado como fonte de verdade.');
+has(canonical,'render();repairMissing().catch(()=>{})','Reparo secundário ainda bloqueia a exibição do relatório.');
+has(canonical,'db.runTransaction(async transaction=>','Criação ausente não está protegida contra corrida/overwrite.');
+has(canonical,'if(doc.exists)return true','Transação pode sobrescrever evento que já existe.');
+has(canonical,"read:false",'Índice reconstruído não nasce como não lido.');
+has(canonical,'await refresh(true)','Abrir/atualizar Central não força leitura canônica.');
+lacks(canonical,"db.collection('questionnaires').doc(row.sourceId).set",'Central não pode gravar no questionário canônico.');
+lacks(canonical,"db.collection('questionnaires').doc(row.sourceId).update",'Central não pode alterar resposta canônica.');
+lacks(canonical,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central não pode gravar no relatório semanal canônico.');
+lacks(canonical,"db.collection('weeklyCheckins').doc(row.sourceId).update",'Central não pode alterar relatório semanal canônico.');
+lacks(canonical,'.delete(','Central não pode excluir dados.');
+lacks(canonical,'setInterval(','Central não pode usar polling.');
+lacks(canonical,'MutationObserver','Central não pode observar globalmente o DOM.');
 
 /* Segurança: mantém Rules 28 fechadas e usa exatamente as permissões já existentes. */
 has(rules,'match /trainerActivity/{trainerUid}','Rules 28 não possuem a caixa privada trainerActivity.');
@@ -84,4 +83,4 @@ if(failures.length){
   console.error('FALHA — recuperação das atualizações do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — envios canônicos antigos e futuros são preservados; aluno cria índice determinístico e treinador reconcilia somente eventos ausentes sem alterar respostas, fotos ou relatórios originais.');
+console.log('APROVADO — envio canônico continua soberano: aluno tenta indexar futuros relatórios, enquanto o treinador lê questionários/check-ins reais diretamente e repara trainerActivity sem alterar respostas, fotos ou datas.');
