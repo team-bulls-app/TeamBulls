@@ -7,7 +7,7 @@ const assert=(condition,message)=>{if(!condition)failures.push(message);};
 const has=(text,needle,message)=>assert(text.includes(needle),message);
 const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
-const modulePath='modules/trainer-canonical-inbox-v10_10_48.js';
+const modulePath='modules/trainer-canonical-inbox-v10_10_49.js';
 const loaderPath='modules/intelligence-suite-loader-v10_10_42.js';
 for(const path of [modulePath,loaderPath]){
   assert(fs.existsSync(path),`Arquivo obrigatório ausente: ${path}`);
@@ -19,14 +19,16 @@ const loader=read(loaderPath);
 const rules=read('firebase.json');
 const sw=read('sw.js');
 
-has(source,"const VERSION='10.10.48-canonicalinbox1'",'Central canônica está na revisão errada.');
-has(loader,"trainer-canonical-inbox-v10_10_48.js?v=10.10.48-canonicalinbox1",'Loader do treinador não entrega a Central canônica.');
+has(source,"const VERSION='10.10.49-canonicalinbox2'",'Central canônica está na revisão errada.');
+has(loader,"trainer-canonical-inbox-v10_10_49.js?v=10.10.49-canonicalinbox2",'Loader do treinador não entrega a Central canônica atual.');
 lacks(loader,'trainer-activity-reconciliation-v10_10_47.js?v=10.10.47-activityreconcile1','Loader ainda depende da reconciliação secundária para visibilidade.');
 
 has(source,"db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)",'Roster da Central não está isolado pelo treinador conforme Rules 28.');
 has(source,"db.collection('questionnaires').where('studentId','==',sid).get()",'Central não lê questionários diretamente por aluno.');
 has(source,"db.collection('weeklyCheckins').where('studentId','==',sid).get()",'Central não lê relatórios semanais diretamente por aluno.');
-has(source,'if(data.answered!==true','Questionário ainda pode aparecer antes de ter sido realmente respondido.');
+has(source,'function questionnaireComplete(data)','Compatibilidade de conclusão de questionário não está explícita.');
+has(source,'if(data?.answered===true)return true','Questionário canônico respondido deixou de ser reconhecido.');
+has(source,'if(!stampMs(data?.answeredAt))return false','Registro legado incompleto poderia aparecer sem timestamp de resposta.');
 has(source,"eventId('questionnaire',doc.id)",'Questionários não usam ID determinístico do índice.');
 has(source,"eventId('weekly_checkin',doc.id)",'Relatórios semanais não usam ID determinístico do índice.');
 
@@ -49,8 +51,8 @@ lacks(source,'.delete(','Correção não pode excluir registros.');
 lacks(source,'setInterval(','Central canônica não pode introduzir polling.');
 lacks(source,'MutationObserver','Central canônica não pode observar globalmente o DOM.');
 
-has(source,"async openInbox(){const result=await hub.openInbox.apply(hub,arguments);hookFilters();await refresh(true);return result;}",'Abrir Central não força leitura canônica.');
-has(source,"async refreshInbox(){const result=await hub.refreshInbox.apply(hub,arguments);await refresh(true);return result;}",'Botão atualizar não força leitura canônica.');
+has(source,'async openInbox(){const result=await hub.openInbox.apply(hub,arguments);hookFilters();await refresh(true);return result;}','Abrir Central não força leitura canônica.');
+has(source,'async refreshInbox(){const result=await hub.refreshInbox.apply(hub,arguments);await refresh(true);return result;}','Botão atualizar não força leitura canônica.');
 has(source,'async markAllRead(){return markAllRead();}','Marcar tudo lido não foi integrado à fonte canônica.');
 
 assert(JSON.parse(rules)?.firestore?.rules==='firebase/firestore_28_compacto.rules','Correção alterou a Rules ativa.');
@@ -60,4 +62,4 @@ if(failures.length){
   console.error('FALHA — Central canônica do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — relatórios respondidos e weekly check-ins aparecem a partir das fontes canônicas mesmo sem trainerActivity; índice secundário é reparado depois, sem alterar ou excluir envios dos alunos.');
+console.log('APROVADO — relatórios respondidos e weekly check-ins aparecem a partir das fontes canônicas mesmo sem trainerActivity; compatibilidade legada exige evidência real de conclusão e não altera os envios.');

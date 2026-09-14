@@ -45,6 +45,7 @@ jobs:
           node scripts/trainer-runtime-reliability-check.mjs
           node scripts/trainer-activity-recovery-check.mjs
           node scripts/trainer-canonical-inbox-check.mjs
+          node scripts/trainer-legacy-report-visibility-check.mjs
           node scripts/session-recovery-home-dates-check.mjs
           node scripts/student-request-realtime-check.mjs
           node scripts/student-weekly-report-entry-check.mjs
