@@ -296,7 +296,6 @@
       };
       wrapped.__tbSessionStable=true;showScreen=wrapped;
     }
-
     if(!doLogin.__tbSessionStable){
       const base=doLogin;
       const wrapped=async function(){
@@ -370,4 +369,97 @@
     setPending(false,'restore-timeout');
     bootOriginal?.activateAuth?.('Não foi possível restaurar a sessão automaticamente. Você já pode entrar novamente; seus dados locais continuam preservados.');
   },12000);
+})();
+
+/* Team Bulls v10.10.46 — entrada rápida do treinador e ponte de runtime confiável. */
+(()=>{
+  if(window.__TEAM_BULLS_TRAINER_COLDSTART_101046__)return;
+  window.__TEAM_BULLS_TRAINER_COLDSTART_101046__=true;
+
+  const VERSION='10.10.46-coldstart1';
+  const RUNTIME_SRC='./modules/trainer-runtime-reliability-v10_10_46.js?v=10.10.46-trainer1';
+  let appCheckTask=null;
+  let runtimePromise=null;
+
+  function injectBootStyle(){
+    if(document.getElementById('tb-trainer-coldstart-style'))return;
+    const style=document.createElement('style');
+    style.id='tb-trainer-coldstart-style';
+    style.textContent='.fab-wrap{display:none}';
+    document.head.appendChild(style);
+  }
+  function trainerContext(){
+    try{return typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'&&typeof MODE!=='undefined'&&MODE==='cloud';}
+    catch(error){return false;}
+  }
+  function loadRuntime(){
+    if(!trainerContext())return Promise.resolve(false);
+    if(window.TeamBullsTrainerRuntimeReliability?.version==='10.10.46-trainer1')return Promise.resolve(true);
+    if(runtimePromise)return runtimePromise;
+    runtimePromise=new Promise(resolve=>{
+      const expected=new URL(RUNTIME_SRC,location.href).href;
+      const existing=[...document.scripts].find(script=>script.src===expected);
+      if(existing){
+        if(window.TeamBullsTrainerRuntimeReliability){resolve(true);runtimePromise=null;return;}
+        existing.addEventListener('load',()=>{resolve(!!window.TeamBullsTrainerRuntimeReliability);runtimePromise=null;},{once:true});
+        existing.addEventListener('error',()=>{resolve(false);runtimePromise=null;},{once:true});
+        return;
+      }
+      const script=document.createElement('script');let settled=false;
+      const finish=ok=>{if(settled)return;settled=true;clearTimeout(timer);if(!ok)script.remove();resolve(ok);runtimePromise=null;};
+      script.src=RUNTIME_SRC;script.async=true;script.onload=()=>finish(!!window.TeamBullsTrainerRuntimeReliability);script.onerror=()=>finish(false);
+      const timer=setTimeout(()=>finish(false),6500);document.head.appendChild(script);
+    });
+    return runtimePromise;
+  }
+  function patchNetworkGates(){
+    if(typeof withTimeout==='function'&&!withTimeout.__tbTrainerColdStart101046){
+      const base=withTimeout;
+      const wrapped=function(task,ms,label='operação'){
+        let limit=Math.max(250,Number(ms)||10000);
+        if(label==='App Check'){
+          appCheckTask=Promise.resolve(task).catch(()=>false);
+          limit=Math.min(limit,2500);
+        }
+        return base(task,limit,label);
+      };
+      wrapped.__tbTrainerColdStart101046=true;
+      withTimeout=wrapped;
+    }
+    if(typeof getUserProfileWithRetry==='function'&&!getUserProfileWithRetry.__tbTrainerAppCheckOverlap101046){
+      const base=getUserProfileWithRetry;
+      const wrapped=async function(){
+        if(appCheckTask){
+          await Promise.race([appCheckTask,new Promise(resolve=>setTimeout(resolve,1200))]).catch(()=>{});
+        }
+        return base.apply(this,arguments);
+      };
+      wrapped.__tbTrainerAppCheckOverlap101046=true;
+      getUserProfileWithRetry=wrapped;
+    }
+    if(typeof showScreen==='function'&&!showScreen.__tbTrainerRuntime101046){
+      const base=showScreen;
+      const wrapped=function(id){
+        const result=base.apply(this,arguments);
+        if(result!==false&&(id==='screen-trainer'||id==='screen-trainer-student'||String(id||'').startsWith('screen-ts-')))setTimeout(loadRuntime,0);
+        return result;
+      };
+      wrapped.__tbTrainerRuntime101046=true;
+      showScreen=wrapped;
+    }
+    return true;
+  }
+  function install(){
+    injectBootStyle();
+    patchNetworkGates();
+    if(trainerContext())loadRuntime();
+  }
+
+  injectBootStyle();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
+  window.addEventListener('pageshow',()=>{patchNetworkGates();if(trainerContext())loadRuntime();},{passive:true});
+  window.addEventListener('online',()=>{patchNetworkGates();if(trainerContext())loadRuntime();},{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){patchNetworkGates();if(trainerContext())loadRuntime();}},{passive:true});
+
+  window.TeamBullsTrainerColdStart=Object.freeze({version:VERSION,install,loadRuntime});
 })();
