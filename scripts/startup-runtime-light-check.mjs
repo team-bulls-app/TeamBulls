@@ -48,3 +48,4 @@ if(process.exitCode){
   process.exit(process.exitCode);
 }
 console.log('APROVADO — startup limita preloads concorrentes, preserva ordem funcional e devolve mais frames à UI antes da carga pesada.');
+await import('./foreground-write-resilience-check.mjs');

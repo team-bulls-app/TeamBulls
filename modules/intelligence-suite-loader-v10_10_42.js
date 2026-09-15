@@ -1,4 +1,4 @@
-/* Team Bulls v10.10.49 — carregador isolado da suíte de inteligência, progresso e Central canônica. */
+/* Team Bulls v10.10.50 — carregador isolado da suíte de inteligência, progresso e Central canônica. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
@@ -13,6 +13,7 @@
       ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.43-studentinsights2',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.43-studentinsights2']
     ],
     student:[
+      ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge1',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge1'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
     ]
