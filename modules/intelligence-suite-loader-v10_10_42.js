@@ -1,4 +1,4 @@
-/* Team Bulls v10.10.50 — carregador isolado da suíte de inteligência, progresso e Central canônica. */
+/* Team Bulls v10.10.51 — carregador isolado da suíte de inteligência, progresso e Central canônica. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
@@ -6,6 +6,7 @@
   const VERSION='10.10.42-intelsuite1';
   const specs={
     trainer:[
+      ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
       ['./modules/trainer-canonical-inbox-v10_10_49.js?v=10.10.49-canonicalinbox2',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.49-canonicalinbox2'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.44-contextguard3',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.44-contextguard3'],
