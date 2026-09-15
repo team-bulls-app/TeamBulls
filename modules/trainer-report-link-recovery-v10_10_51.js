@@ -57,6 +57,8 @@
       if(recovered>0){
         try{if(typeof showToast==='function')showToast(`✓ ${recovered} vínculo(s) recuperado(s). Recarregando relatórios...`);}catch(error){}
         try{window.dispatchEvent(new CustomEvent('team-bulls-report-link-repaired',{detail:{trainerUid:uid,recovered,result}}));}catch(error){}
+      }else if(force&&Number(result?.unresolved)>0){
+        try{if(typeof showToast==='function')showToast('Há um vínculo antigo que não pôde ser confirmado automaticamente. Nenhum dado foi alterado.',true);}catch(error){}
       }
       return result||{};
     })().catch(error=>{
@@ -96,7 +98,9 @@
       const api=window.TeamBullsTrainerSentReports;
       if(!api||!trainer())return;
       event.preventDefault();event.stopImmediatePropagation();
-      ensure(true).then(()=>entry?api.open():api.refresh()).catch(()=>entry?api.open():api.refresh());
+      const invoke=()=>entry?api.open():api.refresh();
+      if(api.__tbReportLinkRecovery101051){Promise.resolve(invoke()).catch(()=>{});return;}
+      ensure(true).then(invoke).catch(invoke);
     },true);
   }
 
