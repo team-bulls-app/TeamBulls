@@ -63,10 +63,10 @@
       readWithTimeout(studentRef,'relatórios do aluno')
     ]);
     if(ownedResult.status==='rejected'&&studentResult.status==='rejected')throw ownedResult.reason||studentResult.reason||new Error('Relatórios indisponíveis');
-    const rows=new Map();
-    if(ownedResult.status==='fulfilled')for(const doc of ownedResult.value.docs||[]){const data={...doc.data(),id:doc.id};if(String(data.studentId||'')===String(studentUid))rows.set(doc.id,data);}
-    if(studentResult.status==='fulfilled')for(const doc of studentResult.value.docs||[]){const data={...doc.data(),id:doc.id},owner=String(data.trainerId||'');if(String(data.studentId||'')===String(studentUid)&&(!owner||owner===trainerUid))rows.set(doc.id,data);}
-    return[...rows.values()].sort((a,b)=>(stampMs(b.answeredAt)||stampMs(b.createdAt))-(stampMs(a.answeredAt)||stampMs(a.createdAt))||String(b.id).localeCompare(String(a.id)));
+    const rows=Object.create(null);
+    if(ownedResult.status==='fulfilled')for(const doc of ownedResult.value.docs||[]){const data={...doc.data(),id:doc.id};if(String(data.studentId||'')===String(studentUid))rows[doc.id]=data;}
+    if(studentResult.status==='fulfilled')for(const doc of studentResult.value.docs||[]){const data={...doc.data(),id:doc.id},owner=String(data.trainerId||'');if(String(data.studentId||'')===String(studentUid)&&(!owner||owner===trainerUid))rows[doc.id]=data;}
+    return Object.values(rows).sort((a,b)=>(stampMs(b.answeredAt)||stampMs(b.createdAt))-(stampMs(a.answeredAt)||stampMs(a.createdAt))||String(b.id).localeCompare(String(a.id)));
   }
 
   async function refreshQuestionnaires(studentUid){
