@@ -1,15 +1,31 @@
-/* Team Bulls v10.10.44 — guarda de contexto canônico para ações do treinador. */
+/* Team Bulls v10.10.56 — guarda de contexto canônico para ações do treinador. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_TRAINER_CANONICAL_CONTEXT_GUARD_101042__)return;
   window.__TEAM_BULLS_TRAINER_CANONICAL_CONTEXT_GUARD_101042__=true;
-  const VERSION='10.10.44-contextguard3';
+  const VERSION='10.10.56-contextguard4';
   const PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-completed';
   let checkinLoad=null,protocolLoad=null;
 
   const trainer=()=>{try{return CURRENT_USER?.role==='trainer'&&MODE==='cloud'&&!!VIEW_STUDENT;}catch(error){return false;}};
   const currentStudentId=()=>trainer()?String(VIEW_STUDENT?.uid||''):'';
   const completedCycle=()=>{try{return Math.max(0,Math.trunc(Number(V109_PROTOCOL_REVIEW_SCHEDULE?.lastCompletedCycle)||0));}catch(error){return 0;}};
+
+  function dietContext(){
+    if(!trainer())return{ok:false,studentId:'',reason:'Treinador ou aluno não identificado.'};
+    const studentId=currentStudentId();
+    const dietStudentId=String(typeof DIET_CONTEXT!=='undefined'&&DIET_CONTEXT?.targetUid||'');
+    const mealStudentId=String(typeof MEAL_CTX!=='undefined'&&MEAL_CTX?.targetUid||'');
+    if(!studentId)return{ok:false,studentId:'',reason:'Aluno não identificado.'};
+    if((dietStudentId&&dietStudentId!==studentId)||(mealStudentId&&mealStudentId!==studentId)){
+      return{ok:false,studentId,reason:'O contexto da dieta pertence a outro aluno.'};
+    }
+    return{ok:true,studentId,dietStudentId,mealStudentId};
+  }
+
+  function warnDietContext(){
+    if(typeof showToast==='function')showToast('O aluno aberto mudou. Volte ao arquivo do aluno e abra a dieta novamente antes de salvar o cálculo privado.',true);
+  }
 
   async function waitDifferentLoad(holder,studentId){
     if(!holder||holder.studentId===studentId)return;
@@ -109,6 +125,27 @@
     wrapped.__tbCanonicalContextGuard=true;wrapped.__tbBase=base;markProtocolReviewCompleted=wrapped;
   }
 
+  function patchDietCalculator(){
+    const api=window.TeamBullsDietCalculator;
+    if(!api||api.__tbCanonicalContextGuard||typeof api.save!=='function')return false;
+    const baseSave=api.save,baseToggle=typeof api.toggle==='function'?api.toggle:null;
+    const guardedSave=async function(){
+      const context=dietContext();
+      if(!context.ok){warnDietContext();return false;}
+      const studentId=context.studentId;
+      const result=await baseSave.apply(api,arguments);
+      if(currentStudentId()!==studentId)console.warn('[Team Bulls] Cálculo privado terminou após troca do aluno ativo; a próxima ação exigirá o contexto canônico atual.');
+      return result;
+    };
+    const guardedToggle=function(){
+      const context=dietContext();
+      if(!context.ok){warnDietContext();return false;}
+      return baseToggle?baseToggle.apply(api,arguments):false;
+    };
+    window.TeamBullsDietCalculator=Object.freeze({...api,save:guardedSave,toggle:guardedToggle,__tbCanonicalContextGuard:true});
+    return true;
+  }
+
   function patchLogout(){
     if(typeof confirmLogout!=='function'||confirmLogout.__tbCanonicalContextGuard)return;
     const base=confirmLogout;
@@ -116,7 +153,7 @@
     wrapped.__tbCanonicalContextGuard=true;wrapped.__tbBase=base;confirmLogout=wrapped;
   }
 
-  function install(){patchWeeklyCheckinView();patchProtocolCompletion();patchLogout();}
+  function install(){patchWeeklyCheckinView();patchProtocolCompletion();patchDietCalculator();patchLogout();}
   install();window.addEventListener('team-bulls-runtime-ready',install);window.addEventListener('team-bulls-runtime-state',install);window.addEventListener('pageshow',install,{passive:true});window.addEventListener(PROTOCOL_COMPLETED_EVENT,refreshInsightsAfterProtocolCompletion);
-  window.TeamBullsTrainerCanonicalContextGuard=Object.freeze({version:VERSION,ensureWeeklyCheckinContext,ensureProtocolContext,event:PROTOCOL_COMPLETED_EVENT});
+  window.TeamBullsTrainerCanonicalContextGuard=Object.freeze({version:VERSION,ensureWeeklyCheckinContext,ensureProtocolContext,dietContext,event:PROTOCOL_COMPLETED_EVENT});
 })();
