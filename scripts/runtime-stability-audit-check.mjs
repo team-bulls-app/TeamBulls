@@ -40,7 +40,7 @@ assert(src.storageRules.includes('match /studentProfiles/{uid}/profile.json')&&s
 assert(src.guard.includes('checkinLoad.studentId!==studentId')&&src.guard.includes('protocolLoad.studentId!==studentId'),'Contexto: cargas concorrentes de alunos distintos podem voltar a se misturar.');
 assert(src.data.includes('trainingSessionCount')&&src.progress.includes('sessionCount(sessions)')&&src.insights.includes('countTrainingSessions'),'Métricas: documentos por exercício podem voltar a ser contados como sessões completas.');
 assert(src.insights.includes('weightComparable')&&src.insights.includes('completeReview'),'Insights: peso ausente/conclusão com estado obsoleto não estão protegidos.');
-assert(src.loader.includes('10.10.44-contextguard3'),'Modo Revisão: loader precisa exigir a guarda com sincronização pós-confirmação.');
+assert(src.loader.includes('10.10.56-contextguard4'),'Modo Revisão: loader precisa exigir a guarda atual com sincronização pós-confirmação e proteção de contexto da dieta.');
 assert(src.guard.includes("PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-completed'"),'Modo Revisão: evento de conclusão canônica está ausente.');
 const interceptStart=src.guard.indexOf('const intercepted=function');
 const interceptEnd=src.guard.indexOf('showConfirm=intercepted',interceptStart);
@@ -64,4 +64,4 @@ const published=JSON.parse(src.version);
 assert(src.worker.includes(`const BUILD_REVISION=${Number(published.build)};`),'PWA: correção não pode quebrar a coerência com o build publicado.');
 assert(src.worker.includes("CACHE_HOTFIX='update-unblock1'"),'PWA: correção pontual não deve reativar uma navegação forçada de cache.');
 
-console.log('APROVADO — feedbacks/agenda/Storage/contexto/métricas continuam estáveis e o Modo Revisão agora sincroniza somente depois da confirmação canônica, sem polling nem romper o build publicado.');
+console.log('APROVADO — feedbacks/agenda/Storage/contexto/métricas continuam estáveis e o Modo Revisão exige a guarda atual após a confirmação canônica, sem polling nem romper o build publicado.');

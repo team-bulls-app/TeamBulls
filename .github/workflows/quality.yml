@@ -73,4 +73,6 @@ jobs:
           node scripts/startup-cache-recovery-check.mjs
           node scripts/mobile-touch-freeze-check.mjs
           node scripts/runtime-stabilization-check.mjs
+          node scripts/desktop-runtime-hygiene-check.mjs
+          node scripts/runtime-hygiene-smoke-check.mjs
           node testes/testar_cadastro_convite_v10_10_9.js
