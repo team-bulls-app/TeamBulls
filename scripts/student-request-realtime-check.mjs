@@ -6,10 +6,14 @@ const assert=(ok,message)=>{if(!ok)fail.push(message);};
 const read=file=>fs.readFileSync(file,'utf8');
 const config=read('config_v10_7.js');
 const realtime=read('modules/student-request-realtime-v10_10_32.js');
+const submitState=read('modules/student-report-submit-reconciliation-v10_10_54.js');
+const loader=read('modules/intelligence-suite-loader-v10_10_42.js');
 const rules=read('firebase/firestore_28_compacto.rules');
 
-const syntax=spawnSync(process.execPath,['--check','modules/student-request-realtime-v10_10_32.js'],{encoding:'utf8'});
-assert(syntax.status===0,`Módulo realtime possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
+for(const modulePath of ['modules/student-request-realtime-v10_10_32.js','modules/student-report-submit-reconciliation-v10_10_54.js']){
+  const syntax=spawnSync(process.execPath,['--check',modulePath],{encoding:'utf8'});
+  assert(syntax.status===0,`Módulo possui JavaScript inválido (${modulePath}): ${String(syntax.stderr||'').trim()}`);
+}
 
 const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3';
 assert(config.includes(`'${moduleUrl}'`),'Loader prioritário do aluno não inclui a sincronização realtime atual.');
@@ -48,6 +52,27 @@ assert(realtime.includes('firebase.auth().onAuthStateChanged'),'Troca/encerramen
 assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explícito não possui proteção de desmontagem.');
 assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode duplicar listeners para o mesmo aluno.');
 
+// Confirmação pós-envio: o write original continua soberano e nunca é repetido.
+assert(loader.includes("const VERSION='10.10.54-intelsuite4'"),'Loader da suíte não foi cache-bustado para a reconciliação de envio.');
+assert(loader.includes("student-report-submit-reconciliation-v10_10_54.js?v=10.10.54-submitstate1"),'Aluno não carrega a reconciliação pós-envio.');
+assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_54.js'),'Reconciliação deve envolver o fluxo já instrumentado de atividade do treinador.');
+assert(submitState.includes("const VERSION='10.10.54-submitstate1'"),'Reconciliação pós-envio está na revisão errada.');
+assert(submitState.includes("reference.get({source:'server'})"),'Confirmação do envio não prioriza leitura real do servidor.');
+assert(submitState.includes("snap.data()?.answered===true"),'Questionário não é confirmado pelo answered canônico do documento enviado.');
+assert(submitState.includes("db.collection('questionnaires').where('studentId','==',uid).limit(100)"),'Pendências do aluno não são reconciliadas pela coleção canônica.');
+assert(submitState.includes(".filter(report=>report.answered!==true)"),'Banner ainda pode tratar relatório respondido como pendente.');
+assert(submitState.includes("banner.dataset.pendingCount=String(rows.length)"),'Banner não distingue múltiplas solicitações pendentes.');
+assert(submitState.includes("Ainda há ${pendingLabel(pending.length)} diferente(s)"),'Aluno não é informado quando o envio foi confirmado mas existe outra pendência.');
+assert(submitState.includes("weeklyCheckinDocId(uid,request.requestKey)"),'Relatório semanal não é confirmado pelo ID determinístico do envio.');
+assert(submitState.includes("db.collection('weeklyCheckins').doc(sourceId)"),'Relatório semanal não verifica o documento canônico específico.');
+assert((submitState.match(/const result=await base\.apply\(this,arguments\);/g)||[]).length===2,'Cada submit original (questionário e semanal) deve rodar exatamente uma vez, sem retry cego.');
+assert(!submitState.includes('cloudWrite('),'Reconciliação pós-envio não pode criar nova escrita.');
+assert(!/\.set\s*\(/.test(submitState),'Reconciliação pós-envio não pode criar documentos Firestore.');
+assert(!/\.update\s*\(/.test(submitState),'Reconciliação pós-envio não pode alterar documentos Firestore.');
+assert(!/\.delete\s*\(/.test(submitState),'Reconciliação pós-envio não pode excluir documentos Firestore.');
+assert(!submitState.includes('setInterval('),'Reconciliação pós-envio não pode usar polling.');
+assert(!submitState.includes('MutationObserver'),'Reconciliação pós-envio não pode observar globalmente o DOM.');
+
 assert(!realtime.includes('setInterval('),'Sincronização de pedidos não pode usar polling por intervalo.');
 assert(!realtime.includes('cloudWrite('),'Camada realtime deve ser somente leitura e não criar gravações automáticas.');
 assert(!/\.set\s*\(/.test(realtime),'Camada realtime não pode criar documentos Firestore.');
@@ -61,7 +86,7 @@ assert(rules.includes('match /feedback/{id}'),'Rules ativas não contêm feedbac
 assert(rules.includes('match /notifications/{id}'),'Rules ativas não contêm central de notificações.');
 
 if(fail.length){
-  console.error('FALHA — entrega realtime de relatórios e atualizações\n- '+fail.join('\n- '));
+  console.error('FALHA — entrega realtime / confirmação canônica de relatórios\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — relatórios e atualizações chegam por snapshots somente leitura; datas vencidas viram pendência automaticamente sem write/polling; sino/central atualizam e listeners são desmontados no logout.');
+console.log('APROVADO — envios são confirmados pelo documento canônico, múltiplas pendências são diferenciadas e nenhum retry cego é criado.');
