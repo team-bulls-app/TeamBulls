@@ -53,7 +53,7 @@ assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explí
 assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode duplicar listeners para o mesmo aluno.');
 
 // Confirmação pós-envio: o write original continua soberano e nunca é repetido.
-assert(loader.includes("const VERSION='10.10.54-intelsuite4'"),'Loader da suíte não foi cache-bustado para a reconciliação de envio.');
+assert(loader.includes("const VERSION='10.10.55-intelsuite5'"),'Loader da suíte não está na revisão que preserva a reconciliação de envio e corrige o histórico do treinador.');
 assert(loader.includes("student-report-submit-reconciliation-v10_10_54.js?v=10.10.54-submitstate1"),'Aluno não carrega a reconciliação pós-envio.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_54.js'),'Reconciliação deve envolver o fluxo já instrumentado de atividade do treinador.');
 assert(submitState.includes("const VERSION='10.10.54-submitstate1'"),'Reconciliação pós-envio está na revisão errada.');
