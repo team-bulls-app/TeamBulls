@@ -119,6 +119,7 @@ if('caches' in window){
     requestAnimationFrame(()=>setTimeout(resolve,0));
   });
   const criticalModules=[
+    './modules/stability_v10_10_9.js?v=10.10.9',
     './modules/security-hardening-v10_10_9.js?v=10.10.10-security8',
     './modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1',
     './modules/exercise-video-resilience-v10_10_45.js?v=10.10.45-video1'
