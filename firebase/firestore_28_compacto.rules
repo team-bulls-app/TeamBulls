@@ -63,6 +63,18 @@ service cloud.firestore {
       return isTrainer() && questionnaireExists(questionnaireId)
         && questionnaireData(questionnaireId).trainerId == request.auth.uid;
     }
+    function checkinScheduleExists(uid) {
+      return uid is string && uid != ''
+        && exists(/databases/$(database)/documents/checkinSchedules/$(uid));
+    }
+    function checkinScheduleData(uid) {
+      return get(/databases/$(database)/documents/checkinSchedules/$(uid)).data;
+    }
+    function trainerOwnsCheckinSchedule(uid) {
+      return isTrainer() && checkinScheduleExists(uid)
+        && checkinScheduleData(uid).studentId == uid
+        && checkinScheduleData(uid).get('updatedBy', '') == request.auth.uid;
+    }
     function text(value, max) { return value is string && value.size() <= max; }
     function requiredText(value, max) {
       return value is string && value.size() > 0 && value.size() <= max;
@@ -334,12 +346,15 @@ service cloud.firestore {
         && request.resource.data.intervalDays is int
         && request.resource.data.intervalDays >= 1
         && request.resource.data.intervalDays <= 90
+        && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.updatedAt is timestamp;
       allow delete: if false;
     }
 
     match /weeklyCheckins/{id} {
-      allow read: if trainerOwns(resource.data.studentId) || activeOwner(resource.data.studentId);
+      allow read: if trainerOwns(resource.data.studentId)
+        || activeOwner(resource.data.studentId)
+        || trainerOwnsCheckinSchedule(resource.data.studentId);
       allow create: if activeOwner(request.resource.data.studentId)
         && request.resource.data.questions is list
         && request.resource.data.answers is list
@@ -523,8 +538,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Cálculos internos da dieta: somente o treinador vinculado pode ler ou alterar.
-    // Nenhum valor desta coleção é exposto ao aluno; a dieta prescrita continua em mealPlans.
     match /dietCalculations/{uid} {
       allow read: if trainerOwns(uid);
       allow create: if trainerOwns(uid)
@@ -601,8 +614,6 @@ service cloud.firestore {
         && resource.data.trainerId == request.auth.uid;
     }
 
-    // Caixa de entrada privada do treinador. O aluno só pode criar um evento
-    // para o próprio relatório e somente dentro da caixa do treinador vinculado.
     match /trainerActivity/{trainerUid} {
       allow read, write: if false;
 
@@ -658,8 +669,6 @@ service cloud.firestore {
       }
     }
 
-    // Controle financeiro estritamente privado do treinador. O aluno não recebe
-    // acesso de leitura nem escrita aos valores, vencimentos ou comprovantes.
     match /trainerBilling/{trainerUid} {
       allow read, write: if false;
 
@@ -707,8 +716,6 @@ service cloud.firestore {
       }
     }
 
-    // Projeção financeira mínima para o próprio aluno. O domínio privado do
-    // treinador continua fechado; comprovantes e observações não são copiados.
     match /studentBilling/{studentUid} {
       allow read: if (
           trainerOwns(studentUid)
