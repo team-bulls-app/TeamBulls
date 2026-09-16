@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const read=path=>fs.readFileSync(path,'utf8');
 const config=read('config_v10_7.js');
+const stability=read('modules/stability_v10_10_9.js');
 
 function assert(condition,message){
   if(!condition){
@@ -17,10 +18,18 @@ assert(config.includes("const STUDENT_YIELD_EVERY=2;"),'Runtime prioritário do 
 const criticalMatch=config.match(/const criticalModules=\[([^\]]*)\];/s);
 assert(criticalMatch,'Lista de módulos críticos não encontrada.');
 if(criticalMatch){
-  assert(criticalMatch[1].includes('security-hardening-v10_10_9.js'),'Security hardening deve continuar crítico.');
-  assert(criticalMatch[1].includes('exercise-video-resilience-v10_10_45.js'),'Resiliência de vídeo deve estar pronta antes do uso dos exercícios.');
-  assert(!criticalMatch[1].includes('destructive-actions-supply-fix'),'Correções destrutivas/suprimentos não devem bloquear autenticação/entrada.');
+  const critical=criticalMatch[1];
+  const stabilityPos=critical.indexOf('stability_v10_10_9.js');
+  const securityPos=critical.indexOf('security-hardening-v10_10_9.js');
+  assert(stabilityPos>=0,'Proteção do primeiro relatório semanal deve ser módulo crítico.');
+  assert(stabilityPos>=0&&securityPos>=0&&stabilityPos<securityPos,'Proteção do relatório semanal deve carregar antes dos demais módulos críticos e antes de liberar a interface da sessão.');
+  assert(critical.includes('security-hardening-v10_10_9.js'),'Security hardening deve continuar crítico.');
+  assert(critical.includes('exercise-video-resilience-v10_10_45.js'),'Resiliência de vídeo deve estar pronta antes do uso dos exercícios.');
+  assert(!critical.includes('destructive-actions-supply-fix'),'Correções destrutivas/suprimentos não devem bloquear autenticação/entrada.');
 }
+
+assert(stability.includes("where('studentId','==',studentUid).where('requestKey','==',request.requestKey).limit(1)"),'Primeiro envio semanal deve verificar duplicidade por consulta autorizada do próprio aluno, sem get direto em documento inexistente.');
+assert(!stability.includes("existingCheckin=await cloudGet(checkinRef,'verificar relatório')"),'Patch crítico não pode voltar ao get direto de weeklyCheckins/{id} antes da criação.');
 
 const modulesMatch=config.match(/const modules=\[\s*([^\n]+)/);
 assert(modulesMatch&&modulesMatch[1].includes('destructive-actions-supply-fix-v10_10_29.js'),'Correção de dieta/sessões deve continuar carregando após a sessão, sem virar módulo crítico.');
@@ -61,5 +70,5 @@ assert(config.includes("btn.textContent='CONEXÃO LENTA...'"),'Login muito lento
 if(process.exitCode){
   process.exit(process.exitCode);
 }
-console.log('APROVADO — startup limita preloads concorrentes, preserva ordem funcional, pré-aquece Firebase e evita esperas artificiais no login.');
+console.log('APROVADO — startup limita preloads concorrentes, preserva ordem funcional, protege o primeiro envio semanal, pré-aquece Firebase e evita esperas artificiais no login.');
 await import('./foreground-write-resilience-check.mjs');

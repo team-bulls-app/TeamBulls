@@ -17,7 +17,7 @@ const updater=read('update_v10_10_9.js');
 const core=read('app_v10_10_9_core.js');
 
 has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.34-sessionperf2','Hotfix de registro rápido não está carregado.');
-assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('stability_v10_10_9.js'),'Registro rápido deve ser o primeiro hotfix após a pintura.');
+assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('pending-session-mutations-v10_10_34.js'),'Registro rápido deve carregar antes da camada de mutações pendentes no runtime prioritário do aluno.');
 lacks(config,'attempts++>=80','Polling agressivo voltou ao startup.');
 has(config,"const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}",'Warmup/resiliência de autenticação não está definido.');
 has(config,'installAndWarm();','Resiliência não é instalada imediatamente durante a avaliação do bootstrap.');
