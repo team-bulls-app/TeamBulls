@@ -87,7 +87,11 @@ has(heicWorker,'new self.libheif.HeifDecoder()','Worker HEIC não instancia o de
 has(heicWorker,'self.postMessage({id,ok:true,width,height,rgba:data.buffer},[data.buffer])','Worker HEIC não devolve pixels por transferência eficiente.');
 has(invites,'suspendAuthListenerForRegistration','Cadastro canônico perdeu a pausa do listener de autenticação.');
 has(invites,'cred.user.getIdTokenResult(true)','Cadastro canônico perdeu a renovação de token/claims.');
-has(invites,'await ensureRegistrationAppCheck()','Cadastro canônico perdeu o preflight de App Check.');
+has(invites,'await ensureRegistrationAppCheck({forceRefresh:false})','Cadastro canônico perdeu o preflight App Check cached-first.');
+has(invites,"withTimeout(initOptionalAppCheck(),8000,'App Check do cadastro')",'Cadastro canônico voltou a herdar o timeout curto do boot.');
+has(invites,'service.getToken(!!forceRefresh)','Cadastro canônico perdeu a seleção segura de token App Check.');
+has(invites,'await ensureRegistrationAppCheck({forceRefresh:true})','Cadastro canônico perdeu o refresh forçado na recuperação 403.');
+has(invites,"doRegister.__tbRegistrationAppCheck='cached-first'",'Cadastro canônico não expõe a política App Check resiliente.');
 has(invites,'doRegister.__tbCanonicalInviteRegistration=true','Cadastro canônico não está identificado para autorreparo.');
 has(invites,"window.addEventListener('team-bulls-runtime-state',enforceCanonicalRegistration)",'Cadastro canônico não se restaura após módulos diferidos.');
 lacks(integrity,'doRegister=secured','registration-integrity voltou a sobrescrever o cadastro canônico.');
