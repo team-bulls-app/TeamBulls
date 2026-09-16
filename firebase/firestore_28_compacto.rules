@@ -52,6 +52,17 @@ service cloud.firestore {
       return isTrainer() && workoutExists(workoutId)
         && trainerOwns(workoutData(workoutId).userId);
     }
+    function questionnaireExists(questionnaireId) {
+      return questionnaireId is string && questionnaireId != ''
+        && exists(/databases/$(database)/documents/questionnaires/$(questionnaireId));
+    }
+    function questionnaireData(questionnaireId) {
+      return get(/databases/$(database)/documents/questionnaires/$(questionnaireId)).data;
+    }
+    function trainerOwnsQuestionnaire(questionnaireId) {
+      return isTrainer() && questionnaireExists(questionnaireId)
+        && questionnaireData(questionnaireId).trainerId == request.auth.uid;
+    }
     function text(value, max) { return value is string && value.size() <= max; }
     function requiredText(value, max) {
       return value is string && value.size() > 0 && value.size() <= max;
@@ -198,7 +209,9 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /questionnaires/{id} {
-      allow read: if trainerOwns(resource.data.studentId) || activeOwner(resource.data.studentId);
+      allow read: if trainerOwns(resource.data.studentId)
+        || activeOwner(resource.data.studentId)
+        || (isTrainer() && resource.data.trainerId == request.auth.uid);
       allow create: if trainerOwns(request.resource.data.studentId)
         && request.resource.data.trainerId == request.auth.uid
         && request.resource.data.get('requestMode', 'full') in ['full', 'written', 'photos']
@@ -344,7 +357,10 @@ service cloud.firestore {
     }
 
     match /progressPhotos/{id} {
-      allow read: if trainerOwns(resource.data.userId) || activeOwner(resource.data.userId);
+      allow read: if trainerOwns(resource.data.userId)
+        || activeOwner(resource.data.userId)
+        || (trainerOwnsQuestionnaire(resource.data.get('questionnaireId', ''))
+          && questionnaireData(resource.data.questionnaireId).studentId == resource.data.userId);
       allow create: if activeOwner(request.resource.data.userId)
         && isoDate(request.resource.data.date)
         && request.resource.data.get('dataUrl', '') is string
