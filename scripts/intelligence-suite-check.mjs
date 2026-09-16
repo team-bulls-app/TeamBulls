@@ -24,7 +24,7 @@ assert(src.loader.includes('trainer-intelligence-data-v10_10_42.js')&&src.loader
 assert(src.loader.includes('trainer-canonical-context-guard-v10_10_42.js')&&src.loader.indexOf('trainer-canonical-context-guard-v10_10_42.js')<src.loader.indexOf('trainer-student-insights-v10_10_42.js'),'loader: guarda canônica deve carregar antes das telas do treinador');
 assert(src.loader.includes('student-progress-hub-v10_10_42.js'),'loader: módulo de progresso do aluno ausente');
 assert(src.loader.includes("MODE==='cloud'"),'loader: recursos sincronizados devem exigir cloud');
-assert(src.loader.includes('10.10.44-contextguard3')&&src.loader.includes('10.10.43-studentinsights2')&&src.loader.includes('10.10.43-studentprogress2'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
+assert(src.loader.includes('10.10.56-contextguard4')&&src.loader.includes('10.10.43-studentinsights2')&&src.loader.includes('10.10.43-studentprogress2'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
 
 assert(src.data.includes('trainerActivity')&&src.data.includes('trainerBilling'),'dados: deve reaproveitar índices globais já existentes');
 assert(src.data.includes("db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)"),'dados: roster do radar deve restringir trainerId + role=student para respeitar Rules 28');
@@ -47,7 +47,12 @@ assert(src.guard.includes("PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-
 assert(src.guard.includes('const result=await callback.apply(this,arguments)')&&src.guard.includes('notifyProtocolCompleted(studentId,beforeCycle)'),'guarda: evento de conclusão deve ocorrer depois do callback canônico terminar');
 assert(src.guard.includes('cycle<=beforeCycle')&&src.guard.includes('activeStudent!==studentId'),'guarda: cancelamento/falha/outro aluno não podem simular conclusão do ciclo');
 assert(src.guard.includes('TeamBullsTrainerIntelligenceData?.invalidateStudent?.(studentId)')&&src.guard.includes('TeamBullsTrainerStudentInsights?.refresh?.()'),'guarda: análise aberta precisa invalidar cache e recarregar somente após conclusão real');
+assert(src.guard.includes('function dietContext()')&&src.guard.includes("DIET_CONTEXT?.targetUid")&&src.guard.includes("MEAL_CTX?.targetUid"),'guarda: cálculo privado deve validar os contextos da dieta/refeição contra VIEW_STUDENT');
+assert(src.guard.includes('dietStudentId!==studentId')&&src.guard.includes('mealStudentId!==studentId'),'guarda: contexto antigo de outro aluno deve ser recusado');
+assert(src.guard.includes('function patchDietCalculator()')&&src.guard.includes('TeamBullsDietCalculator=Object.freeze'),'guarda: API do cálculo privado precisa receber proteção canônica');
+assert(src.guard.includes('if(!context.ok){warnDietContext();return false;}'),'guarda: cálculo privado não pode continuar com contexto inconsistente');
 assert(!/collection\(['"]weeklyCheckins['"]\)/.test(src.guard),'guarda: não deve reimplementar consulta de relatório; usar fetchWeeklyCheckins');
+assert(!/collection\(['"]dietCalculations['"]\)/.test(src.guard),'guarda: proteção de contexto não pode duplicar leituras/escritas de dietCalculations');
 
 for(const text of ['Radar diário','Prioridades de hoje','Resumo semanal','SEMÁFORO OPERACIONAL','PRÓXIMA AÇÃO'])assert(src.command.includes(text),`central: recurso ausente — ${text}`);
 assert(src.command.includes('decorateStudentCards'),'central: semáforo da lista de alunos ausente');
@@ -70,4 +75,4 @@ assert(src.student.includes('sessionCount(sessions)')&&src.student.includes('ses
 assert(!/cloudWrite/.test(src.student),'aluno: tela de conquistas não pode usar cloudWrite');
 assert(!/collection\([^\n]+\)\.(?:add|doc\([^\n]+\)\.(?:set|update|delete))\s*\(/.test(src.student),'aluno: tela de conquistas não pode gravar no Firestore');
 
-console.log('APROVADO — suíte de inteligência mantém as 10 ideias, roster compatível com Rules 28, contexto isolado por aluno, sessões reais nas métricas, peso ausente sem falsa variação e Modo Revisão sincronizado somente após a confirmação canônica; sem polling ou coleções paralelas.');
+console.log('APROVADO — suíte de inteligência mantém as 10 ideias, roster compatível com Rules 28, contexto isolado por aluno inclusive no cálculo privado da dieta, sessões reais nas métricas, peso ausente sem falsa variação e Modo Revisão sincronizado somente após a confirmação canônica; sem polling ou coleções paralelas.');
