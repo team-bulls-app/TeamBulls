@@ -1,13 +1,13 @@
-/* Team Bulls v10.10.54 — carregador isolado da suíte de inteligência, progresso e relatórios. */
+/* Team Bulls v10.10.55 — carregador isolado da suíte de inteligência, progresso e relatórios. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
-  const VERSION='10.10.54-intelsuite4';
+  const VERSION='10.10.55-intelsuite5';
   const specs={
     trainer:[
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
-      ['./modules/trainer-student-report-history-v10_10_54.js?v=10.10.54-studentreports2',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.54-studentreports2'],
+      ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports3'],
       ['./modules/trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.52-canonicalinbox3'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.44-contextguard3',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.44-contextguard3'],
