@@ -25,6 +25,10 @@ assert(src.loader.includes('trainer-canonical-context-guard-v10_10_42.js')&&src.
 assert(src.loader.includes('student-progress-hub-v10_10_42.js'),'loader: módulo de progresso do aluno ausente');
 assert(src.loader.includes("MODE==='cloud'"),'loader: recursos sincronizados devem exigir cloud');
 assert(src.loader.includes('10.10.44-contextguard3')&&src.loader.includes('10.10.43-studentinsights2')&&src.loader.includes('10.10.43-studentprogress2'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
+assert(src.loader.includes('const removeScript=script=>'),'loader: scripts dinâmicos inválidos não possuem limpeza explícita.');
+assert(src.loader.includes('if(!ok)removeScript(existing);finish(ok);'),'loader: script existente que terminou sem inicializar continua preso no DOM.');
+assert(src.loader.includes('timer=setTimeout(settleExisting,8000)'),'loader: recuperação de script existente não possui timeout finito.');
+assert(src.loader.includes('if(!ok)loading.delete(src)'),'loader: falha transitória não libera o estado para uma tentativa posterior.');
 
 assert(src.data.includes('trainerActivity')&&src.data.includes('trainerBilling'),'dados: deve reaproveitar índices globais já existentes');
 assert(src.data.includes("db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)"),'dados: roster do radar deve restringir trainerId + role=student para respeitar Rules 28');
@@ -70,4 +74,4 @@ assert(src.student.includes('sessionCount(sessions)')&&src.student.includes('ses
 assert(!/cloudWrite/.test(src.student),'aluno: tela de conquistas não pode usar cloudWrite');
 assert(!/collection\([^\n]+\)\.(?:add|doc\([^\n]+\)\.(?:set|update|delete))\s*\(/.test(src.student),'aluno: tela de conquistas não pode gravar no Firestore');
 
-console.log('APROVADO — suíte de inteligência mantém as 10 ideias, roster compatível com Rules 28, contexto isolado por aluno, sessões reais nas métricas, peso ausente sem falsa variação e Modo Revisão sincronizado somente após a confirmação canônica; sem polling ou coleções paralelas.');
+console.log('APROVADO — suíte de inteligência mantém as 10 ideias, roster compatível com Rules 28, contexto isolado por aluno, recuperação finita de scripts dinâmicos, sessões reais nas métricas, peso ausente sem falsa variação e Modo Revisão sincronizado somente após a confirmação canônica; sem polling ou coleções paralelas.');
