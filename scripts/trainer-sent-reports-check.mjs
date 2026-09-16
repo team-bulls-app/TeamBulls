@@ -33,13 +33,15 @@ assert(module.includes("screen-trainer-sent-reports"),'Tela própria de relatór
 assert(module.includes('await viewQuestionnaire(report.id,true)'),'Relatório respondido não reaproveita o visualizador de respostas/fotos.');
 assert(module.includes('Status: AGUARDANDO RESPOSTA DO ALUNO'),'Pedido pendente não informa claramente que ainda aguarda resposta.');
 
-// Somente leitura dos documentos canônicos.
+// Somente leitura dos documentos canônicos. Map.set local é permitido; operações
+// de escrita Firestore continuam proibidas explicitamente.
 assert(!module.includes('setInterval('),'Arquivo de relatórios não pode adicionar polling.');
 assert(!module.includes('onSnapshot('),'Arquivo global deve carregar somente quando aberto/atualizado.');
 assert(!module.includes('cloudWrite('),'Arquivo global deve ser somente leitura.');
-assert(!/\.set\s*\(/.test(module),'Arquivo global não pode gravar documentos Firestore.');
-assert(!/\.update\s*\(/.test(module),'Arquivo global não pode alterar documentos Firestore.');
-assert(!/\.delete\s*\(/.test(module),'Arquivo global não pode excluir documentos Firestore.');
+assert(!module.includes('db.batch('),'Arquivo global não pode iniciar batch de escrita.');
+assert(!module.includes('runTransaction('),'Arquivo global não pode iniciar transação de escrita.');
+assert(!/db\.collection\([^\n]+\)\.doc\([^\n]+\)\.(?:set|update|delete)\s*\(/.test(module),'Arquivo global não pode gravar documentos Firestore.');
+assert(!/db\.collection\([^\n]+\)\.add\s*\(/.test(module),'Arquivo global não pode adicionar documentos Firestore.');
 
 // Segurança: propriedade histórica só vale porque trainerId é definido pelo
 // treinador na criação e fica imutável quando o aluno responde.
