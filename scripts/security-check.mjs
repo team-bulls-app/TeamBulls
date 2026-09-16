@@ -76,8 +76,11 @@ has(invites,"if(state==='committed')",'Cadastro não reconcilia commit confirmad
 has(invites,'TB.inviteHash=sha256','Fluxo canônico não expõe o hash criptográfico dos convites.');
 has(invites,'authListenerSuspended=suspendAuthListenerForRegistration()','Cadastro não pausa o listener global antes da criação Auth.');
 has(invites,'cred.user.getIdTokenResult(true)','Cadastro não renova a credencial/claims antes da transação protegida.');
-has(invites,'await ensureRegistrationAppCheck()','Cadastro não valida App Check antes de criar a conta Auth.');
-has(invites,'service.getToken(true)','Cadastro não força token App Check válido antes do convite.');
+has(invites,'await ensureRegistrationAppCheck({forceRefresh:false})','Cadastro não valida App Check antes de criar a conta Auth.');
+has(invites,"withTimeout(initOptionalAppCheck(),8000,'App Check do cadastro')",'Cadastro voltou a herdar o timeout curto de App Check usado apenas no boot.');
+has(invites,'service.getToken(!!forceRefresh)','Cadastro não usa a política App Check cached-first com refresh explícito.');
+has(invites,'await ensureRegistrationAppCheck({forceRefresh:true})','Recuperação de permission-denied não força nova atestação antes do retry único.');
+has(invites,"doRegister.__tbRegistrationAppCheck='cached-first'",'Política App Check do cadastro não está marcada para diagnóstico.');
 has(invites,"window.TeamBullsRegistrationDiagnostics=registrationDiagnostic",'Cadastro não expõe diagnóstico seguro por etapa.');
 has(invites,'doRegister.__tbCanonicalInviteRegistration=true','Cadastro seguro não está marcado como implementação canônica.');
 
