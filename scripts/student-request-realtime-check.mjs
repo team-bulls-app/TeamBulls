@@ -32,7 +32,7 @@ assert(realtime.includes("db.collection('notifications').where('studentId','==',
 
 assert(realtime.includes("liveSchedule?.enabled===false?null"),'Relatório semanal desativado por plano pode reaparecer pela camada realtime.');
 assert(realtime.includes('WEEKLY_CHECKIN_REQUEST=request'),'Estado semanal oficial não é sincronizado com o snapshot.');
-assert(realtime.includes("V109_PROTOCOL_REVIEW_SCHEDULE=schedule"),'Estado oficial do ciclo de protocolo não é atualizado pelo snapshot.');
+assert(realtime.includes("V109_PROTOCOL_REVIEW_SCHEDULE=schedule"),'Estado oficial do ciclo de protocolo não é atualizado com o snapshot.');
 assert(realtime.includes("document.getElementById('tb-home-notice-count')"),'Sino da Home não recebe as novas pendências em tempo real.');
 assert(realtime.includes("screen-student-notifications"),'Central aberta não é renovada quando chega um evento novo.');
 assert(realtime.includes('badgeObserver.observe(badge'),'Proteção do contador precisa observar somente o badge local da Home.');
@@ -53,7 +53,7 @@ assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explí
 assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode duplicar listeners para o mesmo aluno.');
 
 // Confirmação pós-envio: o write original continua soberano e nunca é repetido.
-assert(loader.includes("const VERSION='10.10.54-intelsuite4'"),'Loader da suíte não foi cache-bustado para a reconciliação de envio.');
+assert(loader.includes("const VERSION='10.10.55-intelsuite5'"),'Loader da suíte não foi cache-bustado para a reconciliação de envio.');
 assert(loader.includes("student-report-submit-reconciliation-v10_10_54.js?v=10.10.54-submitstate1"),'Aluno não carrega a reconciliação pós-envio.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_54.js'),'Reconciliação deve envolver o fluxo já instrumentado de atividade do treinador.');
 assert(submitState.includes("const VERSION='10.10.54-submitstate1'"),'Reconciliação pós-envio está na revisão errada.');
