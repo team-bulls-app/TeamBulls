@@ -19,7 +19,10 @@ const core=read('app_v10_10_9_core.js');
 has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.34-sessionperf2','Hotfix de registro rápido não está carregado.');
 assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('stability_v10_10_9.js'),'Registro rápido deve ser o primeiro hotfix após a pintura.');
 lacks(config,'attempts++>=80','Polling agressivo voltou ao startup.');
-has(config,"document.addEventListener('DOMContentLoaded',patch,{once:true})",'Resiliência não é instalada antes do initApp.');
+has(config,"const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}",'Warmup/resiliência de autenticação não está definido.');
+has(config,'installAndWarm();','Resiliência não é instalada imediatamente durante a avaliação do bootstrap.');
+has(config,"document.addEventListener('DOMContentLoaded',installAndWarm,{once:true})",'Resiliência não é reaplicada no DOMContentLoaded.');
+assert(config.indexOf('installAndWarm();')<config.indexOf("document.addEventListener('DOMContentLoaded',installAndWarm,{once:true})"),'Warmup precisa iniciar antes de depender do DOMContentLoaded.');
 
 has(session,"const QUEUE_PREFIX='team_bulls_pending_sessions_v1_'",'Fila persistente de séries ausente.');
 has(session,'if(!enqueue(entry))','Registro rápido não possui fallback seguro quando a fila local falha.');
