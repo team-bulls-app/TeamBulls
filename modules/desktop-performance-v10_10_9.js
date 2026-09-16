@@ -182,7 +182,7 @@
     window.addEventListener('pageshow',syncDesktopState,{passive:true});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncDesktopState();},{passive:true});
     window.TeamBullsDesktopPerformance=Object.freeze({
-      version:'10.10.9-desktop2',
+      version:'10.10.9-desktop1',
       refresh:syncDesktopState,
       tuneMedia:scheduleMediaTune,
       state:()=>({desktop:isDesktopLike(),scrollListeners:desktopListenersBound,mediaPending:!!mediaTask})
