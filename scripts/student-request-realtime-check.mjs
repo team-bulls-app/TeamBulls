@@ -65,7 +65,7 @@ assert(submitState.includes("banner.dataset.pendingCount=String(rows.length)"),'
 assert(submitState.includes("Ainda há ${pendingLabel(pending.length)} diferente(s)"),'Aluno não é informado quando o envio foi confirmado mas existe outra pendência.');
 assert(submitState.includes("weeklyCheckinDocId(uid,request.requestKey)"),'Relatório semanal não é confirmado pelo ID determinístico do envio.');
 assert(submitState.includes("db.collection('weeklyCheckins').doc(sourceId)"),'Relatório semanal não verifica o documento canônico específico.');
-assert((submitState.match(/base\.apply\(this,arguments\)/g)||[]).length===3,'Wrappers pós-envio devem executar cada operação original exatamente uma vez, sem retry cego.');
+assert((submitState.match(/const result=await base\.apply\(this,arguments\);/g)||[]).length===2,'Cada submit original (questionário e semanal) deve rodar exatamente uma vez, sem retry cego.');
 assert(!submitState.includes('cloudWrite('),'Reconciliação pós-envio não pode criar nova escrita.');
 assert(!/\.set\s*\(/.test(submitState),'Reconciliação pós-envio não pode criar documentos Firestore.');
 assert(!/\.update\s*\(/.test(submitState),'Reconciliação pós-envio não pode alterar documentos Firestore.');
