@@ -1,12 +1,13 @@
-/* Team Bulls v10.10.52 — carregador isolado da suíte de inteligência, progresso e Central canônica. */
+/* Team Bulls v10.10.53 — carregador isolado da suíte de inteligência, progresso e Central canônica. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
-  const VERSION='10.10.52-intelsuite2';
+  const VERSION='10.10.53-intelsuite3';
   const specs={
     trainer:[
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
+      ['./modules/trainer-student-report-history-v10_10_53.js?v=10.10.53-studentreports1',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.53-studentreports1'],
       ['./modules/trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.52-canonicalinbox3'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.44-contextguard3',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.44-contextguard3'],

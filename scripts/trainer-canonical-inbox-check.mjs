@@ -9,14 +9,16 @@ const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
 const modulePath='modules/trainer-canonical-inbox-v10_10_52.js';
 const recoveryPath='modules/trainer-report-link-recovery-v10_10_51.js';
+const historyPath='modules/trainer-student-report-history-v10_10_53.js';
 const loaderPath='modules/intelligence-suite-loader-v10_10_42.js';
-for(const path of [modulePath,recoveryPath,loaderPath]){
+for(const path of [modulePath,recoveryPath,historyPath,loaderPath]){
   assert(fs.existsSync(path),`Arquivo obrigatório ausente: ${path}`);
   if(fs.existsSync(path))new vm.Script(read(path),{filename:path});
 }
 
 const source=read(modulePath);
 const recovery=read(recoveryPath);
+const history=read(historyPath);
 const loader=read(loaderPath);
 const firebaseConfig=read('firebase.json');
 const firestoreRules=read('firebase/firestore_28_compacto.rules');
@@ -26,9 +28,11 @@ const sw=read('sw.js');
 
 has(source,"const VERSION='10.10.52-canonicalinbox3'",'Central canônica está na revisão errada.');
 has(loader,"trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3",'Loader do treinador não entrega a Central canônica por propriedade histórica.');
-has(loader,"const VERSION='10.10.52-intelsuite2'",'Loader não foi cache-bustado para a revisão de propriedade histórica.');
+has(loader,"const VERSION='10.10.53-intelsuite3'",'Loader não foi cache-bustado para o histórico individual corrigido.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
-assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('trainer-canonical-inbox-v10_10_52.js'),'Recuperação de vínculo deve continuar antes da Central canônica.');
+has(loader,"trainer-student-report-history-v10_10_53.js?v=10.10.53-studentreports1",'Loader não entrega a correção da tela individual do aluno.');
+assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('trainer-student-report-history-v10_10_53.js'),'Recuperação de vínculo deve continuar antes do histórico individual.');
+assert(loader.indexOf('trainer-student-report-history-v10_10_53.js')<loader.indexOf('trainer-canonical-inbox-v10_10_52.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
 
 // Fonte de verdade: questionários que o próprio treinador criou devem ser encontrados
 // diretamente pelo trainerId imutável, mesmo se o roster atual do aluno estiver inconsistente.
@@ -37,6 +41,22 @@ has(source,'loadTrainerOwnedQuestionnaires(uid)','Central não incorpora a leitu
 has(source,'const [roster,ownedRows]=await Promise.all','Leitura por propriedade não ocorre independentemente do roster.');
 has(source,'const canonicalRows=[...ownedRows,...groups.flatMap','Questionários históricos não são mesclados aos canônicos atuais.');
 has(source,'ownerRecoveredCount','Diagnóstico de recuperação histórica não está disponível.');
+
+// A tela individual de RELATÓRIOS precisa usar a mesma propriedade histórica.
+has(history,"const VERSION='10.10.53-studentreports1'",'Histórico individual está na revisão errada.');
+has(history,"db.collection('questionnaires').where('trainerId','==',trainerUid).limit(MAX_REPORTS)",'Tela individual ainda depende exclusivamente da query antiga por studentId.');
+has(history,".filter(report=>String(report.studentId||'')===String(studentUid))",'Tela individual não isola o aluno selecionado depois da leitura por propriedade.');
+has(history,'report?.answeredAt?{...report,createdAt:report.answeredAt}:report','Card do treinador continua exibindo apenas a data da solicitação em vez da resposta quando disponível.');
+has(history,'TS_QUEST_CACHE=questionnaires','Tela individual não substitui o cache antigo pelo histórico canônico atualizado.');
+has(history,"renderQuestList(TS_QUEST_CACHE,'ts-quest-list','ts-quest-empty',true)",'Tela individual não renderiza imediatamente o histórico recuperado.');
+has(history,'fetchWeeklyCheckins(studentUid)','Correção individual não preserva a seção de relatórios semanais existente.');
+lacks(history,"db.collection('questionnaires').doc",'Histórico individual deve ser somente leitura e não alterar questionários.');
+lacks(history,'cloudWrite(','Histórico individual não pode fazer writes.');
+lacks(history,'.update(','Histórico individual não pode atualizar documentos.');
+lacks(history,'.set(','Histórico individual não pode criar documentos.');
+lacks(history,'.delete(','Histórico individual não pode excluir dados.');
+lacks(history,'setInterval(','Histórico individual não pode usar polling.');
+lacks(history,'MutationObserver','Histórico individual não pode observar globalmente o DOM.');
 
 // Compatibilidade: vínculo atual e relatórios semanais continuam funcionando.
 has(source,"db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)",'Roster atual deixou de ficar isolado pelo treinador.');
@@ -91,7 +111,7 @@ assert(JSON.parse(firebaseConfig)?.storage?.rules==='firebase/storage_6.rules','
 has(sw,"'/modules/intelligence-suite-loader-v10_10_42.js'",'Loader da Central não permanece network-first/mutável no PWA.');
 
 if(failures.length){
-  console.error('FALHA — propriedade histórica de relatórios do treinador\n- '+failures.join('\n- '));
+  console.error('FALHA — propriedade histórica / histórico individual de relatórios do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — questionários criados pelo treinador permanecem visíveis pelo trainerId imutável mesmo com vínculo atual inconsistente; fotos usam caminho de até 2 documentos e nenhum envio original é alterado.');
+console.log('APROVADO — tela individual e Central usam o trainerId imutável como fonte histórica; respostas recentes usam answeredAt e nenhum envio original é alterado.');
