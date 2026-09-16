@@ -1,11 +1,11 @@
-/* Team Bulls v10.10.46 — confiabilidade do runtime do treinador e navegação imediata. */
+/* Team Bulls v10.10.52 — confiabilidade do runtime do treinador e navegação imediata. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_TRAINER_RUNTIME_RELIABILITY_101046__)return;
   window.__TEAM_BULLS_TRAINER_RUNTIME_RELIABILITY_101046__=true;
 
-  const VERSION='10.10.46-trainer1';
-  const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_46.js?v=10.10.46-sentreports2';
+  const VERSION='10.10.52-trainer2';
+  const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports3';
   const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback2';
   const loads=new Map();
   let viewStudentBase=null;
@@ -71,6 +71,7 @@
     if(!trainer())return false;
     // Impede que revisões antigas cacheadas assumam novamente as mesmas telas.
     window.__TEAM_BULLS_TRAINER_SENT_REPORTS_101033__=true;
+    window.__TEAM_BULLS_TRAINER_SENT_REPORTS_101046__=true;
     window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101037__=true;
     const [reports,feedback]=await Promise.all([loadScript(REPORTS_SRC),loadScript(FEEDBACK_SRC)]);
     return reports&&feedback;
