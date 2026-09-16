@@ -5,6 +5,9 @@
   window.__TEAM_BULLS_GLOBAL_PERFORMANCE_V10109__=true;
 
   const ROOT=document.documentElement;
+  const COARSE_QUERY=window.matchMedia?.('(pointer:coarse)')||null;
+  const REDUCED_QUERY=window.matchMedia?.('(prefers-reduced-motion: reduce)')||null;
+  let settleFrame=0;
 
   function installStyles(){
     if(document.getElementById('tb-global-performance-v10-10-9-style'))return;
@@ -64,7 +67,9 @@
 
   function settleTransientUiAnimations(){
     if(document.hidden)return;
-    requestAnimationFrame(()=>{
+    if(settleFrame)cancelAnimationFrame(settleFrame);
+    settleFrame=requestAnimationFrame(()=>{
+      settleFrame=0;
       finishElementAnimations(document.querySelector('.screen.active'));
       document.querySelectorAll('.modal-backdrop.open > .modal-sheet,.modal-backdrop.open > .modal-dialog').forEach(finishElementAnimations);
     });
@@ -72,28 +77,36 @@
 
   function syncVisibilityState(){
     ROOT.classList.toggle('tb-page-hidden',document.hidden);
+    if(document.hidden&&settleFrame){cancelAnimationFrame(settleFrame);settleFrame=0;}
     if(!document.hidden)settleTransientUiAnimations();
   }
 
   function syncCapabilityClasses(){
-    const coarse=window.matchMedia?.('(pointer:coarse)')?.matches===true;
-    const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches===true;
+    const coarse=COARSE_QUERY?.matches===true;
+    const reduced=REDUCED_QUERY?.matches===true;
     const saveData=navigator.connection?.saveData===true;
     ROOT.classList.toggle('tb-coarse-pointer',coarse);
     ROOT.classList.toggle('tb-reduced-motion',reduced);
     ROOT.classList.toggle('tb-save-data',saveData);
   }
 
+  function bindCapabilityChanges(){
+    const bind=query=>{if(query?.addEventListener)query.addEventListener('change',syncCapabilityClasses);else query?.addListener?.(syncCapabilityClasses);};
+    bind(COARSE_QUERY);bind(REDUCED_QUERY);
+    try{navigator.connection?.addEventListener?.('change',syncCapabilityClasses);}catch(error){}
+  }
+
   function install(){
     installStyles();
     syncVisibilityState();
     syncCapabilityClasses();
+    bindCapabilityChanges();
     document.addEventListener('visibilitychange',syncVisibilityState,{passive:true});
     window.addEventListener('pageshow',()=>{syncVisibilityState();syncCapabilityClasses();settleTransientUiAnimations();},{passive:true});
     window.addEventListener('focus',settleTransientUiAnimations,{passive:true});
     window.TeamBullsPerformance=Object.freeze({
       refresh(){syncVisibilityState();syncCapabilityClasses();settleTransientUiAnimations();},
-      version:'10.10.9-perf2'
+      version:'10.10.9-perf3'
     });
   }
 
