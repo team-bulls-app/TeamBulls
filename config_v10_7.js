@@ -1,4 +1,4 @@
-/* Configuração pública Team Bulls v10.10.45 — bootstrap móvel resiliente e runtime leve.
+/* Configuração pública Team Bulls v10.10.56 — bootstrap móvel resiliente e entrada responsiva.
    A chave do App Check/reCAPTCHA Enterprise é pública por definição.
    Não coloque senhas, chaves privadas ou credenciais administrativas aqui. */
 window.TEAM_BULLS_PUBLIC_CONFIG=Object.freeze({
@@ -10,13 +10,41 @@ if('caches' in window){
 }
 
 (()=>{
-  let installed=false;
+  let installed=false,firebaseWarmPromise=null;
   const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const stored=key=>{try{return typeof storageGet==='function'?storageGet(key):localStorage.getItem(key);}catch(error){return null;}};
   const restoringCloudSession=()=>{
     const uid=String(stored('teamms_last_user_uid')||'').trim();
     const guest=stored('teamms_offline_pref')==='1'||stored('teamms_offline_mode')==='guest';
     return !!uid&&!guest&&navigator.onLine!==false;
+  };
+  const firebaseReady=()=>{try{return typeof auth!=='undefined'&&!!auth&&typeof db!=='undefined'&&!!db;}catch(error){return false;}};
+  const optimizeLocalPersistence=()=>{
+    try{
+      if(!firebaseReady()||typeof firebase==='undefined'||typeof firebase.auth!=='function')return false;
+      const instance=auth,local=firebase.auth?.Auth?.Persistence?.LOCAL;
+      if(!instance?.setPersistence||!local||instance.setPersistence.__tbLocalPersistenceFast101056)return false;
+      const base=instance.setPersistence.bind(instance);
+      let localApplied=!!window.TeamBullsAuthPersistence?.state?.().applied,localPending=null;
+      const wrapped=function(mode){
+        if(mode!==local)return base(mode);
+        if(localApplied)return Promise.resolve();
+        if(localPending)return localPending;
+        localPending=Promise.resolve(base(mode)).then(value=>{localApplied=true;return value;}).finally(()=>{localPending=null;});
+        return localPending;
+      };
+      wrapped.__tbLocalPersistenceFast101056=true;
+      instance.setPersistence=wrapped;
+      return true;
+    }catch(error){return false;}
+  };
+  const warmFirebase=()=>{
+    if(navigator.onLine===false)return Promise.resolve(false);
+    if(firebaseReady()){optimizeLocalPersistence();return Promise.resolve(true);}
+    if(firebaseWarmPromise)return firebaseWarmPromise;
+    if(typeof ensureFirebaseReady!=='function')return Promise.resolve(false);
+    firebaseWarmPromise=Promise.resolve().then(()=>ensureFirebaseReady()).then(ok=>{if(ok)optimizeLocalPersistence();return !!ok;}).catch(()=>false).finally(()=>{firebaseWarmPromise=null;});
+    return firebaseWarmPromise;
   };
   const patch=()=>{
     if(installed)return true;
@@ -30,13 +58,54 @@ if('caches' in window){
         BOOT_WATCHDOG=setTimeout(()=>{if(BOOT_SETTLED||!document.getElementById('screen-loading')?.classList.contains('active'))return;AUTH_HANDLED=false;showScreen('screen-auth');window.TeamBullsRecovery?.reveal?.('A conexão ainda está sendo conferida. A tela de acesso foi liberada sem apagar seus dados locais.');},hardDelay);
       };wrapped.__tbMobileSessionRestore=true;startBootWatchdog=wrapped;
     }
-    if(!withTimeout.__tbFirebaseResilience){const base=withTimeout;const wrapped=function(task,ms,label='operação'){let limit=Math.max(250,Number(ms)||10000);if(label==='Firebase'||label==='carregar conexão segura')limit=Math.max(limit,12000);else if(label==='App Check')limit=Math.max(limit,6000);else if(label==='login')limit=Math.max(limit,16000);return base(task,limit,label);};wrapped.__tbFirebaseResilience=true;withTimeout=wrapped;}
+    if(!withTimeout.__tbFirebaseResilience){
+      const base=withTimeout;
+      const wrapped=function(task,ms,label='operação'){
+        let limit=Math.max(250,Number(ms)||10000);
+        if(label==='carregar conexão segura')limit=Math.min(limit,10000);
+        else if(label==='App Check')limit=Math.min(limit,2500);
+        else if(label==='login')limit=Math.min(limit,12000);
+        return base(task,limit,label);
+      };
+      wrapped.__tbFirebaseResilience=true;withTimeout=wrapped;
+    }
     if(typeof initOptionalAppCheck==='function'&&!initOptionalAppCheck.__tbEnterpriseProvider){const legacy=initOptionalAppCheck;const wrapped=async function(){const key=String(typeof CFG!=='undefined'&&CFG.appCheckSiteKey||'').trim();if(!key||typeof firebase==='undefined')return false;try{const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');if(!ok)return false;const Provider=firebase.appCheck?.ReCaptchaEnterpriseProvider;if(typeof Provider==='function'){firebase.appCheck().activate(new Provider(key),true);return true;}return await legacy();}catch(error){const message=String(error?.message||error||'').toLowerCase();if(message.includes('already')&&message.includes('activ'))return true;console.warn('App Check Enterprise não iniciado',error);return false;}};wrapped.__tbEnterpriseProvider=true;initOptionalAppCheck=wrapped;}
-    if(typeof ensureFirebaseReady==='function'&&!ensureFirebaseReady.__tbRetry){const base=ensureFirebaseReady;const wrapped=async function(){if(typeof auth!=='undefined'&&auth&&typeof db!=='undefined'&&db)return true;const first=await base();if(first)return true;if(!navigator.onLine)return false;await delay(450);try{const ready=await withTimeout(ensureFirebaseCore(),12000,'carregar conexão segura');return !!(ready&&initFirebase());}catch(error){console.warn('Firebase indisponível após nova tentativa',error);return false;}};wrapped.__tbRetry=true;ensureFirebaseReady=wrapped;}
+    if(typeof ensureFirebaseReady==='function'&&!ensureFirebaseReady.__tbRetry){
+      const base=ensureFirebaseReady;let readinessPromise=null;
+      const wrapped=function(){
+        if(firebaseReady()){optimizeLocalPersistence();return Promise.resolve(true);}
+        if(readinessPromise)return readinessPromise;
+        readinessPromise=(async()=>{
+          const first=await base();
+          if(first){optimizeLocalPersistence();return true;}
+          if(!navigator.onLine)return false;
+          await delay(250);
+          try{
+            const ready=await withTimeout(ensureFirebaseCore(),3500,'retomar conexão segura');
+            const ok=!!(ready&&initFirebase());if(ok)optimizeLocalPersistence();return ok;
+          }catch(error){console.warn('Firebase indisponível após tentativa curta de retomada',error);return false;}
+        })().finally(()=>{readinessPromise=null;});
+        return readinessPromise;
+      };
+      wrapped.__tbRetry=true;ensureFirebaseReady=wrapped;
+    }
     if(typeof cloudGet==='function'&&!cloudGet.__tbRetry){const base=cloudGet;const wrapped=async function(reference,label='consulta'){try{return await base(reference,label);}catch(error){const retryable=navigator.onLine&&(typeof isNetworkLikeError==='function'?isNetworkLikeError(error):false);if(!retryable)throw error;await delay(400);return base(reference,label+' · nova tentativa');}};wrapped.__tbRetry=true;cloudGet=wrapped;}
     return true;
   };
-  patch();document.addEventListener('DOMContentLoaded',patch,{once:true});window.addEventListener('load',()=>{if(!installed)patch();},{once:true});
+  const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;};
+  const markLoginProgress=()=>{
+    const btn=document.getElementById('btn-login');
+    setTimeout(()=>{if(btn?.disabled&&btn.textContent==='ENTRANDO...')btn.textContent='VALIDANDO CONEXÃO...';},2200);
+    setTimeout(()=>{if(btn?.disabled&&(btn.textContent==='ENTRANDO...'||btn.textContent==='VALIDANDO CONEXÃO...'||btn.textContent==='CONECTANDO...'))btn.textContent='CONEXÃO LENTA...';},6500);
+  };
+  installAndWarm();
+  document.addEventListener('DOMContentLoaded',installAndWarm,{once:true});
+  window.addEventListener('load',()=>{installAndWarm();},{once:true});
+  window.addEventListener('pageshow',()=>installAndWarm(),{passive:true});
+  window.addEventListener('online',()=>installAndWarm(),{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')installAndWarm();},{passive:true});
+  document.addEventListener('click',event=>{if(event.target?.closest?.('#btn-login'))markLoginProgress();},true);
+  window.TeamBullsAuthWarmup=Object.freeze({version:'10.10.56-authwarm1',warm:warmFirebase,state:()=>({installed,warming:!!firebaseWarmPromise,ready:firebaseReady()})});
 })();
 
 (()=>{
