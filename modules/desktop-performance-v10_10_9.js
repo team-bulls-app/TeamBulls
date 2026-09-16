@@ -6,11 +6,14 @@
 
   const ROOT=document.documentElement;
   const DESKTOP_MEDIA='(min-width:900px) and (pointer:fine)';
+  const DESKTOP_QUERY=window.matchMedia?.(DESKTOP_MEDIA)||null;
   let scrollReleaseTimer=0;
   let mediaTask=0;
+  let desktopListenersBound=false;
+  let chartDefaultsSnapshot=null;
 
   function isDesktopLike(){
-    try{return window.matchMedia?.(DESKTOP_MEDIA)?.matches===true;}
+    try{return DESKTOP_QUERY?DESKTOP_QUERY.matches:window.innerWidth>=900;}
     catch(error){return window.innerWidth>=900;}
   }
 
@@ -68,15 +71,32 @@
     document.head.appendChild(style);
   }
 
+  function snapshotChartDefaults(){
+    const defaults=window.Chart?.defaults;
+    if(!defaults||chartDefaultsSnapshot)return;
+    chartDefaultsSnapshot={
+      devicePixelRatio:defaults.devicePixelRatio,
+      animation:defaults.animation
+    };
+  }
+
   function tuneCharts(){
     if(!isDesktopLike())return;
     const ChartCtor=window.Chart;
     if(!ChartCtor?.defaults)return;
+    snapshotChartDefaults();
     try{
       const ratio=Math.max(1,Math.min(1.35,Number(window.devicePixelRatio)||1));
       ChartCtor.defaults.devicePixelRatio=ratio;
     }catch(error){}
     try{ChartCtor.defaults.animation=false;}catch(error){}
+  }
+
+  function restoreChartDefaults(){
+    const defaults=window.Chart?.defaults;
+    if(!defaults||!chartDefaultsSnapshot)return;
+    try{defaults.devicePixelRatio=chartDefaultsSnapshot.devicePixelRatio;}catch(error){}
+    try{defaults.animation=chartDefaultsSnapshot.animation;}catch(error){}
   }
 
   function tuneMedia(root=document.querySelector('.screen.active')){
@@ -93,15 +113,21 @@
     });
   }
 
+  function cancelMediaTune(){
+    if(!mediaTask)return;
+    if('cancelIdleCallback' in window)try{cancelIdleCallback(mediaTask);}catch(error){}
+    clearTimeout(mediaTask);
+    mediaTask=0;
+  }
+
   function scheduleMediaTune(){
     if(!isDesktopLike())return;
-    const run=()=>{mediaTask=0;tuneCharts();tuneMedia();};
+    const run=()=>{mediaTask=0;if(!isDesktopLike())return;tuneCharts();tuneMedia();};
+    cancelMediaTune();
     if('requestIdleCallback' in window){
-      if(mediaTask)try{cancelIdleCallback(mediaTask);}catch(error){}
       mediaTask=requestIdleCallback(run,{timeout:900});
       return;
     }
-    if(mediaTask)clearTimeout(mediaTask);
     mediaTask=setTimeout(run,100);
   }
 
@@ -110,7 +136,7 @@
     if(typeof base!=='function'||base.__tbDesktopPerformance)return;
     const wrapped=function(){
       const result=base.apply(this,arguments);
-      if(result!==false)scheduleMediaTune();
+      if(result!==false&&isDesktopLike())scheduleMediaTune();
       return result;
     };
     wrapped.__tbDesktopPerformance=true;
@@ -118,36 +144,48 @@
   }
 
   function markDesktopScrolling(){
-    if(!isDesktopLike())return;
     ROOT.classList.add('tb-desktop-scrolling');
     clearTimeout(scrollReleaseTimer);
     scrollReleaseTimer=setTimeout(()=>ROOT.classList.remove('tb-desktop-scrolling'),120);
   }
 
   function bindScrollState(){
+    if(desktopListenersBound||!isDesktopLike())return;
+    desktopListenersBound=true;
     window.addEventListener('scroll',markDesktopScrolling,{passive:true});
     document.getElementById('app')?.addEventListener('scroll',markDesktopScrolling,{passive:true});
   }
 
+  function unbindScrollState(){
+    if(!desktopListenersBound)return;
+    desktopListenersBound=false;
+    window.removeEventListener('scroll',markDesktopScrolling);
+    document.getElementById('app')?.removeEventListener('scroll',markDesktopScrolling);
+    clearTimeout(scrollReleaseTimer);
+    scrollReleaseTimer=0;
+    ROOT.classList.remove('tb-desktop-scrolling');
+  }
+
   function syncDesktopState(){
-    ROOT.classList.toggle('tb-desktop-optimized',isDesktopLike());
-    if(isDesktopLike())scheduleMediaTune();
-    else ROOT.classList.remove('tb-desktop-scrolling');
+    const desktop=isDesktopLike();
+    ROOT.classList.toggle('tb-desktop-optimized',desktop);
+    if(desktop){bindScrollState();scheduleMediaTune();}
+    else{unbindScrollState();cancelMediaTune();restoreChartDefaults();}
   }
 
   function install(){
     installStyles();
-    tuneCharts();
     ['showScreen','openModal'].forEach(wrapUiFunction);
-    bindScrollState();
     syncDesktopState();
-    window.addEventListener('resize',syncDesktopState,{passive:true});
+    if(DESKTOP_QUERY?.addEventListener)DESKTOP_QUERY.addEventListener('change',syncDesktopState);
+    else window.addEventListener('resize',syncDesktopState,{passive:true});
     window.addEventListener('pageshow',syncDesktopState,{passive:true});
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncDesktopState();},{passive:true});
     window.TeamBullsDesktopPerformance=Object.freeze({
-      version:'10.10.9-desktop1',
+      version:'10.10.9-desktop2',
       refresh:syncDesktopState,
-      tuneMedia:scheduleMediaTune
+      tuneMedia:scheduleMediaTune,
+      state:()=>({desktop:isDesktopLike(),scrollListeners:desktopListenersBound,mediaPending:!!mediaTask})
     });
   }
 
