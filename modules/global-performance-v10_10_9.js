@@ -106,7 +106,7 @@
     window.addEventListener('focus',settleTransientUiAnimations,{passive:true});
     window.TeamBullsPerformance=Object.freeze({
       refresh(){syncVisibilityState();syncCapabilityClasses();settleTransientUiAnimations();},
-      version:'10.10.9-perf3'
+      version:'10.10.9-perf2'
     });
   }
 
