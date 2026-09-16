@@ -44,8 +44,22 @@ assert(config.includes('requestAnimationFrame(()=>setTimeout(queue,240));'),'Car
 assert(config.includes("MODULE_ROOT+'diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2'"),'Exclusão de módulo pesado no runtime do aluno deve manter URL canônica.');
 assert(config.includes("version:'10.10.45-startup11'"),'Revisão do runtime de baixa contenção deve estar identificada.');
 
+// Entrada/login: Firebase deve começar a aquecer antes do toque e os wrappers
+// não podem alongar artificialmente as esperas originais do core.
+assert(config.includes("version:'10.10.56-authwarm1'"),'Warmup de autenticação não está versionado.');
+assert(config.includes('const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}'),'Firebase não é pré-aquecido assim que o bootstrap fica disponível.');
+assert(config.includes("else if(label==='login')limit=Math.min(limit,12000);"),'Login voltou a ser alongado além do limite original do core.');
+assert(config.includes("if(label==='carregar conexão segura')limit=Math.min(limit,10000);"),'Carga inicial do Firebase pode voltar a ficar presa por timeout excessivo.');
+assert(config.includes("else if(label==='App Check')limit=Math.min(limit,2500);"),'App Check voltou a bloquear a entrada por tempo excessivo.');
+assert(!config.includes("limit=Math.max(limit,16000)"),'Regressão: login não pode voltar ao mínimo artificial de 16 segundos.');
+assert(!config.includes("limit=Math.max(limit,12000)"),'Regressão: conexão segura não pode ser artificialmente estendida para 12 segundos.');
+assert(config.includes("withTimeout(ensureFirebaseCore(),3500,'retomar conexão segura')"),'Retry do Firebase precisa ser curto e limitado.');
+assert(config.includes('__tbLocalPersistenceFast101056'),'Persistência LOCAL repetida não está protegida contra trabalho redundante.');
+assert(config.includes("btn.textContent='VALIDANDO CONEXÃO...'"),'Login lento precisa informar progresso sem parecer travado.');
+assert(config.includes("btn.textContent='CONEXÃO LENTA...'"),'Login muito lento precisa informar a condição real ao usuário.');
+
 if(process.exitCode){
   process.exit(process.exitCode);
 }
-console.log('APROVADO — startup limita preloads concorrentes, preserva ordem funcional e devolve mais frames à UI antes da carga pesada.');
+console.log('APROVADO — startup limita preloads concorrentes, preserva ordem funcional, pré-aquece Firebase e evita esperas artificiais no login.');
 await import('./foreground-write-resilience-check.mjs');
