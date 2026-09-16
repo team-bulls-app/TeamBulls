@@ -57,9 +57,10 @@ lacks(reports,'cloudGet(','Relatórios voltaram a herdar retry global que multip
 lacks(reports,'setInterval(','Relatórios não podem introduzir polling.');
 lacks(reports,'MutationObserver','Relatórios não podem observar globalmente o DOM.');
 lacks(reports,'cloudWrite(','Relatórios não podem criar gravações Firebase.');
-lacks(reports,'.update(','Relatórios não podem atualizar dados.');
-lacks(reports,'.set(','Relatórios não podem criar documentos.');
-lacks(reports,'.delete(','Relatórios não podem excluir documentos.');
+lacks(reports,'db.batch(','Relatórios não podem iniciar batch de escrita.');
+lacks(reports,'runTransaction(','Relatórios não podem iniciar transação de escrita.');
+assert(!/db\.collection\([^\n]+\)\.doc\([^\n]+\)\.(?:set|update|delete)\s*\(/.test(reports),'Relatórios não podem gravar documentos Firestore.');
+assert(!/db\.collection\([^\n]+\)\.add\s*\(/.test(reports),'Relatórios não podem adicionar documentos Firestore.');
 
 has(feedback,"where('trainerId','==',uid).where('role','==','student').limit(500)",'Feedbacks: consulta de alunos não está compatível com Rules 28.');
 has(feedback,'const CONCURRENCY=8','Feedbacks: fan-out não possui concorrência limitada.');
