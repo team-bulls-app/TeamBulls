@@ -2,7 +2,7 @@
 'use strict';
 (function(){
   const TB=window.TeamBulls107;if(!TB)return;
-  const REGISTRATION_DIAGNOSTIC_REVISION='preflight2';
+  const REGISTRATION_DIAGNOSTIC_REVISION='preflight3';
   const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   function randomCode(){
     const bytes=new Uint8Array(15);crypto.getRandomValues(bytes);
@@ -62,19 +62,23 @@
   }
   setRegistrationDiagnostic('idle');
 
-  async function ensureRegistrationAppCheck(){
+  async function ensureRegistrationAppCheck({forceRefresh=false}={}){
     const key=String(typeof CFG!=='undefined'&&CFG.appCheckSiteKey||'').trim();
     if(!key){setRegistrationDiagnostic('app-check','disabled','disabled');return true;}
     try{
-      if(typeof initOptionalAppCheck==='function')await withTimeout(initOptionalAppCheck(),8000,'App Check');
+      /* O boot pode abandonar uma inicialização lenta em 2,5 s para liberar a UI.
+         O cadastro não pode herdar esse orçamento curto: aqui aguardamos até 8 s.
+         getToken(false) reutiliza somente token válido e o próprio SDK renova se
+         estiver ausente/expirado; refresh forçado fica reservado à recuperação 403. */
+      if(typeof initOptionalAppCheck==='function')await withTimeout(initOptionalAppCheck(),8000,'App Check do cadastro');
       const service=typeof firebase!=='undefined'&&typeof firebase.appCheck==='function'?firebase.appCheck():null;
       if(!service||typeof service.getToken!=='function'){
         const error=new Error('A proteção de segurança do aplicativo não iniciou neste aparelho.');
         error.code='team-bulls/app-check-unavailable';throw error;
       }
-      const result=await withTimeout(service.getToken(true),8000,'validar proteção App Check');
+      const result=await withTimeout(service.getToken(!!forceRefresh),8000,forceRefresh?'renovar proteção App Check':'validar proteção App Check');
       if(!result?.token){const error=new Error('Não foi possível validar a proteção de segurança neste aparelho.');error.code='team-bulls/app-check-failed';throw error;}
-      setRegistrationDiagnostic('app-check','ok','valid');return true;
+      setRegistrationDiagnostic('app-check',forceRefresh?'ok-refreshed':'ok','valid');return true;
     }catch(error){
       if(!String(error?.code||'').startsWith('team-bulls/app-check'))error.code='team-bulls/app-check-failed';
       setRegistrationDiagnostic('app-check',error.code,'invalid');throw error;
@@ -156,7 +160,7 @@
       if(!await ensureFirebaseReady())throw new Error('Não foi possível carregar a conexão segura.');
 
       stage='app-check';btn.textContent='VERIFICANDO SEGURANÇA...';setRegistrationDiagnostic(stage);
-      await ensureRegistrationAppCheck();
+      await ensureRegistrationAppCheck({forceRefresh:false});
 
       stage='invite-precheck';btn.textContent='VALIDANDO CONVITE...';setRegistrationDiagnostic(stage,'',registrationDiagnostic.appCheck);
       inviteId=await sha256(code);const inviteRef=db.collection('studentInvites').doc(inviteId);
@@ -190,7 +194,7 @@
         if(!isPermissionDenied(error))throw error;
         stage='transaction-refresh';btn.textContent='RENOVANDO SEGURANÇA...';setRegistrationDiagnostic(stage,'permission-denied-retry',registrationDiagnostic.appCheck);
         tokenResult=await withTimeout(cred.user.getIdTokenResult(true),8000,'renovar credencial de cadastro');
-        await ensureRegistrationAppCheck();
+        await ensureRegistrationAppCheck({forceRefresh:true});
         stage='transaction';btn.textContent='CRIANDO PERFIL...';setRegistrationDiagnostic(stage,'retry',registrationDiagnostic.appCheck);
         await commitRegistration(inviteRef,cred,userData);
       }
@@ -211,8 +215,8 @@
         'auth/email-already-in-use':'Este e-mail já possui uma conta. Antes de usar outro convite, tente entrar normalmente ou recuperar a senha.',
         'auth/invalid-email':'E-mail inválido.','auth/weak-password':'Senha muito fraca.',
         'team-bulls/invalid-invite':'Convite inválido, expirado ou já utilizado. Peça um novo ao treinador.',
-        'team-bulls/app-check-unavailable':'A proteção de segurança do Team Bulls não iniciou neste aparelho [REG-APP-INIT]. Não foi criada nenhuma conta; verifique bloqueadores/DNS/navegador antes de tentar novamente.',
-        'team-bulls/app-check-failed':'Este aparelho não conseguiu concluir a validação de segurança [REG-APP-TOKEN]. Não foi criada nenhuma conta; não gaste outro convite.',
+        'team-bulls/app-check-unavailable':'A proteção de segurança do Team Bulls não iniciou neste aparelho [REG-APP-INIT]. Não foi criada nenhuma conta; atualize a tela e tente novamente com este mesmo convite. Se persistir, verifique bloqueadores, DNS e navegador.',
+        'team-bulls/app-check-failed':'Este aparelho não conseguiu concluir a validação de segurança [REG-APP-TOKEN]. Não foi criada nenhuma conta e o convite não foi consumido. Atualize a tela e tente novamente com este mesmo convite.',
         'team-bulls/auth-email-claim':'A autenticação foi criada sem a confirmação de e-mail exigida pelo perfil [REG-AUTH-EMAIL]. A tentativa foi cancelada com segurança.',
         'team-bulls/timeout':'O servidor demorou para concluir o cadastro. Tente entrar com a mesma conta antes de cadastrar novamente.'
       };
@@ -226,6 +230,7 @@
 
   doRegister.__tbCanonicalInviteRegistration=true;
   doRegister.__tbRegistrationPreflight=REGISTRATION_DIAGNOSTIC_REVISION;
+  doRegister.__tbRegistrationAppCheck='cached-first';
   const CANONICAL_REGISTER=doRegister;
   function enforceCanonicalRegistration(){
     if(typeof doRegister==='function'&&doRegister!==CANONICAL_REGISTER){

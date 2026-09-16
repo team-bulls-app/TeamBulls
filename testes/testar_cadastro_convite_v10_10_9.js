@@ -12,7 +12,7 @@ const sw=read('sw.js');
 const bridge=read('sw_47.js');
 const version=JSON.parse(read('version.json'));
 function need(v,m){if(!v)throw new Error(m);}
-const appCheck=invites.indexOf('await ensureRegistrationAppCheck()');
+const appCheck=invites.indexOf('await ensureRegistrationAppCheck({forceRefresh:false})');
 const invitePrecheck=invites.indexOf("stage='invite-precheck'");
 const pause=invites.indexOf('authListenerSuspended=suspendAuthListenerForRegistration()');
 const create=invites.indexOf('auth.createUserWithEmailAndPassword(email,pass)');
@@ -28,7 +28,11 @@ const workerCache=sw.match(/const CACHE_HOTFIX='([^']+)'/)?.[1]||'';
 const bridgeCache=bridge.match(/const CACHE_HOTFIX='([^']+)'/)?.[1]||'';
 need(activeRules==='firebase/firestore_28_compacto.rules','Cadastro deve ser validado contra a Rules 28 ativa.');
 need(appCheck>=0&&invitePrecheck>appCheck&&create>invitePrecheck,'App Check e convite devem ser validados antes da criação Auth quando o preflight público estiver disponível.');
-need(invites.includes('service.getToken(true)'),'O cadastro deve forçar um token App Check válido antes de continuar.');
+need(invites.includes("withTimeout(initOptionalAppCheck(),8000,'App Check do cadastro')"),'Cadastro deve ter orçamento próprio de 8 s e não herdar o timeout curto do boot.');
+need(invites.includes('service.getToken(!!forceRefresh)'),'Validação App Check deve escolher explicitamente entre token válido em cache e refresh forçado.');
+need(invites.includes('await ensureRegistrationAppCheck({forceRefresh:false})'),'Primeiro preflight deve aceitar token App Check válido já persistido e deixar o SDK renovar apenas se necessário.');
+need(invites.includes('await ensureRegistrationAppCheck({forceRefresh:true})'),'Recuperação de permission-denied da transação deve forçar um token App Check novo antes do único retry.');
+need(invites.includes("doRegister.__tbRegistrationAppCheck='cached-first'"),'Fluxo canônico deve expor a política App Check cached-first para diagnóstico de produção.');
 need(invites.includes("error.code='team-bulls/app-check-failed'"),'Falha de App Check precisa possuir código próprio e não virar permission-denied genérico.');
 need(invites.includes("precheckRequiresAuth=true"),'Permission denied no preflight precisa migrar para revalidação autenticada sem consumir o convite.');
 need(invites.includes("stage='invite-auth-check'"),'O convite precisa ser revalidado depois do Auth quando a Rules publicada negar o preflight anônimo.');
@@ -45,7 +49,7 @@ need(invites.includes("if(typeof AUTH_UNSUBSCRIBE==='function')"),'A pausa preci
 need(invites.includes("if(typeof startAuthListener==='function')startAuthListener()"),'O observador precisa ser restaurado pelo inicializador oficial.');
 need(invites.includes('doRegister.__tbCanonicalInviteRegistration=true'),'O fluxo canônico precisa ser identificado explicitamente.');
 need(invites.includes("doRegister.__tbRegistrationPreflight=REGISTRATION_DIAGNOSTIC_REVISION"),'A revisão de preflight deve ser identificável em produção.');
-need(invites.includes("REGISTRATION_DIAGNOSTIC_REVISION='preflight2'"),'A revisão resiliente do cadastro precisa estar ativa.');
+need(invites.includes("REGISTRATION_DIAGNOSTIC_REVISION='preflight3'"),'A revisão resiliente do cadastro mobile precisa estar ativa.');
 need(invites.includes("window.addEventListener('team-bulls-runtime-state',enforceCanonicalRegistration)"),'O cadastro seguro deve se restaurar após cada módulo diferido.');
 need(!integrity.includes('doRegister=secured'),'A camada de integridade não pode mais substituir doRegister.');
 need(integrity.includes("const VERSION='10.10.9-registration2'"),'A revisão passiva da integridade do cadastro precisa estar ativa.');
@@ -57,4 +61,4 @@ need(updaterBuild===version.build&&workerBuild===version.build&&bridgeBuild===ve
 need(updater.includes("./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2"),'Atualizador deve renovar explicitamente a integridade do cadastro.');
 need(workerCache&&workerCache===bridgeCache,'A release precisa manter os caches coerentes nos dois Service Workers.');
 need(sw.includes("./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2")&&bridge.includes("./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2"),'Service Workers não podem preparar a revisão registration1 antiga.');
-console.log(`APROVADO: cadastro por convite, fallback autenticado, retry único, App Check, atomicidade e build ${version.build} seguem coerentes sob ${activeRules}.`);
+console.log(`APROVADO: cadastro por convite, App Check cached-first com refresh forçado apenas na recuperação 403, atomicidade e build ${version.build} seguem coerentes sob ${activeRules}.`);
