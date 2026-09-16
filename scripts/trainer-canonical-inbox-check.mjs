@@ -9,7 +9,7 @@ const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
 const modulePath='modules/trainer-canonical-inbox-v10_10_52.js';
 const recoveryPath='modules/trainer-report-link-recovery-v10_10_51.js';
-const historyPath='modules/trainer-student-report-history-v10_10_54.js';
+const historyPath='modules/trainer-student-report-history-v10_10_55.js';
 const loaderPath='modules/intelligence-suite-loader-v10_10_42.js';
 for(const path of [modulePath,recoveryPath,historyPath,loaderPath]){
   assert(fs.existsSync(path),`Arquivo obrigatório ausente: ${path}`);
@@ -28,11 +28,11 @@ const sw=read('sw.js');
 
 has(source,"const VERSION='10.10.52-canonicalinbox3'",'Central canônica está na revisão errada.');
 has(loader,"trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3",'Loader do treinador não entrega a Central canônica por propriedade histórica.');
-has(loader,"const VERSION='10.10.54-intelsuite4'",'Loader não foi cache-bustado para a correção de envio/abertura.');
+has(loader,"const VERSION='10.10.55-intelsuite5'",'Loader não foi cache-bustado para corrigir o loading infinito.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
-has(loader,"trainer-student-report-history-v10_10_54.js?v=10.10.54-studentreports2",'Loader não entrega a revisão da tela individual do aluno.');
-assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('trainer-student-report-history-v10_10_54.js'),'Recuperação de vínculo deve continuar antes do histórico individual.');
-assert(loader.indexOf('trainer-student-report-history-v10_10_54.js')<loader.indexOf('trainer-canonical-inbox-v10_10_52.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
+has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3",'Loader não entrega a revisão sem loading infinito.');
+assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Recuperação de vínculo deve continuar antes do histórico individual.');
+assert(loader.indexOf('trainer-student-report-history-v10_10_55.js')<loader.indexOf('trainer-canonical-inbox-v10_10_52.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
 
 // Fonte de verdade: questionários que o próprio treinador criou devem ser encontrados
 // diretamente pelo trainerId imutável, mesmo se o roster atual do aluno estiver inconsistente.
@@ -42,12 +42,23 @@ has(source,'const [roster,ownedRows]=await Promise.all','Leitura por propriedade
 has(source,'const canonicalRows=[...ownedRows,...groups.flatMap','Questionários históricos não são mesclados aos canônicos atuais.');
 has(source,'ownerRecoveredCount','Diagnóstico de recuperação histórica não está disponível.');
 
-// A tela individual precisa abrir antes da rede e usar a mesma propriedade histórica.
-has(history,"const VERSION='10.10.54-studentreports2'",'Histórico individual está na revisão errada.');
+// A tela individual precisa abrir antes da rede, sem reutilizar o token que showScreen invalida.
+has(history,"const VERSION='10.10.55-studentreports3'",'Histórico individual está na revisão errada.');
 has(history,"db.collection('questionnaires').where('trainerId','==',trainerUid).limit(MAX_REPORTS)",'Tela individual ainda depende exclusivamente da query antiga por studentId.');
 has(history,".filter(report=>String(report.studentId||'')===String(studentUid))",'Tela individual não isola o aluno selecionado depois da leitura por propriedade.');
-has(history,"showScreen('screen-ts-quest',navigation)",'A aba Relatórios do aluno não abre imediatamente antes da consulta de rede.');
-assert(history.indexOf("showScreen('screen-ts-quest',navigation)")<history.indexOf('return refreshStudentReports({navigation,showScreenNow:false})'),'A navegação precisa ocorrer antes da leitura canônica.');
+has(history,"showScreen('screen-ts-quest')",'A aba Relatórios do aluno não abre imediatamente antes da consulta de rede.');
+assert(history.indexOf("showScreen('screen-ts-quest')")<history.indexOf('return refreshStudentReports({showLoading:false})'),'A navegação precisa ocorrer antes da leitura canônica.');
+lacks(history,'beginAsyncNavigation(','Histórico individual não pode criar token antes de showScreen e reutilizá-lo depois.');
+lacks(history,'isNavigationCurrent(','Histórico individual não pode descartar a resposta por um token invalidado pelo próprio showScreen.');
+has(history,'const currentLoad=(studentUid,seq)=>','Histórico individual não protege respostas atrasadas pela geração local da carga.');
+has(history,"reportsScreenActive()",'Histórico individual precisa descartar resposta quando a tela já foi fechada.');
+has(history,'const SECTION_TIMEOUT_MS=9000','Cada seção precisa ter watchdog próprio para nunca carregar indefinidamente.');
+has(history,'Promise.allSettled([','Relatórios semanais e personalizados devem carregar de forma independente.');
+has(history,'loadQuestionnaireSection(studentUid,seq)','Carga personalizada não está isolada.');
+has(history,'loadWeeklySection(studentUid,seq)','Carga semanal não está isolada.');
+has(history,"retryButton('ts-quest-list'",'Erro personalizado não oferece saída/retry.');
+has(history,"retryButton('ts-weekly-checkin-list'",'Erro semanal não oferece saída/retry.');
+has(history,"button.textContent='TENTAR NOVAMENTE'",'Estado de erro não oferece botão TENTAR NOVAMENTE.');
 has(history,'report?.answeredAt?{...report,createdAt:report.answeredAt}:report','Card do treinador continua exibindo apenas a data da solicitação em vez da resposta quando disponível.');
 has(history,'TS_QUEST_CACHE=questionnaires','Tela individual não substitui o cache antigo pelo histórico canônico atualizado.');
 has(history,"renderQuestList(TS_QUEST_CACHE,'ts-quest-list','ts-quest-empty',true)",'Tela individual não renderiza o histórico recuperado.');
@@ -112,4 +123,4 @@ if(failures.length){
   console.error('FALHA — propriedade histórica / histórico individual de relatórios do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — aba individual abre antes da rede, histórico usa trainerId imutável/answeredAt e nenhum envio original é alterado.');
+console.log('APROVADO — aba individual abre antes da rede sem token inválido; semanal/personalizado carregam independentes, têm timeout/retry e nenhum envio original é alterado.');
