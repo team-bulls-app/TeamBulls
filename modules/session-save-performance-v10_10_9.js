@@ -1,10 +1,10 @@
-/* Team Bulls v10.10.34 — registro de séries imediato com fila persistente e mutável de sincronização. */
+/* Team Bulls v10.10.58 — registro imediato de séries com restauração local das pendências. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.34-sessionperf2';
+  const VERSION='10.10.58-sessionperf3';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   const MAX_PENDING=160;
   const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
@@ -20,16 +20,33 @@
     const revision=Math.max(0,Math.trunc(Number(item.revision)||0));
     return{...item,queuedAt,createdAtMs,revision};
   }
-  function readQueue(uidValue){
-    if(!uidValue)return[];
+  function parseQueue(raw,uidValue){
     try{
-      const parsed=JSON.parse(storageGet(queueKey(uidValue))||'[]');
+      const parsed=JSON.parse(raw||'[]');
       return Array.isArray(parsed)?parsed.map(normalizeQueuedEntry).filter(item=>item&&item.userId===uidValue):[];
     }catch(error){return[];}
   }
+  function readQueue(uidValue){
+    if(!uidValue)return[];
+    const key=queueKey(uidValue),merged=new Map();
+    const sources=[];
+    try{sources.push(storageGet(key)||'');}catch(error){}
+    try{sources.push(sessionStorage.getItem(key)||'');}catch(error){}
+    for(const raw of sources){
+      for(const item of parseQueue(raw,uidValue)){
+        const current=merged.get(item.id);
+        if(!current||item.revision>current.revision||(item.revision===current.revision&&item.queuedAt>=current.queuedAt))merged.set(item.id,item);
+      }
+    }
+    return[...merged.values()].sort((a,b)=>a.queuedAt-b.queuedAt);
+  }
   function writeQueue(uidValue,items){
     if(!uidValue)return false;
-    try{return storageSet(queueKey(uidValue),JSON.stringify(items));}catch(error){return false;}
+    const key=queueKey(uidValue),serialized=JSON.stringify(items);let durable=false,session=false;
+    try{durable=storageSet(key,serialized)===true;}catch(error){}
+    try{sessionStorage.setItem(key,serialized);session=true;}catch(error){}
+    if(durable){try{sessionStorage.removeItem(key);}catch(error){}}
+    return durable||session;
   }
   function enqueue(entry){
     const normalized=normalizeQueuedEntry(entry),uidValue=String(normalized?.userId||'');if(!uidValue||!normalized?.id)return false;
@@ -53,6 +70,7 @@
     const safePatch={};for(const [key,value] of Object.entries(patch||{}))if(MUTABLE_FIELDS.has(key))safePatch[key]=value;
     const next=normalizeQueuedEntry({...current,...safePatch,id:current.id,userId:current.userId,workoutId:current.workoutId,exerciseId:current.exerciseId,queuedAt:current.queuedAt,createdAtMs:current.createdAtMs,revision:current.revision+1});
     if(!enqueue(next))return null;
+    ensureLocalSession(next,null,true);
     scheduleFlush(120);return next;
   }
   function discardPending(id,uidValue=String(CURRENT_USER?.uid||'')){
@@ -69,13 +87,54 @@
       userId:entry.userId,workoutId:entry.workoutId,exerciseId:entry.exerciseId,exerciseName:entry.exerciseName,
       date:entry.date,week:entry.week,note:entry.note,sets:entry.sets,performedTechniqueMode:entry.performedTechniqueMode||'',
       performedExerciseItemId:entry.performedExerciseItemId||'',performedExerciseName:entry.performedExerciseName||entry.exerciseName||'',
-      createdAt:stableCreatedAt(entry)
+      variantId:entry.variantId||'',variantName:entry.variantName||'',createdAt:stableCreatedAt(entry)
     };
+  }
+  function sessionDataFromEntry(entry,pendingSync=true){
+    return{
+      id:entry.id,userId:entry.userId,workoutId:entry.workoutId,exerciseId:entry.exerciseId,date:entry.date,week:entry.week,
+      note:entry.note,sets:Array.isArray(entry.sets)?entry.sets:[],exerciseName:entry.exerciseName||'',performedTechniqueMode:entry.performedTechniqueMode||'',
+      performedExerciseItemId:entry.performedExerciseItemId||'',performedExerciseName:entry.performedExerciseName||entry.exerciseName||'',
+      variantId:entry.variantId||'',variantName:entry.variantName||'',pendingSync:!!pendingSync
+    };
+  }
+  function ensureLocalSession(entry,exerciseOverride=null,pendingSync=true){
+    try{
+      const exercise=exerciseOverride||(typeof getE==='function'?getE(entry.workoutId,entry.exerciseId):null);
+      if(!exercise)return false;
+      if(!Array.isArray(exercise.sessions))exercise.sessions=[];
+      const next=sessionDataFromEntry(entry,pendingSync),index=exercise.sessions.findIndex(session=>String(session?.id||'')===String(entry.id));
+      if(index>=0)Object.assign(exercise.sessions[index],next);else exercise.sessions.push(next);
+      const current=index>=0?exercise.sessions[index]:exercise.sessions[exercise.sessions.length-1];
+      try{if(typeof syncSessionToHistory==='function')syncSessionToHistory(current);}catch(error){console.warn('[Team Bulls] histórico local da série será reconstruído depois',error);}
+      try{if(typeof saveSessionArchive==='function')saveSessionArchive(entry.userId,[current]);}catch(error){console.warn('[Team Bulls] arquivo local da série será reconstruído depois',error);}
+      exercise.sessions.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+      return index<0;
+    }catch(error){
+      console.warn('[Team Bulls] não foi possível projetar imediatamente o registro pendente no treino',error);
+      return false;
+    }
+  }
+  function restorePendingSessions({rerender=false}={}){
+    try{
+      const uidValue=String(CURRENT_USER?.uid||'');
+      if(!uidValue||CURRENT_USER?.role!=='student'||MODE!=='cloud')return 0;
+      const queue=readQueue(uidValue);let inserted=0,visible=false;
+      for(const entry of queue){
+        if(ensureLocalSession(entry,null,true))inserted++;
+        try{if(CUR_WORKOUT===entry.workoutId&&CUR_EX===entry.exerciseId)visible=true;}catch(error){}
+      }
+      if(rerender&&visible&&inserted>0&&!document.getElementById('modal-session')?.classList.contains('open')){
+        try{if(typeof renderExercise==='function')renderExercise();}catch(error){}
+      }
+      return inserted;
+    }catch(error){return 0;}
   }
   function markLocalSynced(entry){
     try{
       const owner=typeof findSessionOwner==='function'?findSessionOwner(entry.id):null;
-      if(owner?.session){owner.session.pendingSync=false;syncSessionToHistory?.(owner.session);saveSessionArchive?.(entry.userId,[owner.session]);}
+      if(owner?.session){owner.session.pendingSync=false;syncSessionToHistory?.(owner.session);saveSessionArchive?.(entry.userId,[owner.session]);return;}
+      ensureLocalSession(entry,null,false);
     }catch(error){}
   }
   async function syncEntry(entry){
@@ -90,6 +149,7 @@
   async function flushPending({silent=true}={}){
     if(flushing)return flushing;
     flushing=(async()=>{
+      restorePendingSessions({rerender:false});
       if(!networkReady())return false;
       const uidValue=String(CURRENT_USER.uid),queue=readQueue(uidValue);
       if(!queue.length)return true;
@@ -158,23 +218,18 @@
           endAction('save-session','modal-session');
           return base.apply(this,arguments);
         }
-        const sessionData={
-          id:sessionId,userId:CURRENT_USER.uid,workoutId:wid,exerciseId:eid,date,week,note,sets,exerciseName:exercise.name,
-          performedTechniqueMode,...variant,pendingSync:true
-        };
-        if(!exercise.sessions.some(session=>session.id===sessionId))exercise.sessions.push(sessionData);
-        syncSessionToHistory(sessionData);
-        saveSessionArchive(CURRENT_USER.uid,[sessionData]);
-        exercise.sessions.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+        ensureLocalSession(entry,exercise,true);
         SESSION_CREATE_ID=null;
-        closeModal('modal-session');
-        resetRestTimer();
-        if(CUR_WORKOUT===wid&&CUR_EX===eid)renderExercise();
-        showToast('✓ Série registrada');
+        try{closeModal('modal-session');}catch(error){}
+        try{resetRestTimer();}catch(error){}
+        try{if(CUR_WORKOUT===wid&&CUR_EX===eid)renderExercise();}catch(error){console.warn('[Team Bulls] registro salvo; tela será redesenhada na próxima navegação',error);}
+        try{showToast('✓ Série, carga e repetições registradas');}catch(error){}
         scheduleFlush(40);
+        return true;
       }catch(error){
         console.error('[Team Bulls] Falha no registro rápido de série',error);
         alert('Erro ao registrar série: '+(error?.message||error));
+        return false;
       }finally{
         endAction('save-session','modal-session');
       }
@@ -190,6 +245,7 @@
     if(TB.flushPendingMutationSync?.__tbSessionPerf)return true;
     const base=typeof TB.flushPendingMutationSync==='function'?TB.flushPendingMutationSync.bind(TB):async()=>{};
     const combined=async function(){
+      restorePendingSessions({rerender:false});
       await Promise.allSettled([Promise.resolve(base()),flushPending({silent:true})]);
     };
     combined.__tbSessionPerf=true;
@@ -204,18 +260,21 @@
       getPending:queuedEntry,
       updatePending,
       discardPending,
+      restore:()=>restorePendingSessions({rerender:true}),
       flush:()=>flushPending({silent:false}),
       schedule:()=>scheduleFlush(80)
     });
   }
   function install(){
     const saveOk=installSavePatch(),flushOk=installFlushBridge();
-    if(saveOk&&flushOk){exposeApi();return true;}
+    if(saveOk&&flushOk){exposeApi();restorePendingSessions({rerender:true});return true;}
     return false;
   }
 
   if(!install())window.addEventListener('team-bulls-v107-ready',()=>install(),{once:true});
-  window.addEventListener('online',()=>scheduleFlush(250));
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleFlush(350);});
-  [900,2600,7000].forEach(delay=>setTimeout(()=>{install();scheduleFlush(0);},delay));
+  window.addEventListener('team-bulls-runtime-state',()=>restorePendingSessions({rerender:true}));
+  window.addEventListener('team-bulls-student-runtime-ready',()=>restorePendingSessions({rerender:true}));
+  window.addEventListener('online',()=>{restorePendingSessions({rerender:true});scheduleFlush(250);});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){restorePendingSessions({rerender:true});scheduleFlush(350);}});
+  [900,2600,7000].forEach(delay=>setTimeout(()=>{install();restorePendingSessions({rerender:true});scheduleFlush(0);},delay));
 })();
