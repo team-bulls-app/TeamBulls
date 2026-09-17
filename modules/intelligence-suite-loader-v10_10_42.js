@@ -1,9 +1,9 @@
-/* Team Bulls v10.10.55 — carregador isolado da suíte de inteligência, progresso e relatórios. */
+/* Team Bulls v10.10.57 — carregador isolado da suíte de inteligência, progresso e relatórios. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
-  const VERSION='10.10.55-intelsuite5';
+  const VERSION='10.10.57-intelsuite6';
   const specs={
     trainer:[
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
@@ -17,7 +17,7 @@
     student:[
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge1',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge1'],
-      ['./modules/student-report-submit-reconciliation-v10_10_54.js?v=10.10.54-submitstate1',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.54-submitstate1'],
+      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate2',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate2'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
     ]
   };

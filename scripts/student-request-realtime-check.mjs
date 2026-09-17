@@ -6,11 +6,12 @@ const assert=(ok,message)=>{if(!ok)fail.push(message);};
 const read=file=>fs.readFileSync(file,'utf8');
 const config=read('config_v10_7.js');
 const realtime=read('modules/student-request-realtime-v10_10_32.js');
-const submitState=read('modules/student-report-submit-reconciliation-v10_10_54.js');
+const submitPath='modules/student-report-submit-reconciliation-v10_10_57.js';
+const submitState=read(submitPath);
 const loader=read('modules/intelligence-suite-loader-v10_10_42.js');
 const rules=read('firebase/firestore_28_compacto.rules');
 
-for(const modulePath of ['modules/student-request-realtime-v10_10_32.js','modules/student-report-submit-reconciliation-v10_10_54.js']){
+for(const modulePath of ['modules/student-request-realtime-v10_10_32.js',submitPath]){
   const syntax=spawnSync(process.execPath,['--check',modulePath],{encoding:'utf8'});
   assert(syntax.status===0,`Módulo possui JavaScript inválido (${modulePath}): ${String(syntax.stderr||'').trim()}`);
 }
@@ -29,7 +30,6 @@ assert(realtime.includes("db.collection('weeklyCheckins').where('studentId','=='
 assert(realtime.includes("db.collection('protocolReviewSchedules').doc(uid).onSnapshot"),'Atualização completa de protocolo não possui listener realtime.');
 assert(realtime.includes("db.collection('feedback').where('studentId','==',uid).where('read','==',false)"),'Feedback do treinador não possui listener realtime.');
 assert(realtime.includes("db.collection('notifications').where('studentId','==',uid).limit(120).onSnapshot"),'Central de notificações não possui listener realtime.');
-
 assert(realtime.includes("liveSchedule?.enabled===false?null"),'Relatório semanal desativado por plano pode reaparecer pela camada realtime.');
 assert(realtime.includes('WEEKLY_CHECKIN_REQUEST=request'),'Estado semanal oficial não é sincronizado com o snapshot.');
 assert(realtime.includes("V109_PROTOCOL_REVIEW_SCHEDULE=schedule"),'Estado oficial do ciclo de protocolo não é atualizado com o snapshot.');
@@ -37,7 +37,6 @@ assert(realtime.includes("document.getElementById('tb-home-notice-count')"),'Sin
 assert(realtime.includes("screen-student-notifications"),'Central aberta não é renovada quando chega um evento novo.');
 assert(realtime.includes('badgeObserver.observe(badge'),'Proteção do contador precisa observar somente o badge local da Home.');
 assert(!realtime.includes('observer.observe(document.body'),'Módulo realtime não pode instalar observer global no body.');
-
 assert(realtime.includes("const MAX_DUE_TIMER_MS=2000000000"),'Vencimentos futuros não possuem timer seguro para fronteira de data.');
 assert(realtime.includes('localMidnightMs'),'Vencimentos não são ancorados na meia-noite local da data programada.');
 assert(realtime.includes("weeklyFutureDue=request&&!request.pending"),'Relatório semanal futuro não agenda a própria virada para pendente.');
@@ -46,32 +45,44 @@ assert(realtime.includes("recomputeDueStates('timer')"),'Passagem automática da
 assert(realtime.includes("if(activeUid===uid&&unsubs.length){recomputeDueStates('resume')"),'Retorno do background não recalcula vencimentos que passaram com o PWA suspenso.');
 assert(realtime.includes('clearTimeout(dueTimer)'),'Timer de vencimento não é desmontado/reprogramado com segurança.');
 assert(realtime.includes('TeamBullsStudentHomeFastProtocolDate?.sync?.()'),'Data rápida da Home não é atualizada quando o vencimento passa localmente.');
-
 assert(realtime.includes('unsubs.splice(0).forEach'),'Listeners Firestore não são desmontados ao trocar/sair da conta.');
 assert(realtime.includes('firebase.auth().onAuthStateChanged'),'Troca/encerramento da autenticação não encerra os listeners.');
 assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explícito não possui proteção de desmontagem.');
 assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode duplicar listeners para o mesmo aluno.');
 
-// Confirmação pós-envio: o write original continua soberano e nunca é repetido.
-assert(loader.includes("const VERSION='10.10.55-intelsuite5'"),'Loader da suíte não foi cache-bustado para a reconciliação de envio.');
-assert(loader.includes("student-report-submit-reconciliation-v10_10_54.js?v=10.10.54-submitstate1"),'Aluno não carrega a reconciliação pós-envio.');
-assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_54.js'),'Reconciliação deve envolver o fluxo já instrumentado de atividade do treinador.');
-assert(submitState.includes("const VERSION='10.10.54-submitstate1'"),'Reconciliação pós-envio está na revisão errada.');
-assert(submitState.includes("reference.get({source:'server'})"),'Confirmação do envio não prioriza leitura real do servidor.');
-assert(submitState.includes("snap.data()?.answered===true"),'Questionário não é confirmado pelo answered canônico do documento enviado.');
-assert(submitState.includes("db.collection('questionnaires').where('studentId','==',uid).limit(100)"),'Pendências do aluno não são reconciliadas pela coleção canônica.');
-assert(submitState.includes(".filter(report=>report.answered!==true)"),'Banner ainda pode tratar relatório respondido como pendente.');
-assert(submitState.includes("banner.dataset.pendingCount=String(rows.length)"),'Banner não distingue múltiplas solicitações pendentes.');
-assert(submitState.includes("Ainda há ${pendingLabel(pending.length)} diferente(s)"),'Aluno não é informado quando o envio foi confirmado mas existe outra pendência.');
-assert(submitState.includes("weeklyCheckinDocId(uid,request.requestKey)"),'Relatório semanal não é confirmado pelo ID determinístico do envio.');
-assert(submitState.includes("db.collection('weeklyCheckins').doc(sourceId)"),'Relatório semanal não verifica o documento canônico específico.');
-assert((submitState.match(/const result=await base\.apply\(this,arguments\);/g)||[]).length===2,'Cada submit original (questionário e semanal) deve rodar exatamente uma vez, sem retry cego.');
-assert(!submitState.includes('cloudWrite('),'Reconciliação pós-envio não pode criar nova escrita.');
-assert(!/\.set\s*\(/.test(submitState),'Reconciliação pós-envio não pode criar documentos Firestore.');
-assert(!/\.update\s*\(/.test(submitState),'Reconciliação pós-envio não pode alterar documentos Firestore.');
-assert(!/\.delete\s*\(/.test(submitState),'Reconciliação pós-envio não pode excluir documentos Firestore.');
+// Envio canônico: relatórios com fotos não usam mais a fila de batch do Firestore Web SDK.
+assert(loader.includes("const VERSION='10.10.57-intelsuite6'"),'Loader da suíte não foi cache-bustado para o transporte REST seguro.');
+assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate2"),'Aluno não carrega a revisão REST do envio de relatórios.');
+assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
+assert(submitState.includes("const VERSION='10.10.57-submitstate2'"),'Reconciliação pós-envio está na revisão errada.');
+assert(submitState.includes('https://firestore.googleapis.com/v1/'),'Envio crítico não aponta para a API REST oficial do Firestore.');
+assert(submitState.includes("'Authorization':'Bearer '+idToken"),'REST do Firestore não usa o ID token Firebase do próprio aluno.');
+assert(submitState.includes("headers['X-Firebase-AppCheck']=tokenResult.token"),'REST crítico não preserva o token App Check.');
+assert(submitState.includes('appCheck.getToken(false)'),'App Check do envio REST não usa o token oficial do provider ativo.');
+assert(submitState.includes('/documents:commit'),'Envio crítico não usa commit atômico do Firestore REST.');
+assert(submitState.includes("currentDocument:{exists:false}"),'Fotos/check-in não protegem contra sobrescrita acidental.');
+assert(submitState.includes("currentDocument:{exists:true}"),'Atualização de questionário não exige documento canônico existente.');
+assert(submitState.includes("setToServerValue:'REQUEST_TIME'"),'Timestamps canônicos deixaram de ser gerados pelo servidor.');
+assert(submitState.includes('const FIRESTORE_DATA_URL_MAX=620000'),'Fallback sem Storage não limita cada foto a um payload móvel seguro.');
+assert(submitState.includes('const MAX_COMMIT_BODY=7*1024*1024'),'Commit REST não possui limite preventivo abaixo do teto de request.');
+assert(submitState.includes('const UNCERTAIN_RETRY_DELAY=60000'),'Envio incerto não possui janela explícita contra duplicação.');
+assert(submitState.includes("uncertain.set('q:'+reportId"),'Questionário incerto não bloqueia novo envio enquanto confirma o canônico.');
+assert(submitState.includes("uncertain.set('w:'+checkinId"),'Semanal incerto não bloqueia novo envio enquanto confirma o canônico.');
+assert(submitState.includes("notify('Este relatório ainda está em confirmação. Não envie novamente agora.'"),'Questionário incerto não orienta/bloqueia reenvio manual imediato.');
+assert(submitState.includes("notify('Este relatório semanal ainda está em confirmação. Não envie novamente agora.'"),'Semanal incerto não orienta/bloqueia reenvio manual imediato.');
+assert(submitState.includes("restAnswered(await restGet('questionnaires',reportId))"),'Questionário não reconcilia resultado incerto no documento canônico exato.');
+assert(submitState.includes("restGet('weeklyCheckins',checkinId)"),'Semanal não reconcilia resultado incerto no documento canônico exato.');
+assert(submitState.includes('weeklyCheckinDocId(uid,request.requestKey)'),'Semanal perdeu o ID determinístico do envio.');
+assert((submitState.match(/await restCommit\(writes,/g)||[]).length===2,'Questionário e semanal devem executar um único commit atômico cada.');
+assert(!submitState.includes('db.batch('),'Relatórios críticos não podem voltar ao batch interno do Firestore Web SDK.');
+assert(!submitState.includes('cloudWrite('),'Relatórios críticos não podem voltar à fila cloudWrite do SDK.');
 assert(!submitState.includes('setInterval('),'Reconciliação pós-envio não pode usar polling.');
 assert(!submitState.includes('MutationObserver'),'Reconciliação pós-envio não pode observar globalmente o DOM.');
+assert(submitState.includes('TeamBullsStudentTrainerActivityBridge?.install?.()'),'Ponte secundária do treinador não é reinstalada após trocar o submit canônico.');
+assert(submitState.includes("transport:'firestore-rest-commit'"),'Diagnóstico do runtime não informa o transporte canônico ativo.');
+assert(submitState.includes("db.collection('questionnaires').where('studentId','==',uid).limit(100)"),'Pendências do aluno não continuam reconciliadas pela coleção canônica.');
+assert(submitState.includes('.filter(report=>report.answered!==true)'),'Banner ainda pode tratar relatório respondido como pendente.');
+assert(submitState.includes('banner.dataset.pendingCount=String(rows.length)'),'Banner não distingue múltiplas solicitações pendentes.');
 
 assert(!realtime.includes('setInterval('),'Sincronização de pedidos não pode usar polling por intervalo.');
 assert(!realtime.includes('cloudWrite('),'Camada realtime deve ser somente leitura e não criar gravações automáticas.');
@@ -80,13 +91,15 @@ assert(!/\.update\s*\(/.test(realtime),'Camada realtime não pode alterar docume
 assert(!/\.delete\s*\(/.test(realtime),'Camada realtime não pode excluir documentos Firestore.');
 
 assert(rules.includes('match /questionnaires/{id}'),'Rules ativas não contêm questionários.');
+assert(rules.includes('match /weeklyCheckins/{id}'),'Rules ativas não contêm relatórios semanais.');
+assert(rules.includes('match /progressPhotos/{id}'),'Rules ativas não contêm metadados/fotos de progresso.');
 assert(rules.includes('match /checkinSchedules/{uid}'),'Rules ativas não contêm programação semanal.');
 assert(rules.includes('match /protocolReviewSchedules/{uid}'),'Rules ativas não contêm cronograma de atualização.');
 assert(rules.includes('match /feedback/{id}'),'Rules ativas não contêm feedback.');
 assert(rules.includes('match /notifications/{id}'),'Rules ativas não contêm central de notificações.');
 
 if(fail.length){
-  console.error('FALHA — entrega realtime / confirmação canônica de relatórios\n- '+fail.join('\n- '));
+  console.error('FALHA — entrega realtime / envio REST canônico de relatórios\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — envios são confirmados pelo documento canônico, múltiplas pendências são diferenciadas e nenhum retry cego é criado.');
+console.log('APROVADO — relatórios com fotos usam commit REST atômico autenticado/App Check, payload reduzido sem Storage e reconciliação sem retry cego.');

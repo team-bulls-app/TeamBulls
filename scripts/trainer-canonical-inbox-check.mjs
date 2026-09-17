@@ -28,7 +28,7 @@ const sw=read('sw.js');
 
 has(source,"const VERSION='10.10.52-canonicalinbox3'",'Central canônica está na revisão errada.');
 has(loader,"trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3",'Loader do treinador não entrega a Central canônica por propriedade histórica.');
-has(loader,"const VERSION='10.10.55-intelsuite5'",'Loader não foi cache-bustado para a resiliência do histórico individual.');
+has(loader,"const VERSION='10.10.57-intelsuite6'",'Loader não foi cache-bustado para a revisão segura de envio/histórico.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
 has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3",'Loader não entrega a revisão resiliente da tela individual do aluno.');
 assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Recuperação de vínculo deve continuar antes do histórico individual.');
