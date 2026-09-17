@@ -28,24 +28,18 @@
   }
   function readQueue(uidValue){
     if(!uidValue)return[];
-    const key=queueKey(uidValue),merged=new Map();
-    const sources=[];
-    try{sources.push(storageGet(key)||'');}catch(error){}
-    try{sources.push(sessionStorage.getItem(key)||'');}catch(error){}
-    for(const raw of sources){
-      for(const item of parseQueue(raw,uidValue)){
-        const current=merged.get(item.id);
-        if(!current||item.revision>current.revision||(item.revision===current.revision&&item.queuedAt>=current.queuedAt))merged.set(item.id,item);
-      }
-    }
-    return[...merged.values()].sort((a,b)=>a.queuedAt-b.queuedAt);
+    const key=queueKey(uidValue);
+    try{
+      const sessionRaw=sessionStorage.getItem(key);
+      if(sessionRaw!==null)return parseQueue(sessionRaw,uidValue);
+    }catch(error){}
+    try{return parseQueue(storageGet(key)||'',uidValue);}catch(error){return[];}
   }
   function writeQueue(uidValue,items){
     if(!uidValue)return false;
     const key=queueKey(uidValue),serialized=JSON.stringify(items);let durable=false,session=false;
     try{durable=storageSet(key,serialized)===true;}catch(error){}
     try{sessionStorage.setItem(key,serialized);session=true;}catch(error){}
-    if(durable){try{sessionStorage.removeItem(key);}catch(error){}}
     return durable||session;
   }
   function enqueue(entry){
