@@ -55,6 +55,9 @@ for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2",`${name} não prepara a correção móvel de fotos.`);
   has(text,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic1",`${name} não prepara o módulo HEIC.`);
   has(text,"./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker1",`${name} não prepara o worker HEIC same-origin.`);
+  has(text,"'/modules/heic-report-conversion-v10_10_12.js'",`${name} não serve o conversor HEIC como mutável/network-first.`);
+  has(text,"'/modules/heic-libheif-worker-v10_10_12.js'",`${name} não serve o worker HEIC como mutável/network-first.`);
+  has(text,"const CACHE_HOTFIX='heic-recovery1'",`${name} não invalida o cache defeituoso do HEIC.`);
   has(text,"worker-src 'self' blob:",`${name} CSP bloqueia workers locais necessários ao app.`);
   has(text,"type:'TEAM_BULLS_SW_ACTIVATED',version:APP_VERSION,build:BUILD_REVISION",`${name} não anuncia o build ativado.`);
   has(text,"if(relativePath==='/version.json')",`${name} deixou de tratar version.json como mutável.`);
@@ -64,9 +67,9 @@ has(photo,"const VERSION='10.10.9-photoquality2'",'Revisão móvel de fotos não
 has(photo,"createImageBitmap(file,{imageOrientation:'from-image'})",'Decoder móvel perdeu a primeira tentativa orientada.');
 has(photo,'createImageBitmap(file);','Decoder móvel perdeu o fallback Android sem opções.');
 has(photo,'releaseLegacyReportPreviewSurfaces()','Envio não libera previews pesados antes da compressão.');
-has(heic,"const VERSION='10.10.12-heic2'",'Fallback HEIC não está na revisão worker esperada.');
+has(heic,"const VERSION='10.10.12-heic3'",'Fallback HEIC não está na revisão de recuperação de cache esperada.');
 has(heic,"const MAX_HEIC_BYTES=25*1024*1024",'Fallback HEIC perdeu o limite de 25 MB.');
-has(heic,"const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker1'",'Conversor HEIC não usa worker same-origin fixado.');
+has(heic,"const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3'",'Conversor HEIC não rotacionou o worker same-origin preso em cache.');
 has(heic,"new Worker(WORKER_URL)",'Conversor HEIC não cria o worker same-origin.');
 has(heic,"file.arrayBuffer()",'Conversor HEIC não transfere o arquivo como ArrayBuffer.');
 has(heic,"new ImageData(pixels,width,height)",'Conversor HEIC não recompõe os pixels do worker.');
