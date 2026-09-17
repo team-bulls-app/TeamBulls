@@ -62,6 +62,13 @@ for(const path of [
 assert(src.worker===src.workerLegacy,'PWA: sw.js e sw_47.js precisam permanecer idênticos.');
 const published=JSON.parse(src.version);
 assert(src.worker.includes(`const BUILD_REVISION=${Number(published.build)};`),'PWA: correção não pode quebrar a coerência com o build publicado.');
-assert(src.worker.includes("CACHE_HOTFIX='update-unblock1'"),'PWA: correção pontual não deve reativar uma navegação forçada de cache.');
+const cacheHotfix=src.worker.match(/const CACHE_HOTFIX='([^']+)'/)?.[1]||'';
+const intentionalHeicRecovery=cacheHotfix==='heic-recovery1';
+assert(cacheHotfix==='update-unblock1'||intentionalHeicRecovery,'PWA: correção pontual não pode reativar navegação forçada de cache sem um resgate explicitamente auditado.');
+if(intentionalHeicRecovery){
+  assert(src.worker.includes("'/modules/heic-report-conversion-v10_10_12.js'"),'PWA: resgate HEIC só pode invalidar cache se o conversor ficar network-first.');
+  assert(src.worker.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'PWA: resgate HEIC só pode invalidar cache se o worker ficar network-first.');
+  assert(src.worker.includes('if(stale.length)await forceRecoveredNavigation();'),'PWA: resgate HEIC precisa reutilizar a navegação condicionada a cache realmente obsoleto.');
+}
 
 console.log('APROVADO — feedbacks/agenda/Storage/contexto/métricas continuam estáveis e o Modo Revisão exige a guarda atual após a confirmação canônica, sem polling nem romper o build publicado.');
