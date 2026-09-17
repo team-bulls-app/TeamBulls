@@ -129,7 +129,7 @@ if('caches' in window){
     './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4',
     './modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity1',
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
-    './modules/session-save-performance-v10_10_9.js?v=10.10.34-sessionperf2',
+    './modules/session-save-performance-v10_10_9.js?v=10.10.58-sessionperf3',
     './modules/pending-session-mutations-v10_10_34.js?v=10.10.34-pendingsession1',
     './modules/week-selection-fix-v10_10_9.js?v=10.10.9-weekselection1',
     './modules/session-integrity-v10_10_39.js?v=10.10.39-sessionintegrity1',
