@@ -4,7 +4,7 @@
 const APP_VERSION='10.10.9';
 const BUILD_REVISION=2026090801;
 const CACHE_REVISION='guidance2';
-const CACHE_HOTFIX='update-unblock1';
+const CACHE_HOTFIX='heic-recovery1';
 const CACHE_TAG=`${APP_VERSION.replace(/\./g,'-')}-${CACHE_REVISION}-${CACHE_HOTFIX}`;
 const SHELL_CACHE=`team-bulls-shell-${CACHE_TAG}`;
 const RUNTIME_CACHE=`team-bulls-runtime-${CACHE_TAG}`;
@@ -47,6 +47,7 @@ const MUTABLE_PATHS=new Set([
   '/recovery_v10.js','/recovery_v10.css',
   '/modules/v107-core.js','/modules/v107-invites.js','/modules/v107-operations.js',
   '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js',
+  '/modules/heic-report-conversion-v10_10_12.js','/modules/heic-libheif-worker-v10_10_12.js',
   '/modules/trainer-feedback-archive-v10_10_37.js','/modules/trainer-update-organizer-v10_10_41.js','/modules/intelligence-suite-loader-v10_10_42.js',
   '/modules/trainer-intelligence-data-v10_10_42.js','/modules/trainer-canonical-context-guard-v10_10_42.js','/modules/trainer-command-center-v10_10_42.js','/modules/trainer-student-insights-v10_10_42.js','/modules/student-progress-hub-v10_10_42.js'
 ]);
