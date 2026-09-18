@@ -34,6 +34,7 @@ jobs:
           node scripts/trainer-student-list-check.mjs
           node scripts/workflow-controls-check.mjs
           node scripts/report-usability-audit-check.mjs
+          node scripts/report-submit-contract-check.mjs
           node scripts/firestore-read-baseline-check.mjs
           node scripts/diet-calculation-evolution-check.mjs
           node scripts/diet-portion-presets-check.mjs
