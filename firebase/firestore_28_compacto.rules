@@ -111,8 +111,7 @@ service cloud.firestore {
         && checkinScheduleData(data.studentId).get('enabled', true) != false
         && (
           (data.requestKind == 'scheduled'
-            && data.requestKey == 'scheduled:' + data.dueDate
-            && data.dueDate >= checkinScheduleData(data.studentId).nextDueDate)
+            && data.requestKey == 'scheduled:' + data.dueDate)
           || (data.requestKind == 'manual'
             && checkinScheduleData(data.studentId).get('extraRequestId', '') is string
             && checkinScheduleData(data.studentId).get('extraRequestId', '') != ''
@@ -403,7 +402,7 @@ service cloud.firestore {
         && request.resource.data.questions.size() > 0
         && request.resource.data.questions.size() <= 60
         && request.resource.data.sectionAt is map
-        && request.resource.data.sectionAt.size() <= 60
+        && request.resource.data.sectionAt.keys().size() <= 60
         && request.resource.data.answers is list
         && request.resource.data.answers.size() == request.resource.data.questions.size()
         && request.resource.data.answers.size() > 0
