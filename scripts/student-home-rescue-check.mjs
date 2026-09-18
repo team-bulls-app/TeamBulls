@@ -36,7 +36,13 @@ assert(update.includes(`const CURRENT_BUILD=${build};`),'Atualizador não está 
 assert(sw.includes(`const BUILD_REVISION=${build};`),'Service Worker não está no mesmo build publicado.');
 assert(sw47.includes(`const BUILD_REVISION=${build};`),'Service Worker legado não está no mesmo build publicado.');
 assert(sw===sw47,'sw.js e sw_47.js devem permanecer idênticos.');
-assert(sw.includes("const CACHE_HOTFIX='update-unblock1';"),'Performance não deve reativar uma navegação forçada de cache.');
+const cacheHotfix=sw.match(/const CACHE_HOTFIX='([^']+)'/)?.[1]||'';
+const heicRecovery=cacheHotfix==='heic-recovery1';
+assert(cacheHotfix==='update-unblock1'||heicRecovery,'Performance não deve reativar uma navegação forçada de cache sem recuperação explicitamente auditada.');
+if(heicRecovery){
+  assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'"),'Resgate HEIC exige conversor network-first.');
+  assert(sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'Resgate HEIC exige worker network-first.');
+}
 
 assert(update.includes("STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3'"),'Atualizador não conhece o perfil estabilizado.');
 assert(update.includes("STUDENT_HOME_LAYOUT_MODULE='./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'"),'Atualizador não conhece a Home otimizada.');
