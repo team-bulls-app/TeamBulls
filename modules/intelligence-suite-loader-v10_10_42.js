@@ -17,7 +17,7 @@
     student:[
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge1',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge1'],
-      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate2',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate2'],
+      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate3',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate3'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
     ]
   };
