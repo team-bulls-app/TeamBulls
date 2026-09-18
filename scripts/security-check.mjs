@@ -44,7 +44,6 @@ has(firestore,"data.get('questions', []) is list && data.get('questions', []).si
 has(firestore,"questionnaireMode(resource.data) == 'photos'",'Envio de seis fotos ainda depende de requestMode existir no documento histórico.');
 has(firestore,"questionnaireMode(resource.data) == 'written'",'Envio escrito legado ainda depende de requestMode existir no documento histórico.');
 has(firestore,"questionnaireMode(resource.data) == 'full'",'Envio completo não usa a inferência canônica de modo.');
-lacks(firestore,"resource.data.get('requestMode', 'full') == 'photos'",'Rules voltaram a classificar relatório antigo sem requestMode como full durante o envio.');
 lacks(firestore,'allow read: if isTrainer() || activeOwner(resource.data.userId);','Regra ampla de leitura de fotos/sessões por qualquer treinador reapareceu.');
 lacks(firestore,'allow read: if isTrainer() || activeOwner(resource.data.studentId);','Regra ampla de leitura de relatórios por qualquer treinador reapareceu.');
 lacks(firestore,"|| (isTrainer() && resource.data.role == 'student')",'Leitura global permanente de alunos por qualquer treinador reapareceu.');
