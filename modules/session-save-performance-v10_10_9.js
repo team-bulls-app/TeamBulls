@@ -4,12 +4,14 @@
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.58-sessionperf3';
+  const VERSION='10.10.58-sessionperf4';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
+  const QUEUE_SCHEMA=2;
   const MAX_PENDING=160;
   const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
   let flushing=null;
   let retryTimer=null;
+  let queueClock=0;
 
   function safeUid(value){return String(value||'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,160);}
   function queueKey(uidValue){return QUEUE_PREFIX+safeUid(uidValue);}
@@ -20,24 +22,43 @@
     const revision=Math.max(0,Math.trunc(Number(item.revision)||0));
     return{...item,queuedAt,createdAtMs,revision};
   }
-  function parseQueue(raw,uidValue){
+  function parseQueueState(raw,uidValue){
+    if(raw===null||raw===undefined||raw==='')return{valid:false,schema:0,updatedAt:0,items:[]};
     try{
-      const parsed=JSON.parse(raw||'[]');
-      return Array.isArray(parsed)?parsed.map(normalizeQueuedEntry).filter(item=>item&&item.userId===uidValue):[];
-    }catch(error){return[];}
+      const parsed=JSON.parse(raw);
+      const envelope=!!parsed&&!Array.isArray(parsed)&&Number(parsed.schema)===QUEUE_SCHEMA&&Array.isArray(parsed.items);
+      const source=envelope?parsed.items:parsed;
+      if(!Array.isArray(source))return{valid:false,schema:0,updatedAt:0,items:[]};
+      const items=source.map(normalizeQueuedEntry).filter(item=>item&&item.userId===uidValue);
+      const updatedAt=envelope?Math.max(0,Math.trunc(Number(parsed.updatedAt)||0)):0;
+      return{valid:true,schema:envelope?QUEUE_SCHEMA:1,updatedAt,items};
+    }catch(error){return{valid:false,schema:0,updatedAt:0,items:[]};}
+  }
+  function chooseQueueState(durable,session){
+    if(durable.valid&&!session.valid)return durable;
+    if(session.valid&&!durable.valid)return session;
+    if(!durable.valid&&!session.valid)return{valid:false,schema:0,updatedAt:0,items:[]};
+    if(durable.schema===QUEUE_SCHEMA||session.schema===QUEUE_SCHEMA){
+      if(durable.updatedAt!==session.updatedAt)return durable.updatedAt>session.updatedAt?durable:session;
+      if(durable.schema!==session.schema)return durable.schema===QUEUE_SCHEMA?durable:session;
+    }
+    /* Em conflito legado sem relógio de revisão, o armazenamento durável é a
+       fonte canônica. Isso impede uma aba antiga de sombrear a fila persistida. */
+    return durable;
   }
   function readQueue(uidValue){
     if(!uidValue)return[];
-    const key=queueKey(uidValue);
-    try{
-      const sessionRaw=sessionStorage.getItem(key);
-      if(sessionRaw!==null)return parseQueue(sessionRaw,uidValue);
-    }catch(error){}
-    try{return parseQueue(storageGet(key)||'',uidValue);}catch(error){return[];}
+    const key=queueKey(uidValue);let sessionRaw=null,durableRaw=null;
+    try{sessionRaw=sessionStorage.getItem(key);}catch(error){}
+    try{durableRaw=storageGet(key);}catch(error){}
+    const durable=parseQueueState(durableRaw,uidValue),session=parseQueueState(sessionRaw,uidValue);
+    queueClock=Math.max(queueClock,durable.updatedAt,session.updatedAt);
+    return chooseQueueState(durable,session).items;
   }
+  function nextQueueStamp(){queueClock=Math.max(queueClock+1,Date.now());return queueClock;}
   function writeQueue(uidValue,items){
     if(!uidValue)return false;
-    const key=queueKey(uidValue),serialized=JSON.stringify(items);let durable=false,session=false;
+    const key=queueKey(uidValue),serialized=JSON.stringify({schema:QUEUE_SCHEMA,updatedAt:nextQueueStamp(),items});let durable=false,session=false;
     try{durable=storageSet(key,serialized)===true;}catch(error){}
     try{sessionStorage.setItem(key,serialized);session=true;}catch(error){}
     return durable||session;
