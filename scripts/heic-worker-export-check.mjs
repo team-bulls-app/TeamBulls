@@ -37,10 +37,10 @@ for(const [needle,message] of [
 assert(converter.includes("const VERSION='10.10.12-heic3'"),'Conversor HEIC não está na revisão de recuperação de cache.');
 assert(converter.includes("heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3"),'Conversor HEIC não rotacionou a URL do worker defeituoso em cache.');
 for(const [name,text] of [['sw.js',sw],['sw_47.js',swLegacy]]){
-  assert(text.includes("const CACHE_HOTFIX='heic-recovery1'"),`${name} não invalida o cache anterior de HEIC.`);
+  assert(text.includes("const CACHE_HOTFIX='update-unblock1'"),`${name} alterou a revisão global de cache sem necessidade.`);
   assert(text.includes("'/modules/heic-report-conversion-v10_10_12.js'"),`${name} não trata o conversor HEIC como mutável/network-first.`);
   assert(text.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),`${name} não trata o worker HEIC como mutável/network-first.`);
 }
 assert(sw===swLegacy,'sw.js e sw_47.js divergiram na recuperação de cache HEIC.');
 if(fail.length){console.error('FALHA — worker HEIC/libheif\n- '+fail.join('\n- '));process.exit(1);}
-console.log('APROVADO — HEIC resolve exports libheif e recupera celulares presos em cache antigo.');
+console.log('APROVADO — HEIC resolve exports libheif e recupera celulares presos em cache antigo sem reset global da PWA.');
