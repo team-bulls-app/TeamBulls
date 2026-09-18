@@ -36,7 +36,9 @@ for(const moduleName of ['session-save-performance-v10_10_9.js','pending-session
 assert(!integrity.includes('setInterval('),'Integridade de sessão não pode adicionar polling permanente.');
 assert(integrity.includes("if(studentCloud()&&!window.TeamBullsWeekSelectionFix)"),'Registro deve falhar fechado se a proteção de semana ainda não estiver pronta.');
 assert(integrity.includes("if(!window.TeamBullsSessionPerformance)"),'Registro cloud deve aguardar a fila idempotente estar pronta.');
-assert(sessionPerf.includes("db.collection('sessions').doc(entry.id).set"),'Sincronização deve continuar usando documento com ID idempotente.');
+assert(sessionPerf.includes("const ref=db.collection('sessions').doc(entry.id)"),'Sincronização deve continuar usando documento com ID idempotente.');
+assert(sessionPerf.includes("const existing=await cloudGet(ref,'reconciliar registro de série')"),'Sincronização idempotente deve reconciliar uma confirmação anterior antes de decidir entre update e create.');
+assert(sessionPerf.includes('ref.update(mutablePayload(entry))')&&sessionPerf.includes('ref.set(firestorePayload(entry))'),'Reconciliação precisa preservar campos imutáveis em documento existente e usar o mesmo ID ao criar um documento ausente.');
 
 let modalIsOpen=false;
 let saveCalls=0;
@@ -113,4 +115,4 @@ if(fail.length){
   console.error('FALHA — integridade estrutural de sessões\n'+fail.map(item=>'• '+item).join('\n'));
   process.exit(1);
 }
-console.log('APROVADO: registro é idempotente por abertura do modal, proteção de semana carrega antes do treino e ciclo antigo não contamina o contador atual.');
+console.log('APROVADO: registro é idempotente por abertura do modal, reconcilia confirmação antiga sem alterar createdAt, proteção de semana carrega antes do treino e ciclo antigo não contamina o contador atual.');
