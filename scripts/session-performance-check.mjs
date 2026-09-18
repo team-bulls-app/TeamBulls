@@ -16,7 +16,7 @@ const config=read('config_v10_7.js');
 const updater=read('update_v10_10_9.js');
 const core=read('app_v10_10_9_core.js');
 
-has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.58-sessionperf3','Revisão resiliente de registro de séries não está carregada com cache-bust novo.');
+has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.58-sessionperf4','Revisão reconciliada de registro de séries não está carregada com cache-bust novo.');
 assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('pending-session-mutations-v10_10_34.js'),'Registro rápido deve carregar antes da camada de mutações pendentes no runtime prioritário do aluno.');
 lacks(config,'attempts++>=80','Polling agressivo voltou ao startup.');
 has(config,"const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}",'Warmup/resiliência de autenticação não está definido.');
@@ -24,8 +24,15 @@ has(config,'installAndWarm();','Resiliência não é instalada imediatamente dur
 has(config,"document.addEventListener('DOMContentLoaded',installAndWarm,{once:true})",'Resiliência não é reaplicada no DOMContentLoaded.');
 assert(config.indexOf('installAndWarm();')<config.indexOf("document.addEventListener('DOMContentLoaded',installAndWarm,{once:true})"),'Warmup precisa iniciar antes de depender do DOMContentLoaded.');
 
-has(session,"const VERSION='10.10.58-sessionperf3'",'Módulo de sessões não está na revisão resiliente esperada.');
+has(session,"const VERSION='10.10.58-sessionperf4'",'Módulo de sessões não está na revisão reconciliada esperada.');
 has(session,"const QUEUE_PREFIX='team_bulls_pending_sessions_v1_'",'Fila persistente de séries ausente.');
+has(session,'const QUEUE_SCHEMA=2','Fila não versiona o envelope persistido para reconciliar cópias.');
+has(session,'function parseQueueState(raw,uidValue)','Fila não diferencia cópia legada de envelope versionado.');
+has(session,'function chooseQueueState(durable,session)','Fila não reconcilia armazenamento durável e sessionStorage.');
+has(session,'if(durable.updatedAt!==session.updatedAt)return durable.updatedAt>session.updatedAt?durable:session','Fila não escolhe a cópia versionada mais recente.');
+has(session,'return durable;','Conflito legado não preserva o armazenamento durável como fonte canônica.');
+has(session,'function nextQueueStamp()','Fila não possui relógio monotônico de revisão local.');
+has(session,'JSON.stringify({schema:QUEUE_SCHEMA,updatedAt:nextQueueStamp(),items})','Escrita da fila não grava envelope com revisão.');
 has(session,'if(!enqueue(entry))','Registro rápido não possui fallback seguro quando a fila local falha.');
 has(session,"sessionStorage.setItem(key,serialized)",'Fila não possui espelho de sessão quando o armazenamento durável fica indisponível.');
 has(session,'function ensureLocalSession(entry,exerciseOverride=null,pendingSync=true)','Registro pendente não possui projeção local determinística.');
@@ -60,4 +67,4 @@ if(fail.length){
   console.error('\nFalhas de performance:\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('Session/startup/update performance check OK — séries, cargas e repetições pendentes são restauráveis antes da confirmação remota.');
+console.log('Session/startup/update performance check OK — fila de séries reconcilia cópias local/sessão e preserva cargas e repetições antes da confirmação remota.');
