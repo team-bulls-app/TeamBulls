@@ -6,6 +6,7 @@
 
   const VERSION='10.10.58-sessionperf3';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
+  const SESSION_SNAPSHOT_VERSION=2;
   const MAX_PENDING=160;
   const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
   let flushing=null;
@@ -20,26 +21,36 @@
     const revision=Math.max(0,Math.trunc(Number(item.revision)||0));
     return{...item,queuedAt,createdAtMs,revision};
   }
-  function parseQueue(raw,uidValue){
+  function parseQueueSnapshot(raw,uidValue){
     try{
       const parsed=JSON.parse(raw||'[]');
-      return Array.isArray(parsed)?parsed.map(normalizeQueuedEntry).filter(item=>item&&item.userId===uidValue):[];
-    }catch(error){return[];}
+      const legacy=Array.isArray(parsed),source=legacy?parsed:Array.isArray(parsed?.items)?parsed.items:[];
+      const items=source.map(normalizeQueuedEntry).filter(item=>item&&item.userId===uidValue);
+      return{items,fallback:!legacy&&parsed?.fallback===true,version:legacy?1:Math.max(1,Math.trunc(Number(parsed?.v)||1))};
+    }catch(error){return{items:[],fallback:false,version:0};}
   }
   function readQueue(uidValue){
     if(!uidValue)return[];
-    const key=queueKey(uidValue);
-    try{
-      const sessionRaw=sessionStorage.getItem(key);
-      if(sessionRaw!==null)return parseQueue(sessionRaw,uidValue);
-    }catch(error){}
-    try{return parseQueue(storageGet(key)||'',uidValue);}catch(error){return[];}
+    const key=queueKey(uidValue);let durableRaw=null,sessionRaw=null;
+    try{durableRaw=storageGet(key);}catch(error){}
+    try{sessionRaw=sessionStorage.getItem(key);}catch(error){}
+    const durable=durableRaw===null?null:parseQueueSnapshot(durableRaw,uidValue);
+    const session=sessionRaw===null?null:parseQueueSnapshot(sessionRaw,uidValue);
+    /* localStorage é a fonte canônica quando foi gravado com sucesso. O espelho
+       da aba só assume a fila quando a própria gravação durável falhou. Assim uma
+       cópia antiga em sessionStorage nunca sombreia uma fila durável mais nova. */
+    if(session?.fallback)return session.items;
+    if(durable)return durable.items;
+    return session?.items||[];
   }
   function writeQueue(uidValue,items){
     if(!uidValue)return false;
-    const key=queueKey(uidValue),serialized=JSON.stringify(items);let durable=false,session=false;
-    try{durable=storageSet(key,serialized)===true;}catch(error){}
-    try{sessionStorage.setItem(key,serialized);session=true;}catch(error){}
+    const key=queueKey(uidValue),durableSerialized=JSON.stringify(items);let durable=false,session=false;
+    try{durable=storageSet(key,durableSerialized)===true;}catch(error){}
+    try{
+      sessionStorage.setItem(key,JSON.stringify({v:SESSION_SNAPSHOT_VERSION,fallback:!durable,items}));
+      session=true;
+    }catch(error){}
     return durable||session;
   }
   function enqueue(entry){

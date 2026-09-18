@@ -45,7 +45,7 @@ const MUTABLE_PATHS=new Set([
   '/viewport_v10_10_9.js','/boot_v10.js','/config_v10_7.js','/update_v10_10_9.js','/app_v10_10_9_core.js',
   '/interaction_v10_10_9.js','/styles_v10_10_9.css',
   '/recovery_v10.js','/recovery_v10.css',
-  '/modules/v107-core.js','/modules/v107-invites.js','/modules/v107-operations.js',
+  '/modules/v107-core.js','/modules/v107-invites.js','/modules/v107-operations.js','/modules/session-save-performance-v10_10_9.js',
   '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js',
   '/modules/heic-report-conversion-v10_10_12.js','/modules/heic-libheif-worker-v10_10_12.js','/modules/trainer-runtime-reliability-v10_10_46.js',
   '/modules/trainer-feedback-archive-v10_10_37.js','/modules/trainer-update-organizer-v10_10_41.js','/modules/intelligence-suite-loader-v10_10_42.js',

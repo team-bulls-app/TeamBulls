@@ -6,7 +6,7 @@ const assert=(condition,message)=>{if(!condition)fail.push(message);};
 const has=(text,needle,message)=>assert(text.includes(needle),message);
 const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
-for(const path of ['modules/session-save-performance-v10_10_9.js','config_v10_7.js','update_v10_10_9.js','app_v10_10_9_core.js']){
+for(const path of ['modules/session-save-performance-v10_10_9.js','config_v10_7.js','update_v10_10_9.js','app_v10_10_9_core.js','sw.js','sw_47.js']){
   assert(fs.existsSync(path),`Arquivo obrigatório ausente: ${path}`);
 }
 if(fail.length){console.error(fail.join('\n'));process.exit(1);}
@@ -15,8 +15,10 @@ const session=read('modules/session-save-performance-v10_10_9.js');
 const config=read('config_v10_7.js');
 const updater=read('update_v10_10_9.js');
 const core=read('app_v10_10_9_core.js');
+const sw=read('sw.js');
+const sw47=read('sw_47.js');
 
-has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.58-sessionperf3','Revisão resiliente de registro de séries não está carregada com cache-bust novo.');
+has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.58-sessionperf3','Revisão resiliente de registro de séries não está carregada.');
 assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('pending-session-mutations-v10_10_34.js'),'Registro rápido deve carregar antes da camada de mutações pendentes no runtime prioritário do aluno.');
 lacks(config,'attempts++>=80','Polling agressivo voltou ao startup.');
 has(config,"const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}",'Warmup/resiliência de autenticação não está definido.');
@@ -26,8 +28,12 @@ assert(config.indexOf('installAndWarm();')<config.indexOf("document.addEventList
 
 has(session,"const VERSION='10.10.58-sessionperf3'",'Módulo de sessões não está na revisão resiliente esperada.');
 has(session,"const QUEUE_PREFIX='team_bulls_pending_sessions_v1_'",'Fila persistente de séries ausente.');
+has(session,'const SESSION_SNAPSHOT_VERSION=2','Fila de sessão não possui formato que distingue fallback temporário de cópia durável.');
+has(session,'function parseQueueSnapshot(raw,uidValue)','Fila não interpreta snapshots legados e novos de forma compatível.');
+has(session,'if(session?.fallback)return session.items;','Fallback de sessionStorage não assume a fila apenas quando a gravação durável falha.');
+has(session,'if(durable)return durable.items;','Cópia durável não tem prioridade sobre espelho antigo da aba.');
+has(session,"sessionStorage.setItem(key,JSON.stringify({v:SESSION_SNAPSHOT_VERSION,fallback:!durable,items}))",'Espelho da aba não registra se está substituindo temporariamente o armazenamento durável.');
 has(session,'if(!enqueue(entry))','Registro rápido não possui fallback seguro quando a fila local falha.');
-has(session,"sessionStorage.setItem(key,serialized)",'Fila não possui espelho de sessão quando o armazenamento durável fica indisponível.');
 has(session,'function ensureLocalSession(entry,exerciseOverride=null,pendingSync=true)','Registro pendente não possui projeção local determinística.');
 has(session,'function restorePendingSessions({rerender=false}={})','Fila pendente não é restaurada no treino após reentrada/re-render.');
 has(session,'ensureLocalSession(entry,exercise,true);','Salvar série não projeta carga/repetições no exercício antes da sincronização remota.');
@@ -43,6 +49,11 @@ const fastStart=session.indexOf('const fastSave=async function()');
 const fastEnd=session.indexOf('fastSave.__tbSessionPerf=true',fastStart);
 const fastBlock=fastStart>=0&&fastEnd>fastStart?session.slice(fastStart,fastEnd):'';
 lacks(fastBlock,"await cloudWrite(db.collection('sessions')",'Salvar série voltou a esperar o Firestore antes de liberar a interface.');
+
+for(const [name,text] of [['sw.js',sw],['sw_47.js',sw47]]){
+  has(text,"'/modules/session-save-performance-v10_10_9.js'",`${name} precisa servir o módulo de séries como network-first para não prender correções em cache antigo.`);
+}
+assert(sw===sw47,'Service Workers divergiram na política de entrega do registro de séries.');
 
 has(updater,'const UPDATE_FLUSH_BUDGET_MS=700','Atualização voltou a esperar demais por flush de fundo.');
 has(updater,'async function refreshCriticalShell()','Atualização crítica seletiva ausente.');
@@ -60,4 +71,4 @@ if(fail.length){
   console.error('\nFalhas de performance:\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('Session/startup/update performance check OK — séries, cargas e repetições pendentes são restauráveis antes da confirmação remota.');
+console.log('Session/startup/update performance check OK — séries, cargas e repetições pendentes priorizam a cópia durável, usam fallback de aba explícito e recebem correções network-first.');
