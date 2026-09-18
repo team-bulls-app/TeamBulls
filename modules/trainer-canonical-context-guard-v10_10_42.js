@@ -27,6 +27,16 @@
     if(typeof showToast==='function')showToast('O aluno aberto mudou. Volte ao arquivo do aluno e abra a dieta novamente antes de salvar o cálculo privado.',true);
   }
 
+  function weeklyItemMatchesStudent(item,studentId,id=''){
+    if(!item||String(item.studentId||'')!==String(studentId||''))return false;
+    return !id||String(item.id||'')===String(id);
+  }
+  function weeklyCacheMatchesStudent(studentId,id=''){
+    if(typeof WEEKLY_CHECKINS==='undefined'||!Array.isArray(WEEKLY_CHECKINS))return false;
+    if(id)return WEEKLY_CHECKINS.some(item=>weeklyItemMatchesStudent(item,studentId,id));
+    return WEEKLY_CHECKINS.length>0&&WEEKLY_CHECKINS.every(item=>weeklyItemMatchesStudent(item,studentId));
+  }
+
   async function waitDifferentLoad(holder,studentId){
     if(!holder||holder.studentId===studentId)return;
     try{await holder.promise;}catch(error){}
@@ -35,7 +45,11 @@
   async function ensureWeeklyCheckinContext(id=''){
     const studentId=currentStudentId();if(!studentId)return false;
     try{
-      if(typeof WEEKLY_CHECKINS!=='undefined'&&Array.isArray(WEEKLY_CHECKINS)&&(!id||WEEKLY_CHECKINS.some(item=>String(item.id)===String(id))))return true;
+      /* WEEKLY_CHECKINS é um global reutilizado entre alunos. A existência do ID
+         sozinha não prova contexto: após uma troca rápida ele ainda pode conter o
+         aluno anterior. Só aceitamos o cache quando o próprio documento declara
+         o studentId atualmente aberto. */
+      if(weeklyCacheMatchesStudent(studentId,id))return true;
       if(typeof fetchWeeklyCheckins!=='function')return false;
       if(checkinLoad&&checkinLoad.studentId!==studentId){await waitDifferentLoad(checkinLoad,studentId);if(currentStudentId()!==studentId)return false;}
       if(!checkinLoad||checkinLoad.studentId!==studentId){
@@ -48,7 +62,7 @@
         promise.finally(()=>{if(checkinLoad?.promise===promise)checkinLoad=null;});
       }
       await checkinLoad.promise;
-      return currentStudentId()===studentId&&typeof WEEKLY_CHECKINS!=='undefined'&&Array.isArray(WEEKLY_CHECKINS)&&(!id||WEEKLY_CHECKINS.some(item=>String(item.id)===String(id)));
+      return currentStudentId()===studentId&&weeklyCacheMatchesStudent(studentId,id);
     }catch(error){return false;}
   }
 
@@ -90,8 +104,11 @@
     const base=viewWeeklyCheckin;
     const wrapped=async function(id){
       if(trainer()){
+        const studentId=currentStudentId();
         const ok=await ensureWeeklyCheckinContext(id);
-        if(!ok){if(typeof showToast==='function')showToast('Não foi possível carregar este relatório agora.',true);return;}
+        if(!ok||currentStudentId()!==studentId||!weeklyCacheMatchesStudent(studentId,id)){
+          if(typeof showToast==='function')showToast('Não foi possível carregar este relatório agora.',true);return;
+        }
       }
       return base.apply(this,arguments);
     };
