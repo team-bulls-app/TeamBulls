@@ -74,13 +74,15 @@ has(heic,"new Worker(WORKER_URL)",'Conversor HEIC não cria o worker same-origin
 has(heic,"file.arrayBuffer()",'Conversor HEIC não transfere o arquivo como ArrayBuffer.');
 has(heic,"new ImageData(pixels,width,height)",'Conversor HEIC não recompõe os pixels do worker.');
 has(heic,"'image/jpeg',.94",'HEIC não é convertido localmente para JPEG 94%.');
-has(heic,'if(!isHeic(file))return baseDecode(file);','Conversor HEIC interfere em formatos já suportados.');
+has(heic,'if(!isHeic(file)){','Conversor HEIC deixou de separar formatos nativos do fallback HEIC.');
+has(heic,'const decoded=await baseDecode(file);','Formatos nativos não passam mais pelo decoder canônico.');
+has(heic,"if(reportPreviewDepth>0&&isJpeg(file))stageJpegInput(file,decoded);",'JPG de relatório perdeu a preparação única usada para evitar segunda decodificação pesada.');
 has(heic,'try{return await baseDecode(file);}catch(nativeError)','HEIC não tenta primeiro o decoder nativo do aparelho.');
 has(heic,"wrapped.__tbHeicConversion=true",'Wrapper HEIC não possui proteção contra instalação duplicada.');
 has(heic,'const selected=Array.from(target?.files||[])','Seleção em lote não preserva as seis fotos escolhidas.');
 has(heic,'if(selected.length!==6)','Seleção em lote deixou de exigir exatamente seis fotos.');
 has(heic,'for(let slot=0;slot<6;slot++)','Seleção em lote não percorre os seis slots.');
-has(heic,"await base(slot,syntheticEvent(selected[slot]))",'Seleção em lote voltou a enviar somente a primeira foto ao preview.');
+has(heic,"await withReportPreview(()=>base(slot,syntheticEvent(selected[slot])));",'Seleção em lote deixou de processar individualmente cada uma das seis prévias.');
 has(heic,'previewWeeklyCheckinPhoto.__tbSixPhotoBatch','Relatório semanal não possui proteção do seletor em lote.');
 has(heic,'previewQuestionnaireReportPhoto.__tbSixPhotoBatch','Questionário não possui proteção do seletor em lote.');
 has(heic,'const batchInFlight=new WeakSet()','Seleção em lote pode iniciar processamento duplicado da mesma escolha.');
