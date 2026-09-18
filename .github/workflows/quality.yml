@@ -25,6 +25,7 @@ jobs:
           node scripts/diet-deletion-check.mjs
           node scripts/student-guidance-check.mjs
           node scripts/session-performance-check.mjs
+          node scripts/session-hotpath-performance-check.mjs
           node scripts/week-selection-check.mjs
           node scripts/session-integrity-check.mjs
           node scripts/usability-check.mjs

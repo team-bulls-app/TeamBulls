@@ -9,6 +9,7 @@
   const SESSION_SNAPSHOT_VERSION=2;
   const MAX_PENDING=160;
   const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
+  const pendingArchiveByUser=new Map(),pendingArchiveScheduled=new Set();
   let flushing=null;
   let retryTimer=null;
 
@@ -116,6 +117,33 @@
       variantId:entry.variantId||'',variantName:entry.variantName||'',pendingSync:!!pendingSync
     };
   }
+  function durablePendingQueueContains(userId,entry){
+    try{
+      const raw=storageGet(queueKey(userId));if(raw===null)return false;
+      const snapshot=parseQueueSnapshot(raw,String(userId));
+      return snapshot.items.some(item=>String(item.id)===String(entry?.id||'')&&Number(item.revision||0)===Number(entry?.revision||0));
+    }catch(error){return false;}
+  }
+  function persistPendingArchiveLater(userId,session,entry){
+    if(!userId||!session)return false;
+    /* A fila durável já contém todos os dados necessários para reconstruir a
+       sessão. Regravar o arquivo histórico completo a cada toque fazia parse +
+       stringify de todo o histórico no thread principal. Só usamos o arquivo
+       como fallback quando a própria fila não conseguiu chegar ao localStorage. */
+    if(durablePendingQueueContains(userId,entry))return true;
+    let pending=pendingArchiveByUser.get(userId);if(!pending){pending=new Map();pendingArchiveByUser.set(userId,pending);}
+    pending.set(String(session.id||Date.now()),{...session});
+    if(pendingArchiveScheduled.has(userId))return true;
+    pendingArchiveScheduled.add(userId);
+    const flush=()=>{
+      pendingArchiveScheduled.delete(userId);
+      const batch=[...(pendingArchiveByUser.get(userId)?.values()||[])];pendingArchiveByUser.delete(userId);
+      if(!batch.length)return;
+      try{if(typeof saveSessionArchive==='function')saveSessionArchive(userId,batch);}catch(error){console.warn('[Team Bulls] fallback do arquivo local será reconstruído depois',error);}
+    };
+    try{if(typeof runWhenIdle==='function')runWhenIdle(flush,1200);else setTimeout(flush,80);}catch(error){setTimeout(flush,80);}
+    return true;
+  }
   function ensureLocalSession(entry,exerciseOverride=null,pendingSync=true){
     try{
       const exercise=exerciseOverride||(typeof getE==='function'?getE(entry.workoutId,entry.exerciseId):null);
@@ -125,13 +153,25 @@
       if(index>=0)Object.assign(exercise.sessions[index],next);else exercise.sessions.push(next);
       const current=index>=0?exercise.sessions[index]:exercise.sessions[exercise.sessions.length-1];
       try{if(typeof syncSessionToHistory==='function')syncSessionToHistory(current);}catch(error){console.warn('[Team Bulls] histórico local da série será reconstruído depois',error);}
-      try{if(typeof saveSessionArchive==='function')saveSessionArchive(entry.userId,[current]);}catch(error){console.warn('[Team Bulls] arquivo local da série será reconstruído depois',error);}
+      try{
+        if(typeof saveSessionArchive==='function'){
+          if(pendingSync)persistPendingArchiveLater(entry.userId,current,entry);
+          else saveSessionArchive(entry.userId,[current]);
+        }
+      }catch(error){console.warn('[Team Bulls] arquivo local da série será reconstruído depois',error);}
       exercise.sessions.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
       return index<0;
     }catch(error){
       console.warn('[Team Bulls] não foi possível projetar imediatamente o registro pendente no treino',error);
       return false;
     }
+  }
+  function scheduleLocalProjection(entry,exercise,wid,eid){
+    const run=()=>{
+      ensureLocalSession(entry,exercise,true);
+      try{if(CUR_WORKOUT===wid&&CUR_EX===eid&&typeof renderExercise==='function')renderExercise();}catch(error){console.warn('[Team Bulls] registro salvo; tela será redesenhada na próxima navegação',error);}
+    };
+    try{if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else setTimeout(run,0);}catch(error){setTimeout(run,0);}
   }
   function restorePendingSessions({rerender=false}={}){
     try{
@@ -248,12 +288,11 @@
           endAction('save-session','modal-session');
           return base.apply(this,arguments);
         }
-        ensureLocalSession(entry,exercise,true);
         SESSION_CREATE_ID=null;
         try{closeModal('modal-session');}catch(error){}
         try{resetRestTimer();}catch(error){}
-        try{if(CUR_WORKOUT===wid&&CUR_EX===eid)renderExercise();}catch(error){console.warn('[Team Bulls] registro salvo; tela será redesenhada na próxima navegação',error);}
         try{showToast('✓ Série, carga e repetições registradas');}catch(error){}
+        scheduleLocalProjection(entry,exercise,wid,eid);
         scheduleFlush(40);
         return true;
       }catch(error){
