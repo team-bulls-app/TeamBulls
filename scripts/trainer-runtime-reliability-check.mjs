@@ -32,11 +32,13 @@ const firebase=JSON.parse(read('firebase.json'));
 
 // O arquivo mutável continua entrando no cold start; a revisão interna/cache-bust
 // do arquivo de relatórios é controlada pelo próprio runtime.
-has(viewport,"const RUNTIME_SRC='./modules/trainer-runtime-reliability-v10_10_46.js?v=10.10.46-trainer1'",'Cold start deixou de entregar a ponte confiável do treinador.');
+has(viewport,"const RUNTIME_SRC='./modules/trainer-runtime-reliability-v10_10_46.js?v=10.10.52-trainer2'",'Cold start deixou de entregar a revisão confiável atual do treinador.');
+has(viewport,"TeamBullsTrainerRuntimeReliability?.version==='10.10.52-trainer2'",'Cold start ainda valida uma revisão antiga do runtime do treinador.');
 has(viewport,"style.textContent='.fab-wrap{display:none}'",'FAB pode vazar sobre a tela de verificação de sessão.');
 has(viewport,"if(label==='App Check')",'Cold start não identifica a etapa bloqueante de App Check.');
 has(viewport,'limit=Math.min(limit,2500)','App Check pode voltar a bloquear o cold start por mais de 2,5 s.');
 has(sw,"'/viewport_v10_10_9.js'",'Viewport/cold-start não está em arquivo mutável network-first do PWA.');
+has(sw,"'/modules/trainer-runtime-reliability-v10_10_46.js'",'Runtime do treinador precisa ser network-first para não ficar preso em revisão antiga.');
 
 has(runtime,"const VERSION='10.10.52-trainer2'",'Ponte do treinador está na revisão errada.');
 has(runtime,"const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports3'",'Ponte não cache-busta o arquivo de Relatórios enviados por propriedade.');
@@ -80,4 +82,4 @@ if(failures.length){
   console.error('FALHA — confiabilidade do runtime do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — cold start e ABRIR ALUNO permanecem resilientes; Relatórios enviados passam a usar propriedade histórica imutável e Feedbacks mantêm isolamento pelo vínculo atual.');
+console.log('APROVADO — cold start e ABRIR ALUNO permanecem resilientes; runtime atual é network-first, Relatórios enviados usam propriedade histórica imutável e Feedbacks mantêm isolamento pelo vínculo atual.');
