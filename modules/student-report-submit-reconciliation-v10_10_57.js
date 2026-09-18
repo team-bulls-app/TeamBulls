@@ -154,9 +154,17 @@
   async function preparePhoto(file,{photoId,userId,extra}){
     const variants=await buildProgressPhotoVariants(file);
     let photoPath='',thumbPath='';
-    if(typeof uploadCloudPhoto==='function'){
-      photoPath=await uploadCloudPhoto('progressPhotos',userId,photoId,variants.full);
-      if(photoPath)thumbPath=await uploadCloudPhoto('progressPhotoThumbs',userId,photoId,variants.thumb);
+    try{
+      if(typeof uploadCloudPhoto==='function'){
+        photoPath=await uploadCloudPhoto('progressPhotos',userId,photoId,variants.full);
+        if(photoPath)thumbPath=await uploadCloudPhoto('progressPhotoThumbs',userId,photoId,variants.thumb);
+      }
+    }catch(error){
+      /* Se o original subiu e a miniatura falhou, a função ainda não retornou
+         seus paths ao chamador. Sem esta limpeza, o catch externo não conhece o
+         objeto já criado e ele fica órfão no Storage. */
+      await cleanupPaths([photoPath,thumbPath].filter(Boolean));
+      throw error;
     }
     const data={userId,date:typeof today==='function'?today():new Date().toISOString().slice(0,10),pose:extra.pose,...extra};
     if(photoPath){data.photoPath=photoPath;if(thumbPath)data.thumbPath=thumbPath;}
