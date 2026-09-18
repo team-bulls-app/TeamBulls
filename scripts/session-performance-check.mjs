@@ -42,7 +42,13 @@ has(session,'restore:()=>restorePendingSessions({rerender:true})','API de sessõ
 has(session,"closeModal('modal-session')",'Registro rápido não libera o modal imediatamente.');
 has(session,"showToast('✓ Série, carga e repetições registradas')",'Feedback imediato de séries/carga/repetições ausente.');
 has(session,'scheduleFlush(40)','Sincronização em segundo plano ausente.');
-has(session,"db.collection('sessions').doc(entry.id).set",'Fila não sincroniza usando ID idempotente.');
+has(session,"db.collection('sessions').doc(entry.id)",'Fila não sincroniza usando ID idempotente.');
+has(session,"const existing=await cloudGet(ref,'reconciliar registro de série')",'Fila não reconcilia documento já confirmado antes de repetir a sincronização.');
+has(session,'if(existing.exists){','Fila não diferencia criação nova de sessão já existente.');
+has(session,'assertExistingOwner(existing.data(),entry)','Reconciliação não revalida usuário, treino e exercício do documento existente.');
+has(session,"ref.update(mutablePayload(entry))",'Sessão já existente não preserva os campos imutáveis, incluindo createdAt.');
+has(session,"ref.set(firestorePayload(entry))",'Sessão ausente não é criada com o ID e createdAt estáveis da fila.');
+has(session,'function mutablePayload(entry)','Reconciliação não separa campos mutáveis dos campos protegidos pelas Rules 28.');
 has(session,'TB.flushPendingMutationSync=combined','Atualização não integra a fila persistente de séries.');
 lacks(session,'setInterval(','Módulo de séries não pode introduzir polling permanente.');
 const fastStart=session.indexOf('const fastSave=async function()');
@@ -71,4 +77,4 @@ if(fail.length){
   console.error('\nFalhas de performance:\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('Session/startup/update performance check OK — séries, cargas e repetições pendentes priorizam a cópia durável, usam fallback de aba explícito e recebem correções network-first.');
+console.log('Session/startup/update performance check OK — séries pendentes priorizam armazenamento durável, reconciliam writes antigos preservando createdAt e recebem correções network-first.');
