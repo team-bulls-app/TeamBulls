@@ -6,19 +6,20 @@
   window.__TEAM_BULLS_TRAINER_SENT_REPORTS_101046__=true;
   window.__TEAM_BULLS_TRAINER_SENT_REPORTS_101033__=true;
 
-  const VERSION='10.10.52-sentreports3';
+  const VERSION='10.10.52-sentreports4';
   const SCREEN_ID='screen-trainer-sent-reports';
   const ENTRY_ID='tb-trainer-sent-reports-entry';
   const STYLE_ID='tb-trainer-sent-reports-style-v3';
   const READ_TIMEOUT=8000;
   const MAX_REPORTS=500;
+  const CACHE_TTL_MS=60000;
   let reports=[];
   let studentsById=new Map();
-  let filter='all',search='',loading=false,loadSerial=0,loadError='',loadedTrainerUid='';
+  let filter='all',search='',loading=false,loadSerial=0,loadError='',loadedTrainerUid='',loadedAt=0;
 
   const trainer=()=>{try{return CURRENT_USER?.role==='trainer'&&MODE==='cloud'&&!!db;}catch(error){return false;}};
   const trainerUid=()=>trainer()?String(CURRENT_USER?.uid||''):'';
-  const h=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const h=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
   const millis=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.seconds)return Number(value.seconds)*1000;const n=Number(value);return Number.isFinite(n)?n:0;}catch(error){return 0;}};
   const formatDate=value=>{const time=millis(value);if(!time)return'—';try{return new Date(time).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});}catch(error){return new Date(time).toLocaleString('pt-BR');}};
   const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -67,20 +68,23 @@
     list.querySelectorAll('[data-tb-open-report]').forEach(button=>button.addEventListener('click',()=>openReport(button.dataset.tbOpenReport)));list.querySelectorAll('[data-tb-open-student]').forEach(button=>button.addEventListener('click',()=>openStudent(button.dataset.tbOpenStudent)));
   }
   async function load(force=false){
-    if(!trainer()||loading)return false;const uid=trainerUid();if(!uid)return false;if(loadedTrainerUid&&loadedTrainerUid!==uid){reports=[];studentsById=new Map();}
+    if(!trainer())return false;const uid=trainerUid();if(!uid)return false;
+    if(loadedTrainerUid&&loadedTrainerUid!==uid){reports=[];studentsById=new Map();loadedAt=0;loadError='';}
+    if(!force&&loadedTrainerUid===uid&&loadedAt>0&&Date.now()-loadedAt<CACHE_TTL_MS){render();return true;}
+    if(loading)return false;
     const serial=++loadSerial;loading=true;loadError='';render();
     try{
       const [,snapshot]=await Promise.all([loadNames(uid),readOnce(db.collection('questionnaires').where('trainerId','==',uid).limit(MAX_REPORTS),'relatórios pertencentes ao treinador',READ_TIMEOUT)]);
       if(serial!==loadSerial||trainerUid()!==uid)return false;
-      reports=(snapshot.docs||[]).map(doc=>({...doc.data(),id:doc.id})).filter(report=>String(report.trainerId||'')===uid).map(report=>({...report,_studentName:nameFor(report.studentId)})).sort((a,b)=>millis(b.createdAt)-millis(a.createdAt)||String(b.id).localeCompare(String(a.id)));loadedTrainerUid=uid;return true;
+      reports=(snapshot.docs||[]).map(doc=>({...doc.data(),id:doc.id})).filter(report=>String(report.trainerId||'')===uid).map(report=>({...report,_studentName:nameFor(report.studentId)})).sort((a,b)=>millis(b.createdAt)-millis(a.createdAt)||String(b.id).localeCompare(String(a.id)));loadedTrainerUid=uid;loadedAt=Date.now();return true;
     }catch(error){console.warn('[Team Bulls] arquivo por propriedade do treinador indisponível',error);loadError='Não foi possível carregar os relatórios da sua conta agora. Verifique a conexão e tente novamente.';return false;}
     finally{if(serial===loadSerial){loading=false;render();}}
   }
-  async function open(){if(!trainer()){if(typeof showToast==='function')showToast('Este arquivo é exclusivo do treinador.',true);return;}ensureScreen();ensureEntry();if(typeof showScreen==='function')showScreen(SCREEN_ID);await load(true);}
+  async function open(){if(!trainer()){if(typeof showToast==='function')showToast('Este arquivo é exclusivo do treinador.',true);return;}ensureScreen();ensureEntry();if(typeof showScreen==='function')showScreen(SCREEN_ID);await load(false);}
   function pendingDetail(report){const title=document.getElementById('quest-view-title'),body=document.getElementById('quest-view-body');if(!body)return;if(title)title.textContent='Relatório enviado · aguardando';const questions=Array.isArray(report.questions)?report.questions:[];body.innerHTML=`<div class="tb-sent-report-card"><div><strong>${h(report._studentName)}</strong><p>${h(reportLabel(report))} · ${h(formatDate(report.createdAt))}</p><p>Status: AGUARDANDO RESPOSTA DO ALUNO</p></div></div>${reportMode(report)==='photos'?'<div class="no-data-inline">Solicitação de 6 fotos enviada ao aluno.</div>':questions.map((q,i)=>`<div class="no-data-inline"><b>${i+1}.</b> ${h(q)}</div>`).join('')}`;if(typeof openModal==='function')openModal('modal-view-quest');}
   async function openAnswered(report){if(typeof viewQuestionnaire!=='function'){pendingDetail(report);return;}let previous=[];try{previous=Array.isArray(TS_QUEST_CACHE)?TS_QUEST_CACHE.slice():[];}catch(error){}try{TS_QUEST_CACHE=[...previous.filter(item=>String(item.id)!==String(report.id)),report];await viewQuestionnaire(report.id,true);}catch(error){console.warn('[Team Bulls] resposta arquivada indisponível',error);if(typeof showToast==='function')showToast('Não foi possível abrir este relatório agora.',true);}finally{try{TS_QUEST_CACHE=previous;}catch(error){}}}
   function openReport(id){const report=reports.find(item=>String(item.id)===String(id));if(!report)return;if(report.answered)openAnswered(report);else pendingDetail(report);}
   function openStudent(uid){const student=studentsById.get(String(uid));if(!student)return;const api=window.TeamBullsTrainerRuntimeReliability;if(api?.openStudent){api.openStudent(student.uid,student.name,student.email,student.status);return;}if(typeof viewStudent==='function')viewStudent(student.uid,student.name||'Aluno',student.email||'',student.status||'active');}
   function install(){if(!trainer())return false;const wasActive=document.getElementById(SCREEN_ID)?.classList.contains('active');cleanupLegacy();ensureScreen();ensureEntry();if(wasActive&&typeof showScreen==='function')showScreen(SCREEN_ID);return true;}
-  install();window.TeamBullsTrainerSentReports=Object.freeze({version:VERSION,open,refresh:()=>load(true),state:()=>({total:reports.length,loading,error:loadError,ownerQuery:true})});
+  install();window.TeamBullsTrainerSentReports=Object.freeze({version:VERSION,open,refresh:()=>load(true),state:()=>({total:reports.length,loading,error:loadError,ownerQuery:true,loadedAt,cacheTtlMs:CACHE_TTL_MS})});
 })();
