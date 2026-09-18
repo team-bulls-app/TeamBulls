@@ -95,6 +95,19 @@
       variantId:entry.variantId||'',variantName:entry.variantName||'',createdAt:stableCreatedAt(entry)
     };
   }
+  function mutablePayload(entry){
+    return{
+      exerciseName:entry.exerciseName,date:entry.date,week:entry.week,note:entry.note,sets:entry.sets,
+      performedTechniqueMode:entry.performedTechniqueMode||'',performedExerciseItemId:entry.performedExerciseItemId||'',
+      performedExerciseName:entry.performedExerciseName||entry.exerciseName||'',variantId:entry.variantId||'',variantName:entry.variantName||''
+    };
+  }
+  function assertExistingOwner(data,entry){
+    if(String(data?.userId||'')!==String(entry.userId)||String(data?.workoutId||'')!==String(entry.workoutId)||String(data?.exerciseId||'')!==String(entry.exerciseId)){
+      const error=new Error('O registro salvo no servidor não corresponde à sessão local. Atualize o aplicativo antes de continuar.');
+      error.code='team-bulls/session-conflict';throw error;
+    }
+  }
   function sessionDataFromEntry(entry,pendingSync=true){
     return{
       id:entry.id,userId:entry.userId,workoutId:entry.workoutId,exerciseId:entry.exerciseId,date:entry.date,week:entry.week,
@@ -144,7 +157,19 @@
   }
   async function syncEntry(entry){
     if(!networkReady()||CURRENT_USER.uid!==entry.userId)return false;
-    await cloudWrite(db.collection('sessions').doc(entry.id).set(firestorePayload(entry)),'sincronizar registro de série');
+    const ref=db.collection('sessions').doc(entry.id);
+    /* Filas antigas podem ter usado serverTimestamp no primeiro write. Se a
+       resposta daquele write se perdeu, recriar com o timestamp local atual
+       viola a imutabilidade de createdAt das Rules 28. Reconciliamos uma vez:
+       documento existente recebe somente campos mutáveis; ausente usa o ID e
+       createdAt estáveis da fila atual. Nenhum retry cego é disparado aqui. */
+    const existing=await cloudGet(ref,'reconciliar registro de série');
+    if(existing.exists){
+      assertExistingOwner(existing.data(),entry);
+      await cloudWrite(ref.update(mutablePayload(entry)),'sincronizar registro de série');
+    }else{
+      await cloudWrite(ref.set(firestorePayload(entry)),'sincronizar registro de série');
+    }
     const latest=queuedEntry(entry.id,entry.userId);
     if(latest&&latest.revision!==entry.revision){scheduleFlush(30);return true;}
     if(latest&&!removeQueued(entry.userId,entry.id))throw new Error('O registro chegou ao servidor, mas a fila local não pôde ser finalizada.');
