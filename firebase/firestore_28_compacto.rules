@@ -95,6 +95,31 @@ service cloud.firestore {
             ? 'photos'
             : 'full'));
     }
+    function weeklyPhotoIdsMatch(id, data) {
+      return data.photoIds is list
+        && data.photoIds.size() == 6
+        && data.photoIds[0] == id + '-p1'
+        && data.photoIds[1] == id + '-p2'
+        && data.photoIds[2] == id + '-p3'
+        && data.photoIds[3] == id + '-p4'
+        && data.photoIds[4] == id + '-p5'
+        && data.photoIds[5] == id + '-p6';
+    }
+    function weeklyRequestMatchesSchedule(data) {
+      return checkinScheduleExists(data.studentId)
+        && checkinScheduleData(data.studentId).studentId == data.studentId
+        && checkinScheduleData(data.studentId).get('enabled', true) != false
+        && (
+          (data.requestKind == 'scheduled'
+            && data.requestKey == 'scheduled:' + data.dueDate
+            && data.dueDate >= checkinScheduleData(data.studentId).nextDueDate)
+          || (data.requestKind == 'manual'
+            && checkinScheduleData(data.studentId).get('extraRequestId', '') is string
+            && checkinScheduleData(data.studentId).get('extraRequestId', '') != ''
+            && data.requestKey == 'manual:' + checkinScheduleData(data.studentId).get('extraRequestId', '')
+            && data.dueDate == checkinScheduleData(data.studentId).get('extraRequestedAt', ''))
+        );
+    }
     function safeColor(value) {
       return value in ['#e11d48', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444', '#64748b'];
     }
@@ -365,14 +390,25 @@ service cloud.firestore {
         || activeOwner(resource.data.studentId)
         || trainerOwnsCheckinSchedule(resource.data.studentId);
       allow create: if activeOwner(request.resource.data.studentId)
+        && request.resource.data.keys().hasOnly([
+          'studentId','requestKey','requestKind','dueDate','submittedDate','weight',
+          'questions','sectionAt','answers','photoIds','createdAt'
+        ])
+        && requiredText(request.resource.data.requestKey, 220)
+        && request.resource.data.requestKind in ['scheduled', 'manual']
+        && isoDate(request.resource.data.dueDate)
+        && isoDate(request.resource.data.submittedDate)
+        && weeklyRequestMatchesSchedule(request.resource.data)
         && request.resource.data.questions is list
+        && request.resource.data.questions.size() > 0
+        && request.resource.data.questions.size() <= 60
+        && request.resource.data.sectionAt is map
+        && request.resource.data.sectionAt.size() <= 60
         && request.resource.data.answers is list
         && request.resource.data.answers.size() == request.resource.data.questions.size()
         && request.resource.data.answers.size() > 0
         && !request.resource.data.answers.hasAny([''])
-        && request.resource.data.questions.size() <= 60
-        && request.resource.data.photoIds is list
-        && request.resource.data.photoIds.size() == 6
+        && weeklyPhotoIdsMatch(id, request.resource.data)
         && request.resource.data.weight is number
         && request.resource.data.weight >= 20
         && request.resource.data.weight <= 500
