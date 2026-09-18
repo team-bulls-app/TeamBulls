@@ -36,15 +36,11 @@ has(report,"resolvePhotoSource(p,{full:false})",'Visualizador não antecipa a mi
 has(report,"openModal('modal-photo-view')",'Visualizador de foto não abre imediatamente.');
 assert(!report.includes("Promise.all((checkin.photoIds||[]).slice(0,6).map")&&!report.includes("resolvePhotoSource(record,{full:CURRENT_USER?.role==='trainer'})"),'Relatório voltou a carregar seis fotos originais simultaneamente.');
 
-has(submit,'async function preparePhoto(file,{photoId,userId,extra})','Envio canônico perdeu a preparação isolada de cada fotografia.');
-has(submit,"photoPath=await uploadCloudPhoto('progressPhotos'",'Original otimizado não é enviado pelo caminho canônico do Storage.');
-has(submit,"thumbPath=await uploadCloudPhoto('progressPhotoThumbs'",'Miniatura não é enviada pelo caminho canônico do Storage.');
-has(submit,'await cleanupPaths([photoPath,thumbPath].filter(Boolean))','Falha após upload parcial pode deixar arquivo órfão no Storage.');
-const prepareStart=submit.indexOf('async function preparePhoto');
-const cleanupStart=submit.indexOf('async function cleanupPaths',prepareStart);
-const prepareBlock=prepareStart>=0&&cleanupStart>prepareStart?submit.slice(prepareStart,cleanupStart):'';
-assert(prepareBlock.includes('catch(error)')&&prepareBlock.indexOf('cleanupPaths([photoPath,thumbPath].filter(Boolean))')<prepareBlock.indexOf('throw error'),'Upload parcial precisa ser limpo antes de propagar a falha.');
-has(submit,"if(!uncertainWrite)await cleanupPaths(createdPaths)",'Falha definitiva do envio completo precisa continuar limpando uploads já rastreados.');
+has(submit,"const VERSION='10.10.57-submitstate3'",'Envio canônico não usa a revisão Firestore-only atual.');
+has(submit,'async function preparePhoto(file,{userId,extra})','Envio canônico perdeu a preparação isolada de cada fotografia.');
+has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório deixou de usar o payload Firestore/dataURL canônico.');
+assert(!submit.includes("uploadCloudPhoto('progressPhotos'")&&!submit.includes("uploadCloudPhoto('progressPhotoThumbs'"),'Relatório voltou a depender de Firebase Storage antes do commit Firestore.');
+assert(!submit.includes('deleteCloudPhoto(')&&!submit.includes('createdPaths'),'Envio Firestore-only voltou a carregar estado/cleanup de Storage sem necessidade.');
 
 has(audit,'#modal-feedback.tb-feedback-float{pointer-events:none!important','Feedback flutuante pode voltar a bloquear a tela atrás.');
 has(audit,'#modal-feedback.tb-feedback-float .feedback-editor-sheet{pointer-events:auto!important','Editor de feedback perdeu interação própria.');
@@ -92,4 +88,4 @@ if(failures.length){
   console.error('\nFalhas da auditoria de relatórios/usabilidade:\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('Report/usability audit OK — fotos rápidas, cleanup de upload parcial, trancas e regressões recentes protegidas independentemente da revisão global do shell.');
+console.log('Report/usability audit OK — fotos rápidas, envio Firestore-only, trancas e regressões recentes protegidas independentemente da revisão global do shell.');

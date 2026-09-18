@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_101057__)return;
   window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_101057__=true;
 
-  const VERSION='10.10.57-submitstate2';
+  const VERSION='10.10.57-submitstate3';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -144,35 +144,20 @@
     return{confirmed,pending};
   }
 
-  async function firestoreFallbackData(file,current){
+  async function firestorePhotoData(file,current){
     if(typeof current==='string'&&current.length<=FIRESTORE_DATA_URL_MAX)return current;
     if(typeof decodeImageForCompression!=='function'||typeof encodeImageVariant!=='function')throw new Error('Não foi possível otimizar a fotografia para o Firestore.');
     const decoded=await decodeImageForCompression(file);
     try{return encodeImageVariant(decoded,1280,.74,FIRESTORE_DATA_URL_MAX);}finally{decoded.close?.();}
   }
 
-  async function preparePhoto(file,{photoId,userId,extra}){
+  async function preparePhoto(file,{userId,extra}){
     const variants=await buildProgressPhotoVariants(file);
-    let photoPath='',thumbPath='';
-    try{
-      if(typeof uploadCloudPhoto==='function'){
-        photoPath=await uploadCloudPhoto('progressPhotos',userId,photoId,variants.full);
-        if(photoPath)thumbPath=await uploadCloudPhoto('progressPhotoThumbs',userId,photoId,variants.thumb);
-      }
-    }catch(error){
-      /* Se o original subiu e a miniatura falhou, a função ainda não retornou
-         seus paths ao chamador. Sem esta limpeza, o catch externo não conhece o
-         objeto já criado e ele fica órfão no Storage. */
-      await cleanupPaths([photoPath,thumbPath].filter(Boolean));
-      throw error;
-    }
     const data={userId,date:typeof today==='function'?today():new Date().toISOString().slice(0,10),pose:extra.pose,...extra};
-    if(photoPath){data.photoPath=photoPath;if(thumbPath)data.thumbPath=thumbPath;}
-    else data.dataUrl=await firestoreFallbackData(file,variants.full);
-    return{data,paths:[photoPath,thumbPath].filter(Boolean)};
+    data.dataUrl=await firestorePhotoData(file,variants.full);
+    return{data};
   }
 
-  async function cleanupPaths(paths){if(typeof deleteCloudPhoto!=='function'||!paths?.length)return;await Promise.allSettled(paths.map(path=>deleteCloudPhoto(path)));}
   function friendly(error){
     const code=String(error?.code||'');
     if(code==='team-bulls/app-check-unavailable')return error.message;
@@ -219,7 +204,6 @@
     if(uncertainState==='confirmed'){hideSubmittedBanner(reportId);notify('✓ O envio anterior foi confirmado pelo servidor.');await reconcileQuestionnaires({submittedId:reportId});return true;}
     if(uncertainState==='wait'){notify('Este relatório ainda está em confirmação. Não envie novamente agora.',true);return false;}
     if(!beginAction('answer-questionnaire','modal-answer-quest'))return;
-    const createdPaths=[];
     try{
       if(navigator.onLine===false)throw Object.assign(new Error('Sem conexão com a internet.'),{code:'team-bulls/offline',definite:true});
       const fresh=await restGet('questionnaires',reportId);if(!fresh)throw Object.assign(new Error('Este relatório não está mais disponível.'),{code:'team-bulls/report-missing',definite:true});if(restAnswered(fresh))throw Object.assign(new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.'),{code:'team-bulls/already-sent',definite:true});
@@ -228,7 +212,7 @@
         for(let index=0;index<6;index++){
           notify('Preparando foto '+(index+1)+' de 6...');
           const photoId=(reportId+'-r'+(index+1)).slice(0,190);photoIds.push(photoId);
-          const prepared=await preparePhoto(QUESTIONNAIRE_REPORT_FILES[index],{photoId,userId:uid,extra:{reportId,questionnaireId:reportId,pose:CHECKIN_POSES[index]}});createdPaths.push(...prepared.paths);writes.push(createWrite('progressPhotos',photoId,prepared.data));
+          const prepared=await preparePhoto(QUESTIONNAIRE_REPORT_FILES[index],{userId:uid,extra:{reportId,questionnaireId:reportId,pose:CHECKIN_POSES[index]}});writes.push(createWrite('progressPhotos',photoId,prepared.data));
         }
       }
       writes.push(patchWrite('questionnaires',reportId,{answers,answered:true,photoIds},['answers','answered','photoIds'],'answeredAt'));
@@ -245,8 +229,6 @@
       await reconcileQuestionnaires({submittedId:reportId});
       return true;
     }catch(error){
-      const uncertainWrite=!error?.definite&&(error?.code==='team-bulls/rest-timeout'||error?.code==='team-bulls/rest-network');
-      if(!uncertainWrite)await cleanupPaths(createdPaths);
       console.warn('[Team Bulls] envio canônico do questionário falhou',error?.code||error?.message||error);
       notify(friendly(error),true);return false;
     }finally{endAction('answer-questionnaire','modal-answer-quest');}
@@ -264,7 +246,6 @@
     if(uncertainState==='confirmed'){notify('✓ O relatório semanal anterior foi confirmado pelo servidor.');try{await loadWeeklyCheckinState(true);renderCalendar();}catch(error){}return true;}
     if(uncertainState==='wait'){notify('Este relatório semanal ainda está em confirmação. Não envie novamente agora.',true);return false;}
     if(!beginAction('weekly-checkin-submit','modal-weekly-checkin'))return;
-    const createdPaths=[];
     try{
       if(navigator.onLine===false)throw Object.assign(new Error('Sem conexão com a internet.'),{code:'team-bulls/offline',definite:true});
       if(await restGet('weeklyCheckins',checkinId))throw Object.assign(new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.'),{code:'team-bulls/already-sent',definite:true});
@@ -272,7 +253,7 @@
       for(let index=0;index<6;index++){
         notify('Preparando foto '+(index+1)+' de 6...');
         const photoId=(checkinId+'-p'+(index+1)).slice(0,190);photoIds.push(photoId);
-        const prepared=await preparePhoto(WEEKLY_CHECKIN_FILES[index],{photoId,userId:uid,extra:{weight:Math.round(weight*10)/10,checkinId,pose:CHECKIN_POSES[index]}});createdPaths.push(...prepared.paths);writes.push(createWrite('progressPhotos',photoId,prepared.data));
+        const prepared=await preparePhoto(WEEKLY_CHECKIN_FILES[index],{userId:uid,extra:{weight:Math.round(weight*10)/10,checkinId,pose:CHECKIN_POSES[index]}});writes.push(createWrite('progressPhotos',photoId,prepared.data));
       }
       const checkinData={studentId:uid,requestKey:request.requestKey,requestKind:request.kind,dueDate:request.dueDate,submittedDate:typeof today==='function'?today():new Date().toISOString().slice(0,10),weight:Math.round(weight*10)/10,questions,sectionAt,answers,photoIds};
       writes.push(createWrite('weeklyCheckins',checkinId,checkinData));
@@ -288,8 +269,6 @@
       try{await loadWeeklyCheckinState(true);}catch(error){}try{renderCalendar();}catch(error){}
       return true;
     }catch(error){
-      const uncertainWrite=!error?.definite&&(error?.code==='team-bulls/rest-timeout'||error?.code==='team-bulls/rest-network');
-      if(!uncertainWrite)await cleanupPaths(createdPaths);
       console.warn('[Team Bulls] envio canônico do relatório semanal falhou',error?.code||error?.message||error);
       notify(friendly(error),true);return false;
     }finally{endAction('weekly-checkin-submit','modal-weekly-checkin');}
