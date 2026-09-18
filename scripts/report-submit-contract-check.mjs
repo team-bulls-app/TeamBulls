@@ -39,17 +39,33 @@ has(rules,"questionnaireMode(resource.data) == 'written'",'Relatório escrito le
 has(rules,"questionnaireMode(resource.data) == 'full'",'Relatório completo perdeu inferência segura.');
 has(rules,'request.resource.data.photoIds.size() == 6','Fluxos fotográficos deixaram de exigir exatamente seis IDs.');
 
-// Semanais: criação é do próprio aluno, completa, imutável depois do commit.
+// Semanais: criação é do próprio aluno, vinculada à solicitação/agenda,
+// usa exatamente o schema e os seis IDs determinísticos e fica imutável.
+has(rules,'function weeklyPhotoIdsMatch(id, data)','Rules perderam o vínculo determinístico dos seis IDs de foto semanal.');
+has(rules,'function weeklyRequestMatchesSchedule(data)','Rules perderam o vínculo entre relatório semanal e agenda legítima.');
 has(rules,'match /weeklyCheckins/{id}','Rules não cobrem relatórios semanais.');
 const weeklyStart=rules.indexOf('match /weeklyCheckins/{id}');
 const weeklyEnd=rules.indexOf('match /progressPhotos/{id}',weeklyStart);
 const weekly=weeklyStart>=0&&weeklyEnd>weeklyStart?rules.slice(weeklyStart,weeklyEnd):'';
 has(weekly,'allow create: if activeOwner(request.resource.data.studentId)','Relatório semanal não exige o próprio aluno ativo.');
+has(weekly,'request.resource.data.keys().hasOnly([','Semanal aceita campos arbitrários fora do schema canônico.');
+has(weekly,"'studentId','requestKey','requestKind','dueDate','submittedDate','weight'",'Schema semanal não protege os metadados da solicitação.');
+has(weekly,'requiredText(request.resource.data.requestKey, 220)','requestKey semanal não possui tipo/teto explícito.');
+has(weekly,"request.resource.data.requestKind in ['scheduled', 'manual']",'Semanal aceita tipo de solicitação inválido.');
+has(weekly,'isoDate(request.resource.data.dueDate)','Semanal não valida dueDate.');
+has(weekly,'isoDate(request.resource.data.submittedDate)','Semanal não valida submittedDate.');
+has(weekly,'weeklyRequestMatchesSchedule(request.resource.data)','Semanal não exige solicitação compatível com a agenda.');
+has(weekly,'request.resource.data.sectionAt is map','Semanal não valida o mapa de seções.');
+has(weekly,'request.resource.data.sectionAt.keys().size() <= 60','Mapa de seções semanal não possui limite.');
 has(weekly,'request.resource.data.answers.size() == request.resource.data.questions.size()','Semanal pode divergir perguntas e respostas.');
-has(weekly,'request.resource.data.photoIds.size() == 6','Semanal não exige seis fotos.');
+has(weekly,'weeklyPhotoIdsMatch(id, request.resource.data)','Semanal não exige os seis IDs determinísticos do próprio documento.');
 has(weekly,'request.resource.data.weight >= 20','Semanal perdeu limite mínimo de peso.');
 has(weekly,'request.resource.data.weight <= 500','Semanal perdeu limite máximo de peso.');
 has(weekly,'allow update, delete: if false','Semanal confirmado voltou a ser mutável.');
+has(rules,"data.requestKey == 'scheduled:' + data.dueDate",'Solicitação semanal programada não amarra requestKey à data.');
+has(rules,"data.requestKey == 'manual:' + checkinScheduleData(data.studentId).get('extraRequestId', '')",'Solicitação semanal extra não amarra requestKey ao pedido do treinador.');
+has(rules,"data.dueDate == checkinScheduleData(data.studentId).get('extraRequestedAt', '')",'Relatório extra não amarra a data ao pedido do treinador.');
+for(let index=1;index<=6;index++)has(rules,`data.photoIds[${index-1}] == id + '-p${index}'`,`Foto semanal ${index} perdeu o ID determinístico.`);
 
 // Fotos Firestore: fallback dataURL precisa caber nas Rules e nunca pode ser vazio.
 const photoStart=rules.indexOf('match /progressPhotos/{id}');
@@ -92,4 +108,4 @@ if(fail.length){
   console.error('FALHA — contrato de envio de relatórios\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — envio de relatórios mantém 6 fotos, atomicidade, App Check, Rules 28, isolamento por aluno, reconciliação sem retry cego e proteção PWA.');
+console.log('APROVADO — envio de relatórios mantém 6 fotos, agenda/schema semanais íntegros, atomicidade, App Check, Rules 28, isolamento por aluno, reconciliação sem retry cego e proteção PWA.');
