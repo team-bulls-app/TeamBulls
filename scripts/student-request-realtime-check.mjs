@@ -52,9 +52,9 @@ assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode dup
 
 // Envio canônico: relatórios com fotos não usam mais a fila de batch do Firestore Web SDK.
 assert(loader.includes("const VERSION='10.10.57-intelsuite6'"),'Loader da suíte não foi cache-bustado para o transporte REST seguro.');
-assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate2"),'Aluno não carrega a revisão REST do envio de relatórios.');
+assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate3"),'Aluno não carrega a revisão Firestore-only do envio de relatórios.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
-assert(submitState.includes("const VERSION='10.10.57-submitstate2'"),'Reconciliação pós-envio está na revisão errada.');
+assert(submitState.includes("const VERSION='10.10.57-submitstate3'"),'Reconciliação pós-envio está na revisão Firestore-only errada.');
 assert(submitState.includes('https://firestore.googleapis.com/v1/'),'Envio crítico não aponta para a API REST oficial do Firestore.');
 assert(submitState.includes("'Authorization':'Bearer '+idToken"),'REST do Firestore não usa o ID token Firebase do próprio aluno.');
 assert(submitState.includes("headers['X-Firebase-AppCheck']=tokenResult.token"),'REST crítico não preserva o token App Check.');
@@ -63,7 +63,7 @@ assert(submitState.includes('/documents:commit'),'Envio crítico não usa commit
 assert(submitState.includes("currentDocument:{exists:false}"),'Fotos/check-in não protegem contra sobrescrita acidental.');
 assert(submitState.includes("currentDocument:{exists:true}"),'Atualização de questionário não exige documento canônico existente.');
 assert(submitState.includes("setToServerValue:'REQUEST_TIME'"),'Timestamps canônicos deixaram de ser gerados pelo servidor.');
-assert(submitState.includes('const FIRESTORE_DATA_URL_MAX=620000'),'Fallback sem Storage não limita cada foto a um payload móvel seguro.');
+assert(submitState.includes('const FIRESTORE_DATA_URL_MAX=620000'),'Payload Firestore não limita cada foto a um tamanho móvel seguro.');
 assert(submitState.includes('const MAX_COMMIT_BODY=7*1024*1024'),'Commit REST não possui limite preventivo abaixo do teto de request.');
 assert(submitState.includes('const UNCERTAIN_RETRY_DELAY=60000'),'Envio incerto não possui janela explícita contra duplicação.');
 assert(submitState.includes("uncertain.set('q:'+reportId"),'Questionário incerto não bloqueia novo envio enquanto confirma o canônico.');
@@ -102,4 +102,4 @@ if(fail.length){
   console.error('FALHA — entrega realtime / envio REST canônico de relatórios\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — relatórios com fotos usam commit REST atômico autenticado/App Check, payload reduzido sem Storage e reconciliação sem retry cego.');
+console.log('APROVADO — relatórios com fotos usam commit REST atômico autenticado/App Check, payload reduzido Firestore-only e reconciliação sem retry cego.');

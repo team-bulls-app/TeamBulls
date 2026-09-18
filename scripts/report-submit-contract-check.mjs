@@ -51,7 +51,8 @@ has(weekly,'request.resource.data.weight >= 20','Semanal perdeu limite mínimo d
 has(weekly,'request.resource.data.weight <= 500','Semanal perdeu limite máximo de peso.');
 has(weekly,'allow update, delete: if false','Semanal confirmado voltou a ser mutável.');
 
-// Fotos Firestore: fallback dataURL precisa caber nas Rules e nunca pode ser vazio.
+// Fotos dos relatórios ficam no Firestore/dataURL. O payload precisa caber nas
+// Rules e o caminho canônico não pode voltar a tentar Storage antes do commit.
 const photoStart=rules.indexOf('match /progressPhotos/{id}');
 const photoEnd=rules.indexOf('match /',photoStart+10);
 const photos=photoStart>=0?rules.slice(photoStart,photoEnd>photoStart?photoEnd:undefined):'';
@@ -60,6 +61,12 @@ has(photos,"request.resource.data.get('dataUrl', '').size() <= 950000",'Teto Fir
 has(photos,"(request.resource.data.get('dataUrl', '') != '' || request.resource.data.get('photoPath', '') != '')",'Rules voltaram a aceitar foto vazia.');
 has(submit,'const FIRESTORE_DATA_URL_MAX=620000','Cliente perdeu o teto conservador de dataURL abaixo das Rules.');
 has(submit,'const MAX_COMMIT_BODY=7*1024*1024','Commit REST perdeu limite preventivo de payload.');
+has(submit,"const VERSION='10.10.57-submitstate3'",'Envio canônico não usa a revisão Firestore-only atual.');
+has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório não é preparada diretamente para Firestore.');
+lacks(submit,"uploadCloudPhoto('progressPhotos'",'Relatório voltou a tentar Firebase Storage antes do Firestore.');
+lacks(submit,"uploadCloudPhoto('progressPhotoThumbs'",'Relatório voltou a criar miniatura em Storage sem necessidade.');
+lacks(submit,'deleteCloudPhoto(','Fluxo Firestore-only voltou a depender de cleanup de Storage.');
+lacks(submit,'createdPaths','Fluxo Firestore-only voltou a manter estado de uploads externos.');
 
 // Commit: seis fotos + conclusão devem permanecer atômicos. Resultado incerto é
 // reconciliado por leitura; não existe retry automático/cego de escrita.
@@ -81,8 +88,6 @@ has(submit,"appCheck.getToken(false)",'App Check deve usar token atual sem refre
 // Falhas de foto e memória já corrigidas continuam cobertas no mesmo contrato.
 has(heic,'const preparedJpegInputs=new WeakMap()','JPG voltou a exigir segunda decodificação integral no envio.');
 has(heic,'preparedJpegInputs.delete(file);return baseDecode(prepared);','JPG preparado não é consumido de forma única.');
-has(submit,'await cleanupPaths([photoPath,thumbPath].filter(Boolean))','Upload parcial pode deixar objeto órfão.');
-has(submit,'if(!uncertainWrite)await cleanupPaths(createdPaths)','Falha definitiva pode deixar uploads órfãos.');
 
 // Entrega PWA não pode divergir entre os dois workers.
 assert(sw===sw47,'sw.js e sw_47.js divergiram.');
@@ -92,4 +97,4 @@ if(fail.length){
   console.error('FALHA — contrato de envio de relatórios\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — envio de relatórios mantém 6 fotos, atomicidade, App Check, Rules 28, isolamento por aluno, reconciliação sem retry cego e proteção PWA.');
+console.log('APROVADO — envio de relatórios mantém 6 fotos, Firestore-only, atomicidade, App Check, Rules 28, isolamento por aluno, reconciliação sem retry cego e proteção PWA.');
