@@ -38,6 +38,9 @@ assert(!src.profile.includes("const storageRoot=()=>{try{return typeof firebase!
 assert(src.storageRules.includes('match /studentProfiles/{uid}/profile.json')&&src.storageRules.includes('match /studentProfiles/{uid}/avatar.jpg'),'Perfil: regras canônicas de Storage do aluno desapareceram.');
 
 assert(src.guard.includes('checkinLoad.studentId!==studentId')&&src.guard.includes('protocolLoad.studentId!==studentId'),'Contexto: cargas concorrentes de alunos distintos podem voltar a se misturar.');
+assert(src.guard.includes('function weeklyItemMatchesStudent(item,studentId,id=')&&src.guard.includes("String(item.studentId||'')!==String(studentId||'')"),'Contexto: cache semanal precisa provar studentId, não apenas reutilizar um ID global após troca de aluno.');
+assert(src.guard.includes('function weeklyCacheMatchesStudent(studentId,id=')&&src.guard.includes('WEEKLY_CHECKINS.some(item=>weeklyItemMatchesStudent(item,studentId,id))'),'Contexto: relatório semanal não valida o cache global contra o aluno atualmente aberto.');
+assert(src.guard.includes('!ok||currentStudentId()!==studentId||!weeklyCacheMatchesStudent(studentId,id)'),'Contexto: a ação de abrir relatório não revalida aluno e cache depois da espera assíncrona.');
 assert(src.data.includes('trainingSessionCount')&&src.progress.includes('sessionCount(sessions)')&&src.insights.includes('countTrainingSessions'),'Métricas: documentos por exercício podem voltar a ser contados como sessões completas.');
 assert(src.insights.includes('weightComparable')&&src.insights.includes('completeReview'),'Insights: peso ausente/conclusão com estado obsoleto não estão protegidos.');
 assert(src.loader.includes('10.10.56-contextguard4'),'Modo Revisão: loader precisa exigir a guarda atual com sincronização pós-confirmação e proteção de contexto da dieta.');
@@ -55,6 +58,7 @@ for(const path of [
   '/modules/intelligence-suite-loader-v10_10_42.js',
   '/modules/trainer-intelligence-data-v10_10_42.js',
   '/modules/trainer-canonical-context-guard-v10_10_42.js',
+  '/modules/trainer-command-center-v10_10_42.js',
   '/modules/trainer-student-insights-v10_10_42.js',
   '/modules/student-progress-hub-v10_10_42.js',
   '/modules/student-home-profile-v10_10_12.js'
@@ -71,4 +75,4 @@ if(intentionalHeicRecovery){
   assert(src.worker.includes('if(stale.length)await forceRecoveredNavigation();'),'PWA: resgate HEIC precisa reutilizar a navegação condicionada a cache realmente obsoleto.');
 }
 
-console.log('APROVADO — feedbacks/agenda/Storage/contexto/métricas continuam estáveis e o Modo Revisão exige a guarda atual após a confirmação canônica, sem polling nem romper o build publicado.');
+console.log('APROVADO — feedbacks/agenda/Storage/contexto semanal por aluno/métricas continuam estáveis e o Modo Revisão exige a guarda atual após a confirmação canônica, sem polling nem romper o build publicado.');
