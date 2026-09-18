@@ -9,18 +9,20 @@ const assert=(condition,message)=>{if(!condition)failures.push(message);};
 const has=(text,needle,message)=>assert(text.includes(needle),message);
 
 const reportPath='modules/report-photo-ux-v10_10_10.js';
+const submitPath='modules/student-report-submit-reconciliation-v10_10_57.js';
 const auditPath='modules/usability-audit-v10_10_10.js';
 const lockBridgePath='modules/prescription-lock-bridge-v10_10_10.js';
 const gerBridgePath='modules/ger-lock-bridge-v10_10_10.js';
 for(const [file,message] of [
   [reportPath,'Módulo de fotos rápidas em relatórios ausente.'],
+  [submitPath,'Módulo de envio canônico dos relatórios ausente.'],
   [auditPath,'Módulo de auditoria de usabilidade ausente.'],
   [lockBridgePath,'Ponte entre propagação direcional e trancas ausente.'],
   [gerBridgePath,'Ponte entre GER em lote e trancas ausente.']
 ])assert(exists(file),message);
 if(failures.length){console.error('\nFalhas da auditoria de relatórios/usabilidade:\n- '+failures.join('\n- '));process.exit(1);}
 
-const report=read(reportPath),audit=read(auditPath),lockBridge=read(lockBridgePath),gerBridge=read(gerBridgePath),config=read('config_v10_7.js'),sw=read('sw.js'),sw47=read('sw_47.js');
+const report=read(reportPath),submit=read(submitPath),audit=read(auditPath),lockBridge=read(lockBridgePath),gerBridge=read(gerBridgePath),config=read('config_v10_7.js'),sw=read('sw.js'),sw47=read('sw_47.js');
 
 has(report,"const MAX_RECORD_CACHE=180",'Cache curto de registros fotográficos não está limitado.');
 has(report,"where('userId','==',uid)",'Consulta agrupada de fotos não está vinculada ao aluno atual.');
@@ -33,6 +35,16 @@ has(report,"openPhotoView(button.dataset.tbReportPhoto,true)",'Foto dentro do re
 has(report,"resolvePhotoSource(p,{full:false})",'Visualizador não antecipa a miniatura leve enquanto a versão completa carrega.');
 has(report,"openModal('modal-photo-view')",'Visualizador de foto não abre imediatamente.');
 assert(!report.includes("Promise.all((checkin.photoIds||[]).slice(0,6).map")&&!report.includes("resolvePhotoSource(record,{full:CURRENT_USER?.role==='trainer'})"),'Relatório voltou a carregar seis fotos originais simultaneamente.');
+
+has(submit,'async function preparePhoto(file,{photoId,userId,extra})','Envio canônico perdeu a preparação isolada de cada fotografia.');
+has(submit,"photoPath=await uploadCloudPhoto('progressPhotos'",'Original otimizado não é enviado pelo caminho canônico do Storage.');
+has(submit,"thumbPath=await uploadCloudPhoto('progressPhotoThumbs'",'Miniatura não é enviada pelo caminho canônico do Storage.');
+has(submit,'await cleanupPaths([photoPath,thumbPath].filter(Boolean))','Falha após upload parcial pode deixar arquivo órfão no Storage.');
+const prepareStart=submit.indexOf('async function preparePhoto');
+const cleanupStart=submit.indexOf('async function cleanupPaths',prepareStart);
+const prepareBlock=prepareStart>=0&&cleanupStart>prepareStart?submit.slice(prepareStart,cleanupStart):'';
+assert(prepareBlock.includes('catch(error)')&&prepareBlock.indexOf('cleanupPaths([photoPath,thumbPath].filter(Boolean))')<prepareBlock.indexOf('throw error'),'Upload parcial precisa ser limpo antes de propagar a falha.');
+has(submit,"if(!uncertainWrite)await cleanupPaths(createdPaths)",'Falha definitiva do envio completo precisa continuar limpando uploads já rastreados.');
 
 has(audit,'#modal-feedback.tb-feedback-float{pointer-events:none!important','Feedback flutuante pode voltar a bloquear a tela atrás.');
 has(audit,'#modal-feedback.tb-feedback-float .feedback-editor-sheet{pointer-events:auto!important','Editor de feedback perdeu interação própria.');
@@ -80,4 +92,4 @@ if(failures.length){
   console.error('\nFalhas da auditoria de relatórios/usabilidade:\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('Report/usability audit OK — fotos rápidas, trancas em todas as rotas de propagação e regressões recentes protegidas independentemente da revisão global do shell.');
+console.log('Report/usability audit OK — fotos rápidas, cleanup de upload parcial, trancas e regressões recentes protegidas independentemente da revisão global do shell.');
