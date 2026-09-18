@@ -2,7 +2,7 @@
 'use strict';
 (function(){
   const TB=window.TeamBulls107;if(!TB)return;
-  const REGISTRATION_DIAGNOSTIC_REVISION='preflight3';
+  const REGISTRATION_DIAGNOSTIC_REVISION='preflight4';
   const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   function randomCode(){
     const bytes=new Uint8Array(15);crypto.getRandomValues(bytes);
@@ -137,6 +137,21 @@
       transaction.update(inviteRef,{active:false,usedBy:cred.user.uid,usedAt:firebase.firestore.FieldValue.serverTimestamp()});
     });
   }
+  async function createRegistrationCredential(email,pass,button){
+    /* createUserWithEmailAndPassword não aceita AbortSignal. Um timeout artificial
+       rejeitava a tela, mas a criação continuava no SDK e podia concluir depois,
+       deixando uma conta Auth sem perfil/convite. Aqui o limite de 12 s vira só
+       feedback visual: o fluxo só avança ou falha quando a operação Auth realmente
+       se resolve, portanto a credencial nunca fica fora do alcance da limpeza. */
+    let settled=false;
+    const slowTimer=setTimeout(()=>{
+      if(settled||!button?.disabled)return;
+      button.textContent='CRIANDO CONTA · CONEXÃO LENTA...';
+      setRegistrationDiagnostic('auth-create','waiting-network',registrationDiagnostic.appCheck);
+    },12000);
+    try{return await auth.createUserWithEmailAndPassword(email,pass);}
+    finally{settled=true;clearTimeout(slowTimer);}
+  }
 
   /* Cadastro seguro e diagnosticável. O convite é validado antes do Auth quando
      as Rules publicadas permitem leitura pública. Se uma implantação antiga negar
@@ -174,7 +189,7 @@
 
       stage='auth-create';btn.textContent='CRIANDO CONTA...';setRegistrationDiagnostic(stage);AUTH_HANDLED=false;startBootWatchdog();
       authListenerSuspended=suspendAuthListenerForRegistration();
-      cred=await withTimeout(auth.createUserWithEmailAndPassword(email,pass),12000,'criação da conta');
+      cred=await createRegistrationCredential(email,pass,btn);
 
       stage='auth-token';btn.textContent='VALIDANDO CONTA...';setRegistrationDiagnostic(stage);
       let tokenResult=await withTimeout(cred.user.getIdTokenResult(true),8000,'atualização da credencial de cadastro');
@@ -218,7 +233,7 @@
         'team-bulls/app-check-unavailable':'A proteção de segurança do Team Bulls não iniciou neste aparelho [REG-APP-INIT]. Não foi criada nenhuma conta; atualize a tela e tente novamente com este mesmo convite. Se persistir, verifique bloqueadores, DNS e navegador.',
         'team-bulls/app-check-failed':'Este aparelho não conseguiu concluir a validação de segurança [REG-APP-TOKEN]. Não foi criada nenhuma conta e o convite não foi consumido. Atualize a tela e tente novamente com este mesmo convite.',
         'team-bulls/auth-email-claim':'A autenticação foi criada sem a confirmação de e-mail exigida pelo perfil [REG-AUTH-EMAIL]. A tentativa foi cancelada com segurança.',
-        'team-bulls/timeout':'O servidor demorou para concluir o cadastro. Tente entrar com a mesma conta antes de cadastrar novamente.'
+        'team-bulls/timeout':'O servidor demorou além do esperado. A tentativa foi tratada de forma conservadora; use este mesmo convite e siga a orientação exibida antes de tentar novamente.'
       };
       const message=isPermissionDenied(error)?registrationPermissionMessage(stage):(messages[error?.code]||error?.message||'Não foi possível criar a conta.');
       showAuthError('reg-error',message);
@@ -231,6 +246,7 @@
   doRegister.__tbCanonicalInviteRegistration=true;
   doRegister.__tbRegistrationPreflight=REGISTRATION_DIAGNOSTIC_REVISION;
   doRegister.__tbRegistrationAppCheck='cached-first';
+  doRegister.__tbRegistrationAuthCreate='settle-before-continue';
   const CANONICAL_REGISTER=doRegister;
   function enforceCanonicalRegistration(){
     if(typeof doRegister==='function'&&doRegister!==CANONICAL_REGISTER){

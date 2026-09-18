@@ -15,7 +15,7 @@ function need(v,m){if(!v)throw new Error(m);}
 const appCheck=invites.indexOf('await ensureRegistrationAppCheck({forceRefresh:false})');
 const invitePrecheck=invites.indexOf("stage='invite-precheck'");
 const pause=invites.indexOf('authListenerSuspended=suspendAuthListenerForRegistration()');
-const create=invites.indexOf('auth.createUserWithEmailAndPassword(email,pass)');
+const create=invites.indexOf('cred=await createRegistrationCredential(email,pass,btn)');
 const token=invites.indexOf('cred.user.getIdTokenResult(true)');
 const transaction=invites.indexOf('async function commitRegistration');
 const profileWrite=invites.indexOf("transaction.set(db.collection('users').doc(cred.user.uid),userData)");
@@ -42,6 +42,11 @@ need(invites.includes('[REG-FS-403]'),'Permission denied final da transação de
 need(invites.includes("window.TeamBullsRegistrationDiagnostics=registrationDiagnostic"),'Diagnóstico seguro da última etapa deve ficar disponível sem expor e-mail, senha ou convite.');
 need(pause>=0&&create>pause,'O observador de autenticação deve ser pausado antes de criar a conta Auth.');
 need(token>create&&transaction>=0,'A credencial Auth deve ser renovada e a transação canônica deve existir.');
+need(invites.includes("async function createRegistrationCredential(email,pass,button)"),'Cadastro deve possuir uma barreira própria para aguardar a criação Auth real.');
+need(invites.includes("return await auth.createUserWithEmailAndPassword(email,pass)"),'A criação Auth deve permanecer acessível ao fluxo até resolver ou rejeitar de verdade.');
+need(!invites.includes("withTimeout(auth.createUserWithEmailAndPassword(email,pass)"),'createUserWithEmailAndPassword não pode usar timeout artificial não cancelável.');
+need(invites.includes("button.textContent='CRIANDO CONTA · CONEXÃO LENTA...'"),'Espera Auth longa deve informar conexão lenta sem abandonar a Promise.');
+need(invites.includes("doRegister.__tbRegistrationAuthCreate='settle-before-continue'"),'Fluxo canônico deve expor a política de criação Auth sem corrida.');
 need(invites.includes("tokenResult?.claims?.email||cred.user.email"),'O perfil deve usar o e-mail canônico do token Auth para corresponder literalmente às Rules.');
 need(profileWrite>transaction&&inviteWrite>profileWrite,'Perfil e consumo do convite devem permanecer na mesma transação.');
 need(resume>profileWrite,'O observador só pode voltar depois da janela crítica do cadastro.');
@@ -49,7 +54,7 @@ need(invites.includes("if(typeof AUTH_UNSUBSCRIBE==='function')"),'A pausa preci
 need(invites.includes("if(typeof startAuthListener==='function')startAuthListener()"),'O observador precisa ser restaurado pelo inicializador oficial.');
 need(invites.includes('doRegister.__tbCanonicalInviteRegistration=true'),'O fluxo canônico precisa ser identificado explicitamente.');
 need(invites.includes("doRegister.__tbRegistrationPreflight=REGISTRATION_DIAGNOSTIC_REVISION"),'A revisão de preflight deve ser identificável em produção.');
-need(invites.includes("REGISTRATION_DIAGNOSTIC_REVISION='preflight3'"),'A revisão resiliente do cadastro mobile precisa estar ativa.');
+need(invites.includes("REGISTRATION_DIAGNOSTIC_REVISION='preflight4'"),'A revisão resiliente do cadastro precisa proteger também a criação Auth lenta.');
 need(invites.includes("window.addEventListener('team-bulls-runtime-state',enforceCanonicalRegistration)"),'O cadastro seguro deve se restaurar após cada módulo diferido.');
 need(!integrity.includes('doRegister=secured'),'A camada de integridade não pode mais substituir doRegister.');
 need(integrity.includes("const VERSION='10.10.9-registration2'"),'A revisão passiva da integridade do cadastro precisa estar ativa.');
@@ -61,4 +66,4 @@ need(updaterBuild===version.build&&workerBuild===version.build&&bridgeBuild===ve
 need(updater.includes("./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2"),'Atualizador deve renovar explicitamente a integridade do cadastro.');
 need(workerCache&&workerCache===bridgeCache,'A release precisa manter os caches coerentes nos dois Service Workers.');
 need(sw.includes("./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2")&&bridge.includes("./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2"),'Service Workers não podem preparar a revisão registration1 antiga.');
-console.log(`APROVADO: cadastro por convite, App Check cached-first com refresh forçado apenas na recuperação 403, atomicidade e build ${version.build} seguem coerentes sob ${activeRules}.`);
+console.log(`APROVADO: cadastro por convite, criação Auth sem timeout órfão, App Check cached-first, atomicidade e build ${version.build} seguem coerentes sob ${activeRules}.`);
