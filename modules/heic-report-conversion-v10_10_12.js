@@ -11,6 +11,8 @@
   let workerSeq=0;
   const pendingWorkerRequests=new Map();
   const batchInFlight=new WeakSet();
+  const preparedJpegInputs=new WeakMap();
+  let reportPreviewDepth=0;
 
   const fileType=file=>{
     const raw=String(file?.type||'').toLowerCase().trim();
@@ -21,6 +23,26 @@
     return'';
   };
   const isHeic=file=>!!fileType(file);
+  const isJpeg=file=>{
+    const raw=String(file?.type||'').toLowerCase().trim();
+    if(raw==='image/jpeg'||raw==='image/jpg'||raw==='image/pjpeg')return true;
+    return /\.jpe?g$/i.test(String(file?.name||''));
+  };
+  const dataUrlToJpegBlob=value=>{
+    try{
+      const match=/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(value||''));if(!match)return null;
+      const raw=atob(match[1]),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+      return new Blob([bytes],{type:'image/jpeg'});
+    }catch(error){return null;}
+  };
+  const withReportPreview=async task=>{reportPreviewDepth++;try{return await task();}finally{reportPreviewDepth=Math.max(0,reportPreviewDepth-1);}};
+  const stageJpegInput=(file,decoded)=>{
+    if(!isJpeg(file)||!decoded?.width||!decoded?.height||typeof encodeImageVariant!=='function')return;
+    try{
+      const dataUrl=encodeImageVariant(decoded,1280,.78,850000),blob=dataUrlToJpegBlob(dataUrl);
+      if(blob?.size)preparedJpegInputs.set(file,blob);
+    }catch(error){console.warn('[Team Bulls] JPG seguirá pelo decode normal no envio.',error?.message||error);}
+  };
   const timeout=(promise,ms,label)=>new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error(`${label} demorou mais que o esperado.`)),ms);
     Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
@@ -107,7 +129,13 @@
     if(typeof decodeImageForCompression!=='function'||decodeImageForCompression.__tbHeicConversion)return false;
     const baseDecode=decodeImageForCompression;
     const wrapped=async function(file){
-      if(!isHeic(file))return baseDecode(file);
+      if(!isHeic(file)){
+        const prepared=preparedJpegInputs.get(file);
+        if(prepared){preparedJpegInputs.delete(file);return baseDecode(prepared);}
+        const decoded=await baseDecode(file);
+        if(reportPreviewDepth>0&&isJpeg(file))stageJpegInput(file,decoded);
+        return decoded;
+      }
       try{return await baseDecode(file);}catch(nativeError){
         try{
           const jpeg=await convertHeic(file);
@@ -140,7 +168,7 @@
     try{
       for(let slot=0;slot<6;slot++){
         if(typeof showToast==='function')showToast(`Preparando foto ${slot+1} de 6...`);
-        await base(slot,syntheticEvent(selected[slot]));
+        await withReportPreview(()=>base(slot,syntheticEvent(selected[slot])));
         await nextPaint();
       }
       let complete=false;
@@ -162,12 +190,12 @@
     let changed=false;
     if(typeof previewWeeklyCheckinPhoto==='function'&&!previewWeeklyCheckinPhoto.__tbSixPhotoBatch){
       const base=previewWeeklyCheckinPhoto;
-      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'weekly');return base.apply(this,arguments);};
+      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'weekly');const args=arguments,context=this;return withReportPreview(()=>base.apply(context,args));};
       wrapped.__tbSixPhotoBatch=true;wrapped.__tbBase=base;previewWeeklyCheckinPhoto=wrapped;changed=true;
     }
     if(typeof previewQuestionnaireReportPhoto==='function'&&!previewQuestionnaireReportPhoto.__tbSixPhotoBatch){
       const base=previewQuestionnaireReportPhoto;
-      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'questionnaire');return base.apply(this,arguments);};
+      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'questionnaire');const args=arguments,context=this;return withReportPreview(()=>base.apply(context,args));};
       wrapped.__tbSixPhotoBatch=true;wrapped.__tbBase=base;previewQuestionnaireReportPhoto=wrapped;changed=true;
     }
     return changed;
