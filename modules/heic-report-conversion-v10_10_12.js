@@ -4,9 +4,9 @@
   if(window.__TEAM_BULLS_HEIC_REPORT_CONVERSION__)return;
   window.__TEAM_BULLS_HEIC_REPORT_CONVERSION__=true;
 
-  const VERSION='10.10.12-heic2';
+  const VERSION='10.10.12-heic3';
   const MAX_HEIC_BYTES=25*1024*1024;
-  const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker1';
+  const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3';
   let workerPromise=null;
   let workerSeq=0;
   const pendingWorkerRequests=new Map();
