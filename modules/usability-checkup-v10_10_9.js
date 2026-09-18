@@ -280,8 +280,8 @@
 
 /* Carrega a suíte de inteligência somente depois que o papel do usuário já é conhecido. */
 (()=>{
-  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.42-intelsuite1';
-  const EXPECTED_VERSION='10.10.42-intelsuite1';
+  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.57-intelsuite6';
+  const EXPECTED_VERSION='10.10.57-intelsuite6';
   let loading=null;
   const supportedContext=()=>{try{return MODE==='cloud'&&(CURRENT_USER?.role==='trainer'||CURRENT_USER?.role==='student');}catch(error){return false;}};
   const ready=()=>window.TeamBullsIntelligenceSuiteLoader?.version===EXPECTED_VERSION;

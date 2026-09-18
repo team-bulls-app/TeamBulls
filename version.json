@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026090801,
-  "revision": "session-restore-home-fastdates-1",
-  "publishedAt": "2026-09-08T12:25:00Z",
+  "build": 2026091701,
+  "revision": "runtime-delivery-integrity-1",
+  "publishedAt": "2026-09-18T00:51:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Evita falso aviso de correção durante restauração reconhecida da sessão e mostra as próximas datas da Home imediatamente a partir do estado conhecido, mantendo a atualização remota em segundo plano."
+  "message": "Sincroniza a entrega dos hotfixes atuais, a suíte de relatórios/inteligência, o runtime do treinador e a recuperação HEIC sem alterar as regras de dados."
 }
