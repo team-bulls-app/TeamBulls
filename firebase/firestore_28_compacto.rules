@@ -86,6 +86,15 @@ service cloud.firestore {
     function immutable(field) {
       return request.resource.data.get(field, null) == resource.data.get(field, null);
     }
+    function questionnaireMode(data) {
+      return data.get('requestMode', '') in ['full', 'written', 'photos']
+        ? data.get('requestMode', '')
+        : (data.get('requiresPhotos', true) == false
+          ? 'written'
+          : (data.get('questions', []) is list && data.get('questions', []).size() == 0
+            ? 'photos'
+            : 'full'));
+    }
     function safeColor(value) {
       return value in ['#e11d48', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444', '#64748b'];
     }
@@ -260,15 +269,15 @@ service cloud.firestore {
         && request.resource.data.answered == true
         && request.resource.data.answeredAt is timestamp
         && (
-          (resource.data.get('requestMode', 'full') == 'photos'
+          (questionnaireMode(resource.data) == 'photos'
             && request.resource.data.answers.size() == 0
             && request.resource.data.photoIds.size() == 6)
-          || (resource.data.get('requestMode', 'full') == 'written'
+          || (questionnaireMode(resource.data) == 'written'
             && request.resource.data.answers.size() == resource.data.questions.size()
             && request.resource.data.answers.size() > 0
             && !request.resource.data.answers.hasAny([''])
             && request.resource.data.photoIds.size() == 0)
-          || (resource.data.get('requestMode', 'full') == 'full'
+          || (questionnaireMode(resource.data) == 'full'
             && request.resource.data.answers.size() == resource.data.questions.size()
             && request.resource.data.answers.size() > 0
             && !request.resource.data.answers.hasAny([''])

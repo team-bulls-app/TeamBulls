@@ -38,6 +38,12 @@ has(firestore,'trainerOwns(request.resource.data.studentId)','Criações do trei
 has(firestore,'trainerOwns(resource.data.userId) || activeOwner(resource.data.userId)','Dados pessoais ainda não estão isolados por treinador.');
 has(firestore,'safeColor(request.resource.data.color)','Cor de protocolo não é validada por whitelist.');
 has(firestore,"(request.resource.data.get('dataUrl', '') != '' || request.resource.data.get('photoPath', '') != '')",'Regra ainda permite registro de foto vazio.');
+has(firestore,'function questionnaireMode(data)','Relatórios legados não possuem inferência canônica de modo.');
+has(firestore,"data.get('requiresPhotos', true) == false",'Relatório escrito legado não é inferido pelos campos imutáveis existentes.');
+has(firestore,"data.get('questions', []) is list && data.get('questions', []).size() == 0",'Relatório antigo somente de fotos não é reconhecido quando requestMode está ausente.');
+has(firestore,"questionnaireMode(resource.data) == 'photos'",'Envio de seis fotos ainda depende de requestMode existir no documento histórico.');
+has(firestore,"questionnaireMode(resource.data) == 'written'",'Envio escrito legado ainda depende de requestMode existir no documento histórico.');
+has(firestore,"questionnaireMode(resource.data) == 'full'",'Envio completo não usa a inferência canônica de modo.');
 lacks(firestore,'allow read: if isTrainer() || activeOwner(resource.data.userId);','Regra ampla de leitura de fotos/sessões por qualquer treinador reapareceu.');
 lacks(firestore,'allow read: if isTrainer() || activeOwner(resource.data.studentId);','Regra ampla de leitura de relatórios por qualquer treinador reapareceu.');
 lacks(firestore,"|| (isTrainer() && resource.data.role == 'student')",'Leitura global permanente de alunos por qualquer treinador reapareceu.');
