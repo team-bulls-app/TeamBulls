@@ -50,6 +50,18 @@ has(runtime,"list.innerHTML='<div class=\"no-data-inline\">Carregando protocolos
 lacks(runtime,'setInterval(','Ponte do treinador não pode introduzir polling.');
 lacks(runtime,'MutationObserver','Ponte do treinador não pode observar globalmente o DOM.');
 
+// Atalhos de feedback do histórico individual precisam permanecer contextuais,
+// trabalhar somente com o cache já carregado e não criar novas leituras Firestore.
+has(runtime,'function patchQuestionnaireFeedbackShortcuts()','Relatórios personalizados perderam o atalho de feedback.');
+has(runtime,'window.openFeedbackForQuestionnaireReport=openQuestionnaireFeedback','Atalho de feedback personalizado não está exposto para a tela do treinador.');
+has(runtime,"String(listId)!=='ts-quest-list'",'Atalho de feedback pode vazar para listas fora do arquivo individual.');
+has(runtime,"if(!report?.answered)return false",'Atalho de feedback pode aparecer para relatório ainda não respondido.');
+has(runtime,"sourceType:'questionnaire_report'",'Feedback personalizado perdeu a origem contextual do relatório.');
+has(runtime,"sourceId:String(report.id)",'Feedback personalizado perdeu o ID real do relatório.');
+has(runtime,"button.textContent='FEEDBACK EXTENSO'",'Botão de feedback extenso não é restaurado nos relatórios personalizados.');
+has(runtime,'Array.isArray(TS_QUEST_CACHE)?TS_QUEST_CACHE:[]','Atalho não reutiliza o histórico já carregado em memória.');
+lacks(runtime,"db.collection('questionnaires')",'Atalho de feedback introduziu leitura Firestore desnecessária.');
+
 // Relatórios: propriedade histórica é a fonte de descoberta; roster serve apenas
 // para nome/atalho. Feedback continua estritamente pelo vínculo atual.
 has(reports,"db.collection('questionnaires').where('trainerId','==',uid).limit(MAX_REPORTS)",'Relatórios ainda dependem do fan-out pelo roster.');
@@ -82,4 +94,4 @@ if(failures.length){
   console.error('FALHA — confiabilidade do runtime do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — cold start e ABRIR ALUNO permanecem resilientes; runtime atual é network-first, Relatórios enviados usam propriedade histórica imutável e Feedbacks mantêm isolamento pelo vínculo atual.');
+console.log('APROVADO — cold start, ABRIR ALUNO e atalhos contextuais de feedback permanecem resilientes; runtime é network-first, Relatórios enviados usam propriedade histórica imutável e Feedbacks mantêm isolamento pelo vínculo atual.');
