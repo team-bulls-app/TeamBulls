@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_101057__)return;
   window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_101057__=true;
 
-  const VERSION='10.10.57-submitstate3';
+  const VERSION='10.10.57-submitstate4';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -248,7 +248,10 @@
     if(!beginAction('weekly-checkin-submit','modal-weekly-checkin'))return;
     try{
       if(navigator.onLine===false)throw Object.assign(new Error('Sem conexão com a internet.'),{code:'team-bulls/offline',definite:true});
-      if(await restGet('weeklyCheckins',checkinId))throw Object.assign(new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.'),{code:'team-bulls/already-sent',definite:true});
+      /* Não faça GET de weeklyCheckins/{checkinId} antes do create. Quando o documento
+         ainda não existe, as Rules de leitura não têm resource.data.studentId para
+         provar a propriedade e o Firestore responde permission-denied. A precondição
+         currentDocument.exists:false do commit já impede duplicação sem abrir regra. */
       const {questions,sectionAt}=buildWeeklyCheckinQuestions(),photoIds=[],writes=[];
       for(let index=0;index<6;index++){
         notify('Preparando foto '+(index+1)+' de 6...');
