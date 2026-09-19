@@ -33,8 +33,9 @@ assert(sw.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic3')&&sw.i
 assert(heic.includes("const VERSION='10.10.12-heic3'")&&heic.includes('heicworker3'),'Conversor HEIC canônico não corresponde às referências publicadas.');
 assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'")&&sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'HEIC precisa permanecer network-first.');
 
-assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.57-intelsuite6')&&usability.includes("const EXPECTED_VERSION='10.10.57-intelsuite6'"),'Bootstrap ainda espera suíte de inteligência antiga.');
-assert(intelligence.includes("const VERSION='10.10.57-intelsuite6'"),'Suíte de inteligência canônica não está na revisão esperada.');
+assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.57-intelsuite7')&&usability.includes("const EXPECTED_VERSION='10.10.57-intelsuite7'"),'Bootstrap ainda espera suíte de inteligência antiga.');
+assert(intelligence.includes("const VERSION='10.10.57-intelsuite7'"),'Suíte de inteligência canônica não está na revisão esperada.');
+assert(intelligence.includes('student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate4'),'Suíte não entrega a correção atual do envio semanal.');
 
 assert(viewport.includes('trainer-runtime-reliability-v10_10_46.js?v=10.10.52-trainer2'),'Cold start ainda pede runtime antigo do treinador.');
 assert(viewport.includes("TeamBullsTrainerRuntimeReliability?.version==='10.10.52-trainer2'"),'Cold start ainda valida revisão antiga do treinador.');
