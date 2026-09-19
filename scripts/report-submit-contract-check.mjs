@@ -77,7 +77,7 @@ has(photos,"request.resource.data.get('dataUrl', '').size() <= 950000",'Teto Fir
 has(photos,"(request.resource.data.get('dataUrl', '') != '' || request.resource.data.get('photoPath', '') != '')",'Rules voltaram a aceitar foto vazia.');
 has(submit,'const FIRESTORE_DATA_URL_MAX=620000','Cliente perdeu o teto conservador de dataURL abaixo das Rules.');
 has(submit,'const MAX_COMMIT_BODY=7*1024*1024','Commit REST perdeu limite preventivo de payload.');
-has(submit,"const VERSION='10.10.57-submitstate3'",'Envio canônico não usa a revisão Firestore-only atual.');
+has(submit,"const VERSION='10.10.57-submitstate4'",'Envio canônico não usa a revisão que corrige permission-denied semanal.');
 has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório não é preparada diretamente para Firestore.');
 lacks(submit,"uploadCloudPhoto('progressPhotos'",'Relatório voltou a tentar Firebase Storage antes do Firestore.');
 lacks(submit,"uploadCloudPhoto('progressPhotoThumbs'",'Relatório voltou a criar miniatura em Storage sem necessidade.');
@@ -96,6 +96,16 @@ has(submit,"uncertain.set('w:'",'Semanal perdeu estado de confirmação para res
 has(submit,"O app não fará reenvio automático",'Fluxo não deixa explícita a ausência de retry cego.');
 lacks(submit,'setInterval(','Envio de relatórios não pode introduzir polling.');
 
+// Um relatório semanal novo ainda não possui resource.data. Fazer GET direto em
+// weeklyCheckins/{id} antes do create faz a regra de leitura negar o documento
+// inexistente. Duplicação já é barrada atomicamente por currentDocument.exists:false.
+const weeklySubmitStart=submit.indexOf('async function robustWeeklySubmit()');
+const weeklyCommitStart=submit.indexOf("try{await restCommit(writes,'enviar relatório semanal');}",weeklySubmitStart);
+const weeklyPreCommit=weeklySubmitStart>=0&&weeklyCommitStart>weeklySubmitStart?submit.slice(weeklySubmitStart,weeklyCommitStart):'';
+assert(weeklyPreCommit.length>0,'Não foi possível isolar o preflight do envio semanal.');
+lacks(weeklyPreCommit,"restGet('weeklyCheckins',checkinId)",'Semanal voltou a ler o documento inexistente antes do create e pode receber permission-denied.');
+has(weeklyPreCommit,"writes.push(createWrite('weeklyCheckins',checkinId,checkinData))",'Semanal perdeu o create atômico protegido por precondição.');
+
 // App Check e sessão acompanham o commit REST; não basta autenticar no SDK.
 has(submit,"'Authorization':'Bearer '+idToken",'Commit REST perdeu autenticação Firebase do aluno.');
 has(submit,"headers['X-Firebase-AppCheck']=tokenResult.token",'Commit REST perdeu App Check.');
@@ -113,4 +123,4 @@ if(fail.length){
   console.error('FALHA — contrato de envio de relatórios\n- '+fail.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — envio de relatórios mantém 6 fotos, Firestore-only, agenda/schema semanais íntegros, atomicidade, App Check, Rules 28, isolamento por aluno, reconciliação sem retry cego e proteção PWA.');
+console.log('APROVADO — envio de relatórios mantém 6 fotos, Firestore-only, agenda/schema semanais íntegros, create sem GET inexistente, atomicidade, App Check, Rules 28, isolamento por aluno, reconciliação sem retry cego e proteção PWA.');
