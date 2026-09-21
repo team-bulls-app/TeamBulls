@@ -48,7 +48,7 @@ const MUTABLE_PATHS=new Set([
   '/modules/v107-core.js','/modules/v107-invites.js','/modules/v107-operations.js','/modules/session-save-performance-v10_10_9.js',
   '/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js',
   '/modules/heic-report-conversion-v10_10_12.js','/modules/heic-libheif-worker-v10_10_12.js','/modules/trainer-runtime-reliability-v10_10_46.js',
-  '/modules/trainer-feedback-archive-v10_10_37.js','/modules/trainer-update-organizer-v10_10_41.js','/modules/intelligence-suite-loader-v10_10_42.js',
+  '/modules/trainer-feedback-archive-v10_10_37.js','/modules/trainer-update-organizer-v10_10_41.js','/modules/intelligence-suite-loader-v10_10_42.js','/modules/trainer-inbox-payments-v10_10_12.js',
   '/modules/trainer-intelligence-data-v10_10_42.js','/modules/trainer-canonical-context-guard-v10_10_42.js','/modules/trainer-command-center-v10_10_42.js','/modules/trainer-student-insights-v10_10_42.js','/modules/student-progress-hub-v10_10_42.js'
 ]);
 
