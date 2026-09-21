@@ -20,5 +20,6 @@ jobs:
       - name: Security regression checks
         run: |
           node scripts/security-check.mjs
+          node scripts/exercise-ownership-rules-check.mjs
           node scripts/report-submit-contract-check.mjs
           node scripts/production-audit-check.mjs

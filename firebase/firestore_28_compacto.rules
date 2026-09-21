@@ -52,6 +52,10 @@ service cloud.firestore {
       return isTrainer() && workoutExists(workoutId)
         && trainerOwns(workoutData(workoutId).userId);
     }
+    function trainerOwnsExercise(data) {
+      return trainerOwns(data.get('userId', ''))
+        || trainerOwnsWorkout(data.get('workoutId', ''));
+    }
     function questionnaireExists(questionnaireId) {
       return questionnaireId is string && questionnaireId != ''
         && exists(/databases/$(database)/documents/questionnaires/$(questionnaireId));
@@ -189,9 +193,8 @@ service cloud.firestore {
     }
 
     match /exercises/{id} {
-      allow read: if trainerOwns(resource.data.userId)
-        || trainerOwnsWorkout(resource.data.workoutId)
-        || activeOwner(resource.data.userId);
+      allow read: if trainerOwnsExercise(resource.data)
+        || activeOwner(resource.data.get('userId', ''));
       allow create: if trainerOwns(request.resource.data.userId)
         && request.resource.data.workoutId is string
         && workoutExists(request.resource.data.workoutId)
@@ -205,7 +208,7 @@ service cloud.firestore {
         && request.resource.data.get('weeklyPlan', {}) is map
         && request.resource.data.get('weeklyTechniquePlan', {}) is map
         && request.resource.data.createdAt is timestamp;
-      allow update: if trainerOwns(resource.data.userId)
+      allow update: if trainerOwnsExercise(resource.data)
         && immutable('userId') && immutable('workoutId')
         && immutable('createdAt')
         && requiredText(request.resource.data.name, 180)
@@ -216,7 +219,7 @@ service cloud.firestore {
         && request.resource.data.get('optionalTechniqueIds', []).size() <= 100
         && request.resource.data.get('weeklyPlan', {}) is map
         && request.resource.data.get('weeklyTechniquePlan', {}) is map;
-      allow delete: if trainerOwns(resource.data.userId);
+      allow delete: if trainerOwnsExercise(resource.data);
     }
 
     match /sessions/{id} {
