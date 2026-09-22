@@ -5,15 +5,15 @@ const failures=[];
 const assert=(ok,message)=>{if(!ok)failures.push(message);};
 const has=(text,needle,message)=>assert(text.includes(needle),message);
 const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
-const modulePath='modules/trainer-canonical-inbox-v10_10_52.js';
+const modulePath='modules/trainer-canonical-inbox-v10_10_58.js';
 const source=fs.readFileSync(modulePath,'utf8');
 const loader=fs.readFileSync('modules/intelligence-suite-loader-v10_10_42.js','utf8');
 const rules=fs.readFileSync('firebase/firestore_28_compacto.rules','utf8');
 
 new vm.Script(source,{filename:modulePath});
 
-has(source,"const VERSION='10.10.52-canonicalinbox3'",'Revisão compatível da Central não está ativa.');
-has(loader,'trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3','Loader não força a revisão compatível da Central.');
+has(source,"const VERSION='10.10.58-canonicalinbox4'",'Revisão compatível da Central não está ativa.');
+has(loader,'trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4','Loader não força a revisão compatível da Central.');
 
 /* Dois caminhos de leitura coexistem sem substituir um ao outro:
    1) vínculo atual por studentId para documentos antigos/legados;
@@ -33,6 +33,11 @@ has(source,'if(!stampMs(data?.answeredAt))return false','Relatório legado sem a
 has(source,"if(mode==='photos')return photos.length>=6;",'Relatório apenas de fotos não exige as seis fotos no fallback legado.');
 has(source,"if(mode==='written')return writtenOk;",'Relatório escrito legado não exige respostas preenchidas.');
 has(source,'return writtenOk&&photos.length>=6;','Relatório completo legado não exige respostas e seis fotos.');
+
+/* A deduplicação semanal nova não pode contaminar o tratamento de questionários
+   legados nem inferir equivalência onde não existe requestKey. */
+has(source,"_weeklyRequestKey:String(data.requestKey||'')",'Central não transporta requestKey semanal para deduplicação comprovada.');
+has(source,"if(!key){selected.push(row);continue;}",'Semanal legado sem requestKey está sendo deduplicado por inferência.');
 
 /* Modelo protegido: um questionário pode aparecer pelo vínculo atual mesmo que o
    trainerId histórico seja diferente; e um questionário criado pelo treinador
@@ -68,4 +73,4 @@ if(failures.length){
   console.error('FALHA — visibilidade de relatório com metadados legados\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — vínculo atual continua recuperando metadados legados e trainerId imutável recupera questionários do treinador mesmo com roster inconsistente, sem alterar o envio original.');
+console.log('APROVADO — vínculo atual continua recuperando metadados legados, trainerId imutável recupera questionários do treinador e dedupe semanal só ocorre com requestKey explícito.');
