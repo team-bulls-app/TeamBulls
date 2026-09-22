@@ -26,16 +26,26 @@ const submit=read(submitPath);
 const history=read(historyPath);
 const core=read(corePath);
 
-has(integrity,"const VERSION='10.10.58-weeklyintegrity1'",'Guarda semanal está na revisão errada.');
+has(integrity,"const VERSION='10.10.58-weeklyintegrity2'",'Guarda semanal está na revisão errada.');
+has(integrity,'function effectiveSubmittedDate(row)','Recuperação da data real de envio não está explícita.');
+has(integrity,'localStampDate(row?.createdAt)||isoDate(row?.submittedDate)||isoDate(row?.dueDate)','Data exibida não prioriza o timestamp de criação confirmado pelo servidor.');
+has(integrity,'_weeklyDateRecovered:true','Histórico não sinaliza recuperação de submittedDate legado.');
 has(integrity,'function logicalKey(row)','Deduplicação semanal não possui identidade lógica explícita.');
 has(integrity,"const requestKey=String(row?.requestKey||'').trim()",'Deduplicação não usa requestKey canônico.');
-has(integrity,"if(!key){result.push(row);continue;}",'Histórico legado sem requestKey está sendo inferido/deduplicado indevidamente.');
-has(integrity,'if(prefer(row,result[position]))result[position]=row','Duplicata lógica não preserva um representante determinístico.');
+has(integrity,'function legacyFingerprint(row)','Duplicata legada não possui prova forte separada.');
+has(integrity,"photos.length!==6||photos.some(value=>!value)",'Duplicata legada pode ser inferida sem os seis photoIds.');
+has(integrity,'photos.join(\'\\u0001\')','Fingerprint legado não exige os mesmos photoIds.');
+has(integrity,'function historyForRequestCalculation(rows)','Cálculo do próximo período não recupera identidade legada de forma isolada.');
+has(integrity,"requestKey:'scheduled:'+due",'Relatório programado legado com dueDate não avança o ciclo semanal.');
+has(integrity,"if(String(row?.requestKind||'scheduled')==='manual')return row",'Pedido extra/manual está sendo inferido indevidamente como programado.');
 has(integrity,"reference.get({source:'server'})",'Preflight semanal não força confirmação no servidor.');
 has(integrity,"db.collection('checkinSchedules').doc(uid)",'Preflight não confirma a agenda semanal atual.');
 has(integrity,"db.collection('weeklyCheckins').where('studentId','==',uid)",'Preflight não confirma o histórico semanal do próprio aluno.');
-has(integrity,'const request=computeCheckinRequest(schedule,history)','Preflight não recalcula a solicitação com estado fresco.');
+has(integrity,'const requestHistory=historyForRequestCalculation(history)','Preflight não usa identidade recuperada somente para cálculo.');
+has(integrity,'const request=computeCheckinRequest(schedule,requestHistory)','Preflight não recalcula a solicitação com estado fresco/compatível.');
+has(integrity,'WEEKLY_CHECKINS=history','Histórico exibido foi contaminado pela identidade sintética usada só no cálculo.');
 has(integrity,'WEEKLY_CHECKIN_REQUEST=request','Solicitação fresca não substitui o request obsoleto antes do envio.');
+has(integrity,'__tbWeeklyIntegrity1010582','Hot upgrade não distingue a revisão nova da guarda antiga.');
 has(integrity,"if(typeof base!=='function'||base.__tbRestCanonical101057!==true)return false",'Guarda pode envolver um submit legado/não canônico.');
 has(integrity,'wrapped.__tbRestCanonical101057=true','Reconciliador pode remover o preflight fresco em reinstalações.');
 has(integrity,'window.TeamBullsStudentTrainerActivityBridge?.install?.()','Índice secundário do treinador não é reinstalado após envolver o submit.');
@@ -54,18 +64,19 @@ has(central,"if(!key){selected.push(row);continue;}",'Central está inferindo du
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central não pode regravar semanal para reparar duplicata visual.');
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Central não pode apagar semanal histórico.');
 
-has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1",'Suíte não entrega a guarda semanal nova.');
+has(loader,"const VERSION='10.10.58-intelsuite8'",'Loader não foi rotacionado para entregar a correção.');
+has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2",'Suíte não entrega a guarda semanal com recuperação de data.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4",'Suíte não entrega a Central semanal deduplicada.');
-const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1");
+const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2");
 const trainerHistory=loader.indexOf('trainer-student-report-history-v10_10_55.js');
 const trainerCentral=loader.indexOf('trainer-canonical-inbox-v10_10_58.js');
-assert(trainerIntegrity>=0&&trainerHistory>trainerIntegrity,'Treinador precisa instalar deduplicação antes de carregar o histórico individual.');
+assert(trainerIntegrity>=0&&trainerHistory>trainerIntegrity,'Treinador precisa instalar recuperação/deduplicação antes de carregar o histórico individual.');
 assert(trainerCentral>trainerHistory,'Central do treinador deve carregar depois do histórico individual.');
 const studentSubmit=loader.indexOf('student-report-submit-reconciliation-v10_10_57.js');
-const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1");
+const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2");
 assert(studentSubmit>=0&&studentIntegrity>studentSubmit,'Aluno precisa instalar a guarda depois do submit REST canônico.');
 
-has(history,'fetchWeeklyCheckins(studentUid)','Histórico do treinador deixou de passar pelo leitor semanal deduplicado.');
+has(history,'fetchWeeklyCheckins(studentUid)','Histórico do treinador deixou de passar pelo leitor semanal corrigido.');
 has(core,"while(completed.has(checkinRequestKey('scheduled',due))",'Cálculo semanal não avança sobre períodos já concluídos.');
 has(core,"return stableEntityId('weekly-checkin',studentUid,requestKey).slice(0,180)",'ID semanal deixou de ser determinístico por aluno/requestKey.');
 has(submit,"currentDocument:{exists:false}",'Submit perdeu a precondição contra sobrescrita/duplicação do ID canônico.');
@@ -79,4 +90,4 @@ if(failures.length){
   console.error('FALHA — integridade de relatórios semanais\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — período semanal é confirmado no servidor antes do envio, duplicatas com mesmo requestKey são ocultadas sem apagar histórico e o write continua único/atômico.');
+console.log('APROVADO — data real usa createdAt do servidor, legado programado avança pelo dueDate sem reescrita e duplicata só é ocultada com identidade canônica ou seis photoIds idênticos.');
