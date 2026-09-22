@@ -7,7 +7,7 @@
   const specs={
     trainer:[
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
-      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity1'],
+      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity2'],
       ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports3'],
       ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox4'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
@@ -19,7 +19,7 @@
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge1',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge1'],
       ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate4',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate4'],
-      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity1'],
+      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity2'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
     ]
   };

@@ -51,9 +51,13 @@ assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explí
 assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode duplicar listeners para o mesmo aluno.');
 
 // Envio canônico: relatórios com fotos não usam mais a fila de batch do Firestore Web SDK.
-assert(loader.includes("const VERSION='10.10.57-intelsuite7'"),'Loader da suíte não foi cache-bustado para o transporte REST seguro.');
+// O loader físico é mutável/network-first; sua revisão pública permanece compatível
+// com o bootstrap enquanto o módulo semanal usa um cache-buster próprio novo.
+assert(loader.includes("const VERSION='10.10.57-intelsuite7'"),'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate4"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
+assert(loader.includes("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2"),'Aluno não carrega a guarda semanal atual depois do transporte REST.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
+assert(loader.indexOf('student-report-submit-reconciliation-v10_10_57.js')<loader.lastIndexOf('weekly-report-integrity-v10_10_58.js'),'Guarda semanal precisa envolver o submit REST canônico, não antecedê-lo.');
 assert(submitState.includes("const VERSION='10.10.57-submitstate4'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
 assert(submitState.includes('https://firestore.googleapis.com/v1/'),'Envio crítico não aponta para a API REST oficial do Firestore.');
 assert(submitState.includes("'Authorization':'Bearer '+idToken"),'REST do Firestore não usa o ID token Firebase do próprio aluno.');
