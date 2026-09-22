@@ -1,9 +1,9 @@
-/* Team Bulls v10.10.58 — carregador isolado da suíte de inteligência, progresso e relatórios. */
+/* Team Bulls v10.10.57 — carregador isolado da suíte de inteligência, progresso e relatórios. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
-  const VERSION='10.10.58-intelsuite8';
+  const VERSION='10.10.57-intelsuite7';
   const specs={
     trainer:[
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
