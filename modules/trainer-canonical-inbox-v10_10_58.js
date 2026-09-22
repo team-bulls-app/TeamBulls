@@ -28,7 +28,7 @@
   const cleanId=value=>String(value??'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,190);
   const eventId=(type,sourceId)=>(type==='weekly_checkin'?'w-':'q-')+cleanId(sourceId);
   const iso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?String(value):'';
-  const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+  const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const js=value=>JSON.stringify(String(value??''));
   const stampMs=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.toDate)return value.toDate().getTime();if(value?.seconds)return Number(value.seconds)*1000;const parsed=new Date(value||0).getTime();return Number.isFinite(parsed)?parsed:0;}catch(error){return 0;}};
   const dateIso=value=>{try{const date=value?.toDate?.();return date instanceof Date&&!Number.isNaN(date.getTime())?date.toISOString().slice(0,10):'';}catch(error){return'';}};
