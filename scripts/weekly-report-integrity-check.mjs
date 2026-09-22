@@ -8,17 +8,19 @@ const has=(text,needle,message)=>assert(text.includes(needle),message);
 const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
 const integrityPath='modules/weekly-report-integrity-v10_10_58.js';
+const centralPath='modules/trainer-canonical-inbox-v10_10_58.js';
 const loaderPath='modules/intelligence-suite-loader-v10_10_42.js';
 const submitPath='modules/student-report-submit-reconciliation-v10_10_57.js';
 const historyPath='modules/trainer-student-report-history-v10_10_55.js';
 const corePath='app_v10_10_9_core.js';
-for(const file of [integrityPath,loaderPath,submitPath,historyPath,corePath]){
+for(const file of [integrityPath,centralPath,loaderPath,submitPath,historyPath,corePath]){
   assert(fs.existsSync(file),`Arquivo obrigatório ausente: ${file}`);
   if(fs.existsSync(file)&&file.endsWith('.js'))new vm.Script(read(file),{filename:file});
 }
 if(failures.length){console.error(failures.join('\n'));process.exit(1);}
 
 const integrity=read(integrityPath);
+const central=read(centralPath);
 const loader=read(loaderPath);
 const submit=read(submitPath);
 const history=read(historyPath);
@@ -40,14 +42,25 @@ has(integrity,'window.TeamBullsStudentTrainerActivityBridge?.install?.()','Índi
 lacks(integrity,'setInterval(','Integridade semanal não pode introduzir polling.');
 lacks(integrity,'MutationObserver','Integridade semanal não deve observar o DOM globalmente.');
 lacks(integrity,'restCommit(','Guarda de integridade não pode criar um segundo caminho de write.');
-lacks(integrity,'.set(','Guarda de integridade não pode gravar documentos.');
+lacks(integrity,').set(','Guarda de integridade não pode gravar documentos Firestore.');
 lacks(integrity,'.update(','Guarda de integridade não pode alterar histórico.');
 lacks(integrity,'.delete(','Guarda de integridade não pode apagar duplicatas históricas.');
 
+has(central,"const VERSION='10.10.58-canonicalinbox4'",'Central do treinador não usa a revisão deduplicada.');
+has(central,"_weeklyRequestKey:String(data.requestKey||'')",'Central não carrega requestKey do semanal canônico.');
+has(central,'function weeklyLogicalKey(row)','Central não deduplica pela identidade semanal canônica.');
+has(central,'suppressedIds.add','Central não oculta o índice secundário correspondente à duplicata.');
+has(central,"if(!key){selected.push(row);continue;}",'Central está inferindo duplicidade em registro legado sem requestKey.');
+lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central não pode regravar semanal para reparar duplicata visual.');
+lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Central não pode apagar semanal histórico.');
+
 has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1",'Suíte não entrega a guarda semanal nova.');
+has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4",'Suíte não entrega a Central semanal deduplicada.');
 const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1");
 const trainerHistory=loader.indexOf('trainer-student-report-history-v10_10_55.js');
+const trainerCentral=loader.indexOf('trainer-canonical-inbox-v10_10_58.js');
 assert(trainerIntegrity>=0&&trainerHistory>trainerIntegrity,'Treinador precisa instalar deduplicação antes de carregar o histórico individual.');
+assert(trainerCentral>trainerHistory,'Central do treinador deve carregar depois do histórico individual.');
 const studentSubmit=loader.indexOf('student-report-submit-reconciliation-v10_10_57.js');
 const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1");
 assert(studentSubmit>=0&&studentIntegrity>studentSubmit,'Aluno precisa instalar a guarda depois do submit REST canônico.');
