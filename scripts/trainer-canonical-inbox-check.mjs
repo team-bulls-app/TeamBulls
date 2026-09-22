@@ -7,11 +7,12 @@ const assert=(condition,message)=>{if(!condition)failures.push(message);};
 const has=(text,needle,message)=>assert(text.includes(needle),message);
 const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
-const modulePath='modules/trainer-canonical-inbox-v10_10_52.js';
+const modulePath='modules/trainer-canonical-inbox-v10_10_58.js';
 const recoveryPath='modules/trainer-report-link-recovery-v10_10_51.js';
 const historyPath='modules/trainer-student-report-history-v10_10_55.js';
+const integrityPath='modules/weekly-report-integrity-v10_10_58.js';
 const loaderPath='modules/intelligence-suite-loader-v10_10_42.js';
-for(const path of [modulePath,recoveryPath,historyPath,loaderPath]){
+for(const path of [modulePath,recoveryPath,historyPath,integrityPath,loaderPath]){
   assert(fs.existsSync(path),`Arquivo obrigatório ausente: ${path}`);
   if(fs.existsSync(path))new vm.Script(read(path),{filename:path});
 }
@@ -19,6 +20,7 @@ for(const path of [modulePath,recoveryPath,historyPath,loaderPath]){
 const source=read(modulePath);
 const recovery=read(recoveryPath);
 const history=read(historyPath);
+const integrity=read(integrityPath);
 const loader=read(loaderPath);
 const firebaseConfig=read('firebase.json');
 const firestoreRules=read('firebase/firestore_28_compacto.rules');
@@ -26,13 +28,15 @@ const storageRules=read('firebase/storage_6.rules');
 const legacyRepair=read('modules/legacy-student-link-repair-v10_10_10.js');
 const sw=read('sw.js');
 
-has(source,"const VERSION='10.10.52-canonicalinbox3'",'Central canônica está na revisão errada.');
-has(loader,"trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3",'Loader do treinador não entrega a Central canônica por propriedade histórica.');
-has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader não foi cache-bustado para a revisão segura de envio/histórico.');
+has(source,"const VERSION='10.10.58-canonicalinbox4'",'Central canônica está na revisão errada.');
+has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4",'Loader do treinador não entrega a Central com deduplicação semanal.');
+has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader da suíte divergiu inesperadamente do bootstrap publicado.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
+has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1",'Loader não entrega a guarda de integridade semanal.');
 has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3",'Loader não entrega a revisão resiliente da tela individual do aluno.');
-assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Recuperação de vínculo deve continuar antes do histórico individual.');
-assert(loader.indexOf('trainer-student-report-history-v10_10_55.js')<loader.indexOf('trainer-canonical-inbox-v10_10_52.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
+assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('weekly-report-integrity-v10_10_58.js'),'Recuperação de vínculo deve continuar antes da integridade semanal.');
+assert(loader.indexOf('weekly-report-integrity-v10_10_58.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Deduplicação semanal precisa ser instalada antes do histórico individual.');
+assert(loader.indexOf('trainer-student-report-history-v10_10_55.js')<loader.indexOf('trainer-canonical-inbox-v10_10_58.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
 
 has(source,"db.collection('questionnaires').where('trainerId','==',uid).limit(MAX_ITEMS)",'Central não consulta questionários diretamente pelo trainerId imutável.');
 has(source,'loadTrainerOwnedQuestionnaires(uid)','Central não incorpora a leitura histórica por propriedade.');
@@ -47,12 +51,14 @@ has(history,"db.collection('questionnaires').where('trainerId','==',trainerUid).
 has(history,"db.collection('questionnaires').where('studentId','==',studentUid).limit(MAX_REPORTS)",'Tela individual perdeu o fallback legado por studentId.');
 has(history,"sectionError('ts-quest-list','Não foi possível carregar os relatórios personalizados agora.')",'Falha de personalizados pode permanecer em loading infinito.');
 has(history,"sectionError('ts-weekly-checkin-list','Não foi possível carregar os relatórios semanais agora.')",'Falha de semanais pode permanecer em loading infinito.');
-has(history,"TENTAR NOVAMENTE",'Tela individual sem retry explícito após falha.');
+has(history,'TENTAR NOVAMENTE','Tela individual sem retry explícito após falha.');
 has(history,"showScreen('screen-ts-quest',navigation)",'A aba Relatórios do aluno não abre imediatamente antes da consulta de rede.');
 has(history,'report?.answeredAt?{...report,createdAt:report.answeredAt}:report','Card do treinador continua exibindo a data errada da resposta.');
 has(history,'TS_QUEST_CACHE=questionnaires','Tela individual não substitui o cache antigo pelo histórico canônico atualizado.');
 has(history,"renderQuestList(TS_QUEST_CACHE,'ts-quest-list','ts-quest-empty',true)",'Tela individual não renderiza o histórico recuperado.');
 has(history,'fetchWeeklyCheckins(studentUid)','Correção individual não preserva a seção de relatórios semanais existente.');
+has(integrity,'fetchWeeklyCheckins=wrapped','Leitor semanal não recebe a deduplicação por requestKey.');
+has(integrity,"if(!key){result.push(row);continue;}",'Registros legados sem requestKey não podem ser colapsados por inferência.');
 lacks(history,'cloudWrite(','Histórico individual não pode fazer writes.');
 lacks(history,'.update(','Histórico individual não pode atualizar documentos.');
 lacks(history,'.set(','Histórico individual não pode criar documentos.');
@@ -63,6 +69,11 @@ lacks(history,'MutationObserver','Histórico individual não pode observar globa
 has(source,"db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)",'Roster atual deixou de ficar isolado pelo treinador.');
 has(source,"db.collection('questionnaires').where('studentId','==',sid).get()",'Compatibilidade com questionários antigos sem trainerId foi removida.');
 has(source,"db.collection('weeklyCheckins').where('studentId','==',sid).get()",'Relatórios semanais atuais deixaram de ser consultados pelo aluno vinculado.');
+has(source,'_weeklyRequestKey:String(data.requestKey||\'\')','Central não transporta a identidade lógica do relatório semanal.');
+has(source,'function weeklyLogicalKey(row)','Central não deduplica semanal pelo requestKey canônico.');
+has(source,'suppressedIds.add','Central não suprime o índice secundário do documento duplicado.');
+has(source,'weeklyDuplicateCount++','Central não expõe diagnóstico de duplicatas lógicas.');
+has(source,'if(!key){selected.push(row);continue;}','Central está inferindo duplicidade em histórico sem requestKey.');
 has(source,'function questionnaireComplete(data)','Compatibilidade de conclusão de questionário não está explícita.');
 has(source,'if(data?.answered===true)return true','Questionário respondido deixou de ser reconhecido.');
 
@@ -107,4 +118,4 @@ if(failures.length){
   console.error('FALHA — propriedade histórica / histórico individual de relatórios do treinador\n- '+failures.join('\n- '));
   process.exit(1);
 }
-console.log('APROVADO — tela individual não fica em loading infinito, personalizados/semanais carregam separados e semanais antigos podem ser lidos somente pelo treinador que programou a agenda.');
+console.log('APROVADO — histórico individual e Central ocultam somente duplicatas semanais comprovadas por requestKey, sem apagar legado, e preservam isolamento/propriedade histórica.');
