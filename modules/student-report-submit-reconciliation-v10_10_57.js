@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.57 — envio canônico resiliente de relatórios sem depender da fila interna do Firestore Web SDK. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_101057__)return;
-  window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_101057__=true;
+  if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010575__)return;
+  window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010575__=true;
 
-  const VERSION='10.10.57-submitstate4';
+  const VERSION='10.10.57-submitstate5';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -178,14 +178,54 @@
       return'wait';
     }catch(error){return'wait';}
   }
+  function sameRestValue(a,b){
+    if(!a||!b)return false;
+    if('integerValue' in a||'doubleValue' in a)return Number(a.integerValue??a.doubleValue)===Number(b.integerValue??b.doubleValue);
+    if(a.arrayValue)return (a.arrayValue.values||[]).length===(b.arrayValue?.values||[]).length&&(a.arrayValue.values||[]).every((v,i)=>sameRestValue(v,b.arrayValue?.values?.[i]));
+    if(a.mapValue)return sameRestFields(a.mapValue.fields,b.mapValue?.fields);
+    return JSON.stringify(a)===JSON.stringify(b);
+  }
+  function sameRestFields(expected,actual){
+    return !!actual&&Object.entries(expected||{}).every(([key,value])=>sameRestValue(value,actual[key]));
+  }
+  async function confirmWeeklyAttempt(checkinId,state){
+    if(!state?.writes?.length)return false;
+    // A deterministic ID proves the period, not that these answers/photos arrived.
+    // Compare every field of all seven atomic writes before reporting success.
+    for(const write of state.writes){
+      const parts=write.update.name.split('/'),id=parts.pop(),collection=parts.pop();
+      const doc=await restGet(collection,id);
+      if(!doc||doc.name!==write.update.name||!sameRestFields(write.update.fields,doc.fields))return false;
+    }
+    return true;
+  }
+
   async function uncertainWeekly(checkinId){
     const state=uncertain.get('w:'+checkinId);if(!state)return false;
     try{
-      const doc=await restGet('weeklyCheckins',checkinId);
-      if(doc){uncertain.delete('w:'+checkinId);return'confirmed';}
+      const confirmed=await confirmWeeklyAttempt(checkinId,state);
+      if(confirmed){uncertain.delete('w:'+checkinId);return'confirmed';}
       if(Date.now()>=state.until){uncertain.delete('w:'+checkinId);return false;}
       return'wait';
     }catch(error){return'wait';}
+  }
+
+  async function reconcileWeeklyPending(){
+    const uid=studentUid();
+    for(const [key,state] of uncertain){
+      if(!key.startsWith('w:')||state.writes?.at(-1)?.update?.fields?.studentId?.stringValue!==uid)continue;
+      const result=await uncertainWeekly(key.slice(2));
+      if(result==='confirmed'){
+        if(typeof clearWeeklyCheckinPreviews==='function')clearWeeklyCheckinPreviews();
+        WEEKLY_CHECKIN_FILES=Array(6).fill(null);
+        if(typeof closeModal==='function')closeModal('modal-weekly-checkin');
+        notify('✓ O relatório semanal anterior foi confirmado pelo servidor.');
+        try{await loadWeeklyCheckinState(true);renderCalendar();}catch(error){}
+        return true;
+      }
+      if(result==='wait'){notify('Este relatório semanal ainda está em confirmação. Não envie novamente agora.',true);return false;}
+    }
+    return null;
   }
 
   async function robustQuestionnaireSubmit(){
@@ -236,6 +276,7 @@
   robustQuestionnaireSubmit.__tbRestCanonical101057=true;
 
   async function robustWeeklySubmit(){
+    const pending=await reconcileWeeklyPending();if(pending!==null)return pending;
     const request=typeof WEEKLY_CHECKIN_REQUEST!=='undefined'?WEEKLY_CHECKIN_REQUEST:null;
     const uid=studentUid();if(!request||!uid)return;
     const weight=Number(String(document.getElementById('weekly-checkin-weight')?.value||'').replace(',','.'));if(!Number.isFinite(weight)||weight<20||weight>500){alert('Informe um peso válido entre 20 e 500 kg.');return;}
@@ -262,8 +303,8 @@
       writes.push(createWrite('weeklyCheckins',checkinId,checkinData));
       try{await restCommit(writes,'enviar relatório semanal');}
       catch(error){
-        if(!error?.definite){uncertain.set('w:'+checkinId,{until:Date.now()+UNCERTAIN_RETRY_DELAY});await sleep(1200);try{if(await restGet('weeklyCheckins',checkinId)){uncertain.delete('w:'+checkinId);error=null;}}catch(confirmError){}if(error)throw error;}
-        else{try{if(await restGet('weeklyCheckins',checkinId))error=null;}catch(confirmError){}if(error)throw error;}
+        if(!error?.definite){uncertain.set('w:'+checkinId,{until:Date.now()+UNCERTAIN_RETRY_DELAY,writes});await sleep(1200);try{if(await confirmWeeklyAttempt(checkinId,uncertain.get('w:'+checkinId))){uncertain.delete('w:'+checkinId);error=null;}}catch(confirmError){}if(error)throw error;}
+        else{throw error;}
       }
       uncertain.delete('w:'+checkinId);
       if(typeof clearWeeklyCheckinPreviews==='function')clearWeeklyCheckinPreviews();
@@ -277,6 +318,7 @@
     }finally{endAction('weekly-checkin-submit','modal-weekly-checkin');}
   }
   robustWeeklySubmit.__tbRestCanonical101057=true;
+  robustWeeklySubmit.__tbWeeklyAttempt5=true;
 
   function unwrapBridge(fn){let current=fn;for(let i=0;i<5&&current?.__tbActivityBridge101047&&current.__tbBase;i++)current=current.__tbBase;return current;}
   function installPendingCheck(){
@@ -292,7 +334,7 @@
   function installWeeklySubmit(){
     try{
       if(typeof submitWeeklyCheckin!=='function')return false;
-      const unwrapped=unwrapBridge(submitWeeklyCheckin);if(unwrapped?.__tbRestCanonical101057){installedWeekly=true;return true;}
+      const unwrapped=unwrapBridge(submitWeeklyCheckin);if(unwrapped?.__tbWeeklyAttempt5){installedWeekly=true;return true;}
       submitWeeklyCheckin=robustWeeklySubmit;installedWeekly=true;return true;
     }catch(error){return false;}
   }
@@ -309,5 +351,5 @@
   window.addEventListener('team-bulls-student-runtime-ready',install);
   window.addEventListener('pageshow',()=>{if(student()){install();reconcileQuestionnaires().catch(()=>{});}},{passive:true});
 
-  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
+  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
 })();
