@@ -16,6 +16,7 @@ jobs:
         run: |
           node scripts/production-audit-check.mjs
           node scripts/report-submit-contract-check.mjs
+          node scripts/weekly-report-integrity-check.mjs
           node scripts/mobile-startup-consistency-check.mjs
           node scripts/heic-worker-export-check.mjs
           node scripts/pdf-export-check.mjs
