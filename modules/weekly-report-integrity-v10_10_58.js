@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.58 — integridade do ciclo semanal sem reescrever histórico. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010582__)return;
-  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010582__=true;
+  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010583__)return;
+  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010583__=true;
 
-  const VERSION='10.10.58-weeklyintegrity2';
+  const VERSION='10.10.58-weeklyintegrity3';
   const READ_TIMEOUT=10000;
   let fetchInstalled=false;
   let submitInstalled=false;
@@ -47,11 +47,11 @@
     return String(row?.studentId||'')+'\u0000'+requestKey;
   }
   function legacyFingerprint(row){
-    if(logicalKey(row))return'';
+
     const photos=Array.isArray(row?.photoIds)?row.photoIds.map(value=>String(value||'')):[];
     if(photos.length!==6||photos.some(value=>!value))return'';
     const date=effectiveSubmittedDate(row);if(!date)return'';
-    const answers=Array.isArray(row?.answers)?row.answers.map(value=>String(value??'')).join('\u0001'):'';
+    const answers=JSON.stringify([row?.requestKey||'',row?.requestKind||'scheduled',row?.questions||[],row?.sectionAt||{},row?.answers||[]]);
     return[String(row?.studentId||''),date,isoDate(row?.dueDate),String(Number(row?.weight)||0),photos.join('\u0001'),answers].join('\u0000');
   }
   function prefer(candidate,current){
@@ -65,7 +65,7 @@
     const source=(Array.isArray(rows)?rows:[]).map(normalizeWeeklyRow),result=[],positions=new Map(),legacyPositions=new Map();
     let suppressed=0,legacySuppressed=0;
     for(const row of source){
-      const key=logicalKey(row);
+      const key=logicalKey(row)&&legacyFingerprint(row)?logicalKey(row)+'\u0000'+legacyFingerprint(row):'';
       if(key){
         const position=positions.get(key);
         if(position===undefined){positions.set(key,result.length);result.push(row);continue;}
@@ -99,6 +99,17 @@
     return prepared;
   }
 
+  function installRequestGuard(){
+    if(typeof computeCheckinRequest!=='function'||computeCheckinRequest.__tbWeeklyCalculation3)return;
+    const base=computeCheckinRequest;
+    const wrapped=function(schedule,rows){
+      if(schedule?.enabled===false)return null;
+      return base.call(this,schedule,historyForRequestCalculation((rows||[]).map(normalizeWeeklyRow)));
+    };
+    wrapped.__tbWeeklyCalculation3=true;
+    computeCheckinRequest=wrapped;
+  }
+
   function unwrapFetchGuard(fn){
     let current=fn;
     for(let index=0;index<6&&current?.__tbWeeklyIntegrity101058&&current.__tbBase;index++)current=current.__tbBase;
@@ -107,11 +118,11 @@
   function installFetchGuard(){
     try{
       if(typeof fetchWeeklyCheckins!=='function')return false;
-      if(fetchWeeklyCheckins.__tbWeeklyIntegrity1010582){fetchInstalled=true;return true;}
+      if(fetchWeeklyCheckins.__tbWeeklyIntegrity1010583){fetchInstalled=true;return true;}
       const base=unwrapFetchGuard(fetchWeeklyCheckins);
       const wrapped=async function(){return dedupeWeeklyCheckins(await base.apply(this,arguments));};
       wrapped.__tbWeeklyIntegrity101058=true;
-      wrapped.__tbWeeklyIntegrity1010582=true;
+      wrapped.__tbWeeklyIntegrity1010583=true;
       wrapped.__tbBase=base;
       fetchWeeklyCheckins=wrapped;
       fetchInstalled=true;
@@ -147,7 +158,7 @@
     let current=fn;
     for(let index=0;index<8;index++){
       if(current?.__tbActivityBridge101047&&current.__tbBase){current=current.__tbBase;continue;}
-      if(current?.__tbWeeklyIntegrity101058&&!current?.__tbWeeklyIntegrity1010582&&current.__tbBase){current=current.__tbBase;continue;}
+      if(current?.__tbWeeklyIntegrity101058&&!current?.__tbWeeklyIntegrity1010583&&current.__tbBase){current=current.__tbBase;continue;}
       break;
     }
     return current;
@@ -156,8 +167,8 @@
     try{
       if(!student()||typeof submitWeeklyCheckin!=='function')return false;
       let current=submitWeeklyCheckin;
-      if(current?.__tbActivityBridge101047&&current.__tbBase?.__tbWeeklyIntegrity1010582){submitInstalled=true;return true;}
-      if(current?.__tbWeeklyIntegrity1010582){submitInstalled=true;return true;}
+      if(current?.__tbActivityBridge101047&&current.__tbBase?.__tbWeeklyIntegrity1010583){submitInstalled=true;return true;}
+      if(current?.__tbWeeklyIntegrity1010583){submitInstalled=true;return true;}
       const base=unwrapSubmit(current);
       // Só envolvemos o submit canônico corrigido. Assim um runtime antigo não
       // recebe um selo falso de compatibilidade nem volta a escrever pelo fluxo legado.
@@ -166,6 +177,11 @@
         const uid=String(CURRENT_USER?.uid||'');
         if(!student()||!uid)return base.apply(this,arguments);
         if(navigator.onLine===false)return base.apply(this,arguments);
+        if(wrapped.busy)return false;
+        wrapped.busy=true;
+        try{
+        const pending=await window.TeamBullsStudentReportSubmitReconciliation?.reconcileWeeklyPending?.();
+        if(pending===true||pending===false)return pending;
         const previousKey=String(typeof WEEKLY_CHECKIN_REQUEST!=='undefined'&&WEEKLY_CHECKIN_REQUEST?.requestKey||'');
         try{
           const fresh=await refreshCanonicalRequest(uid);
@@ -175,13 +191,15 @@
           notify('Não foi possível confirmar o período atual do relatório no servidor. Nenhum envio foi feito; atualize o app e tente novamente.',true);
           return false;
         }
-        return base.apply(this,arguments);
+        return await base.apply(this,arguments);
+        }finally{wrapped.busy=false;}
       };
       wrapped.__tbWeeklyIntegrity101058=true;
-      wrapped.__tbWeeklyIntegrity1010582=true;
+      wrapped.__tbWeeklyIntegrity1010583=true;
       // O reconciliador reconhece este wrapper como continuação do submit REST,
       // evitando que seus timers o substituam pelo caminho sem o preflight fresco.
       wrapped.__tbRestCanonical101057=true;
+      wrapped.__tbWeeklyAttempt5=base.__tbWeeklyAttempt5;
       wrapped.__tbBase=base;
       submitWeeklyCheckin=wrapped;
       submitInstalled=true;
@@ -191,6 +209,7 @@
   }
 
   function install(){
+    installRequestGuard();
     installFetchGuard();
     if(student())installSubmitGuard();
     return fetchInstalled&&(!student()||submitInstalled);
@@ -209,6 +228,7 @@
     install,
     dedupe:dedupeWeeklyCheckins,
     effectiveSubmittedDate,
+    fingerprint:legacyFingerprint,
     state:()=>({fetchInstalled,submitInstalled,suppressedDuplicates,suppressedLegacyDuplicates,recoveredDates,recoveredRequestKeys})
   });
 })();

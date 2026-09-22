@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.58 — Central canônica com deduplicação semanal por requestKey. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_101058__)return;
-  window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_101058__=true;
+  if(window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_1010585__)return;
+  window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_1010585__=true;
 
-  const VERSION='10.10.58-canonicalinbox4';
+  const VERSION='10.10.58-canonicalinbox5';
   const MAX_ITEMS=500;
   const CONCURRENCY=6;
   const REPAIR_CONCURRENCY=4;
@@ -45,7 +45,7 @@
   }
   function submittedDate(type,data){
     if(type==='questionnaire')return iso(data?.submittedDate)||dateIso(data?.answeredAt)||iso(data?.dueDate)||dateIso(data?.createdAt)||todayIso();
-    return iso(data?.submittedDate)||dateIso(data?.createdAt)||iso(data?.dueDate)||todayIso();
+    return window.TeamBullsWeeklyReportIntegrity?.effectiveSubmittedDate(data)||iso(data?.submittedDate)||iso(data?.dueDate)||'';
   }
   function sourceCreatedAt(type,data){
     if(type==='questionnaire'&&data?.answeredAt?.toDate)return data.answeredAt;
@@ -103,7 +103,7 @@
     }catch(error){console.warn('[Team Bulls] Relatórios por vínculo indisponíveis para',sid,error?.code||error?.message||error);}
     try{
       const snap=await timeout(db.collection('weeklyCheckins').where('studentId','==',sid).get(),9000,'relatórios semanais de '+String(student.name||'aluno').slice(0,60));
-      (snap.docs||[]).forEach(doc=>{const data=doc.data()||{};if(String(data.studentId||'')!==sid)return;rows.push({id:eventId('weekly_checkin',doc.id),type:'weekly_checkin',sourceId:doc.id,studentId:sid,title:titleFor('weekly_checkin',data),submittedDate:submittedDate('weekly_checkin',data),createdAt:sourceCreatedAt('weekly_checkin',data),_createdMs:sourceMs('weekly_checkin',data),_weeklyRequestKey:String(data.requestKey||''),canonical:true});});
+      (snap.docs||[]).forEach(doc=>{const data=doc.data()||{};if(String(data.studentId||'')!==sid)return;rows.push({id:eventId('weekly_checkin',doc.id),type:'weekly_checkin',sourceId:doc.id,studentId:sid,title:titleFor('weekly_checkin',data),submittedDate:submittedDate('weekly_checkin',data),createdAt:sourceCreatedAt('weekly_checkin',data),_createdMs:sourceMs('weekly_checkin',data),_weeklyRequestKey:String(data.requestKey||''),_weeklyFingerprint:window.TeamBullsWeeklyReportIntegrity?.fingerprint(data)||'',canonical:true});});
     }catch(error){console.warn('[Team Bulls] Check-ins canônicos indisponíveis para',sid,error?.code||error?.message||error);}
     return rows;
   }
@@ -111,7 +111,7 @@
     try{const snap=await timeout(eventCollection(uid).orderBy('createdAt','desc').limit(MAX_ITEMS).get(),9000,'estado lido da Central');return(snap.docs||[]).map(doc=>({...doc.data(),id:doc.id,_createdMs:stampMs(doc.data()?.createdAt),canonical:false}));}
     catch(error){console.warn('[Team Bulls] Índice da Central indisponível; exibindo fontes canônicas.',error?.code||error?.message||error);return[];}
   }
-  function weeklyLogicalKey(row){const key=String(row?._weeklyRequestKey||'').trim();return row?.type==='weekly_checkin'&&key?String(row.studentId||'')+'\u0000'+key:'';}
+  function weeklyLogicalKey(row){return row?.type==='weekly_checkin'&&row._weeklyFingerprint?String(row.studentId||'')+'\u0000'+row._weeklyFingerprint:'';}
   function preferWeekly(candidate,current){
     const candidateMs=Number(candidate?._createdMs)||0,currentMs=Number(current?._createdMs)||0;
     if(candidateMs!==currentMs)return candidateMs>currentMs;
@@ -132,8 +132,11 @@
       if(takeCandidate)selected[position]=row;
     }
     const map=new Map();
-    (indexRows||[]).forEach(row=>{if(!suppressedIds.has(String(row.id||'')))map.set(String(row.id),{...row});});
-    selected.forEach(row=>{const indexed=map.get(row.id);map.set(row.id,{...indexed,...row,read:indexed?.read===true,readAt:indexed?.readAt||null,_createdMs:row._createdMs||indexed?._createdMs||0,canonical:true});});
+    const sources=new Set((canonicalRows||[]).map(row=>row.type+'\u0000'+row.sourceId));
+    (indexRows||[]).forEach(row=>{if(!sources.has(row.type+'\u0000'+row.sourceId)&&!suppressedIds.has(String(row.id||'')))map.set(String(row.id),{...row});});
+    const indexBySource=new Map();
+    (indexRows||[]).forEach(row=>{const key=row.type+'\u0000'+row.sourceId,current=indexBySource.get(key);if(!current||row.read===true)indexBySource.set(key,row);});
+    selected.forEach(row=>{const indexed=indexBySource.get(row.type+'\u0000'+row.sourceId);map.set(row.id,{...indexed,...row,read:indexed?.read===true,readAt:indexed?.readAt||null,_createdMs:row._createdMs||indexed?._createdMs||0,canonical:true});});
     return[...map.values()].sort((a,b)=>(b._createdMs||0)-(a._createdMs||0)||String(b.submittedDate||'').localeCompare(String(a.submittedDate||''))).slice(0,MAX_ITEMS);
   }
   function studentName(studentId){const row=rosterMap.get(String(studentId||''));return String(row?.name||row?.email||'Aluno');}

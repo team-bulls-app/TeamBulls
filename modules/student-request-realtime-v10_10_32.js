@@ -99,7 +99,7 @@
     let request=null;
     try{
       WEEKLY_CHECKIN_SCHEDULE=liveSchedule;
-      WEEKLY_CHECKINS=liveCheckins.slice();
+      WEEKLY_CHECKINS=window.TeamBullsWeeklyReportIntegrity?.dedupe?.(liveCheckins)||liveCheckins.slice();
       request=liveSchedule?.enabled===false?null:(typeof computeCheckinRequest==='function'?computeCheckinRequest(liveSchedule,liveCheckins):null);
       WEEKLY_CHECKIN_REQUEST=request;WEEKLY_CHECKIN_STATE_UID=uid;
       if(typeof renderWeeklyCheckinCard==='function')renderWeeklyCheckinCard();

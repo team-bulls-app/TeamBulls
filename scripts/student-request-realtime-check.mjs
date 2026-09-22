@@ -54,11 +54,11 @@ assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode dup
 // O loader físico é mutável/network-first; sua revisão pública permanece compatível
 // com o bootstrap enquanto o módulo semanal usa um cache-buster próprio novo.
 assert(loader.includes("const VERSION='10.10.57-intelsuite7'"),'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
-assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate4"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
-assert(loader.includes("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2"),'Aluno não carrega a guarda semanal atual depois do transporte REST.');
+assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate5"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
+assert(loader.includes("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity3"),'Aluno não carrega a guarda semanal atual depois do transporte REST.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
 assert(loader.indexOf('student-report-submit-reconciliation-v10_10_57.js')<loader.lastIndexOf('weekly-report-integrity-v10_10_58.js'),'Guarda semanal precisa envolver o submit REST canônico, não antecedê-lo.');
-assert(submitState.includes("const VERSION='10.10.57-submitstate4'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
+assert(submitState.includes("const VERSION='10.10.57-submitstate5'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
 assert(submitState.includes('https://firestore.googleapis.com/v1/'),'Envio crítico não aponta para a API REST oficial do Firestore.');
 assert(submitState.includes("'Authorization':'Bearer '+idToken"),'REST do Firestore não usa o ID token Firebase do próprio aluno.');
 assert(submitState.includes("headers['X-Firebase-AppCheck']=tokenResult.token"),'REST crítico não preserva o token App Check.');
@@ -75,7 +75,7 @@ assert(submitState.includes("uncertain.set('w:'+checkinId"),'Semanal incerto nã
 assert(submitState.includes("notify('Este relatório ainda está em confirmação. Não envie novamente agora.'"),'Questionário incerto não orienta/bloqueia reenvio manual imediato.');
 assert(submitState.includes("notify('Este relatório semanal ainda está em confirmação. Não envie novamente agora.'"),'Semanal incerto não orienta/bloqueia reenvio manual imediato.');
 assert(submitState.includes("restAnswered(await restGet('questionnaires',reportId))"),'Questionário não reconcilia resultado incerto no documento canônico exato.');
-assert(submitState.includes("restGet('weeklyCheckins',checkinId)"),'Semanal não reconcilia resultado incerto no documento canônico exato.');
+assert(submitState.includes('confirmWeeklyAttempt(checkinId,state)')&&submitState.includes('sameRestFields(write.update.fields,doc.fields)'),'Semanal não verifica o conteúdo completo do commit incerto.');
 assert(submitState.includes('weeklyCheckinDocId(uid,request.requestKey)'),'Semanal perdeu o ID determinístico do envio.');
 assert((submitState.match(/await restCommit\(writes,/g)||[]).length===2,'Questionário e semanal devem executar um único commit atômico cada.');
 assert(!submitState.includes('db.batch('),'Relatórios críticos não podem voltar ao batch interno do Firestore Web SDK.');
