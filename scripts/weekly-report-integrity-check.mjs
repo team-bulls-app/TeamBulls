@@ -64,7 +64,7 @@ has(central,"if(!key){selected.push(row);continue;}",'Central está inferindo du
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central não pode regravar semanal para reparar duplicata visual.');
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Central não pode apagar semanal histórico.');
 
-has(loader,"const VERSION='10.10.58-intelsuite8'",'Loader não foi rotacionado para entregar a correção.');
+has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2",'Suíte não entrega a guarda semanal com recuperação de data.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4",'Suíte não entrega a Central semanal deduplicada.');
 const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity2");
