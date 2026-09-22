@@ -9,7 +9,7 @@
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity1',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity1'],
       ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports3'],
-      ['./modules/trainer-canonical-inbox-v10_10_52.js?v=10.10.52-canonicalinbox3',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.52-canonicalinbox3'],
+      ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox4',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox4'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.56-contextguard4',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.56-contextguard4'],
       ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command1',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command1'],
@@ -24,7 +24,7 @@
     ]
   };
   const loading=new Map();let completedRole='';
-  const role=()=>{try{const value=String(CURRENT_USER?.role||'');if(value==='trainer'&&MODE==='cloud')return'trainer';if(value==='student'&&MODE==='cloud')return'student';}catch(error){}return'';};
+  const role=()=>{try{return String(CURRENT_USER?.role||'')==='trainer'&&MODE==='cloud'?'trainer':String(CURRENT_USER?.role||'')==='student'&&MODE==='cloud'?'student':'';}catch(error){return'';}};
   function loadOne(src,ready){
     if(ready())return Promise.resolve(true);if(loading.has(src))return loading.get(src);
     const promise=new Promise(resolve=>{let settled=false,timer=0;const finish=ok=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);if(!ok)loading.delete(src);resolve(!!ok);},url=new URL(src,location.href).href,existing=[...document.scripts].find(script=>String(script.src||'')===url);if(existing){if(ready()){finish(true);return;}existing.addEventListener('load',()=>finish(ready()),{once:true});existing.addEventListener('error',()=>finish(false),{once:true});timer=setTimeout(()=>finish(ready()),8000);return;}const script=document.createElement('script');script.src=src;script.async=false;script.dataset.teamBullsIntelligenceSuite='1';script.onload=()=>finish(ready());script.onerror=()=>finish(false);timer=setTimeout(()=>{try{script.remove();}catch(error){}finish(false);},8000);document.head.appendChild(script);});loading.set(src,promise);return promise;
