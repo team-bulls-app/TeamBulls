@@ -17,7 +17,7 @@
   let badgeRefreshPromise=null;
   let noticeActionBusy=false;
 
-  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
+  const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const student=()=>CURRENT_USER?.role==='student'?CURRENT_USER:null;
   const uidOf=value=>String(value?.uid||value?.id||'');
   const studentUid=()=>uidOf(student());
