@@ -188,7 +188,7 @@ if('caches' in window){
     './modules/pending-session-mutations-v10_10_34.js?v=10.10.34-pendingsession1',
     './modules/week-selection-fix-v10_10_9.js?v=10.10.9-weekselection1',
     './modules/session-integrity-v10_10_39.js?v=10.10.39-sessionintegrity1',
-    './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3',
+    './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime4',
     './modules/student-weekly-report-entry-v10_10_35.js?v=10.10.35-weeklyentry1',
     './modules/pdf-export-v10_10_12.js?v=10.10.12-pdf1&fix=student1',
     './modules/student-workout-library-v10_10_24.js?v=10.10.24-workoutlibrary1',

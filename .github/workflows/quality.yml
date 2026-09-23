@@ -36,6 +36,8 @@ jobs:
           node scripts/report-usability-audit-check.mjs
           node scripts/report-submit-contract-check.mjs
           node scripts/weekly-report-integrity-check.mjs
+          node scripts/monthly-report-cycle-check.mjs
+          node scripts/questionnaire-confirmation-check.mjs
           node scripts/firestore-read-baseline-check.mjs
           node scripts/diet-calculation-evolution-check.mjs
           node scripts/diet-portion-presets-check.mjs
