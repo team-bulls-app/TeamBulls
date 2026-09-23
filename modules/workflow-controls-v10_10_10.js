@@ -505,7 +505,7 @@
       const trainer=CURRENT_USER?.role==='trainer'&&String(listId)==='ts-weekly-checkin-list';
       list.innerHTML=items.map(item=>{
         const count=Array.isArray(item.photoIds)?item.photoIds.length:6;
-        const card=`<button class="weekly-checkin-history-card" onclick="viewWeeklyCheckin(${jsArg(item.id)})"><div><span>${esc(fmt(item.submittedDate||item.dueDate))}</span><strong>${item.requestKind==='manual'?'Relatório extra':'Relatório semanal'}</strong><small>${Number(item.weight)>0?esc(Number(item.weight).toLocaleString('pt-BR',{maximumFractionDigits:1}))+' kg · ':''}${count} fotos</small></div><span class="exercise-row-arrow">›</span></button>`;
+        const card=`<button class="weekly-checkin-history-card" onclick="viewWeeklyCheckin(${jsArg(item.id)})"><div><span>${esc(fmt(item.submittedDate||item.dueDate))}</span><strong>${item.requestKind==='manual'?'Relatório extra':'Relatório semanal'}</strong><small>${Number(item.weight)>0?esc(Number(item.weight).toLocaleString('pt-BR',{maximumFractionDigits:1}))+' kg · ':''}${count} fotos${item.dueDate?' · Período: '+esc(fmt(item.dueDate)):''}</small></div><span class="exercise-row-arrow">›</span></button>`;
         return trainer?`<div class="tb-weekly-report-actions">${card}<button type="button" class="btn-add-set tb-report-feedback-btn" onclick="openFeedbackForWeeklyReport(${jsArg(item.id)})">FEEDBACK EXTENSO</button></div>`:card;
       }).join('');
     };

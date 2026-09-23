@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.57 — envio canônico resiliente de relatórios sem depender da fila interna do Firestore Web SDK. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010575__)return;
-  window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010575__=true;
+  if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010576__)return;
+  window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010576__=true;
 
-  const VERSION='10.10.57-submitstate5';
+  const VERSION='10.10.57-submitstate6';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -12,6 +12,7 @@
   const FIRESTORE_DATA_URL_MAX=620000;
   const MAX_COMMIT_BODY=7*1024*1024;
   const uncertain=new Map();
+  let weeklyReceipt=null;
   let installedQuestionnaire=false;
   let installedWeekly=false;
   let installedPending=false;
@@ -216,6 +217,7 @@
       if(!key.startsWith('w:')||state.writes?.at(-1)?.update?.fields?.studentId?.stringValue!==uid)continue;
       const result=await uncertainWeekly(key.slice(2));
       if(result==='confirmed'){
+        weeklyReceipt=Object.freeze({studentId:uid,sourceId:key.slice(2)});
         if(typeof clearWeeklyCheckinPreviews==='function')clearWeeklyCheckinPreviews();
         WEEKLY_CHECKIN_FILES=Array(6).fill(null);
         if(typeof closeModal==='function')closeModal('modal-weekly-checkin');
@@ -276,13 +278,14 @@
   robustQuestionnaireSubmit.__tbRestCanonical101057=true;
 
   async function robustWeeklySubmit(){
+    const request=window.TeamBullsWeeklyReportIntegrity?.submissionRequest?.();
+    const uid=studentUid();if(!request||!uid||request.studentId!==uid||!request.pending){notify('Abra o relatório atualizado antes de enviar.',true);return false;}
     const pending=await reconcileWeeklyPending();if(pending!==null)return pending;
-    const request=typeof WEEKLY_CHECKIN_REQUEST!=='undefined'?WEEKLY_CHECKIN_REQUEST:null;
-    const uid=studentUid();if(!request||!uid)return;
     const weight=Number(String(document.getElementById('weekly-checkin-weight')?.value||'').replace(',','.'));if(!Number.isFinite(weight)||weight<20||weight>500){alert('Informe um peso válido entre 20 e 500 kg.');return;}
     const areas=[...document.querySelectorAll('[data-weekly-question]')],answers=areas.map(area=>area.value.normalize('NFKC').trim());if(answers.some(answer=>!answer)){alert('Responda todas as perguntas do relatório semanal.');return;}
-    if(WEEKLY_CHECKIN_FILES.some(file=>!(file instanceof File))){alert('Envie obrigatoriamente as seis fotos: frente, costas, lado direito, lado esquerdo, frente contraída e costas contraída.');return;}
-    const checkinId=weeklyCheckinDocId(uid,request.requestKey);
+    const files=WEEKLY_CHECKIN_FILES.slice();
+    if(files.length!==6||files.some(file=>!(file instanceof File))){alert('Envie obrigatoriamente as seis fotos: frente, costas, lado direito, lado esquerdo, frente contraída e costas contraída.');return;}
+    const checkinId=weeklyCheckinDocId(uid,request.documentKey||request.requestKey);
     const uncertainState=await uncertainWeekly(checkinId);
     if(uncertainState==='confirmed'){notify('✓ O relatório semanal anterior foi confirmado pelo servidor.');try{await loadWeeklyCheckinState(true);renderCalendar();}catch(error){}return true;}
     if(uncertainState==='wait'){notify('Este relatório semanal ainda está em confirmação. Não envie novamente agora.',true);return false;}
@@ -297,9 +300,11 @@
       for(let index=0;index<6;index++){
         notify('Preparando foto '+(index+1)+' de 6...');
         const photoId=(checkinId+'-p'+(index+1)).slice(0,190);photoIds.push(photoId);
-        const prepared=await preparePhoto(WEEKLY_CHECKIN_FILES[index],{userId:uid,extra:{weight:Math.round(weight*10)/10,checkinId,pose:CHECKIN_POSES[index]}});writes.push(createWrite('progressPhotos',photoId,prepared.data));
+        const prepared=await preparePhoto(files[index],{userId:uid,extra:{weight:Math.round(weight*10)/10,checkinId,pose:CHECKIN_POSES[index]}});writes.push(createWrite('progressPhotos',photoId,prepared.data));
       }
       const checkinData={studentId:uid,requestKey:request.requestKey,requestKind:request.kind,dueDate:request.dueDate,submittedDate:typeof today==='function'?today():new Date().toISOString().slice(0,10),weight:Math.round(weight*10)/10,questions,sectionAt,answers,photoIds};
+      if(answers.length!==questions.length)throw Object.assign(new Error('As perguntas mudaram. Abra o relatório novamente.'),{definite:true});
+      if(studentUid()!==uid)throw Object.assign(new Error('A sessão mudou. Entre novamente antes de enviar.'),{definite:true});
       writes.push(createWrite('weeklyCheckins',checkinId,checkinData));
       try{await restCommit(writes,'enviar relatório semanal');}
       catch(error){
@@ -307,6 +312,7 @@
         else{throw error;}
       }
       uncertain.delete('w:'+checkinId);
+      weeklyReceipt=Object.freeze({studentId:uid,sourceId:checkinId});
       if(typeof clearWeeklyCheckinPreviews==='function')clearWeeklyCheckinPreviews();
       try{WEEKLY_CHECKIN_FILES=Array(6).fill(null);}catch(error){}
       if(typeof closeModal==='function')closeModal('modal-weekly-checkin');notify('✓ Relatório semanal enviado e confirmado com 6 fotos');
@@ -318,7 +324,7 @@
     }finally{endAction('weekly-checkin-submit','modal-weekly-checkin');}
   }
   robustWeeklySubmit.__tbRestCanonical101057=true;
-  robustWeeklySubmit.__tbWeeklyAttempt5=true;
+  robustWeeklySubmit.__tbWeeklyAttempt6=true;
 
   function unwrapBridge(fn){let current=fn;for(let i=0;i<5&&current?.__tbActivityBridge101047&&current.__tbBase;i++)current=current.__tbBase;return current;}
   function installPendingCheck(){
@@ -334,7 +340,7 @@
   function installWeeklySubmit(){
     try{
       if(typeof submitWeeklyCheckin!=='function')return false;
-      const unwrapped=unwrapBridge(submitWeeklyCheckin);if(unwrapped?.__tbWeeklyAttempt5){installedWeekly=true;return true;}
+      const unwrapped=unwrapBridge(submitWeeklyCheckin);if(unwrapped?.__tbWeeklyAttempt6){installedWeekly=true;return true;}
       submitWeeklyCheckin=robustWeeklySubmit;installedWeekly=true;return true;
     }catch(error){return false;}
   }
@@ -351,5 +357,5 @@
   window.addEventListener('team-bulls-student-runtime-ready',install);
   window.addEventListener('pageshow',()=>{if(student()){install();reconcileQuestionnaires().catch(()=>{});}},{passive:true});
 
-  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
+  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,weeklyReceipt:()=>weeklyReceipt,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
 })();

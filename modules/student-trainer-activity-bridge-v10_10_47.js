@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.47 — ponte leve entre envios canônicos do aluno e a central do treinador. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_STUDENT_TRAINER_ACTIVITY_BRIDGE_101047__)return;
-  window.__TEAM_BULLS_STUDENT_TRAINER_ACTIVITY_BRIDGE_101047__=true;
+  if(window.__TEAM_BULLS_STUDENT_TRAINER_ACTIVITY_BRIDGE_1010472__)return;
+  window.__TEAM_BULLS_STUDENT_TRAINER_ACTIVITY_BRIDGE_1010472__=true;
 
-  const VERSION='10.10.47-activitybridge1';
+  const VERSION='10.10.47-activitybridge2';
   let installedWeekly=false;
   let installedQuestionnaire=false;
 
@@ -63,16 +63,17 @@
   function installWeekly(){
     try{
       if(typeof submitWeeklyCheckin!=='function')return false;
-      if(submitWeeklyCheckin.__tbActivityBridge101047){installedWeekly=true;return true;}
-      const base=submitWeeklyCheckin;
+      if(submitWeeklyCheckin.__tbActivityBridge1010472){installedWeekly=true;return true;}
+      let base=submitWeeklyCheckin;
+      while(base?.__tbActivityBridge101047&&base.__tbBase)base=base.__tbBase;
       const wrapped=async function(){
-        const uid=studentUid(),request=typeof WEEKLY_CHECKIN_REQUEST!=='undefined'?WEEKLY_CHECKIN_REQUEST:null;
-        const sourceId=uid&&request&&typeof weeklyCheckinDocId==='function'?weeklyCheckinDocId(uid,request.requestKey):'';
+        const uid=studentUid();
         const result=await base.apply(this,arguments);
-        if(uid&&sourceId)indexWeekly(sourceId);
+        const receipt=window.TeamBullsStudentReportSubmitReconciliation?.weeklyReceipt?.();
+        if(result===true&&uid&&uid===studentUid()&&receipt?.studentId===uid&&receipt.sourceId)indexWeekly(receipt.sourceId);
         return result;
       };
-      wrapped.__tbActivityBridge101047=true;wrapped.__tbBase=base;submitWeeklyCheckin=wrapped;installedWeekly=true;return true;
+      wrapped.__tbActivityBridge101047=true;wrapped.__tbActivityBridge1010472=true;wrapped.__tbBase=base;submitWeeklyCheckin=wrapped;installedWeekly=true;return true;
     }catch(error){return false;}
   }
   function installQuestionnaire(){

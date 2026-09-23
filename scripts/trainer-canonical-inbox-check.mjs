@@ -33,7 +33,7 @@ has(source,"const VERSION='10.10.58-canonicalinbox5'",'Central canônica está n
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox5",'Loader do treinador não entrega a Central com deduplicação semanal.');
 has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
-has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity3",'Loader não entrega a guarda semanal com recuperação de data.');
+has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4",'Loader não entrega a guarda semanal com recuperação de data.');
 has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3",'Loader não entrega a revisão resiliente da tela individual do aluno.');
 assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('weekly-report-integrity-v10_10_58.js'),'Recuperação de vínculo deve continuar antes da integridade semanal.');
 assert(loader.indexOf('weekly-report-integrity-v10_10_58.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Integridade semanal precisa ser instalada antes do histórico individual.');
