@@ -1,4 +1,4 @@
-/* Configuração pública Team Bulls v10.10.56 — bootstrap móvel resiliente e entrada responsiva.
+/* Configuração pública Team Bulls v10.10.60 — bootstrap móvel resiliente e entrada responsiva.
    A chave do App Check/reCAPTCHA Enterprise é pública por definição.
    Não coloque senhas, chaves privadas ou credenciais administrativas aqui. */
 window.TEAM_BULLS_PUBLIC_CONFIG=Object.freeze({
@@ -10,19 +10,33 @@ if('caches' in window){
 }
 
 (()=>{
-  let installed=false,firebaseWarmPromise=null;
+  let installed=false,firebaseWarmPromise=null,coldStartRecoveryPromise=null;
   const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const STARTUP_FIREBASE_ERROR='Sem acesso ao servidor. Use sua conta offline já validada, o modo local ou tente novamente.';
   const stored=key=>{try{return typeof storageGet==='function'?storageGet(key):localStorage.getItem(key);}catch(error){return null;}};
   const restoringCloudSession=()=>{
     const uid=String(stored('teamms_last_user_uid')||'').trim();
     const guest=stored('teamms_offline_pref')==='1'||stored('teamms_offline_mode')==='guest';
     return !!uid&&!guest&&navigator.onLine!==false;
   };
-  const firebaseReady=()=>{try{return typeof auth!=='undefined'&&!!auth&&typeof db!=='undefined'&&!!db;}catch(error){return false;}};
+  const firebaseServices=()=>{
+    try{
+      if(typeof auth!=='undefined'&&auth&&typeof db!=='undefined'&&db)return{auth,db};
+    }catch(error){}
+    try{
+      if(window.firebase?.apps?.length&&typeof window.firebase.auth==='function'&&typeof window.firebase.firestore==='function'){
+        const authService=window.firebase.auth(),firestoreService=window.firebase.firestore();
+        if(authService&&firestoreService)return{auth:authService,db:firestoreService};
+      }
+    }catch(error){}
+    return null;
+  };
+  const firebaseReady=()=>!!firebaseServices();
   const optimizeLocalPersistence=()=>{
     try{
-      if(!firebaseReady()||typeof firebase==='undefined'||typeof firebase.auth!=='function')return false;
-      const instance=auth,local=firebase.auth?.Auth?.Persistence?.LOCAL;
+      const services=firebaseServices();
+      if(!services||typeof firebase==='undefined'||typeof firebase.auth!=='function')return false;
+      const instance=services.auth,local=firebase.auth?.Auth?.Persistence?.LOCAL;
       if(!instance?.setPersistence||!local||instance.setPersistence.__tbLocalPersistenceFast101056)return false;
       const base=instance.setPersistence.bind(instance);
       let localApplied=!!window.TeamBullsAuthPersistence?.state?.().applied,localPending=null;
@@ -46,6 +60,36 @@ if('caches' in window){
     firebaseWarmPromise=Promise.resolve().then(()=>ensureFirebaseReady()).then(ok=>{if(ok)optimizeLocalPersistence();return !!ok;}).catch(()=>false).finally(()=>{firebaseWarmPromise=null;});
     return firebaseWarmPromise;
   };
+  const hasStartupFirebaseError=()=>{
+    const error=document.getElementById('login-error');
+    return !!error&&String(error.textContent||'').includes('Sem acesso ao servidor');
+  };
+  const clearStartupFirebaseError=()=>{
+    const error=document.getElementById('login-error');
+    if(!error||!String(error.textContent||'').includes('Sem acesso ao servidor'))return false;
+    if(typeof clearAuthError==='function')clearAuthError('login-error');
+    else{error.textContent='';error.classList.remove('show');}
+    return true;
+  };
+  const shouldRecoverColdStart=()=>navigator.onLine!==false&&(restoringCloudSession()||hasStartupFirebaseError());
+  const recoverColdStartFirebase=(reason='resume')=>{
+    if(!shouldRecoverColdStart())return Promise.resolve(false);
+    if(firebaseReady()){
+      optimizeLocalPersistence();clearStartupFirebaseError();
+      try{if(typeof setLoadingMessage==='function')setLoadingMessage('verificando sessão...');if(typeof startAuthListener==='function')startAuthListener();}catch(error){}
+      return Promise.resolve(true);
+    }
+    if(coldStartRecoveryPromise)return coldStartRecoveryPromise;
+    if(typeof ensureFirebaseReady!=='function')return Promise.resolve(false);
+    coldStartRecoveryPromise=Promise.resolve().then(()=>ensureFirebaseReady()).then(ok=>{
+      if(!ok)return false;
+      optimizeLocalPersistence();clearStartupFirebaseError();
+      if(typeof setLoadingMessage==='function')setLoadingMessage('verificando sessão...');
+      if(typeof startAuthListener==='function')startAuthListener();
+      return true;
+    }).catch(error=>{console.warn('[Team Bulls] Retomada do Firebase após cold start continuará disponível.',reason,error?.code||error?.message||error);return false;}).finally(()=>{coldStartRecoveryPromise=null;});
+    return coldStartRecoveryPromise;
+  };
   const patch=()=>{
     if(installed)return true;
     if(typeof withTimeout!=='function'||typeof ensureFirebaseReady!=='function'||typeof cloudGet!=='function')return false;
@@ -62,12 +106,22 @@ if('caches' in window){
       const base=withTimeout;
       const wrapped=function(task,ms,label='operação'){
         let limit=Math.max(250,Number(ms)||10000);
-        if(label==='carregar conexão segura')limit=Math.min(limit,10000);
+        if(label==='Firebase')limit=Math.max(limit,21000);
+        else if(label==='carregar conexão segura')limit=Math.min(limit,10000);
         else if(label==='App Check')limit=Math.min(limit,2500);
         else if(label==='login')limit=Math.min(limit,12000);
         return base(task,limit,label);
       };
       wrapped.__tbFirebaseResilience=true;withTimeout=wrapped;
+    }
+    if(typeof bootToAuth==='function'&&!bootToAuth.__tbColdStartFirebaseRecovery){
+      const base=bootToAuth;
+      const wrapped=function(message){
+        const result=base.apply(this,arguments);
+        if(String(message||'')===STARTUP_FIREBASE_ERROR&&navigator.onLine!==false)setTimeout(()=>recoverColdStartFirebase('boot-failover'),0);
+        return result;
+      };
+      wrapped.__tbColdStartFirebaseRecovery=true;bootToAuth=wrapped;
     }
     if(typeof initOptionalAppCheck==='function'&&!initOptionalAppCheck.__tbEnterpriseProvider){const legacy=initOptionalAppCheck;const wrapped=async function(){const key=String(typeof CFG!=='undefined'&&CFG.appCheckSiteKey||'').trim();if(!key||typeof firebase==='undefined')return false;try{const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');if(!ok)return false;const Provider=firebase.appCheck?.ReCaptchaEnterpriseProvider;if(typeof Provider==='function'){firebase.appCheck().activate(new Provider(key),true);return true;}return await legacy();}catch(error){const message=String(error?.message||error||'').toLowerCase();if(message.includes('already')&&message.includes('activ'))return true;console.warn('App Check Enterprise não iniciado',error);return false;}};wrapped.__tbEnterpriseProvider=true;initOptionalAppCheck=wrapped;}
     if(typeof ensureFirebaseReady==='function'&&!ensureFirebaseReady.__tbRetry){
@@ -93,6 +147,7 @@ if('caches' in window){
     return true;
   };
   const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;};
+  const resume=reason=>{installAndWarm();setTimeout(()=>recoverColdStartFirebase(reason),0);};
   const markLoginProgress=()=>{
     const btn=document.getElementById('btn-login');
     setTimeout(()=>{if(btn?.disabled&&btn.textContent==='ENTRANDO...')btn.textContent='VALIDANDO CONEXÃO...';},2200);
@@ -100,12 +155,12 @@ if('caches' in window){
   };
   installAndWarm();
   document.addEventListener('DOMContentLoaded',installAndWarm,{once:true});
-  window.addEventListener('load',()=>{installAndWarm();},{once:true});
-  window.addEventListener('pageshow',()=>installAndWarm(),{passive:true});
-  window.addEventListener('online',()=>installAndWarm(),{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')installAndWarm();},{passive:true});
+  window.addEventListener('load',()=>{resume('load');},{once:true});
+  window.addEventListener('pageshow',()=>resume('pageshow'),{passive:true});
+  window.addEventListener('online',()=>resume('online'),{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resume('visible');},{passive:true});
   document.addEventListener('click',event=>{if(event.target?.closest?.('#btn-login'))markLoginProgress();},true);
-  window.TeamBullsAuthWarmup=Object.freeze({version:'10.10.56-authwarm1',warm:warmFirebase,state:()=>({installed,warming:!!firebaseWarmPromise,ready:firebaseReady()})});
+  window.TeamBullsAuthWarmup=Object.freeze({version:'10.10.60-authwarm2',warm:warmFirebase,recover:recoverColdStartFirebase,state:()=>({installed,warming:!!firebaseWarmPromise,recovering:!!coldStartRecoveryPromise,ready:firebaseReady()})});
 })();
 
 (()=>{
@@ -248,7 +303,7 @@ if('caches' in window){
   };
   const scheduleDeferred=()=>{
     if(!sessionUiReady()||runtimeComplete())return;
-    const queue=()=>{if(!sessionUiReady()||runtimeComplete())return;if(studentHomeActive())loadStudentPriority().finally(()=>{if(!deferredStarted)loadDeferred();});else loadDeferred();};
+    const queue=()=>{if(!sessionUiReady()||runtimeComplete())return;if(studentHomeActive())loadStudentPriority().finally(scheduleDeferred);else loadDeferred();};
     requestAnimationFrame(()=>setTimeout(queue,240));
   };
   const contextChanged=()=>{
