@@ -228,8 +228,10 @@
     const run=async()=>{
       const key='organizer-monthly-'+item.studentId+'-'+cycle;if(typeof beginAction==='function'&&!beginAction(key))return;
       try{
+        await ensureReportCycleRuntime();
         const payload={lastCompletedCycle:cycle,lastCompletedDate:todayIso(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:trainerUid(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
         await cloudWrite(db.collection('protocolReviewSchedules').doc(item.studentId).update(payload),'concluir atualização mensal na agenda');
+        await window.TeamBullsMonthlyReports.ensureForStudent(item.studentId);
         const nextSchedule={...schedule,...payload,lastCompletedAt:null,updatedAt:null,_exists:true},nextState=monthlyState(nextSchedule);
         if(nextState&&typeof v109SyncActiveProtocolDates==='function')await v109SyncActiveProtocolDates(item.studentId,schedule.startDate,nextState.nextDueDate);
         if(nextState&&typeof v109SyncProtocolMetadataToWeeklySchedule==='function')await v109SyncProtocolMetadataToWeeklySchedule(item.studentId,schedule.startDate,nextState.nextDueDate);

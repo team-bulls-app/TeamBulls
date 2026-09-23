@@ -77,7 +77,7 @@ has(photos,"request.resource.data.get('dataUrl', '').size() <= 950000",'Teto Fir
 has(photos,"(request.resource.data.get('dataUrl', '') != '' || request.resource.data.get('photoPath', '') != '')",'Rules voltaram a aceitar foto vazia.');
 has(submit,'const FIRESTORE_DATA_URL_MAX=620000','Cliente perdeu o teto conservador de dataURL abaixo das Rules.');
 has(submit,'const MAX_COMMIT_BODY=7*1024*1024','Commit REST perdeu limite preventivo de payload.');
-has(submit,"const VERSION='10.10.57-submitstate6'",'Envio canônico não usa a revisão que corrige permission-denied semanal.');
+has(submit,"const VERSION='10.10.57-submitstate7'",'Envio canônico não usa a revisão que corrige permission-denied semanal.');
 has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório não é preparada diretamente para Firestore.');
 lacks(submit,"uploadCloudPhoto('progressPhotos'",'Relatório voltou a tentar Firebase Storage antes do Firestore.');
 lacks(submit,"uploadCloudPhoto('progressPhotoThumbs'",'Relatório voltou a criar miniatura em Storage sem necessidade.');

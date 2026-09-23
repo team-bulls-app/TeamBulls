@@ -6,6 +6,7 @@
   const VERSION='10.10.57-intelsuite7';
   const specs={
     trainer:[
+      ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity4'],
       ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports3'],
@@ -16,9 +17,10 @@
       ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.43-studentinsights2',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.43-studentinsights2']
     ],
     student:[
+      ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge2'],
-      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate6',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate6'],
+      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate7'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity4'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
     ]

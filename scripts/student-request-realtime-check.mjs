@@ -16,7 +16,7 @@ for(const modulePath of ['modules/student-request-realtime-v10_10_32.js',submitP
   assert(syntax.status===0,`Módulo possui JavaScript inválido (${modulePath}): ${String(syntax.stderr||'').trim()}`);
 }
 
-const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime3';
+const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime4';
 assert(config.includes(`'${moduleUrl}'`),'Loader prioritário do aluno não inclui a sincronização realtime atual.');
 const priority=config.match(/const studentPriorityModules=\[([\s\S]*?)\n  \];/)?.[1]||'';
 assert(priority.includes(moduleUrl),'Sincronização realtime precisa estar no runtime prioritário do aluno.');
@@ -54,11 +54,11 @@ assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode dup
 // O loader físico é mutável/network-first; sua revisão pública permanece compatível
 // com o bootstrap enquanto o módulo semanal usa um cache-buster próprio novo.
 assert(loader.includes("const VERSION='10.10.57-intelsuite7'"),'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
-assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate6"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
+assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
 assert(loader.includes("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4"),'Aluno não carrega a guarda semanal atual depois do transporte REST.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
 assert(loader.indexOf('student-report-submit-reconciliation-v10_10_57.js')<loader.lastIndexOf('weekly-report-integrity-v10_10_58.js'),'Guarda semanal precisa envolver o submit REST canônico, não antecedê-lo.');
-assert(submitState.includes("const VERSION='10.10.57-submitstate6'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
+assert(submitState.includes("const VERSION='10.10.57-submitstate7'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
 assert(submitState.includes('https://firestore.googleapis.com/v1/'),'Envio crítico não aponta para a API REST oficial do Firestore.');
 assert(submitState.includes("'Authorization':'Bearer '+idToken"),'REST do Firestore não usa o ID token Firebase do próprio aluno.');
 assert(submitState.includes("headers['X-Firebase-AppCheck']=tokenResult.token"),'REST crítico não preserva o token App Check.');
@@ -74,7 +74,7 @@ assert(submitState.includes("uncertain.set('q:'+reportId"),'Questionário incert
 assert(submitState.includes("uncertain.set('w:'+checkinId"),'Semanal incerto não bloqueia novo envio enquanto confirma o canônico.');
 assert(submitState.includes("notify('Este relatório ainda está em confirmação. Não envie novamente agora.'"),'Questionário incerto não orienta/bloqueia reenvio manual imediato.');
 assert(submitState.includes("notify('Este relatório semanal ainda está em confirmação. Não envie novamente agora.'"),'Semanal incerto não orienta/bloqueia reenvio manual imediato.');
-assert(submitState.includes("restAnswered(await restGet('questionnaires',reportId))"),'Questionário não reconcilia resultado incerto no documento canônico exato.');
+assert(submitState.includes('confirmWeeklyAttempt(reportId,attempt)')&&submitState.includes('currentDocument={updateTime:fresh.updateTime}'),'Questionário deve reconciliar o conteúdo exato e impedir sobrescrita concorrente.');
 assert(submitState.includes('confirmWeeklyAttempt(checkinId,state)')&&submitState.includes('sameRestFields(write.update.fields,doc.fields)'),'Semanal não verifica o conteúdo completo do commit incerto.');
 assert(submitState.includes('weeklyCheckinDocId(uid,request.documentKey||request.requestKey)'),'Semanal perdeu o ID determinístico por aluno e solicitação (incluindo recuperação).');
 assert((submitState.match(/await restCommit\(writes,/g)||[]).length===2,'Questionário e semanal devem executar um único commit atômico cada.');
@@ -84,7 +84,7 @@ assert(!submitState.includes('setInterval('),'Reconciliação pós-envio não po
 assert(!submitState.includes('MutationObserver'),'Reconciliação pós-envio não pode observar globalmente o DOM.');
 assert(submitState.includes('TeamBullsStudentTrainerActivityBridge?.install?.()'),'Ponte secundária do treinador não é reinstalada após trocar o submit canônico.');
 assert(submitState.includes("transport:'firestore-rest-commit'"),'Diagnóstico do runtime não informa o transporte canônico ativo.');
-assert(submitState.includes("db.collection('questionnaires').where('studentId','==',uid).limit(100)"),'Pendências do aluno não continuam reconciliadas pela coleção canônica.');
+assert(submitState.includes("db.collection('questionnaires').where('studentId','==',uid)"),'Pendências do aluno não continuam reconciliadas pela coleção canônica.');
 assert(submitState.includes('.filter(report=>report.answered!==true)'),'Banner ainda pode tratar relatório respondido como pendente.');
 assert(submitState.includes('banner.dataset.pendingCount=String(rows.length)'),'Banner não distingue múltiplas solicitações pendentes.');
 

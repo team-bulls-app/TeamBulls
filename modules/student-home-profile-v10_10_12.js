@@ -209,37 +209,46 @@
 
   async function loadNotifications({includeProtocol=true}={}){
     const user=student(),uid=uidOf(user);if(!user||!uid||MODE!=='cloud'||!db)return[];
-    const items=[];
-    try{
-      const snap=await cloudGet(db.collection('notifications').where('studentId','==',uid).limit(120),'notificações do aluno');
-      snap.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'notification',title:data.title||'Aviso',body:data.body||'',createdAt:data.createdAt,read:!!data.readAt,type:data.type||'aviso'});});
-    }catch(error){console.warn('[Team Bulls] notificações',error);}
-    try{
-      const snap=await cloudGet(db.collection('feedback').where('studentId','==',uid).limit(80),'mensagens da central');
-      snap.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'feedback',title:data.title||'Mensagem da central',body:data.message||'',createdAt:data.createdAt,read:!!data.read,type:data.feedbackType||'central'});});
-    }catch(error){}
-    try{
-      const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',uid).limit(80),'relatórios pendentes');
-      snap.docs.forEach(doc=>{const data=doc.data();if(data.answered)return;items.push({id:doc.id,source:'questionnaire',title:'Relatório pendente',body:'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:'relatório',action:'questionnaire'});});
-    }catch(error){}
-    try{
-      const doc=await cloudGet(db.collection('checkinSchedules').doc(uid),'relatório semanal');
-      if(doc.exists){const data=doc.data(),extra=String(data.extraRequestId||''),due=String(data.nextDueDate||'');if(extra||(due&&due<=todayIso()))items.push({id:'weekly-checkin',source:'virtual',title:extra?'Relatório extra solicitado':'Relatório semanal pendente',body:extra?'Seu treinador solicitou um relatório extra com as fotos obrigatórias.':`Seu relatório semanal de ${due} está pendente.`,createdAt:data.updatedAt||data.extraRequestedAt||0,read:false,type:'relatório semanal',action:'weekly'});}
-    }catch(error){}
-    if(includeProtocol){
-      try{
-        const doc=await cloudGet(db.collection('protocolReviewSchedules').doc(uid),'cronograma de protocolos');
-        if(doc.exists){const data=doc.data();items.push({id:'protocol-review',source:'virtual',title:'Cronograma dos protocolos',body:`Próxima atualização programada: ${data.nextReviewDate||data.startDate||'consulte o cronograma'}.`,createdAt:data.updatedAt||data.createdAt||0,read:true,type:'protocolo',action:'protocol'});}
-      }catch(error){}
+    const requests=[
+      ['avisos',()=>cloudGet(db.collection('notifications').where('studentId','==',uid).limit(120),'notificações do aluno')],
+      ['mensagens',()=>cloudGet(db.collection('feedback').where('studentId','==',uid).limit(80),'mensagens da central')],
+      ['relatórios solicitados',()=>cloudGet(db.collection('questionnaires').where('studentId','==',uid),'relatórios pendentes')],
+      ['agenda semanal',()=>cloudGet(db.collection('checkinSchedules').doc(uid),'relatório semanal')],
+      ['histórico semanal',()=>cloudGet(db.collection('weeklyCheckins').where('studentId','==',uid),'histórico semanal')],
+      ['ciclo mensal',()=>cloudGet(db.collection('protocolReviewSchedules').doc(uid),'cronograma de protocolos')],
+      ['carregamento dos relatórios',()=>ensureReportCycleRuntime()]
+    ];
+    const results=await Promise.allSettled(requests.map(([,read])=>read()));
+    if(studentUid()!==uid)return[];
+    const items=[],value=index=>results[index].status==='fulfilled'?results[index].value:null;
+    results.forEach((result,index)=>{if(result.status==='rejected')items.push({id:'load-error-'+index,source:'error',title:'Não foi possível verificar '+requests[index][0],body:'Toque em atualizar para consultar suas pendências novamente.',read:true,type:'conexão',action:'retry'});});
+    value(0)?.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'notification',title:data.title||'Aviso',body:data.body||'',createdAt:data.createdAt,read:!!data.readAt,type:data.type||'aviso'});});
+    value(1)?.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'feedback',title:data.title||'Mensagem da central',body:data.message||'',createdAt:data.createdAt,read:!!data.read,type:data.feedbackType||'central'});});
+    const monthly=window.TeamBullsMonthlyReports,protocol=value(5),schedule=protocol?.exists?{...protocol.data(),studentId:uid}:null;
+    if(protocol)monthly?.remember(uid,schedule);
+    value(2)?.docs.forEach(doc=>{
+      const data={...doc.data(),id:doc.id};if(data.answered)return;
+      const isMonthly=data.reportType==='monthly';
+      if(isMonthly&&(!protocol||monthly?.status(data,schedule)!=='pending'))return;
+      items.push({id:doc.id,source:'questionnaire',title:isMonthly?'Relatório mensal pendente':'Relatório pendente',body:isMonthly?('Relatório completo de '+fmt(data.dueDate)+', com todas as perguntas e 6 fotos.'):'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:isMonthly?'relatório mensal':'relatório',action:'questionnaire'});
+    });
+    const weekly=value(3),history=value(4);
+    if(weekly?.exists&&history&&results[6].status==='fulfilled'){
+      const data=weekly.data(),request=computeCheckinRequest(data,history.docs.map(doc=>({...doc.data(),id:doc.id})));
+      if(request?.pending)items.push({id:'weekly-checkin',source:'virtual',title:request.kind==='manual'?'Relatório extra solicitado':'Relatório semanal pendente',body:request.kind==='manual'?'Seu treinador solicitou um relatório extra com as fotos obrigatórias.':('Seu relatório semanal de '+fmt(request.dueDate)+' está pendente.'),createdAt:data.updatedAt||0,read:false,type:'relatório semanal',action:'weekly'});
     }
-    notifications=items.sort((a,b)=>timestamp(b.createdAt)-timestamp(a.createdAt));
-    return notifications;
+    if(includeProtocol&&schedule){
+      const current=monthly?.cycle(schedule),forms=value(2);
+      if(current&&forms&&!forms.docs.some(doc=>doc.id===current.id))items.push({id:'monthly-not-prepared',source:'virtual',title:'Programação mensal incompleta',body:'Seu relatório mensal ainda não foi preparado. Avise seu treinador.',read:true,type:'relatório mensal'});
+      items.push({id:'protocol-review',source:'virtual',title:'Revisão de treino e dieta pelo treinador',body:'Acompanhe o cronograma. Enviar seu relatório não conclui a revisão dos protocolos.',createdAt:schedule.updatedAt||0,read:true,type:'protocolo',action:'protocol'});
+    }
+    notifications=items.sort((a,b)=>timestamp(b.createdAt)-timestamp(a.createdAt));return notifications;
   }
 
   function renderNotifications(){
     const host=document.getElementById('tb-notice-list');if(!host)return;
     if(!notifications.length){host.innerHTML='<div class="tb-notice-empty">Nenhuma notificação no momento.</div>';return;}
-    host.innerHTML=notifications.map((item,index)=>`<article class="tb-notice-card ${item.read?'':'unread'}"><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`).join('');
+    host.innerHTML=notifications.map((item,index)=>`<article class="tb-notice-card ${item.read?'':'unread'}"><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='retry'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ATUALIZAR</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`).join('');
   }
 
   function applyNoticeBadge(){
@@ -282,6 +291,7 @@
     const busy=label=>{if(!button)return;button.disabled=true;button.textContent=label;button.setAttribute('aria-busy','true');};
     noticeActionBusy=true;
     try{
+      if(item.action==='retry'){busy('ATUALIZANDO...');await loadNotifications({includeProtocol:true});renderNotifications();applyNoticeBadge();return;}
       if(item.action==='questionnaire'){
         busy('CARREGANDO RELATÓRIO...');
         if(typeof openAnswerQuestionnaire!=='function')throw new Error('Relatório ainda não carregado.');

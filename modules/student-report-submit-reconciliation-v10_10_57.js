@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.57 — envio canônico resiliente de relatórios sem depender da fila interna do Firestore Web SDK. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010576__)return;
-  window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010576__=true;
+  if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010577__)return;
+  window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010577__=true;
 
-  const VERSION='10.10.57-submitstate6';
+  const VERSION='10.10.57-submitstate7';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -118,8 +118,10 @@
 
   async function pendingQuestionnaires(uid){
     if(!uid)return[];
-    const snap=await serverGet(db.collection('questionnaires').where('studentId','==',uid).limit(100),'confirmar pendências');
-    return(snap.docs||[]).map(doc=>({...doc.data(),id:doc.id})).filter(report=>report.answered!==true).sort((a,b)=>(stampMs(a.createdAt)-stampMs(b.createdAt))||String(a.id).localeCompare(String(b.id)));
+    const snap=await serverGet(db.collection('questionnaires').where('studentId','==',uid),'confirmar pendências');
+    let rows=(snap.docs||[]).map(doc=>({...doc.data(),id:doc.id}));
+    if(rows.some(report=>report.reportType==='monthly')){await ensureReportCycleRuntime();rows=await window.TeamBullsMonthlyReports.pending(rows,uid);}
+    return rows.filter(report=>report.answered!==true).sort((a,b)=>(stampMs(a.createdAt)-stampMs(b.createdAt))||String(a.id).localeCompare(String(b.id)));
   }
   function pendingLabel(count){return count===1?'1 atualização pendente':`${count} atualizações pendentes`;}
   function renderPendingBanner(pending){
@@ -173,8 +175,8 @@
   async function uncertainQuestionnaire(reportId){
     const state=uncertain.get('q:'+reportId);if(!state)return false;
     try{
-      const doc=await restGet('questionnaires',reportId);
-      if(restAnswered(doc)){uncertain.delete('q:'+reportId);return'confirmed';}
+      if(state.uid!==studentUid())return'wait';
+      if(await confirmWeeklyAttempt(reportId,state)){uncertain.delete('q:'+reportId);return'confirmed';}
       if(Date.now()>=state.until){uncertain.delete('q:'+reportId);return false;}
       return'wait';
     }catch(error){return'wait';}
@@ -249,19 +251,28 @@
     try{
       if(navigator.onLine===false)throw Object.assign(new Error('Sem conexão com a internet.'),{code:'team-bulls/offline',definite:true});
       const fresh=await restGet('questionnaires',reportId);if(!fresh)throw Object.assign(new Error('Este relatório não está mais disponível.'),{code:'team-bulls/report-missing',definite:true});if(restAnswered(fresh))throw Object.assign(new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.'),{code:'team-bulls/already-sent',definite:true});
+      if(!fresh.updateTime||!sameRestFields(restFields({studentId:uid,trainerId:report.trainerId,questions:report.questions}),fresh.fields))throw new Error('O relatório mudou. Feche e abra novamente antes de enviar.');
+      if(report.reportType==='monthly'){await ensureReportCycleRuntime();await window.TeamBullsMonthlyReports.assertAvailable(report);}
+      const files=QUESTIONNAIRE_REPORT_FILES.slice();
       const photoIds=[],writes=[];
       if(requiresPhotos){
         for(let index=0;index<6;index++){
           notify('Preparando foto '+(index+1)+' de 6...');
           const photoId=(reportId+'-r'+(index+1)).slice(0,190);photoIds.push(photoId);
-          const prepared=await preparePhoto(QUESTIONNAIRE_REPORT_FILES[index],{userId:uid,extra:{reportId,questionnaireId:reportId,pose:CHECKIN_POSES[index]}});writes.push(createWrite('progressPhotos',photoId,prepared.data));
+          const prepared=await preparePhoto(files[index],{userId:uid,extra:{reportId,questionnaireId:reportId,pose:CHECKIN_POSES[index]}});writes.push(createWrite('progressPhotos',photoId,prepared.data));
         }
       }
+      if(studentUid()!==uid||auth?.currentUser?.uid!==uid||CUR_ANSWER_QUEST_ID!==reportId)throw new Error('A sessão ou o formulário mudou durante o preparo. Nenhum envio foi feito.');
+      if(report.reportType==='monthly')await window.TeamBullsMonthlyReports.assertAvailable(report);
       writes.push(patchWrite('questionnaires',reportId,{answers,answered:true,photoIds},['answers','answered','photoIds'],'answeredAt'));
+      writes[writes.length-1].currentDocument={updateTime:fresh.updateTime};
       try{await restCommit(writes,'enviar relatório');}
       catch(error){
-        if(!error?.definite){uncertain.set('q:'+reportId,{until:Date.now()+UNCERTAIN_RETRY_DELAY});await sleep(1200);try{if(restAnswered(await restGet('questionnaires',reportId))){uncertain.delete('q:'+reportId);error=null;}}catch(confirmError){}if(error)throw error;}
-        else{try{if(restAnswered(await restGet('questionnaires',reportId)))error=null;}catch(confirmError){}if(error)throw error;}
+        if(error?.definite)throw error;
+        const attempt={writes,uid,until:Date.now()+UNCERTAIN_RETRY_DELAY};uncertain.set('q:'+reportId,attempt);
+        await sleep(1200);
+        let confirmed=false;try{confirmed=await confirmWeeklyAttempt(reportId,attempt);}catch(confirmError){}
+        if(!confirmed)throw error;
       }
       uncertain.delete('q:'+reportId);
       if(typeof resetQuestionnaireReportPhotos==='function')resetQuestionnaireReportPhotos();
@@ -276,6 +287,7 @@
     }finally{endAction('answer-questionnaire','modal-answer-quest');}
   }
   robustQuestionnaireSubmit.__tbRestCanonical101057=true;
+  robustQuestionnaireSubmit.__tbQuestionnaireAttempt7=true;
 
   async function robustWeeklySubmit(){
     const request=window.TeamBullsWeeklyReportIntegrity?.submissionRequest?.();
@@ -328,12 +340,12 @@
 
   function unwrapBridge(fn){let current=fn;for(let i=0;i<5&&current?.__tbActivityBridge101047&&current.__tbBase;i++)current=current.__tbBase;return current;}
   function installPendingCheck(){
-    try{if(typeof checkQuestionnaires!=='function')return false;if(checkQuestionnaires.__tbSubmitState101057){installedPending=true;return true;}const base=checkQuestionnaires;const wrapped=async function(){if(!student())return base.apply(this,arguments);try{return(await reconcileQuestionnaires()).pending;}catch(error){return base.apply(this,arguments);}};wrapped.__tbSubmitState101057=true;wrapped.__tbBase=base;checkQuestionnaires=wrapped;installedPending=true;return true;}catch(error){return false;}
+    try{if(typeof checkQuestionnaires!=='function')return false;if(checkQuestionnaires.__tbSubmitState1010577){installedPending=true;return true;}let base=checkQuestionnaires;while(base.__tbSubmitState101057&&base.__tbBase)base=base.__tbBase;const wrapped=async function(){if(!student())return base.apply(this,arguments);try{return(await reconcileQuestionnaires()).pending;}catch(error){return base.apply(this,arguments);}};wrapped.__tbSubmitState101057=true;wrapped.__tbSubmitState1010577=true;wrapped.__tbBase=base;checkQuestionnaires=wrapped;installedPending=true;return true;}catch(error){return false;}
   }
   function installQuestionnaireSubmit(){
     try{
       if(typeof submitQuestionnaireAnswers!=='function')return false;
-      const unwrapped=unwrapBridge(submitQuestionnaireAnswers);if(unwrapped?.__tbRestCanonical101057){installedQuestionnaire=true;return true;}
+      const unwrapped=unwrapBridge(submitQuestionnaireAnswers);if(unwrapped?.__tbQuestionnaireAttempt7){installedQuestionnaire=true;return true;}
       submitQuestionnaireAnswers=robustQuestionnaireSubmit;installedQuestionnaire=true;return true;
     }catch(error){return false;}
   }

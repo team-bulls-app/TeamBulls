@@ -2,7 +2,7 @@
   'use strict';
   if(window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__)return;
   window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__=true;
-  const VERSION='10.10.32-studentrealtime3';
+  const VERSION='10.10.32-studentrealtime4';
   const MAX_DUE_TIMER_MS=2000000000;
   let activeUid='';
   let unsubs=[];
@@ -11,7 +11,7 @@
   let questionnairePrimed=false,weeklyPrimed=false,protocolPrimed=false,feedbackPrimed=false,notificationPrimed=false;
   let lastQuestionnaireSignature='',lastWeeklySignature='',lastProtocolKey='',lastFeedbackSignature='',lastNotificationSignature='';
   let liveSchedule=null,liveCheckins=[],scheduleReady=false,checkinsReady=false,liveProtocolSchedule=null;
-  let weeklyFutureDue='',protocolFutureDue='';
+  let weeklyFutureDue='',protocolFutureDue='',questionnaireSnapshot=null;
   const counts={questionnaires:0,weekly:0,protocol:0,feedback:0,notifications:0};
 
   const studentCloud=()=>{
@@ -57,6 +57,7 @@
     const uid=currentUid();if(!uid||uid!==activeUid)return false;
     if(scheduleReady&&checkinsReady)applyWeekly(uid);
     if(liveProtocolSchedule)renderProtocol(liveProtocolSchedule,uid);
+    if(questionnaireSnapshot)showQuestionnaireSnapshot(questionnaireSnapshot,uid);
     try{window.TeamBullsStudentHomeFastProtocolDate?.sync?.();}catch(error){}
     updateBadge();scheduleDueBoundary();
     return true;
@@ -66,6 +67,7 @@
     unsubs.splice(0).forEach(unsub=>{try{unsub?.();}catch(error){}});
     activeUid='';questionnairePrimed=false;weeklyPrimed=false;protocolPrimed=false;feedbackPrimed=false;notificationPrimed=false;
     lastQuestionnaireSignature='';lastWeeklySignature='';lastProtocolKey='';lastFeedbackSignature='';lastNotificationSignature='';
+    questionnaireSnapshot=null;
     liveSchedule=null;liveCheckins=[];scheduleReady=false;checkinsReady=false;liveProtocolSchedule=null;weeklyFutureDue='';protocolFutureDue='';
     Object.keys(counts).forEach(key=>{counts[key]=0;});
     clearTimeout(centerRefreshTimer);clearTimeout(dueTimer);dueTimer=0;
@@ -74,20 +76,21 @@
 
   function showQuestionnaireSnapshot(snapshot,uid){
     if(!isCurrent(uid))return;
-    const pending=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(item=>item.answered!==true).sort((a,b)=>createdMs(a.createdAt)-createdMs(b.createdAt)||String(a.id).localeCompare(String(b.id)));
+    questionnaireSnapshot=snapshot;
+    const pending=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(item=>item.answered!==true&&(item.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(item)==='pending')).sort((a,b)=>createdMs(a.createdAt)-createdMs(b.createdAt)||String(a.id).localeCompare(String(b.id)));
     const first=pending[0]||null,banner=document.getElementById('quest-banner');
     if(banner){if(first){banner.dataset.qid=first.id;banner.style.display='block';}else{banner.dataset.qid='';banner.style.display='none';}}
     const signature=pending.map(item=>item.id).join('|'),changed=changedAfterPrime(questionnairePrimed,lastQuestionnaireSignature,signature);
     if(changed&&pending.length>counts.questionnaires)toast('Novo relatório solicitado pelo treinador.');
-    counts.questionnaires=pending.length;lastQuestionnaireSignature=signature;questionnairePrimed=true;updateBadge();if(changed)refreshOpenCenter();
+    counts.questionnaires=pending.length;lastQuestionnaireSignature=signature;questionnairePrimed=true;updateBadge();if(changed){refreshOpenCenter();window.TeamBullsMonthlyReports?.refreshVisibleReports(uid);}
   }
   function attachQuestionnaires(uid){
     let fallbackUnsub=null;
-    const primary=db.collection('questionnaires').where('studentId','==',uid).where('answered','==',false).limit(20);
+    const primary=db.collection('questionnaires').where('studentId','==',uid).where('answered','==',false);
     const primaryUnsub=primary.onSnapshot(snapshot=>showQuestionnaireSnapshot(snapshot,uid),error=>{
       console.warn('[Team Bulls] listener de relatórios pendentes indisponível, usando consulta compatível',error?.code||error?.message||error);
       if(fallbackUnsub||!isCurrent(uid))return;
-      const fallback=db.collection('questionnaires').where('studentId','==',uid).limit(200);
+      const fallback=db.collection('questionnaires').where('studentId','==',uid);
       fallbackUnsub=fallback.onSnapshot(snapshot=>showQuestionnaireSnapshot(snapshot,uid),fallbackError=>console.warn('[Team Bulls] listener compatível de relatórios',fallbackError?.code||fallbackError?.message||fallbackError));
       unsubs.push(()=>{try{fallbackUnsub?.();}catch(e){}});
     });
@@ -130,16 +133,21 @@
   function renderProtocol(schedule,uid){
     if(!isCurrent(uid))return;
     liveProtocolSchedule=schedule;
+    window.TeamBullsMonthlyReports?.remember(uid,schedule);
+    if(questionnaireSnapshot)showQuestionnaireSnapshot(questionnaireSnapshot,uid);
+    if(document.querySelector('.screen.active')?.id==='screen-my-quest'&&typeof MY_QUEST_CACHE!=='undefined')renderQuestList(MY_QUEST_CACHE,'my-quest-list','my-quest-empty',false);
     try{
       V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=uid;
       const state=typeof v109ProtocolState==='function'?v109ProtocolState(schedule):null;
       protocolFutureDue=state&&!state.pending&&validIso(state.nextDueDate)?String(state.nextDueDate):'';
+      const monthlyDue=window.TeamBullsMonthlyReports?.cycle(schedule)?.dueDate;
+      if(validIso(monthlyDue)&&monthlyDue>today())protocolFutureDue=monthlyDue;
       const banner=document.getElementById('protocol-review-home-banner'),label=document.getElementById('protocol-review-home-label'),text=document.getElementById('protocol-review-home-text');
       if(!banner||!state){if(banner)banner.style.display='none';counts.protocol=0;updateBadge();scheduleDueBoundary();return;}
       banner.style.display='block';banner.classList.toggle('is-due',!!state.pending);
       if(label)label.textContent=state.pending?'Atualização completa pendente':'Cronograma dos protocolos';
       if(text)text.textContent=state.pending?`A atualização completa de treino e dieta está pendente desde ${formatDate(state.nextDueDate)}. Relatórios e ajustes semanais não alteram esse ciclo.`:`${state.weekNumber?`Semana ${state.weekNumber} do protocolo.`:'O protocolo ainda não começou.'} Próxima atualização completa em ${formatDate(state.nextDueDate)}, a cada ${state.intervalWeeks} semanas.`;
-      const key=[schedule?.startDate||'',schedule?.intervalWeeks||'',schedule?.lastCompletedCycle||0,state.nextDueDate||'',state.pending?'1':'0'].join('|'),changed=changedAfterPrime(protocolPrimed,lastProtocolKey,key),nextCount=state.pending?1:0;
+      const key=[schedule?.startDate||'',schedule?.intervalWeeks||'',schedule?.lastCompletedCycle||0,state.nextDueDate||'',state.pending?'1':'0'].join('|'),changed=changedAfterPrime(protocolPrimed,lastProtocolKey,key),nextCount=0 /* revisão administrativa não é uma resposta devida pelo aluno */;
       if(changed&&nextCount>counts.protocol)toast('Há uma atualização completa de treino e dieta pendente.');
       counts.protocol=nextCount;lastProtocolKey=key;protocolPrimed=true;updateBadge();scheduleDueBoundary();if(changed)refreshOpenCenter();
     }catch(error){console.warn('[Team Bulls] atualização de protocolo em tempo real',error);}
@@ -210,6 +218,7 @@
   window.addEventListener('team-bulls-runtime-ready',install);
   window.addEventListener('team-bulls-runtime-state',install);
   window.addEventListener('team-bulls-student-runtime-ready',install);
+  window.addEventListener('team-bulls-intelligence-ready',install);
   window.addEventListener('online',install,{passive:true});
   window.addEventListener('pageshow',install,{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')install();});

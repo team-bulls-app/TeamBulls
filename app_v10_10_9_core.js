@@ -4008,23 +4008,14 @@ async function checkQuestionnaires(){
   if(!CURRENT_USER||CURRENT_USER.role==='trainer')return;
   const studentUid=CURRENT_USER.uid;
   try{
-    let docs;
-    try{
-      const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid).where('answered','==',false).limit(1),'relatório pendente');
-      docs=snap.docs;
-    }catch(indexError){
-      const fallback=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid),'relatórios');
-      docs=fallback.docs.filter(d=>!d.data().answered).slice(0,1);
-    }
+    const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid),'relatórios pendentes');
+    let rows=snap.docs.map(doc=>({...doc.data(),id:doc.id}));
+    if(rows.some(report=>report.reportType==='monthly')){await ensureReportCycleRuntime();rows=await window.TeamBullsMonthlyReports.pending(rows,studentUid);}
+    const pending=rows.filter(questionnaireIsPending);
     if(CURRENT_USER?.uid!==studentUid)return;
-    const b=document.getElementById('quest-banner');
-    if(docs.length){
-      b.dataset.qid=docs[0].id;
-      b.style.display='block';
-    }else{
-      b.style.display='none';
-    }
-  }catch(e){}
+    const banner=document.getElementById('quest-banner');if(!banner)return;
+    banner.dataset.qid=pending[0]?.id||'';banner.style.display=pending.length?'block':'none';
+  }catch(error){console.warn('[Team Bulls] pendências não confirmadas',error?.code||error?.message);}
 }
 function clearQuestionnaireReportPreviews(){
   QUESTIONNAIRE_REPORT_PREVIEW_URLS.forEach(url=>{if(url)try{URL.revokeObjectURL(url);}catch(error){}});
@@ -4107,13 +4098,18 @@ async function submitQuestionnaireAnswers(){
 async function openMyQuestionnaires(){
   if(MODE==='local'){ alert('Relatórios exigem login (recurso do modo nuvem).'); return; }
   const navigation=beginAsyncNavigation(),studentUid=CURRENT_USER.uid;
-  let questionnaires=[];
+  let questionnaires=[],loadError=null;
   try{
     const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid),'relatórios');
     questionnaires=snap.docs.map(d=>({...d.data(),id:d.id}));
+    if(questionnaires.some(report=>report.reportType==='monthly')){await ensureReportCycleRuntime();await window.TeamBullsMonthlyReports.loadSchedule(studentUid);}
     questionnaires.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  }catch(e){questionnaires=[];}
+  }catch(e){loadError=e;}
   if(!isNavigationCurrent(navigation)||CURRENT_USER?.uid!==studentUid)return;
+  if(loadError){
+    document.getElementById('my-quest-list').innerHTML='<div class="no-data-inline">Não foi possível consultar seus relatórios. <button class="btn-ghost" onclick="openMyQuestionnaires()">TENTAR NOVAMENTE</button></div>';
+    document.getElementById('my-quest-empty').style.display='none';showScreen('screen-my-quest',navigation);return;
+  }
   MY_QUEST_CACHE=questionnaires;
   renderQuestList(MY_QUEST_CACHE,'my-quest-list','my-quest-empty',false);
   showScreen('screen-my-quest',navigation);
@@ -7848,6 +7844,14 @@ buildDefaultQuestionnaire=function(){
   return{questions,sectionAt};
 };
 
+async function ensureReportCycleRuntime(){
+  if(!window.TeamBullsMonthlyReports||!window.TeamBullsWeeklyReportIntegrity){
+    const load=window.TeamBullsIntelligenceBootstrap?.load||window.TeamBullsIntelligenceSuiteLoader?.load;
+    if(typeof load==='function')await load();
+  }
+  if(!window.TeamBullsMonthlyReports||!window.TeamBullsWeeklyReportIntegrity)throw new Error('Os relatórios ainda estão carregando. Aguarde e tente novamente.');
+}
+function questionnaireIsPending(report){return report?.answered!==true&&(report?.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(report)==='pending');}
 function v109ReportMode(report){
   const explicit=String(report?.requestMode||'').toLowerCase();if(V109_REPORT_MODES.has(explicit))return explicit;
   if(report?.requiresPhotos===false)return'written';
@@ -7913,9 +7917,14 @@ sendQuestionnaire=async function(){
 renderQuestList=function(cache,listId,emptyId,fromTrainer){
   const list=document.getElementById(listId),empty=document.getElementById(emptyId);if(!list||!empty)return;
   if(!cache.length){list.innerHTML='';empty.style.display='block';return;}empty.style.display='none';
-  list.innerHTML=cache.map(report=>{const mode=v109ReportMode(report),date=report.createdAt?.seconds?new Date(report.createdAt.seconds*1000).toLocaleDateString('pt-BR'):'—',tap=report.answered?`viewQuestionnaire(${jsArg(report.id)},${fromTrainer})`:(fromTrainer?'':`openAnswerQuestionnaire(${jsArg(report.id)})`),photoCount=Array.isArray(report.photoIds)?report.photoIds.length:0;
+  list.innerHTML=cache.map(report=>{
+    const mode=v109ReportMode(report),monthly=report.reportType==='monthly';
+    const state=report.answered?'answered':monthly?(window.TeamBullsMonthlyReports?.status(report)||'loading'):'pending';
+    const label=state==='answered'?'Respondido':state==='scheduled'?'Agendado':state==='superseded'?'Ciclo anterior':state==='loading'?'Atualizando':'Aguardando';
+    const date=report.answered&&report.answeredAt?.seconds?new Date(report.answeredAt.seconds*1000).toLocaleDateString('pt-BR'):monthly?fmt(report.dueDate):report.createdAt?.seconds?new Date(report.createdAt.seconds*1000).toLocaleDateString('pt-BR'):'—';
+    const tap=report.answered?`viewQuestionnaire(${jsArg(report.id)},${fromTrainer})`:(fromTrainer||state!=='pending'?'':`openAnswerQuestionnaire(${jsArg(report.id)})`),photoCount=Array.isArray(report.photoIds)?report.photoIds.length:0;
     const details=[];if(v109ModeRequiresAnswers(mode))details.push(`${report.questions?.length||0} perguntas obrigatórias`);if(v109ModeRequiresPhotos(mode))details.push(report.answered?`${photoCount||0} fotos`:'6 fotos obrigatórias');
-    return`<div class="quest-card" onclick="${tap}"><div class="quest-card-top"><span class="quest-card-date">${date} · ${esc(v109ReportModeLabel(mode))}</span><span class="quest-status ${report.answered?'answered':'pending'}">${report.answered?'Respondido':'Aguardando'}</span></div><div class="quest-card-preview">${details.join(' · ')||'Solicitação registrada'}</div></div>`;
+    return`<div class="quest-card" onclick="${tap}"><div class="quest-card-top"><span class="quest-card-date">${esc(date)} · ${esc(monthly?'Relatório mensal completo':v109ReportModeLabel(mode))}</span><span class="quest-status ${report.answered?'answered':'pending'}">${label}</span></div><div class="quest-card-preview">${details.join(' · ')||'Solicitação registrada'}</div></div>`;
   }).join('');
 };
 
@@ -7923,17 +7932,20 @@ function v109SetQuestionnaireAnswerUi(report){
   const mode=v109ReportMode(report),requiresAnswers=v109ModeRequiresAnswers(mode),requiresPhotos=v109ModeRequiresPhotos(mode);
   const written=document.getElementById('questionnaire-written-section'),photos=document.getElementById('questionnaire-photo-section'),requirements=document.getElementById('quest-answer-requirements'),button=document.getElementById('questionnaire-submit-button'),title=document.getElementById('quest-answer-title');
   if(written)written.style.display=requiresAnswers?'block':'none';if(photos)photos.style.display=requiresPhotos?'block':'none';
-  if(title)title.textContent=v109ReportModeLabel(mode);
+  if(title)title.textContent=report.reportType==='monthly'?'Relatório mensal completo':v109ReportModeLabel(mode);
   if(requirements)requirements.textContent=mode==='photos'?'Envie as seis fotos obrigatórias seguindo o guia do treinador.':mode==='written'?'Responda obrigatoriamente todas as perguntas antes de enviar.':'Todas as perguntas e as seis fotos são obrigatórias para concluir o envio.';
   if(button)button.textContent=mode==='photos'?'ENVIAR 6 FOTOS':mode==='written'?'ENVIAR RELATÓRIO ESCRITO':'ENVIAR RELATÓRIO + 6 FOTOS';
 }
 openAnswerQuestionnaire=async function(qid){
   if(!qid)return;
   try{const doc=await cloudGet(db.collection('questionnaires').doc(qid),'relatório');if(!doc.exists)return;const report={...doc.data(),id:doc.id};if(report.answered){showToast('Este relatório já foi enviado.',true);return;}
+    await ensureReportCycleRuntime();
+    if(report.studentId!==CURRENT_USER?.uid||auth?.currentUser?.uid!==CURRENT_USER?.uid)throw new Error('A sessão do aluno mudou.');
+    await window.TeamBullsMonthlyReports.assertAvailable(report);
     CUR_ANSWER_QUEST_ID=qid;CURRENT_ANSWER_REPORT=report;const mode=v109ReportMode(report),form=document.getElementById('quest-answer-form');
     form.innerHTML=v109ModeRequiresAnswers(mode)?(report.questions||[]).map((question,index)=>`${report.sectionAt&&report.sectionAt[index]?`<div class="quest-section-title">${esc(report.sectionAt[index])}</div>`:''}<div class="quest-answer-item"><label>${index+1}. ${esc(question)} <span aria-hidden="true">*</span></label><textarea class="form-input" data-qi="${index}" required aria-required="true" rows="2" maxlength="5000" style="resize:vertical;min-height:50px"></textarea></div>`).join(''):'';
     resetQuestionnaireReportPhotos();v109SetQuestionnaireAnswerUi(report);openModal('modal-answer-quest');if(v109ModeRequiresPhotos(mode))await renderReportGuideBlocks(report.trainerId);
-  }catch(error){alert('Erro ao carregar o relatório.');}
+  }catch(error){alert(error?.message||'Erro ao carregar o relatório.');}
 };
 submitQuestionnaireAnswers=async function(){
   const reportId=CUR_ANSWER_QUEST_ID,report=CURRENT_ANSWER_REPORT,studentUid=CURRENT_USER?.uid;if(!reportId||!report||!studentUid||CURRENT_USER?.role!=='student')return;
@@ -8124,17 +8136,19 @@ async function saveProtocolReviewSchedule(){
   const studentUid=VIEW_STUDENT?.uid;if(!studentUid||CURRENT_USER?.role!=='trainer')return;const startDate=document.getElementById('trainer-protocol-start-date').value,intervalWeeks=Math.trunc(Number(document.getElementById('trainer-protocol-interval-weeks').value));
   if(!validIsoDate(startDate)){alert('Escolha uma data de início válida.');return;}if(!Number.isInteger(intervalWeeks)||intervalWeeks<1||intervalWeeks>52){alert('Escolha um intervalo entre 1 e 52 semanas.');return;}if(!beginAction('save-protocol-review-schedule'))return;
   try{
+    await ensureReportCycleRuntime();
     const previous=await loadProtocolReviewSchedule(studentUid,true)||{},lastDate=validIsoDate(previous.lastCompletedDate)?previous.lastCompletedDate:'';
     const lastCompletedCycle=lastDate?Math.max(0,Math.floor(Math.max(0,v104DateDiffDays(startDate,lastDate))/(intervalWeeks*7))):0;
     const payload={studentId:studentUid,trainerId:CURRENT_USER.uid,startDate,intervalWeeks,lastCompletedCycle,lastCompletedDate:lastDate,updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).set(payload,{merge:true}),'salvar ciclo de atualização');V109_PROTOCOL_REVIEW_SCHEDULE={...previous,...payload,_exists:true};V109_PROTOCOL_REVIEW_STUDENT=studentUid;
+    await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);
     const state=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,startDate,state.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,startDate,state.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Ciclo de atualização completa salvo');loadTrainerProtocolReviewAlerts().catch(()=>{});
   }catch(error){alert(cloudWriteError(error,'salvar o ciclo de atualização'));}finally{endAction('save-protocol-review-schedule');}
 }
 function markProtocolReviewCompleted(){
   const studentUid=VIEW_STUDENT?.uid,state=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);if(!studentUid||CURRENT_USER?.role!=='trainer'||!state)return;if(!state.pending){showToast('A próxima atualização completa ainda não venceu.',true);return;}
   showConfirm('Confirmar atualização completa',`Marcar a atualização completa nº ${state.pendingCycle} de treino e dieta como realizada? Use esta confirmação apenas após a revisão detalhada dos protocolos; ajustes semanais não entram aqui.`,async()=>{
-    if(!beginAction('complete-protocol-review'))return;try{const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).update(payload),'concluir atualização completa');V109_PROTOCOL_REVIEW_SCHEDULE={...V109_PROTOCOL_REVIEW_SCHEDULE,...payload,_exists:true};const nextState=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Atualização completa registrada');loadTrainerProtocolReviewAlerts().catch(()=>{});}catch(error){alert(cloudWriteError(error,'registrar a atualização completa'));}finally{endAction('complete-protocol-review');}
+    if(!beginAction('complete-protocol-review'))return;try{await ensureReportCycleRuntime();const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).update(payload),'concluir atualização completa');V109_PROTOCOL_REVIEW_SCHEDULE={...V109_PROTOCOL_REVIEW_SCHEDULE,...payload,_exists:true};await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);const nextState=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Atualização completa registrada');loadTrainerProtocolReviewAlerts().catch(()=>{});}catch(error){alert(cloudWriteError(error,'registrar a atualização completa'));}finally{endAction('complete-protocol-review');}
   });
 }
 async function loadStudentProtocolReview(){
