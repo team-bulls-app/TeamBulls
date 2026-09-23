@@ -26,7 +26,7 @@ const submit=read(submitPath);
 const history=read(historyPath);
 const core=read(corePath);
 
-has(integrity,"const VERSION='10.10.58-weeklyintegrity3'",'Guarda semanal está na revisão errada.');
+has(integrity,"const VERSION='10.10.58-weeklyintegrity4'",'Guarda semanal está na revisão errada.');
 has(integrity,'function effectiveSubmittedDate(row)','Recuperação da data real de envio não está explícita.');
 has(integrity,'localStampDate(row?.createdAt)||isoDate(row?.submittedDate)||isoDate(row?.dueDate)','Data exibida não prioriza o timestamp de criação confirmado pelo servidor.');
 has(integrity,'_weeklyDateRecovered:true','Histórico não sinaliza recuperação de submittedDate legado.');
@@ -45,7 +45,7 @@ has(integrity,'const requestHistory=historyForRequestCalculation(history)','Pref
 has(integrity,'const request=computeCheckinRequest(schedule,requestHistory)','Preflight não recalcula a solicitação com estado fresco/compatível.');
 has(integrity,'WEEKLY_CHECKINS=history','Histórico exibido foi contaminado pela identidade sintética usada só no cálculo.');
 has(integrity,'WEEKLY_CHECKIN_REQUEST=request','Solicitação fresca não substitui o request obsoleto antes do envio.');
-has(integrity,'__tbWeeklyIntegrity1010583','Hot upgrade não distingue a revisão nova da guarda antiga.');
+has(integrity,'__tbWeeklyIntegrity1010584','Hot upgrade não distingue a revisão nova da guarda antiga.');
 has(integrity,"if(typeof base!=='function'||base.__tbRestCanonical101057!==true)return false",'Guarda pode envolver um submit legado/não canônico.');
 has(integrity,'wrapped.__tbRestCanonical101057=true','Reconciliador pode remover o preflight fresco em reinstalações.');
 has(integrity,'window.TeamBullsStudentTrainerActivityBridge?.install?.()','Índice secundário do treinador não é reinstalado após envolver o submit.');
@@ -65,15 +65,15 @@ lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central n
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Central não pode apagar semanal histórico.');
 
 has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
-has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity3",'Suíte não entrega a guarda semanal com recuperação de data.');
+has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4",'Suíte não entrega a guarda semanal com recuperação de data.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox5",'Suíte não entrega a Central semanal deduplicada.');
-const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity3");
+const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4");
 const trainerHistory=loader.indexOf('trainer-student-report-history-v10_10_55.js');
 const trainerCentral=loader.indexOf('trainer-canonical-inbox-v10_10_58.js');
 assert(trainerIntegrity>=0&&trainerHistory>trainerIntegrity,'Treinador precisa instalar recuperação/deduplicação antes de carregar o histórico individual.');
 assert(trainerCentral>trainerHistory,'Central do treinador deve carregar depois do histórico individual.');
 const studentSubmit=loader.indexOf('student-report-submit-reconciliation-v10_10_57.js');
-const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity3");
+const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4");
 assert(studentSubmit>=0&&studentIntegrity>studentSubmit,'Aluno precisa instalar a guarda depois do submit REST canônico.');
 
 has(history,'fetchWeeklyCheckins(studentUid)','Histórico do treinador deixou de passar pelo leitor semanal corrigido.');

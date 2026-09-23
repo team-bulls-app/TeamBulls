@@ -71,8 +71,8 @@
     const meta=manual
       ?`Solicitação extra feita em ${formatDate(request.dueDate)}. Responda todas as perguntas e envie exatamente 6 fotos.`
       :`${pending?'Entrega pendente':'Próxima entrega'}: ${formatDate(request.dueDate)}. O relatório inclui as perguntas da consultoria e exatamente 6 fotos.`;
-    const buttonLabel=pending?'ENVIAR RELATÓRIO E 6 FOTOS':'ENVIAR ANTECIPADAMENTE';
-    host.innerHTML=`<div class="tb-weekly-current-card"><div class="tb-weekly-current-head"><div class="tb-weekly-current-copy"><span class="tb-weekly-current-kicker">RELATÓRIO SEMANAL ATUAL</span><strong class="tb-weekly-current-title">${title}</strong></div><span class="tb-weekly-current-status">${pending?'PENDENTE':'AGENDADO'}</span></div><p class="tb-weekly-current-meta">${meta}</p><button type="button" class="btn-primary tb-weekly-current-action">${buttonLabel}</button></div>`;
+    const buttonLabel=pending?'ENVIAR RELATÓRIO E 6 FOTOS':'AGUARDANDO A DATA';
+    host.innerHTML=`<div class="tb-weekly-current-card"><div class="tb-weekly-current-head"><div class="tb-weekly-current-copy"><span class="tb-weekly-current-kicker">RELATÓRIO SEMANAL ATUAL</span><strong class="tb-weekly-current-title">${title}</strong></div><span class="tb-weekly-current-status">${pending?'PENDENTE':'AGENDADO'}</span></div><p class="tb-weekly-current-meta">${meta}</p><button type="button" class="btn-primary tb-weekly-current-action" ${pending?'':'disabled'}>${buttonLabel}</button></div>`;
     host.querySelector('.tb-weekly-current-action')?.addEventListener('click',openCurrentReport);
     return true;
   }

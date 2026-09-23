@@ -34,14 +34,14 @@ has(oldInbox,'function installSubmissionHooks()','Central antiga deixou de conte
 has(config,"MODULE_ROOT+'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2'",'Loader antigo mudou; revisar a regressão da Central.');
 
 /* Entrega atual: aluno tenta criar índice futuro; treinador não depende dele para enxergar o relatório. */
-has(loader,'student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge1','Loader não entrega a ponte ao aluno.');
+has(loader,'student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2','Loader não entrega a ponte ao aluno.');
 has(loader,'trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox5','Loader não entrega a Central canônica atual ao treinador.');
 lacks(loader,'trainer-activity-reconciliation-v10_10_47.js?v=10.10.47-activityreconcile1','Visibilidade do treinador ainda depende da reconciliação secundária antiga.');
 has(sw,"'/modules/intelligence-suite-loader-v10_10_42.js'",'Loader de recuperação não está network-first.');
 
 /* Próximos envios: primeiro salva canônico, depois indexa sem invalidar sucesso. */
 has(bridge,'const result=await base.apply(this,arguments);','Ponte do aluno precisa aguardar o envio canônico antes do índice secundário.');
-has(bridge,'indexWeekly(sourceId)','Relatório semanal não agenda o índice da Central.');
+has(bridge,'indexWeekly(receipt.sourceId)','Relatório semanal não agenda o índice da Central.');
 has(bridge,'indexQuestionnaire(sourceId)','Questionário/atualização não agenda o índice da Central.');
 has(bridge,"db.collection('trainerActivity').doc(trainerId).collection('events').doc(eventId(type,sourceId)).set(payload)",'Ponte não usa o índice privado existente.');
 has(bridge,"(type==='weekly_checkin'?'w-':'q-')+cleanId(sourceId)",'Ponte não usa IDs determinísticos.');

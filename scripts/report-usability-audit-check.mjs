@@ -36,7 +36,7 @@ has(report,"resolvePhotoSource(p,{full:false})",'Visualizador não antecipa a mi
 has(report,"openModal('modal-photo-view')",'Visualizador de foto não abre imediatamente.');
 assert(!report.includes("Promise.all((checkin.photoIds||[]).slice(0,6).map")&&!report.includes("resolvePhotoSource(record,{full:CURRENT_USER?.role==='trainer'})"),'Relatório voltou a carregar seis fotos originais simultaneamente.');
 
-has(submit,"const VERSION='10.10.57-submitstate5'",'Envio canônico não usa a revisão atual que corrige o permission-denied semanal.');
+has(submit,"const VERSION='10.10.57-submitstate6'",'Envio canônico não usa a revisão atual que corrige o permission-denied semanal.');
 has(submit,'async function preparePhoto(file,{userId,extra})','Envio canônico perdeu a preparação isolada de cada fotografia.');
 has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório deixou de usar o payload Firestore/dataURL canônico.');
 assert(!submit.includes("uploadCloudPhoto('progressPhotos'")&&!submit.includes("uploadCloudPhoto('progressPhotoThumbs'"),'Relatório voltou a depender de Firebase Storage antes do commit Firestore.');

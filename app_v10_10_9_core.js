@@ -6297,7 +6297,7 @@ function renderWeeklyCheckinCard(loadError=false){
   const title=document.getElementById('weekly-checkin-title'),status=document.getElementById('weekly-checkin-status'),meta=document.getElementById('weekly-checkin-meta'),action=document.getElementById('weekly-checkin-action');
   if(loadError){title.textContent='Relatório + 6 fotos';status.textContent='OFFLINE';status.className='quest-status pending';meta.textContent='Não foi possível consultar a programação agora. Tente novamente quando a conexão estabilizar.';action.disabled=true;if(homeBanner)homeBanner.style.display='none';return;}
   if(!WEEKLY_CHECKIN_SCHEDULE||!WEEKLY_CHECKIN_REQUEST){title.textContent='Aguardando programação';status.textContent='NÃO PROGRAMADO';status.className='quest-status';meta.textContent='O treinador ainda não definiu a primeira data do relatório semanal.';action.disabled=true;if(homeBanner)homeBanner.style.display='none';return;}
-  const request=WEEKLY_CHECKIN_REQUEST;title.textContent=request.kind==='manual'?'Relatório extra solicitado':'Relatório + 6 fotos';status.textContent=request.pending?'PENDENTE':'AGENDADO';status.className='quest-status '+(request.pending?'pending':'answered');meta.textContent=request.kind==='manual'?`Solicitação extra feita em ${fmt(request.dueDate)}.`:`Próxima entrega: ${fmt(request.dueDate)} · frequência de 7 dias.`;action.disabled=false;action.textContent=request.pending?'ENVIAR RELATÓRIO E 6 FOTOS':'ENVIAR ANTECIPADAMENTE';
+  const request=WEEKLY_CHECKIN_REQUEST;title.textContent=request.kind==='manual'?'Relatório extra solicitado':'Relatório + 6 fotos';status.textContent=request.pending?'PENDENTE':'AGENDADO';status.className='quest-status '+(request.pending?'pending':'answered');meta.textContent=request.kind==='manual'?`Solicitação extra feita em ${fmt(request.dueDate)}.`:`Próxima entrega: ${fmt(request.dueDate)} · frequência de 7 dias.`;action.disabled=!request.pending;action.textContent=request.pending?'ENVIAR RELATÓRIO E 6 FOTOS':'AGUARDANDO A DATA';
   if(homeBanner){homeBanner.style.display=request.pending?'block':'none';document.getElementById('weekly-checkin-home-text').textContent=request.kind==='manual'?'Seu treinador solicitou um relatório extra com todas as perguntas e seis fotos obrigatórias.':`Seu relatório semanal de ${fmt(request.dueDate)} está pendente.`;}
 }
 const V102_OPEN_CALENDAR=openCalendar;
@@ -6310,6 +6310,7 @@ function buildWeeklyCheckinQuestions(){
   return{questions:filtered,sectionAt};
 }
 function openWeeklyCheckinModal(){
+  if(!window.TeamBullsWeeklyReportIntegrity?.canOpenForm?.()){showToast('O relatório ainda está carregando. Aguarde e tente novamente.',true);return;}
   if(MODE!=='cloud'||CURRENT_USER?.role!=='student'){alert('O relatório semanal exige login ativo.');return;}
   if(!WEEKLY_CHECKIN_REQUEST){loadWeeklyCheckinState(true).then(request=>{if(request)openWeeklyCheckinModal();else alert('Seu treinador ainda não programou o relatório semanal.');});return;}
   const request=WEEKLY_CHECKIN_REQUEST,{questions,sectionAt}=buildWeeklyCheckinQuestions();

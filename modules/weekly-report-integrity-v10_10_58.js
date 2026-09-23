@@ -1,12 +1,13 @@
 /* Team Bulls v10.10.58 — integridade do ciclo semanal sem reescrever histórico. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010583__)return;
-  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010583__=true;
+  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010584__)return;
+  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010584__=true;
 
-  const VERSION='10.10.58-weeklyintegrity3';
+  const VERSION='10.10.58-weeklyintegrity4';
   const READ_TIMEOUT=10000;
   let fetchInstalled=false;
+  let formRequest=null,submissionRequest=null,opening=false;
   let submitInstalled=false;
   let suppressedDuplicates=0;
   let suppressedLegacyDuplicates=0;
@@ -99,15 +100,49 @@
     return prepared;
   }
 
+  function canonicalRequest(schedule,rows){
+    if(!schedule||schedule.enabled===false||!isoDate(schedule.nextDueDate))return null;
+    const history=historyForRequestCalculation((rows||[]).map(normalizeWeeklyRow));
+    const completed=new Set(history.map(row=>String(row.requestKey||'')));
+    const manualKey='manual:'+String(schedule.extraRequestId||'');
+    if(schedule.extraRequestId&&!completed.has(manualKey))return{kind:'manual',requestId:String(schedule.extraRequestId),dueDate:String(schedule.extraRequestedAt||today()),requestKey:manualKey,pending:true};
+    const scheduled=history.filter(row=>row.requestKind!=='manual'&&isoDate(row.submittedDate)).sort((a,b)=>b.submittedDate.localeCompare(a.submittedDate));
+    const last=scheduled[0],interval=Math.max(1,Math.min(31,Number(schedule.intervalDays)||7));
+    let due=String(schedule.nextDueDate);
+    if(last){
+      // A saved, unfulfilled future date is an explicit trainer reschedule.
+      // Otherwise count from the actual submission, never from an early duplicate's dueDate.
+      if(!(due>last.submittedDate&&!completed.has('scheduled:'+due)))due=addDaysIso(last.submittedDate,interval);
+    }
+    const requestKey='scheduled:'+due;
+    const occupied=history.filter(row=>row.requestKey===requestKey);
+    const recovery=occupied.length>0&&occupied.every(row=>isoDate(row.submittedDate)&&row.submittedDate<due);
+    if(occupied.length&&!recovery)return null;
+    return{kind:'scheduled',requestId:'',dueDate:due,requestKey,pending:due<=today(),...(recovery?{documentKey:requestKey+':recovery:v1',recovery:true}:{})};
+  }
   function installRequestGuard(){
-    if(typeof computeCheckinRequest!=='function'||computeCheckinRequest.__tbWeeklyCalculation3)return;
-    const base=computeCheckinRequest;
-    const wrapped=function(schedule,rows){
-      if(schedule?.enabled===false)return null;
-      return base.call(this,schedule,historyForRequestCalculation((rows||[]).map(normalizeWeeklyRow)));
+    if(typeof computeCheckinRequest!=='function')return;
+    computeCheckinRequest=canonicalRequest;
+  }
+  const identity=request=>request?[request.kind,request.requestKey,request.dueDate,request.documentKey||request.requestKey].join('|'):'';
+  function installOpenGuard(){
+    if(typeof openWeeklyCheckinModal!=='function'||openWeeklyCheckinModal.__tbWeeklyForm4)return;
+    const base=openWeeklyCheckinModal;
+    const wrapped=async function(){
+      if(!student()||opening||submissionRequest)return false;
+      if(formRequest&&document.getElementById('modal-weekly-checkin')?.classList.contains('open'))return false;
+      opening=true;formRequest=null;
+      try{
+        const pending=await window.TeamBullsStudentReportSubmitReconciliation?.reconcileWeeklyPending?.();
+        if(pending===true||pending===false)return pending;
+        const uid=String(CURRENT_USER.uid),request=await refreshCanonicalRequest(uid);
+        if(!request.pending){notify('O próximo relatório estará disponível em '+request.dueDate+'. Para um envio adicional, peça um relatório extra ao treinador.');return false;}
+        formRequest=Object.freeze({...request,studentId:uid});
+        return base.apply(this,arguments);
+      }catch(error){formRequest=null;notify('Não foi possível confirmar a solicitação no servidor. Tente abrir o relatório novamente.',true);return false;}
+      finally{opening=false;}
     };
-    wrapped.__tbWeeklyCalculation3=true;
-    computeCheckinRequest=wrapped;
+    wrapped.__tbWeeklyForm4=true;wrapped.__tbBase=base;openWeeklyCheckinModal=wrapped;
   }
 
   function unwrapFetchGuard(fn){
@@ -118,11 +153,11 @@
   function installFetchGuard(){
     try{
       if(typeof fetchWeeklyCheckins!=='function')return false;
-      if(fetchWeeklyCheckins.__tbWeeklyIntegrity1010583){fetchInstalled=true;return true;}
+      if(fetchWeeklyCheckins.__tbWeeklyIntegrity1010584){fetchInstalled=true;return true;}
       const base=unwrapFetchGuard(fetchWeeklyCheckins);
       const wrapped=async function(){return dedupeWeeklyCheckins(await base.apply(this,arguments));};
       wrapped.__tbWeeklyIntegrity101058=true;
-      wrapped.__tbWeeklyIntegrity1010583=true;
+      wrapped.__tbWeeklyIntegrity1010584=true;
       wrapped.__tbBase=base;
       fetchWeeklyCheckins=wrapped;
       fetchInstalled=true;
@@ -158,7 +193,7 @@
     let current=fn;
     for(let index=0;index<8;index++){
       if(current?.__tbActivityBridge101047&&current.__tbBase){current=current.__tbBase;continue;}
-      if(current?.__tbWeeklyIntegrity101058&&!current?.__tbWeeklyIntegrity1010583&&current.__tbBase){current=current.__tbBase;continue;}
+      if(current?.__tbWeeklyIntegrity101058&&!current?.__tbWeeklyIntegrity1010584&&current.__tbBase){current=current.__tbBase;continue;}
       break;
     }
     return current;
@@ -167,8 +202,8 @@
     try{
       if(!student()||typeof submitWeeklyCheckin!=='function')return false;
       let current=submitWeeklyCheckin;
-      if(current?.__tbActivityBridge101047&&current.__tbBase?.__tbWeeklyIntegrity1010583){submitInstalled=true;return true;}
-      if(current?.__tbWeeklyIntegrity1010583){submitInstalled=true;return true;}
+      if(current?.__tbActivityBridge101047&&current.__tbBase?.__tbWeeklyIntegrity1010584){submitInstalled=true;return true;}
+      if(current?.__tbWeeklyIntegrity1010584){submitInstalled=true;return true;}
       const base=unwrapSubmit(current);
       // Só envolvemos o submit canônico corrigido. Assim um runtime antigo não
       // recebe um selo falso de compatibilidade nem volta a escrever pelo fluxo legado.
@@ -176,30 +211,34 @@
       const wrapped=async function(){
         const uid=String(CURRENT_USER?.uid||'');
         if(!student()||!uid)return base.apply(this,arguments);
-        if(navigator.onLine===false)return base.apply(this,arguments);
+        if(navigator.onLine===false){notify('Sem conexão. O relatório não foi enviado.',true);return false;}
         if(wrapped.busy)return false;
         wrapped.busy=true;
         try{
         const pending=await window.TeamBullsStudentReportSubmitReconciliation?.reconcileWeeklyPending?.();
         if(pending===true||pending===false)return pending;
-        const previousKey=String(typeof WEEKLY_CHECKIN_REQUEST!=='undefined'&&WEEKLY_CHECKIN_REQUEST?.requestKey||'');
+        const opened=formRequest;
+        if(!opened||opened.studentId!==uid){notify('Abra o relatório novamente antes de enviar.',true);return false;}
         try{
           const fresh=await refreshCanonicalRequest(uid);
-          if(previousKey&&previousKey!==fresh.requestKey)notify('A solicitação semanal foi atualizada. O envio seguirá o período correto.');
+          if(!fresh.pending||identity(opened)!==identity(fresh)){formRequest=null;notify('Esta solicitação já foi atendida ou mudou. Suas respostas não foram enviadas para outro período. Feche e abra o relatório novamente.',true);return false;}
+          submissionRequest=Object.freeze({...fresh,studentId:uid});
         }catch(error){
           console.warn('[Team Bulls] envio semanal bloqueado por estado não confirmado',error?.code||error?.message||error);
           notify('Não foi possível confirmar o período atual do relatório no servidor. Nenhum envio foi feito; atualize o app e tente novamente.',true);
           return false;
         }
-        return await base.apply(this,arguments);
-        }finally{wrapped.busy=false;}
+        const result=await base.apply(this,arguments);
+        if(result===true)formRequest=null;
+        return result;
+        }finally{submissionRequest=null;wrapped.busy=false;}
       };
       wrapped.__tbWeeklyIntegrity101058=true;
-      wrapped.__tbWeeklyIntegrity1010583=true;
+      wrapped.__tbWeeklyIntegrity1010584=true;
       // O reconciliador reconhece este wrapper como continuação do submit REST,
       // evitando que seus timers o substituam pelo caminho sem o preflight fresco.
       wrapped.__tbRestCanonical101057=true;
-      wrapped.__tbWeeklyAttempt5=base.__tbWeeklyAttempt5;
+      wrapped.__tbWeeklyAttempt6=base.__tbWeeklyAttempt6;
       wrapped.__tbBase=base;
       submitWeeklyCheckin=wrapped;
       submitInstalled=true;
@@ -211,6 +250,7 @@
   function install(){
     installRequestGuard();
     installFetchGuard();
+    installOpenGuard();
     if(student())installSubmitGuard();
     return fetchInstalled&&(!student()||submitInstalled);
   }
@@ -229,6 +269,8 @@
     dedupe:dedupeWeeklyCheckins,
     effectiveSubmittedDate,
     fingerprint:legacyFingerprint,
+    canOpenForm:()=>!!formRequest&&student()&&formRequest.studentId===CURRENT_USER.uid,
+    submissionRequest:()=>submissionRequest,
     state:()=>({fetchInstalled,submitInstalled,suppressedDuplicates,suppressedLegacyDuplicates,recoveredDates,recoveredRequestKeys})
   });
 })();
