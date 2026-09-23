@@ -15,6 +15,7 @@
   let badgeRefreshAt=0;
   let badgeRefreshUid='';
   let badgeRefreshPromise=null;
+  let noticeActionBusy=false;
 
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const student=()=>CURRENT_USER?.role==='student'?CURRENT_USER:null;
@@ -274,12 +275,45 @@
       item.read=true;renderNotifications();applyNoticeBadge();
     }catch(error){showToast?.('Não foi possível marcar como lida.',true);}
   }
+  function noticeActionButton(index){return document.querySelector(`#tb-notice-list .tb-notice-card:nth-child(${Number(index)+1}) .tb-notice-actions button`);}
   async function openNotice(index){
-    const item=notifications[index];if(!item)return;
-    if(item.action==='questionnaire'){goHome();setTimeout(()=>{try{openAnswerQuestionnaire(item.id);}catch(error){openMyQuestionnaires?.();}},60);return;}
-    if(item.action==='weekly'){goHome();setTimeout(()=>openWeeklyCheckinModal?.(),60);return;}
-    if(item.action==='protocol'){goHome();setTimeout(()=>openProtocolReviewInfo?.(),60);return;}
-    await markRead(index);
+    const item=notifications[index];if(!item||noticeActionBusy)return;
+    const button=noticeActionButton(index),originalLabel=button?.textContent||'';
+    const busy=label=>{if(!button)return;button.disabled=true;button.textContent=label;button.setAttribute('aria-busy','true');};
+    noticeActionBusy=true;
+    try{
+      if(item.action==='questionnaire'){
+        busy('CARREGANDO RELATÓRIO...');
+        if(typeof openAnswerQuestionnaire!=='function')throw new Error('Relatório ainda não carregado.');
+        await openAnswerQuestionnaire(item.id);
+        if(!document.getElementById('modal-answer-quest')?.classList.contains('open')){
+          await loadNotifications({includeProtocol:true});renderNotifications();applyNoticeBadge();
+          showToast?.('Este relatório não está mais disponível ou já foi atualizado.',true);
+        }
+        return;
+      }
+      if(item.action==='weekly'){
+        busy('CARREGANDO RELATÓRIO...');
+        const loadSuite=window.TeamBullsIntelligenceBootstrap?.load||window.TeamBullsIntelligenceSuiteLoader?.load;
+        if(typeof loadSuite==='function')await Promise.race([Promise.resolve(loadSuite()),new Promise(resolve=>setTimeout(resolve,9000))]);
+        if(typeof openWeeklyCheckinModal!=='function')throw new Error('Relatório semanal ainda não carregado.');
+        await openWeeklyCheckinModal();
+        return;
+      }
+      if(item.action==='protocol'){
+        busy('ABRINDO CRONOGRAMA...');
+        if(typeof openProtocolReviewInfo!=='function')throw new Error('Cronograma ainda não carregado.');
+        await openProtocolReviewInfo();
+        return;
+      }
+      await markRead(index);
+    }catch(error){
+      console.warn('[Team Bulls] ação da notificação não abriu',item.action||item.type,error?.code||error?.message||error);
+      showToast?.('Não foi possível abrir agora. Aguarde alguns segundos e tente novamente.',true);
+    }finally{
+      noticeActionBusy=false;
+      if(button?.isConnected){button.disabled=false;button.removeAttribute('aria-busy');button.textContent=originalLabel;}
+    }
   }
 
   function ensureStatsShell(stats){

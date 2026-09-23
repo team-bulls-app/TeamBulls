@@ -37,6 +37,21 @@ has(mod,'data-tb-profile-logout="1"','Perfil não cria a opção SAIR diretament
 has(mod,'TeamBullsStudentHome.logout()','Opção SAIR do perfil não usa o fluxo canônico do módulo.');
 has(mod,"typeof confirmLogout==='function'",'Logout direto não reutiliza o fluxo seguro existente.');
 
+// Ações pendentes devem permanecer na Central enquanto o conteúdo real abre.
+// Voltar para a Home antes de buscar o documento gerava exatamente o sintoma
+// "tocou em responder e só voltou para a tela inicial" em conexões mais lentas.
+lacks(mod,"if(item.action==='questionnaire'){goHome()",'Relatório personalizado ainda manda o aluno para a Home antes de abrir o formulário.');
+lacks(mod,"if(item.action==='weekly'){goHome()",'Relatório semanal ainda manda o aluno para a Home antes da validação canônica.');
+lacks(mod,"if(item.action==='protocol'){goHome()",'Cronograma ainda manda o aluno para a Home antes de abrir.');
+has(mod,'let noticeActionBusy=false;','A Central não bloqueia toque duplicado enquanto uma pendência está abrindo.');
+has(mod,"busy('CARREGANDO RELATÓRIO...')",'A Central não informa que o relatório está sendo carregado.');
+has(mod,'await openAnswerQuestionnaire(item.id);','Questionário pendente não aguarda a abertura canônica diretamente da Central.');
+has(mod,"document.getElementById('modal-answer-quest')?.classList.contains('open')",'Questionário removido/atualizado não possui reconciliação visual após a tentativa de abertura.');
+has(mod,'window.TeamBullsIntelligenceBootstrap?.load||window.TeamBullsIntelligenceSuiteLoader?.load','Relatório semanal não garante que a suíte de integridade esteja disponível antes de abrir.');
+has(mod,'await openWeeklyCheckinModal();','Relatório semanal não usa diretamente a abertura protegida pela integridade de período.');
+has(mod,'await openProtocolReviewInfo();','Cronograma pendente não abre diretamente da Central.');
+has(mod,"showToast?.('Não foi possível abrir agora. Aguarde alguns segundos e tente novamente.',true)",'Falha de abertura continua silenciosa para o aluno.');
+
 has(usability,"button.textContent='SAIR'",'Fallback de usabilidade do perfil não possui a opção SAIR.');
 has(usability,"typeof confirmLogout==='function'",'Fallback SAIR não reutiliza o fluxo seguro de logout existente.');
 has(usability,'data-tb-profile-logout="1"','Logout do perfil não possui proteção contra duplicação.');
@@ -69,4 +84,4 @@ assert(hotfix.length>0&&hotfix===hotfix47,'Service Workers não compartilham uma
 assert(sw===sw47,'sw.js e sw_47.js divergiram.');
 
 if(fail.length){console.error('FALHA — student home/profile\n- '+fail.join('\n- '));process.exit(1);}
-console.log(`APROVADO — home do aluno preservada no build ${version.build}; notificações otimizadas, avatar/apelido, logout event-driven, protocolos e cache coerentes.`);
+console.log(`APROVADO — home do aluno preservada no build ${version.build}; notificações otimizadas, pendências abrem sem salto para Home, avatar/apelido, logout event-driven, protocolos e cache coerentes.`);
