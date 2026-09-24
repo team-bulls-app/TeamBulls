@@ -46,6 +46,7 @@ jobs:
           node scripts/destructive-actions-supply-check.mjs
           node scripts/pending-session-mutations-check.mjs
           node scripts/startup-runtime-light-check.mjs
+          node scripts/startup-entry-behavior-check.mjs
           node scripts/exercise-video-performance-check.mjs
           node scripts/trainer-runtime-reliability-check.mjs
           node scripts/trainer-activity-recovery-check.mjs

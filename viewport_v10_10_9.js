@@ -128,6 +128,9 @@
   function setPending(value,phase){state.pending=!!value;state.phase=String(phase||state.phase);state.updatedAt=Date.now();}
   function authRestorePending(){
     if(readyAccess())return false;
+    // bootToAuth já concluiu a tentativa com erro. O usuário do SDK e o finally
+    // ainda pendente do handler não podem impedir a tela de recuperação.
+    if(!state.pending&&state.phase==='auth-error')return false;
     if(state.pending)return true;
     if(processingUid())return true;
     const user=firebaseUser();

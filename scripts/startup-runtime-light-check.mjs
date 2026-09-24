@@ -51,15 +51,16 @@ assert(!config.includes("for(const src of modules)await loadScript(src).then(()=
 assert(config.includes('requestAnimationFrame(()=>setTimeout(queue,240));'),'Carga pós-sessão deve respeitar a primeira pintura e evitar contenção imediata com a Home.');
 
 assert(config.includes("MODULE_ROOT+'diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2'"),'Exclusão de módulo pesado no runtime do aluno deve manter URL canônica.');
-assert(config.includes("version:'10.10.45-startup11'"),'Revisão do runtime de baixa contenção deve estar identificada.');
+assert(config.includes("version:'10.10.61-startup12'"),'Revisão do runtime de baixa contenção deve estar identificada.');
 
 // Entrada/login: Firebase deve começar a aquecer antes do toque e os wrappers
 // não podem declarar o servidor indisponível enquanto os SDKs ainda estão carregando.
-assert(config.includes("version:'10.10.60-authwarm2'"),'Warmup/recuperação de autenticação não está na revisão atual.');
+assert(config.includes("version:'10.10.61-authwarm3'"),'Warmup/recuperação de autenticação não está na revisão atual.');
 assert(config.includes('const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}'),'Firebase não é pré-aquecido assim que o bootstrap fica disponível.');
 assert(config.includes("if(label==='Firebase')limit=Math.max(limit,21000);"),'Cold start ainda pode cortar o carregamento dos SDKs antes do timeout interno do Firebase.');
 assert(config.includes("else if(label==='login')limit=Math.min(limit,12000);"),'Login voltou a ser alongado além do limite original do core.');
-assert(config.includes("if(label==='carregar conexão segura')limit=Math.min(limit,10000);"),'Carga normal do Firebase pode voltar a ficar presa por timeout excessivo.');
+assert(!config.includes("if(label==='carregar conexão segura')limit=Math.min(limit,10000);"),'O wrapper não pode cortar o orçamento de duas etapas do SDK.');
+assert(read('app_v10_10_9_core.js').includes('const FIREBASE_CORE_TIMEOUT_MS=2*V106_SDK_TIMEOUT_MS+800;'),'SDK deve ter limite finito para app seguido de auth/firestore.');
 assert(config.includes("else if(label==='App Check')limit=Math.min(limit,2500);"),'App Check voltou a bloquear a entrada por tempo excessivo.');
 assert(!config.includes("limit=Math.max(limit,16000)"),'Regressão: login não pode voltar ao mínimo artificial de 16 segundos.');
 assert(!config.includes("limit=Math.max(limit,12000)"),'Regressão: conexão segura não pode ser artificialmente estendida para 12 segundos.');
