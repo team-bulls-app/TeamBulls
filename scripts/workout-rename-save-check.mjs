@@ -29,7 +29,7 @@ assert.equal(plan.exercises[0].sessions,undefined);
 
 assert(page.includes('onclick="saveWorkoutFromButton()"'),'Botão não usa o caminho protegido de salvamento.');
 assert(page.includes('id="workout-save-status"'),'Editor não exibe o estado de salvamento.');
-assert(page.includes('app_v10_10_9_core.js?v=10.10.9-workoutrename1'));
+assert(page.includes('app_v10_10_9_core.js?v=10.10.9-bc1'));
 assert(page.includes('modules/v107-core.js?v=10.10.9-snapshot1'));
 
 const saveSource=between(core,'async function saveWorkout(){','// Day folders — hierarchy');
