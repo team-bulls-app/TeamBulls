@@ -1674,7 +1674,7 @@ function lastDate(w){let b=null;(w.exercises||[]).forEach(e=>(e.sessions||[]).fo
 function pdfEscape(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function workoutPdfHtml(workout,studentName){
   const days=groupExercisesByDay(workout.exercises||[],getWorkoutDays(workout));
-  const sections=days.map(([day,items])=>`<section><h2>${pdfEscape(day)}</h2>${items.map(ex=>`<article><h3>${pdfEscape(ex.name)}</h3>${String(ex.instructions||'').trim()?`<div class="instruction"><b>Instruções:</b> ${pdfEscape(ex.instructions).replace(/\n/g,'<br>')}</div>`:''}<table><thead><tr><th>Semana</th><th>Prescrição</th></tr></thead><tbody>${[1,2,3,4,5,6,7,8].map(week=>{const rx=resolveWeekPrescription(ex,week);const text=rx.sets.length?rx.sets.map((set,i)=>`${i+1}ª: ${set.targetMin}-${set.targetMax} reps · GER ${String(set.ger).padStart(2,'0')}`).join('<br>'):'Sem exercício';return`<tr><td>Semana ${week}</td><td>${text}</td></tr>`;}).join('')}</tbody></table></article>`).join('')}</section>`).join('');
+  const sections=days.map(([day,items])=>`<section><h2>${pdfEscape(day)}</h2>${items.map(ex=>`<article><h3>${pdfEscape(ex.name)}</h3>${String(ex.instructions||'').trim()?`<div class="instruction"><b>Instruções:</b> ${pdfEscape(ex.instructions).replace(/\n/g,'<br>')}</div>`:''}<table><thead><tr><th>Semana</th><th>Prescrição</th></tr></thead><tbody>${[1,2,3,4,5,6,7,8].map(week=>{const rx=resolveWeekPrescription(ex,week);const text=rx.sets.length?rx.sets.map((set,i)=>`${i+1}ª: ${exerciseHasBcTechnique(ex,week)?BC_PRESCRIPTION_TARGET:set.targetMin+'-'+set.targetMax+' reps'} · GER ${String(set.ger).padStart(2,'0')}`).join('<br>'):'Sem exercício';return`<tr><td>Semana ${week}</td><td>${text}</td></tr>`;}).join('')}</tbody></table></article>`).join('')}</section>`).join('');
   return`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>${pdfEscape(workout.name)}</title><style>@page{size:A4;margin:14mm}body{font-family:Arial,sans-serif;color:#161616}header{border-bottom:3px solid #9b2024;padding-bottom:10px;margin-bottom:18px}h1{font-size:25px;margin:0;text-transform:uppercase}header p{margin:5px 0 0;color:#555}h2{font-size:19px;background:#111;color:#fff;padding:8px 10px;margin:18px 0 8px}article{break-inside:avoid;margin-bottom:14px}h3{font-size:16px;margin:0 0 6px;color:#8f1e22}.instruction{font-size:11px;line-height:1.45;background:#f3eeee;border-left:3px solid #9b2024;padding:7px 9px;margin:0 0 7px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #bbb;padding:6px;text-align:left;vertical-align:top}th{background:#eee}footer{margin-top:20px;font-size:9px;color:#777;text-align:center}</style></head><body><header><h1>TEAM BULLS — ${pdfEscape(workout.name)}</h1><p>Aluno: ${pdfEscape(studentName||'Modo local')} · Treino completo organizado por dias</p></header>${sections||'<p>Nenhum exercício cadastrado.</p>'}<footer>Gerado pelo Team Bulls v10.1. No diálogo de impressão, escolha “Salvar como PDF”.</footer></body></html>`;
 }
 function exportWorkoutPdf(workout,studentName){
@@ -8411,3 +8411,83 @@ async function moveCardioSubstitution(id,delta){if(!cardioCanEdit())return;const
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCardioTimerDisplay();},{passive:true});
 const V10109_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){if(CARDIO_TIMER_INTERVAL){clearInterval(CARDIO_TIMER_INTERVAL);CARDIO_TIMER_INTERVAL=0;}CARDIO_DOCUMENT={main:null,substitutions:[]};CARDIO_CONTEXT={targetUid:'',trainer:false,local:false,source:'workout'};CURRENT_CARDIO_ITEM_ID='';return V10109_CONFIRM_LOGOUT_BASE();};
+
+/* BC é uma técnica criada no catálogo pelo treinador. O alvo é uma orientação
+   textual; os números já salvos continuam intactos para as outras técnicas. */
+const BC_PRESCRIPTION_TARGET='Carga para 5 a 6';
+function bcTechniqueId(){
+  return TECHNIQUE_CATALOG?.items?.find(item=>String(item.code||'').trim().toUpperCase()==='BC')?.id||'';
+}
+function exerciseHasBcTechnique(exercise,week){
+  const id=bcTechniqueId();
+  return !!id&&!!exercise&&exerciseTechniqueIds(exercise,week).includes(id);
+}
+function bcSelectedInPrescriptionEditor(useSavedWeek=false){
+  const exercise=getPlanEditExercise(),week=Number(document.getElementById('input-prescription-week')?.value)||1,id=bcTechniqueId();
+  if(!id||!exercise)return false;
+  if(useSavedWeek)return exerciseHasBcTechnique(exercise,week);
+  const picker=document.getElementById('week-technique-picker');
+  if(!picker?.querySelector('input[type="checkbox"]'))return exerciseHasBcTechnique(exercise,week);
+  return [...picker.querySelectorAll('input[type="checkbox"]:checked')].some(input=>input.value===id);
+}
+function syncBcPrescriptionEditor(useSavedWeek=false){
+  const modal=document.getElementById('modal-prescription'),editor=document.getElementById('prescription-editor');
+  if(!modal||!editor)return;
+  const selected=bcSelectedInPrescriptionEditor(useSavedWeek),minLabel=document.getElementById('prescription-min-label'),maxLabel=document.getElementById('prescription-max-label');
+  modal.classList.toggle('bc-target-active',selected);
+  if(selected&&minLabel)minLabel.textContent='REPETIÇÕES';
+  if(!selected){
+    const exercise=getPlanEditExercise(),week=Number(document.getElementById('input-prescription-week')?.value)||1,time=exercise&&exerciseUsesResistedTime(exercise,week);
+    if(minLabel)minLabel.textContent=time?'Tempo mín.':'Reps mín.';
+    if(maxLabel)maxLabel.textContent=time?'Tempo máx.':'Reps máx.';
+  }
+  editor.querySelectorAll('.plan-set-row').forEach(row=>{
+    row.classList.toggle('bc-target-row',selected);
+    [...row.querySelectorAll('input.set-edit-input')].slice(0,2).forEach(input=>input.classList.toggle('bc-hidden-target',selected));
+    let label=row.querySelector('.bc-target-value');
+    if(selected){
+      if(!label){label=document.createElement('span');label.className='bc-target-value';row.insertBefore(label,row.querySelector('select')||row.querySelector('.btn-rm-set'));}
+      label.textContent=BC_PRESCRIPTION_TARGET;
+    }else label?.remove();
+  });
+}
+function replaceBcRangeText(target){
+  if(!target)return;
+  const backoff=target.querySelector('.backoff-label')?.cloneNode(true);
+  target.textContent=BC_PRESCRIPTION_TARGET;
+  if(backoff)target.appendChild(backoff);
+}
+{
+  const style=document.createElement('style');style.id='bc-prescription-target-style';
+  style.textContent='#modal-prescription.bc-target-active #prescription-min-label{grid-column:2/4;text-align:center}#modal-prescription.bc-target-active #prescription-max-label,#modal-prescription.bc-target-active .bc-hidden-target{display:none!important}#modal-prescription .bc-target-value{grid-column:2/4;min-width:0;padding:8px 6px;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;text-align:center}';
+  document.head.appendChild(style);
+}
+const BC_BASE_WEEK_SELECTION=onWeekTechniqueSelectionChange;
+onWeekTechniqueSelectionChange=function(){const result=BC_BASE_WEEK_SELECTION.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_LOAD_PRESCRIPTION=loadPrescriptionEditor;
+loadPrescriptionEditor=function(){const result=BC_BASE_LOAD_PRESCRIPTION.apply(this,arguments);syncBcPrescriptionEditor(true);return result;};
+const BC_BASE_ADD_PRESCRIPTION_ROW=addPrescriptionSetRow;
+addPrescriptionSetRow=function(){const result=BC_BASE_ADD_PRESCRIPTION_ROW.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_REMOVE_PRESCRIPTION_ROW=removePrescriptionSet;
+removePrescriptionSet=function(){const result=BC_BASE_REMOVE_PRESCRIPTION_ROW.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_COPY_PRESCRIPTION=copyPreviousPrescription;
+copyPreviousPrescription=function(){const result=BC_BASE_COPY_PRESCRIPTION.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_REFRESH_BACKOFF=refreshBackoffPrescriptionRow;
+refreshBackoffPrescriptionRow=function(){const result=BC_BASE_REFRESH_BACKOFF.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_COMPACT_SUMMARY=prescriptionCompactSummary;
+prescriptionCompactSummary=function(exercise,week){
+  const summary=BC_BASE_COMPACT_SUMMARY.apply(this,arguments);
+  return summary?.rx?.sets?.length&&exerciseHasBcTechnique(exercise,week)?{...summary,reps:BC_PRESCRIPTION_TARGET}:summary;
+};
+const BC_BASE_RENDER_PRESCRIPTION=renderExercisePrescription;
+renderExercisePrescription=function(exercise,elId,week){
+  const result=BC_BASE_RENDER_PRESCRIPTION.apply(this,arguments);
+  if(exerciseHasBcTechnique(exercise,week))document.getElementById(elId)?.querySelectorAll('.prescription-set-row .prescription-range').forEach(replaceBcRangeText);
+  return result;
+};
+const BC_BASE_POPULATE_SESSION=populateSessionEditorForWeek;
+populateSessionEditorForWeek=function(week){
+  const result=BC_BASE_POPULATE_SESSION.apply(this,arguments),exercise=getE(SESSION_WID,SESSION_EID);
+  if(exerciseHasBcTechnique(exercise,week))document.querySelectorAll('#sets-editor .performed-set-row[data-target-min] .performed-target').forEach(replaceBcRangeText);
+  return result;
+};
