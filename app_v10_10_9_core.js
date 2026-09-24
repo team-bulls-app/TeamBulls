@@ -4378,7 +4378,10 @@ async function deleteTsExercise(eid){
 /* ══════════════════════════════════════════════════
    MODALS
 ══════════════════════════════════════════════════ */
-function openModal(id){document.getElementById(id).classList.add('open');}
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='modal-workout')setWorkoutSaveStatus('');
+}
 function closeModal(id){
   const modal=document.getElementById(id);if(!modal)return;
   if(id==='modal-catalog-video'){const body=document.getElementById('catalog-video-body');if(body)body.innerHTML='';}
@@ -4388,6 +4391,22 @@ function closeModal(id){
 }
 
 // Workout
+function setWorkoutSaveStatus(message,isError=false){
+  const status=document.getElementById('workout-save-status');
+  if(!status)return;
+  status.textContent=message;
+  status.style.color=isError?'#fca5a5':'';
+}
+async function saveWorkoutFromButton(){
+  try{await saveWorkout();}
+  catch(error){
+    // Inclui erros nas camadas de proteção que envolvem saveWorkout.
+    if(ACTION_LOCKS.has('save-workout'))endAction('save-workout','modal-workout');
+    const message='Não foi possível salvar o treino: '+String(error?.message||error);
+    setWorkoutSaveStatus(message,true);
+    console.error('saveWorkout',error);
+  }
+}
 function buildColorPicker(){
   document.getElementById('color-picker-row').innerHTML=PALETTE.map(c=>
     `<div class="color-swatch ${c===SEL_COLOR?'active':''}" style="background:${c}" data-color="${c}" onclick="pickColor('${c}')"></div>`
@@ -4405,20 +4424,24 @@ async function saveWorkout(){
   const name=document.getElementById('input-workout-name').value.trim();
   const startDate=document.getElementById('input-workout-start-date')?.value||today();
   const updateDate=document.getElementById('input-workout-update-date')?.value||addDaysIso(startDate,28);
-  if(!name){alert('Digite o nome do treino!');return;}
-  if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){alert('Confira as datas do ciclo. A atualização não pode ser anterior ao início.');return;}
+  if(!name){setWorkoutSaveStatus('Digite o nome do treino.',true);return;}
+  if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){setWorkoutSaveStatus('Confira as datas do ciclo: a atualização deve ser no início ou depois.',true);return;}
+  const editingWorkoutId=EDIT_W,modalTarget=MODAL_TARGET,studentUid=modalTarget==='student'?VIEW_STUDENT?.uid:null,color=SEL_COLOR;
   const targetWorkouts=MODAL_TARGET==='student'?(VIEW_STUDENT?.workouts||[]):getWorkouts();
   if(targetWorkouts.some(w=>w.id!==EDIT_W&&normalizedName(w.name)===normalizedName(name))){
-    alert('Já existe um treino com esse nome. Edite o treino existente para evitar duplicações.');
+    setWorkoutSaveStatus('Já existe um treino com esse nome.',true);
     return;
   }
-  if(!beginAction('save-workout','modal-workout'))return;
+  if(!beginAction('save-workout','modal-workout')){setWorkoutSaveStatus('Aguarde o salvamento anterior terminar.',true);return;}
+  setWorkoutSaveStatus('Salvando o treino…');
   try{
     if(MODE==='cloud'){
       const targetUid=MODAL_TARGET==='student'?VIEW_STUDENT?.uid:CURRENT_USER?.uid;
       const serverWorkouts=await cloudGet(db.collection('workouts').where('userId','==',targetUid),'treinos existentes');
+      if(MODAL_TARGET!==modalTarget||EDIT_W!==editingWorkoutId||(modalTarget==='student'&&VIEW_STUDENT?.uid!==studentUid))throw new Error('O aluno ou o treino aberto mudou. Abra o treino novamente e tente salvar.');
+      if(editingWorkoutId&&!serverWorkouts.docs.some(doc=>doc.id===editingWorkoutId))throw new Error('Este treino não pertence ao aluno aberto ou não está mais disponível. Atualize a lista.');
       if(serverWorkouts.docs.some(d=>d.id!==EDIT_W&&normalizedName(d.data().name)===normalizedName(name))){
-        alert('Esse treino já foi salvo. A lista será atualizada para evitar uma duplicação.');
+        setWorkoutSaveStatus('Esse nome já foi salvo em outro treino. Atualize a lista antes de tentar novamente.',true);
         if(MODAL_TARGET==='student')await renderTrainerStudent(VIEW_STUDENT);else await loadCloudHome();
         return;
       }
@@ -4427,7 +4450,11 @@ async function saveWorkout(){
     if(MODAL_TARGET==='student'){
       if(!VIEW_STUDENT)return;
       if(EDIT_W){
-        await cloudWrite(db.collection('workouts').doc(EDIT_W).update({name,color:SEL_COLOR,startDate,updateDate}),'editar treino');
+        await cloudWrite(db.collection('workouts').doc(EDIT_W).update({name,color,startDate,updateDate}),'editar treino');
+        if(VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId)return;
+        const edited=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
+        if(edited)Object.assign(edited,{name,color,startDate,updateDate});
+        if(VIEW_STUDENT_WORKOUT?.id===editingWorkoutId)Object.assign(VIEW_STUDENT_WORKOUT,{name,color,startDate,updateDate});
       }else{
         const docId=WORKOUT_CREATE_ID||(WORKOUT_CREATE_ID=stableEntityId('w',VIEW_STUDENT.uid,normalizedName(name)));
         const existing=normalizeWorkoutCollection(VIEW_STUDENT.workouts||[]),batch=db.batch();
@@ -4436,9 +4463,23 @@ async function saveWorkout(){
         await cloudWrite(batch.commit(),'salvar alterações');
       }
       WORKOUT_CREATE_ID=null;
+      if(editingWorkoutId){
+        const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
+        const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
+        if(card)card.style.setProperty('--wcard-color',color);
+      }
       closeModal('modal-workout');
       showToast('✓ Treino salvo');
       await renderTrainerStudent(VIEW_STUDENT);
+      // A leitura de retorno pode vir do cache durante uma falha temporária.
+      // Preserve na tela a alteração já confirmada pela escrita no servidor.
+      if(editingWorkoutId&&VIEW_STUDENT?.uid===studentUid){
+        const refreshed=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
+        if(refreshed)Object.assign(refreshed,{name,color,startDate,updateDate});
+        const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
+        const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
+        if(card)card.style.setProperty('--wcard-color',color);
+      }
       return;
     }
     const __localSnapshot=JSON.stringify(LOCAL_DB);
@@ -4468,7 +4509,7 @@ async function saveWorkout(){
       closeModal('modal-workout');renderHome();
     }
   }catch(e){
-    alert('Erro ao salvar treino: '+(e.code?e.code+' — ':'')+e.message);
+    setWorkoutSaveStatus('Erro ao salvar treino: '+(e.code?e.code+' — ':'')+e.message,true);
     console.error(e);
   }finally{
     endAction('save-workout','modal-workout');
@@ -5068,7 +5109,7 @@ async function renderTrainerStudent(s){
       const meta=last?'Último: '+fmt(last):dayCount+' '+(dayCount===1?'dia':'dias');
       const wid=jsArg(w.id),isActive=String(w.id)===currentActiveId;
       const orderControls=`<div class="workout-order-controls"><button class="order-btn" ${index===0?'disabled':''} onclick="event.stopPropagation();moveTrainerWorkout(${wid},-1)" title="Mover protocolo para cima">↑</button><button class="order-btn" ${index===workouts.length-1?'disabled':''} onclick="event.stopPropagation();moveTrainerWorkout(${wid},1)" title="Mover protocolo para baixo">↓</button></div>`;
-      return`<div class="workout-card ${isActive?'is-active':'is-inactive'}" style="--wcard-color:${w.color}" onclick="openTsWorkout(${wid})">
+      return`<div class="workout-card ${isActive?'is-active':'is-inactive'}" data-workout-id="${esc(w.id)}" style="--wcard-color:${w.color}" onclick="openTsWorkout(${wid})">
         <div class="workout-card-info"><div class="protocol-state-badge ${isActive?'active':'inactive'}">${isActive?'● TREINO ATIVO':'○ DESATIVADO'}</div><div class="workout-card-name">${esc(w.name)}</div><div class="workout-card-meta">${meta} · ${esc(v104CycleMeta(w))} · ${w.exercises.length} exerc.${isActive?' · plano atual':' · aluno mantém acesso'}</div></div>
         <div class="workout-card-actions">
           ${orderControls}

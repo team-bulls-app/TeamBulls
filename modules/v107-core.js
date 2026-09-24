@@ -42,11 +42,15 @@
     return value;
   }
   function sanitizeWorkout(workout,{includeSessions=false}={}){
-    const out=stripFirestoreValue(clone(workout)||{});
+    // A tela do treinador hidrata anos de sessões nos exercícios. O snapshot do
+    // plano não deve serializar esse histórico só para descartá-lo em seguida.
+    const {exercises:unusedExercises,...workoutFields}=workout||{};
+    const out=stripFirestoreValue(clone(workoutFields)||{});
     delete out.userId;delete out.createdAt;
     out.id=String(workout?.id||out.id||uid());
     out.exercises=(workout?.exercises||[]).map(exercise=>{
-      const item=stripFirestoreValue(clone(exercise)||{});
+      const {sessions:unusedSessions,...exerciseFields}=exercise||{};
+      const item=stripFirestoreValue(clone(exerciseFields)||{});
       delete item.userId;delete item.workoutId;delete item.createdAt;
       item.id=String(exercise?.id||item.id||uid());
       if(includeSessions)item.sessions=stripFirestoreValue(clone(exercise?.sessions||[]));else delete item.sessions;

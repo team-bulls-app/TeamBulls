@@ -26,7 +26,7 @@
 <!-- Firebase é carregado sob demanda após a interface ficar disponível. -->
 <script src="viewport_v10_10_9.js?v=10.10.9"></script>
 <script src="boot_v10.js?v=10.10.9"></script>
-<link as="style" href="styles_v10_10_9.css?v=10.10.9" rel="preload"/><link href="styles_v10_10_9.css?v=10.10.9" rel="stylesheet"/><link as="script" href="app_v10_10_9_core.js?v=10.10.9" rel="preload"/><link as="image" href="team-bulls-auth-bg-v9-8-2.webp" rel="preload" type="image/webp"/>
+<link as="style" href="styles_v10_10_9.css?v=10.10.9" rel="preload"/><link href="styles_v10_10_9.css?v=10.10.9" rel="stylesheet"/><link as="script" href="app_v10_10_9_core.js?v=10.10.9-workoutrename1" rel="preload"/><link as="image" href="team-bulls-auth-bg-v9-8-2.webp" rel="preload" type="image/webp"/>
 <link crossorigin="anonymous" href="https://www.gstatic.com" rel="preconnect"/><link crossorigin="anonymous" href="https://firestore.googleapis.com" rel="preconnect"/><link crossorigin="anonymous" href="https://firebasestorage.googleapis.com" rel="preconnect"/></head>
 <body>
 <div id="portrait-lock-overlay" aria-hidden="true" inert>
@@ -873,7 +873,8 @@
 <label class="form-group"><span class="form-label">Atualização prevista</span><input class="form-input" id="input-workout-update-date" type="date"/></label>
 </div>
 <div class="plan-help">A atualização é sugerida automaticamente para 4 semanas após o início. As semanas e os registros serão relacionados a essas datas.</div>
-<button class="btn-primary" onclick="saveWorkout()">SALVAR</button>
+<button class="btn-primary" type="button" onclick="saveWorkoutFromButton()">SALVAR</button>
+<div id="workout-save-status" role="status" aria-live="polite" style="min-height:16px;margin-top:7px;font-size:11px"></div>
 <button class="btn-ghost" onclick="closeModal('modal-workout')">CANCELAR</button>
 </div>
 </div>
@@ -1451,8 +1452,8 @@
 </div>
 <script defer src="config_v10_7.js?v=10.10.9"></script>
 <script defer src="update_v10_10_9.js?v=10.10.9"></script>
-<script defer src="app_v10_10_9_core.js?v=10.10.9"></script>
-<script defer src="modules/v107-core.js?v=10.10.9"></script>
+<script defer src="app_v10_10_9_core.js?v=10.10.9-workoutrename1"></script>
+<script defer src="modules/v107-core.js?v=10.10.9-snapshot1"></script>
 <script defer src="modules/v107-invites.js?v=10.10.9"></script>
 <script defer src="modules/v107-operations.js?v=10.10.9"></script>
 <script defer src="interaction_v10_10_9.js?v=10.10.9"></script>
