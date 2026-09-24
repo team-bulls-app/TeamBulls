@@ -3,7 +3,7 @@
 (()=>{
   if(window.__TEAM_BULLS_TRAINER_CANONICAL_CONTEXT_GUARD_101042__)return;
   window.__TEAM_BULLS_TRAINER_CANONICAL_CONTEXT_GUARD_101042__=true;
-  const VERSION='10.10.56-contextguard4';
+  const VERSION='10.10.56-contextguard5';
   const PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-completed';
   let checkinLoad=null,protocolLoad=null;
 
@@ -103,7 +103,15 @@
     if(typeof viewWeeklyCheckin!=='function'||viewWeeklyCheckin.__tbCanonicalContextGuard)return;
     const base=viewWeeklyCheckin;
     const wrapped=async function(id){
-      if(trainer()){
+      const inbox=arguments[1];
+      if(inbox?.source==='trainer-inbox'){
+        // A Central lê o documento escolhido diretamente. VIEW_STUDENT pode
+        // continuar apontando para um perfil visitado antes de abrir a Central.
+        const studentId=String(inbox.studentId||'');
+        if(CURRENT_USER?.role!=='trainer'||MODE!=='cloud'||document.querySelector('.screen.active')?.id!=='screen-trainer-inbox'||!studentId||!weeklyCacheMatchesStudent(studentId,id)){
+          if(typeof showToast==='function')showToast('Não foi possível carregar este relatório agora.',true);return;
+        }
+      }else if(trainer()){
         const studentId=currentStudentId();
         const ok=await ensureWeeklyCheckinContext(id);
         if(!ok||currentStudentId()!==studentId||!weeklyCacheMatchesStudent(studentId,id)){

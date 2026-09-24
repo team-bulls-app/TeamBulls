@@ -15,8 +15,8 @@
 
   const trainer=()=>typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'&&typeof MODE!=='undefined'&&MODE==='cloud';
   const student=()=>typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='student'&&typeof MODE!=='undefined'&&MODE==='cloud';
-  const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
-  const js=value=>JSON.stringify(String(value??''));
+  const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const js=value=>h(JSON.stringify(String(value??'')));
   const cleanId=value=>String(value??'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,190);
   const iso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?String(value):'';
   const pad=value=>String(value).padStart(2,'0');
@@ -196,7 +196,7 @@
     if(!trainer())return;const item=activityEvents.find(row=>row.id===id);if(!item)return;markEventRead(id).catch(()=>{});
     try{
       if(item.type==='weekly_checkin'){
-        const doc=await cloudGet(db.collection('weeklyCheckins').doc(item.sourceId),'abrir relatório semanal');if(!doc.exists)throw new Error('Relatório não encontrado.');WEEKLY_CHECKINS=[{...doc.data(),id:doc.id}];return viewWeeklyCheckin(doc.id);
+        const doc=await cloudGet(db.collection('weeklyCheckins').doc(item.sourceId),'abrir relatório semanal');if(!doc.exists)throw new Error('Relatório não encontrado.');WEEKLY_CHECKINS=[{...doc.data(),id:doc.id}];return viewWeeklyCheckin(doc.id,{source:'trainer-inbox',studentId:item.studentId});
       }
       const doc=await cloudGet(db.collection('questionnaires').doc(item.sourceId),'abrir relatório respondido');if(!doc.exists)throw new Error('Relatório não encontrado.');TS_QUEST_CACHE=[{...doc.data(),id:doc.id}];return viewQuestionnaire(doc.id,true);
     }catch(error){toast('Não foi possível abrir este relatório agora.',true);}

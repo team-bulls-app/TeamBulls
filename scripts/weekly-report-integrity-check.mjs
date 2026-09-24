@@ -56,7 +56,7 @@ lacks(integrity,').set(','Guarda de integridade não pode gravar documentos Fire
 lacks(integrity,'.update(','Guarda de integridade não pode alterar histórico.');
 lacks(integrity,'.delete(','Guarda de integridade não pode apagar duplicatas históricas.');
 
-has(central,"const VERSION='10.10.58-canonicalinbox5'",'Central do treinador não usa a revisão deduplicada.');
+has(central,"const VERSION='10.10.58-canonicalinbox6'",'Central do treinador não usa a revisão deduplicada.');
 has(central,"_weeklyRequestKey:String(data.requestKey||'')",'Central não carrega requestKey do semanal canônico.');
 has(central,'function weeklyLogicalKey(row)','Central não deduplica pela identidade semanal canônica.');
 has(central,'suppressedIds.add','Central não oculta o índice secundário correspondente à duplicata.');
@@ -66,7 +66,7 @@ lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Centra
 
 has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4",'Suíte não entrega a guarda semanal com recuperação de data.');
-has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox5",'Suíte não entrega a Central semanal deduplicada.');
+has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6",'Suíte não entrega a Central semanal deduplicada.');
 const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4");
 const trainerHistory=loader.indexOf('trainer-student-report-history-v10_10_55.js');
 const trainerCentral=loader.indexOf('trainer-canonical-inbox-v10_10_58.js');

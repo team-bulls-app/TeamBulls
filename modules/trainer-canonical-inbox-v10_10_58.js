@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_1010585__)return;
   window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_1010585__=true;
 
-  const VERSION='10.10.58-canonicalinbox5';
+  const VERSION='10.10.58-canonicalinbox6';
   const MAX_ITEMS=500;
   const CONCURRENCY=6;
   const REPAIR_CONCURRENCY=4;
@@ -29,7 +29,7 @@
   const eventId=(type,sourceId)=>(type==='weekly_checkin'?'w-':'q-')+cleanId(sourceId);
   const iso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''))?String(value):'';
   const h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const js=value=>JSON.stringify(String(value??''));
+  const js=value=>h(JSON.stringify(String(value??'')));
   const stampMs=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.toDate)return value.toDate().getTime();if(value?.seconds)return Number(value.seconds)*1000;const parsed=new Date(value||0).getTime();return Number.isFinite(parsed)?parsed:0;}catch(error){return 0;}};
   const dateIso=value=>{try{const date=value?.toDate?.();return date instanceof Date&&!Number.isNaN(date.getTime())?date.toISOString().slice(0,10):'';}catch(error){return'';}};
   const todayIso=()=>{try{return typeof today==='function'?today():new Date().toISOString().slice(0,10);}catch(error){return new Date().toISOString().slice(0,10);}};
@@ -159,7 +159,7 @@
   async function open(rowId){
     if(!trainer())return;const row=items.find(item=>item.id===String(rowId));if(!row)return;markRead(row).catch(()=>{});
     try{
-      if(row.type==='weekly_checkin'){const doc=await timeout(db.collection('weeklyCheckins').doc(row.sourceId).get(),9000,'abrir relatório semanal');if(!doc.exists)throw new Error('Relatório não encontrado.');WEEKLY_CHECKINS=[{...doc.data(),id:doc.id}];return viewWeeklyCheckin(doc.id);}
+      if(row.type==='weekly_checkin'){const doc=await timeout(db.collection('weeklyCheckins').doc(row.sourceId).get(),9000,'abrir relatório semanal');if(!doc.exists)throw new Error('Relatório não encontrado.');WEEKLY_CHECKINS=[{...doc.data(),id:doc.id}];return viewWeeklyCheckin(doc.id,{source:'trainer-inbox',studentId:row.studentId});}
       const doc=await timeout(db.collection('questionnaires').doc(row.sourceId).get(),9000,'abrir relatório respondido');if(!doc.exists||!questionnaireComplete(doc.data()||{}))throw new Error('Relatório não encontrado.');TS_QUEST_CACHE=[{...doc.data(),answered:true,id:doc.id}];return viewQuestionnaire(doc.id,true);
     }catch(error){if(typeof showToast==='function')showToast('Não foi possível abrir este relatório agora.',true);}
   }
