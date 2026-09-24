@@ -35,7 +35,7 @@ has(config,"MODULE_ROOT+'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpay
 
 /* Entrega atual: aluno tenta criar índice futuro; treinador não depende dele para enxergar o relatório. */
 has(loader,'student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2','Loader não entrega a ponte ao aluno.');
-has(loader,'trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox5','Loader não entrega a Central canônica atual ao treinador.');
+has(loader,'trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6','Loader não entrega a Central canônica atual ao treinador.');
 lacks(loader,'trainer-activity-reconciliation-v10_10_47.js?v=10.10.47-activityreconcile1','Visibilidade do treinador ainda depende da reconciliação secundária antiga.');
 has(sw,"'/modules/intelligence-suite-loader-v10_10_42.js'",'Loader de recuperação não está network-first.');
 

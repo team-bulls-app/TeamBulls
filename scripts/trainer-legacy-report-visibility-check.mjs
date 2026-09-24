@@ -12,8 +12,8 @@ const rules=fs.readFileSync('firebase/firestore_28_compacto.rules','utf8');
 
 new vm.Script(source,{filename:modulePath});
 
-has(source,"const VERSION='10.10.58-canonicalinbox5'",'Revisão compatível da Central não está ativa.');
-has(loader,'trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox5','Loader não força a revisão compatível da Central.');
+has(source,"const VERSION='10.10.58-canonicalinbox6'",'Revisão compatível da Central não está ativa.');
+has(loader,'trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6','Loader não força a revisão compatível da Central.');
 
 /* Dois caminhos de leitura coexistem sem substituir um ao outro:
    1) vínculo atual por studentId para documentos antigos/legados;

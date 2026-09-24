@@ -24,7 +24,7 @@ assert(src.loader.includes('trainer-intelligence-data-v10_10_42.js')&&src.loader
 assert(src.loader.includes('trainer-canonical-context-guard-v10_10_42.js')&&src.loader.indexOf('trainer-canonical-context-guard-v10_10_42.js')<src.loader.indexOf('trainer-student-insights-v10_10_42.js'),'loader: guarda canônica deve carregar antes das telas do treinador');
 assert(src.loader.includes('student-progress-hub-v10_10_42.js'),'loader: módulo de progresso do aluno ausente');
 assert(src.loader.includes("MODE==='cloud'"),'loader: recursos sincronizados devem exigir cloud');
-assert(src.loader.includes('10.10.56-contextguard4')&&src.loader.includes('10.10.43-studentinsights2')&&src.loader.includes('10.10.43-studentprogress2'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
+assert(src.loader.includes('10.10.56-contextguard5')&&src.loader.includes('10.10.43-studentinsights2')&&src.loader.includes('10.10.43-studentprogress2'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
 
 assert(src.data.includes('trainerActivity')&&src.data.includes('trainerBilling'),'dados: deve reaproveitar índices globais já existentes');
 assert(src.data.includes("db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)"),'dados: roster do radar deve restringir trainerId + role=student para respeitar Rules 28');

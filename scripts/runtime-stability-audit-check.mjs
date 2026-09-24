@@ -43,7 +43,7 @@ assert(src.guard.includes('function weeklyCacheMatchesStudent(studentId,id=')&&s
 assert(src.guard.includes('!ok||currentStudentId()!==studentId||!weeklyCacheMatchesStudent(studentId,id)'),'Contexto: a ação de abrir relatório não revalida aluno e cache depois da espera assíncrona.');
 assert(src.data.includes('trainingSessionCount')&&src.progress.includes('sessionCount(sessions)')&&src.insights.includes('countTrainingSessions'),'Métricas: documentos por exercício podem voltar a ser contados como sessões completas.');
 assert(src.insights.includes('weightComparable')&&src.insights.includes('completeReview'),'Insights: peso ausente/conclusão com estado obsoleto não estão protegidos.');
-assert(src.loader.includes('10.10.56-contextguard4'),'Modo Revisão: loader precisa exigir a guarda atual com sincronização pós-confirmação e proteção de contexto da dieta.');
+assert(src.loader.includes('10.10.56-contextguard5'),'Modo Revisão: loader precisa exigir a guarda atual com sincronização pós-confirmação e proteção de contexto da dieta.');
 assert(src.guard.includes("PROTOCOL_COMPLETED_EVENT='team-bulls-protocol-review-completed'"),'Modo Revisão: evento de conclusão canônica está ausente.');
 const interceptStart=src.guard.indexOf('const intercepted=function');
 const interceptEnd=src.guard.indexOf('showConfirm=intercepted',interceptStart);
