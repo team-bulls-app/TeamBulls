@@ -1,4 +1,4 @@
-/* Configuração pública Team Bulls v10.10.60 — bootstrap móvel resiliente e entrada responsiva.
+/* Configuração pública Team Bulls v10.10.61 — conclusão do runtime e retomada estável da sessão.
    A chave do App Check/reCAPTCHA Enterprise é pública por definição.
    Não coloque senhas, chaves privadas ou credenciais administrativas aqui. */
 window.TEAM_BULLS_PUBLIC_CONFIG=Object.freeze({
@@ -107,7 +107,7 @@ if('caches' in window){
       const wrapped=function(task,ms,label='operação'){
         let limit=Math.max(250,Number(ms)||10000);
         if(label==='Firebase')limit=Math.max(limit,21000);
-        else if(label==='carregar conexão segura')limit=Math.min(limit,10000);
+        // O core limita cada etapa do SDK. Não cortar a soma app + auth/firestore.
         else if(label==='App Check')limit=Math.min(limit,2500);
         else if(label==='login')limit=Math.min(limit,12000);
         return base(task,limit,label);
@@ -160,11 +160,12 @@ if('caches' in window){
   window.addEventListener('online',()=>resume('online'),{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')resume('visible');},{passive:true});
   document.addEventListener('click',event=>{if(event.target?.closest?.('#btn-login'))markLoginProgress();},true);
-  window.TeamBullsAuthWarmup=Object.freeze({version:'10.10.60-authwarm2',warm:warmFirebase,recover:recoverColdStartFirebase,state:()=>({installed,warming:!!firebaseWarmPromise,recovering:!!coldStartRecoveryPromise,ready:firebaseReady()})});
+  window.TeamBullsAuthWarmup=Object.freeze({version:'10.10.61-authwarm3',warm:warmFirebase,recover:recoverColdStartFirebase,state:()=>({installed,warming:!!firebaseWarmPromise,recovering:!!coldStartRecoveryPromise,ready:firebaseReady()})});
 })();
 
 (()=>{
   let requested=false,deferredStarted=false,deferredComplete=false,completedRole='',studentPriorityStarted=false,healing=false,healTimer=null,readyResolved=false,hadFailures=false,screenObserver=null,deferredPhase=false,deferredBatchCount=0,deferredEligible=[];
+  let studentPriorityPromise=null,deferredScheduled=false;
   const PRELOAD_WINDOW=3;
   const DEFERRED_YIELD_EVERY=2;
   const STUDENT_YIELD_EVERY=2;
@@ -255,6 +256,9 @@ if('caches' in window){
   const emitRuntimeState=type=>{try{window.dispatchEvent(new CustomEvent(type,{detail:runtimeDetail()}));}catch(error){}};
   const markReady=()=>{
     if(activeFailures().length)return;
+    // Ausência de falhas não significa que os módulos ainda não tentados estejam prontos.
+    const required=[...criticalModules,...modules.filter(roleAllowsModule),...(studentPriorityStarted&&runtimeRole()!=='trainer'?studentPriorityModules:[])];
+    if(!required.every(src=>loadedModules.has(src)))return;
     deferredComplete=true;completedRole=runtimeRole()||'shared';document.documentElement.dataset.teamBullsRuntime='ready';
     if(!readyResolved){readyResolved=true;readyResolve?.(true);emitRuntimeState('team-bulls-runtime-ready');}else emitRuntimeState('team-bulls-runtime-state');
     if(hadFailures&&typeof showToast==='function')showToast('✓ Recursos do aplicativo sincronizados');
@@ -275,24 +279,29 @@ if('caches' in window){
   };
   const scheduleHeal=(delay=1800)=>{clearTimeout(healTimer);if(!activeFailures().length)return;healTimer=setTimeout(()=>healFailedModules(),Math.max(400,delay));};
   const healFailedModules=async()=>{if(healing||navigator.onLine===false)return false;const pending=activeFailures();if(!pending.length){markReady();return true;}healing=true;preloadModules(pending.slice(0,PRELOAD_WINDOW));try{for(let index=0;index<pending.length;index++){await loadScript(pending[index],9000);if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();}}finally{healing=false;}if(activeFailures().length)scheduleHeal(5000);else markReady();return activeFailures().length===0;};
-  const loadStudentPriority=async()=>{
-    if(studentPriorityStarted||!studentHomeActive())return !!window.TeamBullsStudentHomeLayout;
+  const loadStudentPriority=()=>{
+    if(studentPriorityPromise)return studentPriorityPromise;
+    if(!studentHomeActive())return Promise.resolve(false);
     studentPriorityStarted=true;document.documentElement.dataset.teamBullsStudentRuntime='loading';preloadModules(studentPriorityModules.slice(0,PRELOAD_WINDOW));
-    for(let index=0;index<studentPriorityModules.length;index++){
-      await loadScript(studentPriorityModules[index],6500);
-      if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();
-    }
-    try{window.TeamBullsStudentHomeLayout?.syncHotbar?.();}catch(error){}
-    document.documentElement.dataset.teamBullsStudentRuntime=window.TeamBullsStudentHomeLayout?'ready':'partial';
-    emitRuntimeState('team-bulls-student-runtime-ready');
-    if(activeFailures().length)scheduleHeal(900);
-    return !!window.TeamBullsStudentHomeLayout;
+    studentPriorityPromise=(async()=>{
+      for(let index=0;index<studentPriorityModules.length;index++){
+        await loadScript(studentPriorityModules[index],6500);
+        if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();
+      }
+      try{window.TeamBullsStudentHomeLayout?.syncHotbar?.();}catch(error){}
+      document.documentElement.dataset.teamBullsStudentRuntime=window.TeamBullsStudentHomeLayout?'ready':'partial';
+      emitRuntimeState('team-bulls-student-runtime-ready');
+      if(activeFailures().length)scheduleHeal(900);
+      return !!window.TeamBullsStudentHomeLayout;
+    })();
+    return studentPriorityPromise;
   };
   const loadDeferred=async()=>{
     if(deferredStarted||!sessionUiReady()||runtimeComplete())return;
     deferredStarted=true;document.documentElement.dataset.teamBullsRuntime='loading';
     try{
-      if(studentHomeActive())await loadStudentPriority();
+      if(studentHomeActive()||studentPriorityPromise)await (studentPriorityPromise||loadStudentPriority());
+      if(!sessionUiReady())return;
       deferredEligible=modules.filter(roleAllowsModule);deferredBatchCount=0;
       preloadAhead(deferredEligible,0);
       deferredPhase=true;
@@ -302,12 +311,13 @@ if('caches' in window){
     if(activeFailures().length){if(typeof showToast==='function')showToast('Conexão instável: alguns recursos continuam sendo finalizados automaticamente.',true);scheduleHeal(1200);}else markReady();
   };
   const scheduleDeferred=()=>{
-    if(!sessionUiReady()||runtimeComplete())return;
-    const queue=()=>{if(!sessionUiReady()||runtimeComplete())return;if(studentHomeActive())loadStudentPriority().finally(scheduleDeferred);else loadDeferred();};
+    if(deferredScheduled||deferredStarted||!sessionUiReady()||runtimeComplete())return;
+    deferredScheduled=true;
+    const queue=()=>{deferredScheduled=false;if(!sessionUiReady()||runtimeComplete())return;loadDeferred();};
     requestAnimationFrame(()=>setTimeout(queue,240));
   };
   const contextChanged=()=>{
-    if(studentHomeActive()){loadStudentPriority().finally(scheduleDeferred);return;}
+    if(studentHomeActive())loadStudentPriority();
     if(sessionUiReady())scheduleDeferred();
   };
   const installSessionGate=()=>{
@@ -319,7 +329,7 @@ if('caches' in window){
   };
   const load=async()=>{if(requested)return;requested=true;for(const src of criticalModules)await loadScript(src,6500);installSessionGate();contextChanged();};
   preloadModules(criticalModules);
-  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.45-startup11',context:'role-aware-low-contention'});
-  window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.45-startup11',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
+  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.61-startup12',context:'role-aware-low-contention'});
+  window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.61-startup12',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
   window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleHeal(700);});window.addEventListener('pageshow',()=>scheduleHeal(900));if(window.TeamBulls107)load();else window.addEventListener('team-bulls-v107-ready',load,{once:true});
 })();

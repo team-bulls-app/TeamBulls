@@ -1266,12 +1266,10 @@ async function doLogin(){
   const btn=document.getElementById('btn-login');
   if(btn.disabled)return;
   btn.disabled=true;btn.textContent='ENTRANDO...';
-  if(navigator.onLine&&!auth){btn.textContent='CONECTANDO...';await ensureFirebaseReady();}
-  if(!navigator.onLine||!auth){
-    await offlineRegisteredLogin(email,pass);
-    btn.disabled=false;btn.textContent='ACESSAR SISTEMA';return;
-  }
   try{
+    if(navigator.onLine&&!auth){btn.textContent='CONECTANDO...';await ensureFirebaseReady();}
+    if(!navigator.onLine||!auth){await offlineRegisteredLogin(email,pass);return;}
+    startAuthListener();
     AUTH_HANDLED=false;startBootWatchdog();setLoadingMessage('validando acesso...');
     const cred=await withTimeout(auth.signInWithEmailAndPassword(email,pass),12000,'login');
     await rememberOfflineCredential(email,pass,cred.user.uid);
@@ -1445,8 +1443,8 @@ async function getUserProfileWithRetry(userId){
       const snap=await withTimeout(db.collection('users').doc(userId).get(),PROFILE_READ_TIMEOUT_MS,'leitura do perfil');
       if(snap.exists)return snap;
       if(attempt===attempts-1)return null;
-    }catch(error){lastError=error;if(!navigator.onLine||error?.code==='team-bulls/timeout')break;}
-    await new Promise(resolve=>setTimeout(resolve,250));
+    }catch(error){lastError=error;if(!navigator.onLine||!isNetworkLikeError(error))break;}
+    if(attempt<attempts-1)await new Promise(resolve=>setTimeout(resolve,250));
   }
   if(lastError)throw lastError;
   return null;
@@ -1454,9 +1452,12 @@ async function getUserProfileWithRetry(userId){
 
 let AUTH_CALLBACK_SEEN=false;
 let AUTH_PROCESSING_UID='';
+let AUTH_STATE_REVISION=0;
+let AUTH_LISTENER_SERVICE=null;
 async function handleAuthStateUser(user){
   AUTH_CALLBACK_SEEN=true;
   if(!user){
+    AUTH_STATE_REVISION++;
     AUTH_HANDLED=false;
     AUTH_PROCESSING_UID='';
     if(AUTH_EXPECTED_LOCAL_SIGNOUT)return;
@@ -1467,17 +1468,21 @@ async function handleAuthStateUser(user){
   if(AUTH_PROCESSING_UID===user.uid)return;
   if(AUTH_HANDLED&&CURRENT_USER?.uid===user.uid&&ACCESS_MODE!=='offline-registered')return;
   AUTH_PROCESSING_UID=user.uid;
+  const revision=++AUTH_STATE_REVISION,service=auth;
+  const current=()=>revision===AUTH_STATE_REVISION&&auth===service&&auth?.currentUser?.uid===user.uid;
   AUTH_HANDLED=true;
   setLoadingMessage('validando perfil...');
 
   // Assim que o Firebase confirma qual usuário está autenticado, o aluno pode
   // abrir imediatamente o último plano local. Vídeos e gravações na nuvem só são
   // liberados depois que o perfil remoto é validado.
-  const cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});
+  let cachedShellOpened=false;
   try{
+    cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});
     let snap;
     try{snap=await getUserProfileWithRetry(user.uid);}
-    catch(profileError){if(cachedShellOpened||restoreCachedStudentAccess(user,profileError))return;throw profileError;}
+    catch(profileError){if(!current())return;if(cachedShellOpened||restoreCachedStudentAccess(user,profileError))return;throw profileError;}
+    if(!current())return;
     if(!snap){
       AUTH_HANDLED=false;
       await withTimeout(auth.signOut(),2500,'saída de conta sem perfil').catch(()=>{});
@@ -1520,29 +1525,40 @@ async function handleAuthStateUser(user){
     const hasPending=storageGet('teamms_migration_pending')==='1'&&(!pendingOwner||pendingOwner===user.uid);
     const legacyNeedsCheck=hasOffline&&!storageGet('teamms_cloud_mirror_'+user.uid)&&(!pendingOwner||pendingOwner===user.uid);
     (async()=>{
+      if(!current())return;
       if(hasPending||legacyNeedsCheck)await migrateLocalToCloud(user.uid,{background:true});
+      if(!current())return;
       await loadCloudHome();
     })().catch(error=>console.warn('Sincronização pós-login:',error));
   }catch(error){
+    if(!current())return;
     console.error('Auth handler error:',error);
     AUTH_HANDLED=false;
     if(cachedShellOpened||restoreCachedStudentAccess(user,error))return;
     bootToAuth(isNetworkLikeError(error)?'O servidor não respondeu. Treinadores precisam de conexão; alunos podem usar o acesso offline já validado.':'Não foi possível validar este perfil. Entre novamente.');
   }finally{
-    if(AUTH_PROCESSING_UID===user.uid)AUTH_PROCESSING_UID='';
+    if(revision===AUTH_STATE_REVISION&&AUTH_PROCESSING_UID===user.uid)AUTH_PROCESSING_UID='';
   }
 }
 function startAuthListener(){
   if(!auth){bootToAuth('O serviço de autenticação não foi carregado. Tente corrigir a atualização.');return;}
+  if(AUTH_UNSUBSCRIBE&&AUTH_LISTENER_SERVICE===auth){
+    // Retomar o app reutiliza a assinatura; somente uma validação pendente/falha é retomada.
+    if(auth.currentUser&&!AUTH_PROCESSING_UID&&(!AUTH_HANDLED||ACCESS_MODE==='offline-registered'))handleAuthStateUser(auth.currentUser);
+    return;
+  }
   if(AUTH_UNSUBSCRIBE){AUTH_UNSUBSCRIBE();AUTH_UNSUBSCRIBE=null;}
+  const service=auth;AUTH_LISTENER_SERVICE=service;
   AUTH_CALLBACK_SEEN=false;
-  AUTH_UNSUBSCRIBE=auth.onAuthStateChanged(handleAuthStateUser,error=>{
+  AUTH_UNSUBSCRIBE=service.onAuthStateChanged(user=>{if(AUTH_LISTENER_SERVICE===service&&auth===service)handleAuthStateUser(user);},error=>{
+    if(AUTH_LISTENER_SERVICE!==service||auth!==service)return;
+    AUTH_UNSUBSCRIBE?.();AUTH_UNSUBSCRIBE=null;AUTH_LISTENER_SERVICE=null;AUTH_STATE_REVISION++;
     console.error('Auth state error:',error);AUTH_HANDLED=false;AUTH_PROCESSING_UID='';
     bootToAuth('Falha ao consultar a sessão. Você já pode tentar entrar novamente ou usar o modo local.');
   });
   // Em alguns navegadores currentUser já está restaurado antes do primeiro
   // callback. Usá-lo reduz uma espera desnecessária sem liberar dados de treinador.
-  queueMicrotask(()=>{if(!AUTH_CALLBACK_SEEN&&auth.currentUser)handleAuthStateUser(auth.currentUser);});
+  queueMicrotask(()=>{if(AUTH_LISTENER_SERVICE===service&&auth===service&&!AUTH_CALLBACK_SEEN&&service.currentUser)handleAuthStateUser(service.currentUser);});
 }
 
 /* ══════════════════════════════════════════════════
@@ -7637,6 +7653,8 @@ cloudWriteError=function(error,action='concluir a operação'){
    possibilidade de nova tentativa depois de uma falha. A implementação antiga
    podia aguardar para sempre quando uma tag <script> já havia falhado. */
 const V106_SDK_TIMEOUT_MS=9000;
+// firebase-app carrega primeiro; auth e firestore compartilham a segunda etapa.
+const FIREBASE_CORE_TIMEOUT_MS=2*V106_SDK_TIMEOUT_MS+800;
 let V106_FIREBASE_READY_PROMISE=null;
 loadSdkOnce=function(src,globalReady){
   if(globalReady?.())return Promise.resolve(true);
@@ -7668,7 +7686,7 @@ ensureFirebaseReady=function(){
   if(auth&&db)return Promise.resolve(true);
   if(V106_FIREBASE_READY_PROMISE)return V106_FIREBASE_READY_PROMISE;
   V106_FIREBASE_READY_PROMISE=(async()=>{
-    const ready=await withTimeout(ensureFirebaseCore(),V106_SDK_TIMEOUT_MS+800,'carregar conexão segura').catch(()=>false);
+    const ready=await withTimeout(ensureFirebaseCore(),FIREBASE_CORE_TIMEOUT_MS,'carregar conexão segura').catch(()=>false);
     return !!(ready&&initFirebase());
   })().finally(()=>{if(!(auth&&db))V106_FIREBASE_READY_PROMISE=null;});
   return V106_FIREBASE_READY_PROMISE;

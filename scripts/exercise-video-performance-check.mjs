@@ -49,7 +49,7 @@ has(config,'const DEFERRED_YIELD_EVERY=2;','Carga diferida não devolve frames c
 has(config,'preloadModules(studentPriorityModules.slice(0,PRELOAD_WINDOW));','Aluno continua pré-carregando todos os módulos prioritários simultaneamente.');
 lacks(config,'preloadModules(studentPriorityModules);','Pré-carga irrestrita dos módulos prioritários voltou.');
 has(config,'requestAnimationFrame(()=>setTimeout(queue,240));','Carga pesada pós-login continua começando cedo demais.');
-has(config,"version:'10.10.45-startup11'",'Revisão otimizada do loader não está identificada.');
+has(config,"version:'10.10.61-startup12'",'Revisão otimizada do loader não está identificada.');
 
 const renderAt=core.indexOf("renderExerciseVideo(e,'exercise-video-box','student')");
 const showAt=core.indexOf("showScreen('screen-exercise')",renderAt);
