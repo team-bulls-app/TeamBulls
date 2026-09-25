@@ -45,7 +45,7 @@ has(conversion,"await withReportPreview(()=>base(slot,syntheticEvent(selected[sl
 has(conversion,"return withReportPreview(()=>base.apply(context,args))",'Seleção individual de foto não ativa a preparação antecipada de JPG.');
 
 has(config,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2",'Loader não inclui a revisão móvel de qualidade/download.');
-has(config,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic3",'Loader não inclui o runtime mutável de conversão/preparo de fotos.');
+has(config,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4",'Loader não inclui o runtime mutável de conversão/preparo de fotos.');
 has(rules,'match /progressPhotoOriginals/{uid}/{photoId}','Regras do Storage não cobrem originais.');
 has(rules,"request.resource.contentType.matches('image/(jpeg|png|webp|gif|avif|heic|heif)')",'Tipos de imagem originais permitidos estão incorretos.');
 has(rules,'validOriginalProgressPhoto(25 * 1024 * 1024)','Limite do Storage para original não é 25 MiB.');

@@ -19,10 +19,12 @@ jobs:
           node scripts/weekly-report-integrity-check.mjs
           node scripts/mobile-startup-consistency-check.mjs
           node scripts/heic-worker-export-check.mjs
+          node scripts/heic-worker-initialization-check.mjs
           node scripts/pdf-export-check.mjs
           node scripts/technique-composition-integrity-check.mjs
           node scripts/student-home-profile-check.mjs
           node scripts/student-extra-report-notice-check.mjs
           node scripts/diet-division-deletion-check.mjs
           node scripts/diet-division-schedule-energy-check.mjs
+          node scripts/diet-free-meal-day-rule-check.mjs
           node testes/testar_cadastro_convite_v10_10_9.js

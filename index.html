@@ -1146,7 +1146,9 @@
 <label class="form-group"><span class="form-label">Refeições a substituir no dia</span><input class="form-input" id="input-diet-free-meal-replacements" type="number" min="0" max="10" step="1" value="2"/></label>
 <label class="form-group"><span class="form-label">Intervalo mínimo em dias</span><input class="form-input" id="input-diet-free-meal-interval" type="number" min="1" max="365" step="1" value="7"/></label>
 </div>
-<div class="plan-help">Exemplo: até 1.000 kcal, substituindo 2 refeições do dia, no máximo uma vez a cada 7 dias.</div>
+<label class="form-group"><span class="form-label">Quando o aluno pode fazer a refeição livre</span><select class="form-input" id="input-diet-free-meal-day-rule" onchange="updateDietFreeMealDayRule()"><option value="free">Aluno escolhe o dia</option><option value="rest">Dia de descanso</option><option value="training">Qualquer dia de treino</option><option value="workout">Treino específico</option></select></label>
+<label class="form-group" id="diet-free-meal-workout-wrap" style="display:none"><span class="form-label">Qual treino</span><select class="form-input" id="input-diet-free-meal-workout"><option value="">Escolha um treino...</option></select><small>Use o protocolo e o dia de treino do aluno.</small></label>
+<div class="plan-help">O aluno verá quando realizar a refeição livre, respeitando o limite de calorias, as refeições substituídas e o intervalo mínimo.</div>
 </div>
 <button class="btn-primary" onclick="saveDietPlan()">SALVAR DIETA</button><button class="btn-ghost" id="btn-delete-diet" onclick="deleteCurrentDiet()" style="display:none;color:var(--danger)">EXCLUIR DIETA</button><button class="btn-ghost" onclick="closeModal('modal-diet')">CANCELAR</button></div></div>
 <!-- MODAL: Divisão da dieta -->

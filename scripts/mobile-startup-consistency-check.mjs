@@ -41,20 +41,20 @@ has(config,'const healFailedModules=async()=>','Loader não possui autorreparo.'
 has(config,"window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();})",'Ao recuperar conexão, o loader deve retentar módulos falhos e reavaliar o contexto atual.');
 has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2','Loader não entrega a Central/Pagamentos atual.');
 has(config,'photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2','Loader não entrega a correção móvel de fotos.');
-has(config,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic3','Loader não entrega o fallback HEIC/HEIF atual.');
+has(config,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Loader não entrega o fallback HEIC/HEIF atual.');
 assert(config.indexOf('heic-report-conversion-v10_10_12.js')>config.indexOf('photo-quality-download-v10_10_9.js'),'Conversor HEIC precisa carregar após a camada de qualidade de fotos.');
 has(updater,'function compareRelease(info)','Atualizador não compara versão + build.');
 has(updater,'function safeForAutomaticHotfix()','Atualização automática não possui gate de tela segura.');
 has(updater,"if(screen!=='screen-auth')return false",'Atualizador poderia reiniciar durante uso ativo.');
 has(updater,'&b=${CURRENT_BUILD}','Service Worker não é registrado com build.');
-has(updater,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic3','Atualizador não renova o módulo HEIC atual.');
-has(updater,'heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3','Atualizador não prepara o worker HEIC same-origin atual.');
+has(updater,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Atualizador não renova o módulo HEIC atual.');
+has(updater,'heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','Atualizador não prepara o worker HEIC same-origin atual.');
 for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2",`${name} regrediu a integridade do cadastro.`);
   has(text,"./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2",`${name} não prepara a Central/Pagamentos.`);
   has(text,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2",`${name} não prepara a correção móvel de fotos.`);
-  has(text,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic3",`${name} não prepara o módulo HEIC atual.`);
-  has(text,"./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3",`${name} não prepara o worker HEIC same-origin atual.`);
+  has(text,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4",`${name} não prepara o módulo HEIC atual.`);
+  has(text,"./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4",`${name} não prepara o worker HEIC same-origin atual.`);
   has(text,"'/modules/heic-report-conversion-v10_10_12.js'",`${name} não serve o conversor HEIC como mutável/network-first.`);
   has(text,"'/modules/heic-libheif-worker-v10_10_12.js'",`${name} não serve o worker HEIC como mutável/network-first.`);
   has(text,"const CACHE_HOTFIX='heic-recovery1'",`${name} não invalida o cache defeituoso do HEIC.`);
@@ -67,9 +67,9 @@ has(photo,"const VERSION='10.10.9-photoquality2'",'Revisão móvel de fotos não
 has(photo,"createImageBitmap(file,{imageOrientation:'from-image'})",'Decoder móvel perdeu a primeira tentativa orientada.');
 has(photo,'createImageBitmap(file);','Decoder móvel perdeu o fallback Android sem opções.');
 has(photo,'releaseLegacyReportPreviewSurfaces()','Envio não libera previews pesados antes da compressão.');
-has(heic,"const VERSION='10.10.12-heic3'",'Fallback HEIC não está na revisão de recuperação de cache esperada.');
+has(heic,"const VERSION='10.10.12-heic4'",'Fallback HEIC não está na revisão de recuperação de cache esperada.');
 has(heic,"const MAX_HEIC_BYTES=25*1024*1024",'Fallback HEIC perdeu o limite de 25 MB.');
-has(heic,"const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3'",'Conversor HEIC não rotacionou o worker same-origin preso em cache.');
+has(heic,"const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4'",'Conversor HEIC não rotacionou o worker same-origin preso em cache.');
 has(heic,"new Worker(WORKER_URL)",'Conversor HEIC não cria o worker same-origin.');
 has(heic,"file.arrayBuffer()",'Conversor HEIC não transfere o arquivo como ArrayBuffer.');
 has(heic,"new ImageData(pixels,width,height)",'Conversor HEIC não recompõe os pixels do worker.');

@@ -4,14 +4,15 @@
   if(window.__TEAM_BULLS_HEIC_REPORT_CONVERSION__)return;
   window.__TEAM_BULLS_HEIC_REPORT_CONVERSION__=true;
 
-  const VERSION='10.10.12-heic3';
+  const VERSION='10.10.12-heic4';
   const MAX_HEIC_BYTES=25*1024*1024;
-  const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3';
+  const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4';
   let workerPromise=null;
   let workerSeq=0;
   const pendingWorkerRequests=new Map();
   const batchInFlight=new WeakSet();
   const preparedJpegInputs=new WeakMap();
+  const convertedHeicInputs=new WeakMap();
   let reportPreviewDepth=0;
 
   const fileType=file=>{
@@ -65,7 +66,7 @@
       try{worker=new Worker(WORKER_URL);}catch(error){reject(error);return;}
       const timer=setTimeout(()=>{
         if(settled)return;settled=true;try{worker.terminate();}catch(error){};reject(new Error('O decoder HEIC não respondeu a tempo.'));
-      },18000);
+      },35000);
       worker.addEventListener('message',event=>{
         const data=event.data||{};
         if(data.type==='ready'&&!settled){
@@ -136,10 +137,14 @@
         if(reportPreviewDepth>0&&isJpeg(file))stageJpegInput(file,decoded);
         return decoded;
       }
+      const converted=convertedHeicInputs.get(file);
+      if(converted)return baseDecode(converted);
       try{return await baseDecode(file);}catch(nativeError){
         try{
           const jpeg=await convertHeic(file);
-          return await baseDecode(jpeg);
+          const decoded=await baseDecode(jpeg);
+          convertedHeicInputs.set(file,jpeg);
+          return decoded;
         }catch(error){
           const name=String(file?.name||'esta foto');
           const detail=String(error?.message||'').trim();
@@ -169,6 +174,8 @@
       for(let slot=0;slot<6;slot++){
         if(typeof showToast==='function')showToast(`Preparando foto ${slot+1} de 6...`);
         await withReportPreview(()=>base(slot,syntheticEvent(selected[slot])));
+        const prepared=kind==='weekly'?(typeof WEEKLY_CHECKIN_FILES!=='undefined'?WEEKLY_CHECKIN_FILES[slot]:null):(typeof QUESTIONNAIRE_REPORT_FILES!=='undefined'?QUESTIONNAIRE_REPORT_FILES[slot]:null);
+        if(!(prepared instanceof File)){if(typeof showToast==='function')showToast(`Foto ${slot+1} não foi preparada. Escolha uma versão JPG/JPEG ou tente novamente.`,true);return false;}
         await nextPaint();
       }
       let complete=false;

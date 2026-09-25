@@ -7325,10 +7325,16 @@ renderTsDay=function(){
 
 function normalizeDietFreeMealPolicy(value){
   const raw=value&&typeof value==='object'?value:{};
+  const dayRule=['free','rest','training','workout'].includes(raw.dayRule)?raw.dayRule:'free';
   return{
     maxCalories:Math.max(0,Math.min(10000,Math.round(Number(raw.maxCalories)||1000))),
     mealsToReplace:Math.max(0,Math.min(10,Math.round(Number(raw.mealsToReplace)||2))),
-    intervalDays:Math.max(1,Math.min(365,Math.round(Number(raw.intervalDays)||7)))
+    intervalDays:Math.max(1,Math.min(365,Math.round(Number(raw.intervalDays)||7))),
+    dayRule,
+    workoutId:dayRule==='workout'?String(raw.workoutId||'').slice(0,128):'',
+    workoutDayId:dayRule==='workout'?String(raw.workoutDayId||'').slice(0,128):'',
+    workoutName:dayRule==='workout'?String(raw.workoutName||'').slice(0,60):'',
+    workoutDayName:dayRule==='workout'?String(raw.workoutDayName||'').slice(0,60):''
   };
 }
 const V10513_BASE_NORMALIZE_DIET_PLAN=normalizeDietPlan;
@@ -7341,7 +7347,25 @@ function dietFreeMealPolicyText(policy){
   const p=normalizeDietFreeMealPolicy(policy);
   const meals=p.mealsToReplace===1?'1 refeição':`${p.mealsToReplace} refeições`;
   const interval=p.intervalDays===1?'1 dia':`${p.intervalDays} dias`;
-  return `Até ${p.maxCalories.toLocaleString('pt-BR')} kcal · substituir ${meals} do dia · intervalo mínimo de ${interval}`;
+  const day=p.dayRule==='rest'?'em dia de descanso':p.dayRule==='training'?'em dia de treino':p.dayRule==='workout'?`no treino ${p.workoutName||'não definido'}${p.workoutDayName?' — '+p.workoutDayName:''}`:'em dia escolhido pelo aluno';
+  return `Até ${p.maxCalories.toLocaleString('pt-BR')} kcal · substituir ${meals} do dia · intervalo mínimo de ${interval} · ${day}`;
+}
+function dietFreeMealWorkoutChoices(){
+  const workouts=DIET_CONTEXT.trainer?(VIEW_STUDENT?.uid===DIET_CONTEXT.targetUid?VIEW_STUDENT.workouts||[]:[]):getWorkouts();
+  return(Array.isArray(workouts)?workouts:[]).flatMap(workout=>getWorkoutDays(workout).map(day=>({workoutId:String(workout.id),workoutDayId:String(day.id),workoutName:String(workout.name||'Treino'),workoutDayName:String(day.name)})));
+}
+function updateDietFreeMealDayRule(){
+  const rule=document.getElementById('input-diet-free-meal-day-rule')?.value,wrap=document.getElementById('diet-free-meal-workout-wrap');
+  if(wrap)wrap.style.display=rule==='workout'?'block':'none';
+}
+function populateDietFreeMealWorkoutChoices(policy){
+  const select=document.getElementById('input-diet-free-meal-workout');if(!select)return;
+  const choices=dietFreeMealWorkoutChoices(),saved=normalizeDietFreeMealPolicy(policy);
+  const current=choices.findIndex(item=>item.workoutId===saved.workoutId&&item.workoutDayId===saved.workoutDayId);
+  select.innerHTML='<option value="">Escolha um treino...</option>'+choices.map((item,index)=>`<option value="${index}">${esc(item.workoutName+' — '+item.workoutDayName)}</option>`).join('');
+  if(current>=0)select.value=String(current);
+  else if(saved.dayRule==='workout'&&saved.workoutId&&saved.workoutDayId){select.innerHTML+=`<option value="saved">${esc((saved.workoutName||'Treino anterior')+' — '+(saved.workoutDayName||'dia anterior')+' (não encontrado; escolha outro)')}</option>`;select.value='saved';}
+  updateDietFreeMealDayRule();
 }
 function renderDietFreeMealPolicy(hostId,plan,canEdit=false){
   const host=document.getElementById(hostId);if(!host||!plan)return;
@@ -7357,6 +7381,7 @@ openAddDietModal=function(){
     'input-diet-free-meal-interval':7
   };
   Object.entries(values).forEach(([id,value])=>{const el=document.getElementById(id);if(el)el.value=String(value);});
+  document.getElementById('input-diet-free-meal-day-rule').value='free';populateDietFreeMealWorkoutChoices({dayRule:'free'});
 };
 const V10513_BASE_OPEN_EDIT_DIET=openEditDietModal;
 openEditDietModal=function(id=CURRENT_DIET_ID){
@@ -7369,6 +7394,7 @@ openEditDietModal=function(id=CURRENT_DIET_ID){
     'input-diet-free-meal-interval':p.intervalDays
   };
   Object.entries(values).forEach(([field,value])=>{const el=document.getElementById(field);if(el)el.value=String(value);});
+  document.getElementById('input-diet-free-meal-day-rule').value=p.dayRule;populateDietFreeMealWorkoutChoices(p);
 };
 saveDietPlan=async function(){
   if(!dietCanEdit()||!beginAction('save-diet','modal-diet'))return;
@@ -8348,7 +8374,9 @@ openEditDietModal=function(id=CURRENT_DIET_ID){V1010_OPEN_EDIT_DIET_BASE(id);con
 saveDietPlan=async function(){
   if(!dietCanEdit()||!beginAction('save-diet','modal-diet'))return;
   const name=document.getElementById('input-diet-name').value.trim(),active=document.getElementById('input-diet-active').value==='true',startDate=document.getElementById('input-diet-start-date').value,updateDate=document.getElementById('input-diet-update-date').value;
-  const freeMealPolicy=normalizeDietFreeMealPolicy({maxCalories:document.getElementById('input-diet-free-meal-max-calories')?.value,mealsToReplace:document.getElementById('input-diet-free-meal-replacements')?.value,intervalDays:document.getElementById('input-diet-free-meal-interval')?.value});
+  const dayRule=document.getElementById('input-diet-free-meal-day-rule')?.value||'free',workoutSelection=document.getElementById('input-diet-free-meal-workout')?.value||'',workoutChoice=dayRule==='workout'?dietFreeMealWorkoutChoices()[Number(workoutSelection)]:null;
+  if(dayRule==='workout'&&(!workoutChoice||workoutSelection==='')){alert('Escolha um treino atual para a refeição livre. Se o treino anterior não aparece, selecione outro.');endAction('save-diet','modal-diet');return;}
+  const freeMealPolicy=normalizeDietFreeMealPolicy({maxCalories:document.getElementById('input-diet-free-meal-max-calories')?.value,mealsToReplace:document.getElementById('input-diet-free-meal-replacements')?.value,intervalDays:document.getElementById('input-diet-free-meal-interval')?.value,dayRule,...workoutChoice});
   const editingPlan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID),variantEnergy={};
   document.querySelectorAll('[data-diet-variant-energy]').forEach(field=>{variantEnergy[String(field.dataset.dietVariantEnergy||'')]=v1010EnergyValue(field.value);});
   const energySummary=normalizeDietEnergySummary({...editingPlan?.energySummary,totalExpenditure:document.getElementById('input-diet-total-expenditure')?.value,variantEnergy},editingPlan?.variants||normalizeDietPlan({id:EDIT_DIET_PLAN_ID,variants:[]},0).variants);
