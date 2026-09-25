@@ -24,6 +24,7 @@ jobs:
           node scripts/prescription-propagation-check.mjs
           node scripts/diet-deletion-check.mjs
           node scripts/student-guidance-check.mjs
+          node scripts/student-extra-report-notice-check.mjs
           node scripts/session-performance-check.mjs
           node scripts/session-hotpath-performance-check.mjs
           node scripts/week-selection-check.mjs
