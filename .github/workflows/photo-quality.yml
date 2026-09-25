@@ -21,5 +21,6 @@ jobs:
       - name: Validate original photo preservation and trainer download
         run: |
           node scripts/photo-quality-download-check.mjs
+          node scripts/heic-worker-initialization-check.mjs
           node scripts/report-submit-contract-check.mjs
           node scripts/weekly-report-integrity-check.mjs

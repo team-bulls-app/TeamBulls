@@ -27,10 +27,10 @@ assert(updater.includes(`const CURRENT_BUILD=${build};`),'Atualizador divergiu d
 assert(sw.includes(`const BUILD_REVISION=${build};`)&&sw47.includes(`const BUILD_REVISION=${build};`),'Service Workers divergem do build publicado.');
 assert(sw===sw47,'sw.js e sw_47.js divergiram.');
 
-assert(config.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic3'),'Loader ainda pede conversor HEIC antigo.');
-assert(updater.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic3')&&updater.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3'),'Atualizador ainda aquece revisão HEIC antiga.');
-assert(sw.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic3')&&sw.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker3'),'Shell ainda prepara revisão HEIC antiga.');
-assert(heic.includes("const VERSION='10.10.12-heic3'")&&heic.includes('heicworker3'),'Conversor HEIC canônico não corresponde às referências publicadas.');
+assert(config.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4'),'Loader ainda pede conversor HEIC antigo.');
+assert(updater.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&updater.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4'),'Atualizador ainda aquece revisão HEIC antiga.');
+assert(sw.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&sw.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4'),'Shell ainda prepara revisão HEIC antiga.');
+assert(heic.includes("const VERSION='10.10.12-heic4'")&&heic.includes('heicworker4'),'Conversor HEIC canônico não corresponde às referências publicadas.');
 assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'")&&sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'HEIC precisa permanecer network-first.');
 
 assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.57-intelsuite7')&&usability.includes("const EXPECTED_VERSION='10.10.57-intelsuite7'"),'Bootstrap ainda espera suíte de inteligência antiga.');

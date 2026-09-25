@@ -25,6 +25,7 @@ jobs:
           node scripts/diet-deletion-check.mjs
           node scripts/diet-division-deletion-check.mjs
           node scripts/diet-division-schedule-energy-check.mjs
+          node scripts/diet-free-meal-day-rule-check.mjs
           node scripts/student-guidance-check.mjs
           node scripts/student-extra-report-notice-check.mjs
           node scripts/session-performance-check.mjs
