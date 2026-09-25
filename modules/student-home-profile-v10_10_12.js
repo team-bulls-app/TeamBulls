@@ -157,7 +157,7 @@
       #screen-home.tb-home-v2 #home-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}.tb-home-v2 #home-stats .stat-cell{min-height:92px}.tb-home-v2 #home-stats .lbl{font-size:10px}
       .tb-hero-status{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}.tb-confidential-badge{position:static!important;display:inline-flex!important;align-items:center;height:24px;padding:0 9px;border:1px solid rgba(225,29,72,.55);color:#c65b6f;font:600 8px 'DM Mono',monospace;letter-spacing:1px;vertical-align:middle;margin-left:8px}
       #screen-student-notifications{padding-bottom:90px}.tb-notice-screen-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #282020;position:sticky;top:0;background:#0c0c0c;z-index:4}.tb-notice-screen-head h1{font:800 25px 'Barlow Condensed',sans-serif;margin:0}
-      .tb-notice-list{padding:14px 16px;display:grid;gap:10px}.tb-notice-card{border:1px solid #302427;background:linear-gradient(135deg,#141112,#0d0d0d);padding:14px;border-radius:9px;display:grid;gap:8px}.tb-notice-card.unread{border-color:rgba(225,29,72,.62);box-shadow:inset 3px 0 #e11d48}.tb-notice-card strong{font:800 15px 'Barlow Condensed',sans-serif;letter-spacing:.3px}.tb-notice-card p{margin:0;color:#c5b9b2;font:400 13px/1.5 'Barlow',sans-serif}.tb-notice-meta{font:500 8px 'DM Mono',monospace;color:#786b66;text-transform:uppercase;letter-spacing:.7px}.tb-notice-actions{display:flex;gap:8px;flex-wrap:wrap}.tb-notice-actions button{padding:8px 10px;border:1px solid #4a252c;background:#201114;color:#f1dfdc;font:700 9px 'DM Mono',monospace}.tb-notice-empty{padding:40px 18px;text-align:center;color:#786b66;font:500 11px 'DM Mono',monospace}
+      .tb-notice-list{padding:14px 16px;display:grid;gap:10px}.tb-notice-card{border:1px solid #302427;background:linear-gradient(135deg,#141112,#0d0d0d);padding:14px;border-radius:9px;display:grid;gap:8px}.tb-notice-card[data-notice-index]{cursor:pointer}.tb-notice-card[data-notice-index]:focus-visible{outline:2px solid #e11d48;outline-offset:3px}.tb-notice-card.unread{border-color:rgba(225,29,72,.62);box-shadow:inset 3px 0 #e11d48}.tb-notice-card strong{font:800 15px 'Barlow Condensed',sans-serif;letter-spacing:.3px}.tb-notice-card p{margin:0;color:#c5b9b2;font:400 13px/1.5 'Barlow',sans-serif}.tb-notice-meta{font:500 8px 'DM Mono',monospace;color:#786b66;text-transform:uppercase;letter-spacing:.7px}.tb-notice-actions{display:flex;gap:8px;flex-wrap:wrap}.tb-notice-actions button{padding:8px 10px;border:1px solid #4a252c;background:#201114;color:#f1dfdc;font:700 9px 'DM Mono',monospace}.tb-notice-empty{padding:40px 18px;text-align:center;color:#786b66;font:500 11px 'DM Mono',monospace}
       .tb-trainer-profile-card{margin:10px 18px 0;padding:12px;border:1px solid #302427;background:#111;display:flex;align-items:center;gap:12px}.tb-trainer-profile-card img,.tb-trainer-profile-avatar{width:54px;height:54px;border-radius:50%;object-fit:cover;border:1px solid #6b2734;background:#1b1315;display:grid;place-items:center;font:800 18px 'Barlow Condensed',sans-serif}.tb-trainer-profile-copy{min-width:0;flex:1}.tb-trainer-profile-copy strong,.tb-trainer-profile-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tb-trainer-profile-copy strong{font:800 17px 'Barlow Condensed',sans-serif}.tb-trainer-profile-copy span{font:500 9px 'DM Mono',monospace;color:#aa9b93;margin-top:3px}.tb-trainer-profile-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.tb-trainer-profile-actions button{border:1px solid #4a252c;background:#171112;color:#ddd;padding:7px 8px;font:600 8px 'DM Mono',monospace}
       @media(max-width:480px){#screen-home.tb-home-v2 .header-title{font-size:20px}.tb-home-actions{gap:8px}.tb-avatar-button{width:48px;height:48px}.tb-profile-name{max-width:90px}.tb-notice-button{width:40px;height:40px}}
     `;
@@ -230,7 +230,7 @@
       const data={...doc.data(),id:doc.id};if(data.answered)return;
       const isMonthly=data.reportType==='monthly';
       if(isMonthly&&(!protocol||monthly?.status(data,schedule)!=='pending'))return;
-      items.push({id:doc.id,source:'questionnaire',title:isMonthly?'Relatório mensal pendente':'Relatório pendente',body:isMonthly?('Relatório completo de '+fmt(data.dueDate)+', com todas as perguntas e 6 fotos.'):'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:isMonthly?'relatório mensal':'relatório',action:'questionnaire'});
+      items.push({id:doc.id,source:'questionnaire',title:isMonthly?'Relatório mensal pendente':data.reportType==='standard-extra'?'Relatório extra pendente':'Relatório pendente',body:isMonthly?('Relatório completo de '+fmt(data.dueDate)+', com todas as perguntas e 6 fotos.'):'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:isMonthly?'relatório mensal':'relatório',action:'questionnaire'});
     });
     const weekly=value(3),history=value(4);
     if(weekly?.exists&&history&&results[6].status==='fulfilled'){
@@ -248,7 +248,12 @@
   function renderNotifications(){
     const host=document.getElementById('tb-notice-list');if(!host)return;
     if(!notifications.length){host.innerHTML='<div class="tb-notice-empty">Nenhuma notificação no momento.</div>';return;}
-    host.innerHTML=notifications.map((item,index)=>`<article class="tb-notice-card ${item.read?'':'unread'}"><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='retry'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ATUALIZAR</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`).join('');
+    host.innerHTML=notifications.map((item,index)=>{
+      const actionable=['questionnaire','weekly','retry','protocol'].includes(item.action);
+      return`<article class="tb-notice-card ${item.read?'':'unread'}"${actionable?` data-notice-index="${index}" role="button" tabindex="0"`:''}><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='retry'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ATUALIZAR</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`;
+    }).join('');
+    host.onclick=event=>{if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(card&&host.contains(card))openNotice(Number(card.dataset.noticeIndex));};
+    host.onkeydown=event=>{if(event.key!=='Enter'&&event.key!==' ')return;if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(!card||!host.contains(card))return;event.preventDefault();openNotice(Number(card.dataset.noticeIndex));};
   }
 
   function applyNoticeBadge(){
@@ -305,9 +310,13 @@
       if(item.action==='weekly'){
         busy('CARREGANDO RELATÓRIO...');
         const loadSuite=window.TeamBullsIntelligenceBootstrap?.load||window.TeamBullsIntelligenceSuiteLoader?.load;
-        if(typeof loadSuite==='function')await Promise.race([Promise.resolve(loadSuite()),new Promise(resolve=>setTimeout(resolve,9000))]);
-        if(typeof openWeeklyCheckinModal!=='function')throw new Error('Relatório semanal ainda não carregado.');
+        if(typeof loadSuite==='function')await loadSuite();
+        if(!window.TeamBullsWeeklyReportIntegrity?.canOpenForm||typeof openWeeklyCheckinModal!=='function')throw new Error('Relatório semanal ainda não carregado.');
         await openWeeklyCheckinModal();
+        if(!document.getElementById('modal-weekly-checkin')?.classList.contains('open')){
+          await loadNotifications({includeProtocol:true});renderNotifications();applyNoticeBadge();
+          showToast?.('O relatório extra não abriu. Confira a conexão e toque novamente para tentar.',true);
+        }
         return;
       }
       if(item.action==='protocol'){
