@@ -23,4 +23,5 @@ jobs:
           node scripts/technique-composition-integrity-check.mjs
           node scripts/student-home-profile-check.mjs
           node scripts/student-extra-report-notice-check.mjs
+          node scripts/diet-division-deletion-check.mjs
           node testes/testar_cadastro_convite_v10_10_9.js
