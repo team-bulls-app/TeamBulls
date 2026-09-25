@@ -56,7 +56,17 @@
     copy.name=uniqueCopyName(source);
     copy.isActive=false;
     copy.order=(DIET_DOCUMENT?.plans||[]).length;
-    copy.variants=(Array.isArray(source?.variants)?source.variants:[]).map(cloneVariant);
+    const sourceVariants=Array.isArray(source?.variants)?source.variants:[];
+    copy.variants=sourceVariants.map(cloneVariant);
+    const previousEnergy=source?.energySummary?.variantEnergy;
+    if(previousEnergy&&typeof previousEnergy==='object'&&!Array.isArray(previousEnergy)){
+      const variantEnergy={};
+      sourceVariants.forEach((variant,index)=>{
+        const oldId=String(variant?.id||'');
+        if(Object.prototype.hasOwnProperty.call(previousEnergy,oldId))variantEnergy[copy.variants[index].id]=previousEnergy[oldId];
+      });
+      copy.energySummary={...copy.energySummary,variantEnergy};
+    }
     if(copy.variants.length)copy.meals=copy.variants[0].meals;
     else copy.meals=(Array.isArray(source?.meals)?source.meals:[]).map(cloneMeal);
     if(Array.isArray(DIET_SECTION_DEFS)){

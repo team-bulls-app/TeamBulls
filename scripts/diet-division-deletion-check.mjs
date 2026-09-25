@@ -20,6 +20,7 @@ const context={
   dietCanEdit:()=>context.DIET_CONTEXT.trainer||context.DIET_CONTEXT.local,
   v104DietDistribution:plan=>({total:plan.variants.reduce((sum,item)=>sum+item.daysPerWeek,0)}),
   jsArg:value=>'&quot;'+String(value)+'&quot;',esc:value=>String(value),
+  dietVariantDayLabel:()=>'',renderDietEnergySummary:()=>{},
   showConfirm:(title,text,cb)=>{confirmation={title,text,cb};},
   beginAction:key=>{if(locks.has(key))return false;locks.add(key);return true;},
   endAction:key=>locks.delete(key),
