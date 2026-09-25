@@ -45,7 +45,7 @@
       #screen-diet-detail #diet-energy-summary .diet-energy-card{padding:0!important;border:1px solid #3b312b!important;background:#0e0d0c!important}
       #screen-diet-detail #diet-energy-summary .diet-energy-card-head{display:none!important}
       #screen-diet-detail #diet-energy-summary .diet-energy-grid{
-        display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;
+        display:grid!important;grid-template-columns:repeat(auto-fit,minmax(min(100%,115px),1fr))!important;gap:0!important;
       }
       #screen-diet-detail #diet-energy-summary .diet-energy-metric{
         min-width:0!important;min-height:54px!important;padding:8px 7px!important;border:0!important;border-right:1px solid #302722!important;
@@ -54,7 +54,7 @@
       #screen-diet-detail #diet-energy-summary .diet-energy-metric:last-child{border-right:0!important}
       #screen-diet-detail #diet-energy-summary .diet-energy-metric>span{
         color:#786a61!important;font:500 6.4px/1.2 'DM Mono',monospace!important;letter-spacing:.35px!important;
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+        white-space:normal;overflow:visible;
       }
       #screen-diet-detail #diet-energy-summary .diet-energy-metric>strong{
         margin-top:4px!important;color:#e2d7cf!important;font:800 15px/1 'Barlow Condensed',sans-serif!important;
@@ -113,9 +113,8 @@
 
   function compactEnergyLabels(){
     const metrics=[...document.querySelectorAll('#screen-diet-detail #diet-energy-summary .diet-energy-metric')];
-    const labels=['GET','DIA DE TREINO','DIA SEM TREINO'];
-    metrics.slice(0,3).forEach((metric,index)=>{
-      setTextIfChanged(metric.querySelector(':scope > span'),labels[index]);
+    metrics.forEach((metric,index)=>{
+      if(index===0)setTextIfChanged(metric.querySelector(':scope > span'),'GET');
       const value=metric.querySelector(':scope > strong');
       if(value)setTextIfChanged(value,String(value.textContent||'').replace(/\s*kcal\s*\/\s*dia\s*$/i,' kcal').trim());
     });

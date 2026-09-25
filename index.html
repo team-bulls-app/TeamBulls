@@ -1135,10 +1135,9 @@
 <div class="diet-free-meal-editor-title">TABELA CALÓRICA</div>
 <div class="diet-energy-editor-grid">
 <label class="form-group"><span class="form-label">Gasto energético total do aluno</span><input class="form-input" id="input-diet-total-expenditure" type="number" min="0" max="20000" step="1" inputmode="numeric" placeholder="Ex.: 2800"/><small>GET em kcal/dia</small></label>
-<label class="form-group"><span class="form-label">Valor energético total — dia de treino</span><input class="form-input" id="input-diet-training-energy" type="number" min="0" max="20000" step="1" inputmode="numeric" placeholder="Ex.: 2500"/><small>VET em kcal/dia</small></label>
-<label class="form-group"><span class="form-label">Valor energético total — dia sem treino</span><input class="form-input" id="input-diet-rest-energy" type="number" min="0" max="20000" step="1" inputmode="numeric" placeholder="Ex.: 2200"/><small>VET em kcal/dia</small></label>
 </div>
-<div class="plan-help">Os valores são informados pelo treinador e aparecem na dieta do aluno. Use zero ou deixe vazio quando ainda não houver cálculo definido.</div>
+<div class="diet-energy-variant-grid" id="diet-energy-variant-fields"></div>
+<div class="plan-help" id="diet-energy-legacy-note">Informe um valor para cada divisão da dieta. Use zero ou deixe vazio quando ainda não houver cálculo definido.</div>
 </div>
 <div class="diet-free-meal-editor">
 <div class="diet-free-meal-editor-title">REFEIÇÃO LIVRE</div>
@@ -1153,7 +1152,9 @@
 <!-- MODAL: Divisão da dieta -->
 <div class="modal-backdrop" id="modal-diet-variant"><div class="modal-sheet"><div class="modal-handle"></div><div class="modal-title" id="modal-diet-variant-title">Nova divisão</div>
 <div class="form-group"><label class="form-label">Nome da divisão</label><input class="form-input" id="input-diet-variant-name" maxlength="100" placeholder="Ex.: Dia de treino, Baixo carboidrato..."/></div>
-<div class="form-group"><label class="form-label">Dias por semana</label><input class="form-input" id="input-diet-variant-days" type="number" min="0" max="7" step="1" value="0"/><div class="plan-help">A soma ideal das divisões é 7 dias. Ex.: 2 dias de baixo carboidrato e 5 dias de alto carboidrato.</div></div>
+<div class="form-group"><label class="form-label" for="input-diet-variant-day-type">Tipo de dia</label><select class="form-input" id="input-diet-variant-day-type"><option value="">Não definido</option><option value="training">Dia de treino</option><option value="rest">Dia de descanso</option></select></div>
+<fieldset class="diet-weekday-selector"><legend class="form-label">Dias da semana nesta divisão</legend><div class="diet-weekday-options"><label><input type="checkbox" value="1" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>SEG</label><label><input type="checkbox" value="2" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>TER</label><label><input type="checkbox" value="3" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>QUA</label><label><input type="checkbox" value="4" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>QUI</label><label><input type="checkbox" value="5" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>SEX</label><label><input type="checkbox" value="6" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>SÁB</label><label><input type="checkbox" value="0" data-diet-variant-weekday onchange="syncDietVariantDaysFromWeekdays()"/>DOM</label></div><div class="plan-help">Cada dia da semana pode pertencer a somente uma divisão. O tipo de dia identifica treino ou descanso.</div></fieldset>
+<div class="form-group"><label class="form-label">Dias por semana</label><input class="form-input" id="input-diet-variant-days" type="number" min="0" max="7" step="1" value="0" oninput="this.dataset.manualValue=this.value"/><div class="plan-help">Ao escolher os dias acima, esta quantidade é calculada automaticamente. Dietas antigas sem dias definidos continuam com sua frequência atual.</div></div>
 <button class="btn-primary" onclick="saveDietVariant()">SALVAR DIVISÃO</button>
 <button class="btn-ghost" id="btn-delete-diet-variant" onclick="deleteDietVariant()" style="display:none;color:var(--danger)">EXCLUIR DIVISÃO</button>
 <button class="btn-ghost" onclick="closeModal('modal-diet-variant')">CANCELAR</button></div></div>
