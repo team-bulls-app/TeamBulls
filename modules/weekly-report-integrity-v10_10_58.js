@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.58 — integridade do ciclo semanal sem reescrever histórico. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010584__)return;
-  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010584__=true;
+  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010585__)return;
+  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010585__=true;
 
-  const VERSION='10.10.58-weeklyintegrity4';
+  const VERSION='10.10.58-weeklyintegrity5';
   const READ_TIMEOUT=10000;
   let fetchInstalled=false;
   let formRequest=null,submissionRequest=null,opening=false;
@@ -125,11 +125,17 @@
     computeCheckinRequest=canonicalRequest;
   }
   const identity=request=>request?[request.kind,request.requestKey,request.dueDate,request.documentKey||request.requestKey].join('|'):'';
+  function hasOpenGuard(fn){
+    for(let depth=0;depth<20&&typeof fn==='function';depth++,fn=fn.__tbBase){if(fn.__tbWeeklyForm4)return true;}
+    return false;
+  }
   function installOpenGuard(){
-    if(typeof openWeeklyCheckinModal!=='function'||openWeeklyCheckinModal.__tbWeeklyForm4)return;
+    if(typeof openWeeklyCheckinModal!=='function'||hasOpenGuard(openWeeklyCheckinModal))return;
     const base=openWeeklyCheckinModal;
     const wrapped=async function(){
-      if(!student()||opening||submissionRequest)return false;
+      if(!student()){notify('Sua sessão ainda não está pronta. Entre novamente e tente abrir o relatório.',true);return false;}
+      if(opening){notify('O relatório já está abrindo. Aguarde um instante.');return false;}
+      if(submissionRequest){notify('O envio anterior ainda está sendo confirmado. Aguarde.');return false;}
       if(formRequest&&document.getElementById('modal-weekly-checkin')?.classList.contains('open'))return false;
       opening=true;formRequest=null;
       try{

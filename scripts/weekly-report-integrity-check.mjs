@@ -26,7 +26,7 @@ const submit=read(submitPath);
 const history=read(historyPath);
 const core=read(corePath);
 
-has(integrity,"const VERSION='10.10.58-weeklyintegrity4'",'Guarda semanal está na revisão errada.');
+has(integrity,"const VERSION='10.10.58-weeklyintegrity5'",'Guarda semanal está na revisão errada.');
 has(integrity,'function effectiveSubmittedDate(row)','Recuperação da data real de envio não está explícita.');
 has(integrity,'localStampDate(row?.createdAt)||isoDate(row?.submittedDate)||isoDate(row?.dueDate)','Data exibida não prioriza o timestamp de criação confirmado pelo servidor.');
 has(integrity,'_weeklyDateRecovered:true','Histórico não sinaliza recuperação de submittedDate legado.');
@@ -65,15 +65,15 @@ lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central n
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Central não pode apagar semanal histórico.');
 
 has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
-has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4",'Suíte não entrega a guarda semanal com recuperação de data.');
+has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5",'Suíte não entrega a guarda semanal com recuperação de data.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6",'Suíte não entrega a Central semanal deduplicada.');
-const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4");
+const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5");
 const trainerHistory=loader.indexOf('trainer-student-report-history-v10_10_55.js');
 const trainerCentral=loader.indexOf('trainer-canonical-inbox-v10_10_58.js');
 assert(trainerIntegrity>=0&&trainerHistory>trainerIntegrity,'Treinador precisa instalar recuperação/deduplicação antes de carregar o histórico individual.');
 assert(trainerCentral>trainerHistory,'Central do treinador deve carregar depois do histórico individual.');
 const studentSubmit=loader.indexOf('student-report-submit-reconciliation-v10_10_57.js');
-const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity4");
+const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5");
 assert(studentSubmit>=0&&studentIntegrity>studentSubmit,'Aluno precisa instalar a guarda depois do submit REST canônico.');
 
 has(history,'fetchWeeklyCheckins(studentUid)','Histórico do treinador deixou de passar pelo leitor semanal corrigido.');
