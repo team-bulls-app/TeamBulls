@@ -13,6 +13,7 @@ const hosts={'summary':summaryHost,'diet-energy-variant-fields':editorHost,'diet
 let sequence=0;
 const context={
   uid:()=>`new-${++sequence}`,normalizeDietMeal:value=>value,
+  dietFreeMealWorkoutChoices:()=>[],
   document:{getElementById:id=>hosts[id]||null},
   esc:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),
   jsArg:value=>JSON.stringify(value)
@@ -35,6 +36,21 @@ const legacy=context.normalizeDietVariant({id:'old',name:'Dia de treino',daysPer
 assert.equal(legacy.daysPerWeek,5,'dieta antiga mantém a distribuição existente');
 assert.equal(legacy.dayType,'training','tipo de dia antigo permanece reconhecível');
 assert.deepEqual(Array.from(legacy.weekdays),[],'dias específicos não são inventados');
+assert.deepEqual(Array.from(legacy.workoutDays),[],'dieta antiga não ganha vínculo de treino presumido');
+const linked=context.normalizeDietVariant({id:'linked',name:'Carbo alto',dayType:'training',workoutDays:[
+  {workoutId:'protocol-1',workoutDayId:'day-a',workoutName:'Protocolo',workoutDayName:'Treino A'},
+  {workoutId:'protocol-1',workoutDayId:'day-a',workoutName:'Protocolo',workoutDayName:'Treino A'}
+]});
+assert.equal(linked.workoutDays.length,1,'vínculo repetido não é duplicado');
+context.dietFreeMealWorkoutChoices=()=>[{workoutId:'protocol-1',workoutDayId:'day-a',workoutName:'Protocolo novo',workoutDayName:'Treino A novo'}];
+assert.equal(context.dietVariantWorkoutLabels(linked)[0],'Protocolo novo — Treino A novo','nome exibido acompanha o treino atual pelo ID');
+context.dietFreeMealWorkoutChoices=()=>[];
+assert.match(context.dietVariantWorkoutLabels(linked)[0],/não encontrado/,'vínculo removido é identificado sem apagar dados antigos');
+
+const renameContext={getWorkoutDays:()=>[{id:'stable-day-id',name:'Treino A',order:0}],normalizedName:value=>String(value).toLowerCase(),dayIdFromName:()=>{throw new Error('renomear não deve criar ID novo');},normalizeWorkoutDays:days=>days};
+vm.createContext(renameContext);
+vm.runInContext(extract('function dayListAfterRename(', 'async function saveDayFolder('),renameContext);
+assert.equal(renameContext.dayListAfterRename({},'Treino A','Treino A novo')[0].id,'stable-day-id','renomear a pasta preserva o vínculo estável da dieta');
 
 const plan={id:'diet',variants:[scheduled,{id:'high',name:'Carbo alto',dayType:'training',weekdays:[2,3,4],daysPerWeek:3},{id:'middle',name:'Manutenção',dayType:'rest',weekdays:[0,5],daysPerWeek:2}],energySummary:{totalExpenditure:2700,variantEnergy:{low:1900,high:2400,middle:2200}}};
 context.renderDietEnergySummary('summary',plan,true);
@@ -70,6 +86,8 @@ assert.equal(Object.keys(copied.energySummary.variantEnergy).length,2,'IDs antig
 
 const html=fs.readFileSync('index.html','utf8');
 assert(html.includes('data-diet-variant-weekday')&&html.includes('input-diet-variant-day-type'),'editor permite dias da semana e treino/descanso');
+assert(html.includes('diet-variant-workout-options')&&html.includes('updateDietVariantWorkoutVisibility()'),'editor oferece treinos específicos para dias de treino');
+assert(core.includes('workoutConflict=plan.variants.find'),'mesmo treino não pode apontar para duas divisões');
 assert(html.includes('diet-energy-variant-fields'),'editor calórico acompanha divisões');
 assert(!html.includes('id="input-diet-training-energy"')&&!html.includes('id="input-diet-rest-energy"'),'editor não usa dois campos fixos');
 console.log('APROVADO — dias e tipo por divisão, calorias por ID, nomes dinâmicos, legado preservado e cópia correta.');
