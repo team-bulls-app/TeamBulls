@@ -32,6 +32,7 @@ assert.deepEqual(Array.from(scheduled.weekdays),[1,6]);
 assert.equal(scheduled.daysPerWeek,2,'dias selecionados determinam a quantidade');
 assert.equal(scheduled.dayType,'rest');
 assert.equal(context.dietVariantDayLabel(scheduled),'Descanso · SEG, SÁB');
+assert.equal(scheduled.restDaysPerWeek,2,'dias de descanso antigos permanecem reconhecidos');
 const legacy=context.normalizeDietVariant({id:'old',name:'Dia de treino',daysPerWeek:5,meals:[]});
 assert.equal(legacy.daysPerWeek,5,'dieta antiga mantém a distribuição existente');
 assert.equal(legacy.dayType,'training','tipo de dia antigo permanece reconhecível');
@@ -42,8 +43,9 @@ const linked=context.normalizeDietVariant({id:'linked',name:'Carbo alto',dayType
   {workoutId:'protocol-1',workoutDayId:'day-a',workoutName:'Protocolo',workoutDayName:'Treino A'}
 ]});
 assert.equal(linked.workoutDays.length,1,'vínculo repetido não é duplicado');
-context.dietFreeMealWorkoutChoices=()=>[{workoutId:'protocol-1',workoutDayId:'day-a',workoutName:'Protocolo novo',workoutDayName:'Treino A novo'}];
+context.dietFreeMealWorkoutChoices=()=>[{workoutId:'protocol-1',workoutDayId:'day-a',workoutName:'Protocolo novo',workoutDayName:'Treino A novo',active:true},{workoutId:'old',workoutDayId:'day-old',active:false}];
 assert.equal(context.dietVariantWorkoutLabels(linked)[0],'Protocolo novo — Treino A novo','nome exibido acompanha o treino atual pelo ID');
+assert.equal(context.dietActiveWorkoutChoices().length,1,'seletor da divisão não mostra protocolo inativo');
 context.dietFreeMealWorkoutChoices=()=>[];
 assert.match(context.dietVariantWorkoutLabels(linked)[0],/não encontrado/,'vínculo removido é identificado sem apagar dados antigos');
 
@@ -87,6 +89,7 @@ assert.equal(Object.keys(copied.energySummary.variantEnergy).length,2,'IDs antig
 const html=fs.readFileSync('index.html','utf8');
 assert(html.includes('data-diet-variant-weekday')&&html.includes('input-diet-variant-day-type'),'editor permite dias da semana e treino/descanso');
 assert(html.includes('diet-variant-workout-options')&&html.includes('updateDietVariantWorkoutVisibility()'),'editor oferece treinos específicos para dias de treino');
+assert(html.includes('input-diet-variant-rest-days')&&html.includes('data-diet-variant-rest-weekday'),'editor mistura treinos específicos e descansos');
 assert(core.includes('workoutConflict=plan.variants.find'),'mesmo treino não pode apontar para duas divisões');
 assert(html.includes('diet-energy-variant-fields'),'editor calórico acompanha divisões');
 assert(!html.includes('id="input-diet-training-energy"')&&!html.includes('id="input-diet-rest-energy"'),'editor não usa dois campos fixos');

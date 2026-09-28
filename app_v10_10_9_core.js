@@ -6609,14 +6609,17 @@ function normalizeDietVariant(value,index=0){
   const raw=value&&typeof value==='object'?value:{},meals=(Array.isArray(raw.meals)?raw.meals:[]).map(normalizeDietMeal);
   const name=String(raw.name||('Divisão '+(index+1))).trim().slice(0,100)||('Divisão '+(index+1));
   const weekdays=Array.isArray(raw.weekdays)?[...new Set(raw.weekdays.map(Number).filter(day=>Number.isInteger(day)&&day>=0&&day<=6))].sort((a,b)=>(a+6)%7-(b+6)%7):[];
-  const dayType=['training','rest'].includes(raw.dayType)?raw.dayType:name==='Dia de treino'?'training':name==='Dia sem treino'?'rest':'';
+  const dayType=['training','rest','mixed'].includes(raw.dayType)?raw.dayType:name==='Dia de treino'?'training':name==='Dia sem treino'?'rest':'';
   const workoutDays=[],seenWorkoutDays=new Set();
   for(const entry of Array.isArray(raw.workoutDays)?raw.workoutDays:[]){
     const workoutId=String(entry?.workoutId||'').slice(0,180),workoutDayId=String(entry?.workoutDayId||'').slice(0,180);
     const key=workoutId+'\u0000'+workoutDayId;if(!workoutId||!workoutDayId||seenWorkoutDays.has(key))continue;
     seenWorkoutDays.add(key);workoutDays.push({workoutId,workoutDayId,workoutName:String(entry?.workoutName||'').slice(0,100),workoutDayName:String(entry?.workoutDayName||'').slice(0,60)});
   }
-  return{id:String(raw.id||uid()),name,daysPerWeek:weekdays.length||Math.max(0,Math.min(7,Math.trunc(Number(raw.daysPerWeek)||0))),weekdays,dayType,workoutDays,order:Number.isFinite(Number(raw.order))?Math.max(0,Math.trunc(Number(raw.order))):index,meals};
+  const restWeekdays=Array.isArray(raw.restWeekdays)?[...new Set(raw.restWeekdays.map(Number).filter(day=>Number.isInteger(day)&&day>=0&&day<=6))].sort((a,b)=>(a+6)%7-(b+6)%7):dayType==='rest'?weekdays.slice():[];
+  const legacyRest=dayType==='rest'&&!Object.prototype.hasOwnProperty.call(raw,'restDaysPerWeek')?(weekdays.length||Number(raw.daysPerWeek)||0):0;
+  const restDaysPerWeek=restWeekdays.length||Math.max(0,Math.min(7,Math.trunc(Number(raw.restDaysPerWeek??legacyRest)||0)));
+  return{id:String(raw.id||uid()),name,daysPerWeek:weekdays.length||Math.max(0,Math.min(7,Math.trunc(Number(raw.daysPerWeek)||0))),weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays,order:Number.isFinite(Number(raw.order))?Math.max(0,Math.trunc(Number(raw.order))):index,meals};
 }
 normalizeDietPlan=function(plan,index=0){
   const raw=plan&&typeof plan==='object'?plan:{},start=v104DateOr(raw.startDate,today()),update=v104DateOr(raw.updateDate,addDaysIso(start,28));
@@ -6634,32 +6637,56 @@ normalizeDietDocument=function(source){
 };
 function currentDietVariant(){const plan=currentDiet();if(!plan)return null;let found=plan.variants.find(item=>item.id===CURRENT_DIET_VARIANT_ID);if(!found)found=plan.variants[0]||null;if(found)CURRENT_DIET_VARIANT_ID=found.id;return found;}
 const DIET_WEEKDAY_LABELS=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
-function dietVariantDayLabel(variant){const type=variant.dayType==='training'?'Treino':variant.dayType==='rest'?'Descanso':'';const days=(variant.weekdays||[]).map(day=>DIET_WEEKDAY_LABELS[day]).filter(Boolean).join(', ');return[type,days].filter(Boolean).join(' · ');}
+function dietVariantDayLabel(variant){const type=variant.dayType==='training'?'Treino':variant.dayType==='rest'?'Descanso':variant.dayType==='mixed'?'Treino e descanso':'';const rest=Number(variant.restDaysPerWeek)||0;const days=(variant.weekdays||[]).map(day=>DIET_WEEKDAY_LABELS[day]).filter(Boolean).join(', ');const fixedRest=(variant.restWeekdays||[]).map(day=>DIET_WEEKDAY_LABELS[day]).filter(Boolean).join(', ');if(type==='Descanso'&&fixedRest&&fixedRest===days)return type+' · '+days;return[type,rest&&variant.dayType!=='rest'?`${rest} ${rest===1?'descanso':'descansos'}`:'',fixedRest?'descanso: '+fixedRest:'',days?'semana: '+days:''].filter(Boolean).join(' · ');}
 function dietVariantWorkoutLabels(variant){
   const choices=dietFreeMealWorkoutChoices();
   return(variant.workoutDays||[]).map(ref=>{
     const match=choices.find(item=>item.workoutId===ref.workoutId&&item.workoutDayId===ref.workoutDayId);
-    return(match?match.workoutName+' — '+match.workoutDayName:(ref.workoutName||'Treino anterior')+' — '+(ref.workoutDayName||'dia anterior')+' (não encontrado)');
+    return(match?match.workoutName+' — '+match.workoutDayName+(match.active?'':' (protocolo inativo)'):(ref.workoutName||'Treino anterior')+' — '+(ref.workoutDayName||'dia anterior')+' (não encontrado)');
   });
 }
 function updateDietVariantWorkoutVisibility(){
-  const wrap=document.getElementById('diet-variant-workout-wrap');if(wrap)wrap.style.display=document.getElementById('input-diet-variant-day-type')?.value==='training'?'block':'none';
+  const wrap=document.getElementById('diet-variant-workout-wrap');if(wrap)wrap.style.display='block';
+  syncDietVariantDayTypeFromAssignments();
+}
+function dietActiveWorkoutChoices(){return dietFreeMealWorkoutChoices().filter(choice=>choice.active);}
+function syncDietVariantDayTypeFromAssignments(){
+  const rest=document.getElementById('input-diet-variant-rest-days');if(rest&&!rest.disabled)rest.dataset.manualValue=rest.value;
+  const hasWorkout=!!document.querySelector('[data-diet-variant-workout]:checked'),hasRest=Number(rest?.value)>0;
+  const type=document.getElementById('input-diet-variant-day-type');if(type&&(hasWorkout||hasRest))type.value=hasWorkout&&hasRest?'mixed':hasWorkout?'training':'rest';
+  syncDietVariantDaysFromWeekdays();
+}
+function syncDietVariantRestWeekdays(){
+  const field=document.getElementById('input-diet-variant-rest-days');if(!field)return;
+  const fixed=document.querySelectorAll('[data-diet-variant-rest-weekday]:checked').length;
+  if(fixed){if(!field.disabled)field.dataset.manualValue=field.value;field.value=String(fixed);field.disabled=true;}
+  else{field.disabled=false;field.value=field.dataset.manualValue||'0';}
+  syncDietVariantDayTypeFromAssignments();
 }
 function populateDietVariantWorkoutChoices(variant){
   const host=document.getElementById('diet-variant-workout-options');if(!host)return;
-  const choices=dietFreeMealWorkoutChoices(),saved=variant?.workoutDays||[],key=ref=>ref.workoutId+'\u0000'+ref.workoutDayId;
+  const choices=dietActiveWorkoutChoices(),saved=variant?.workoutDays||[],key=ref=>ref.workoutId+'\u0000'+ref.workoutDayId;
   const current=new Set(choices.map(key));
-  host.innerHTML=choices.map((choice,index)=>`<label class="diet-variant-workout-option"><input type="checkbox" data-diet-variant-workout="${index}" ${saved.some(ref=>key(ref)===key(choice))?'checked':''}/><span>${esc(choice.workoutName+' — '+choice.workoutDayName)}</span></label>`).join('')+
-    saved.filter(ref=>!current.has(key(ref))).map(ref=>`<label class="diet-variant-workout-option"><input type="checkbox" data-diet-variant-workout-missing="1" checked/><span>${esc((ref.workoutName||'Treino anterior')+' — '+(ref.workoutDayName||'dia anterior'))} (treino não encontrado; desmarque ou escolha outro)</span></label>`).join('')+
-    (!choices.length&&!saved.length?'<div class="plan-help">Cadastre os treinos do aluno na aba Treinos para vinculá-los aqui.</div>':'');
+  const groups=new Map();choices.forEach((choice,index)=>{if(!groups.has(choice.workoutId))groups.set(choice.workoutId,{name:choice.workoutName,rows:[]});groups.get(choice.workoutId).rows.push({choice,index});});
+  host.innerHTML=[...groups.values()].map(group=>`<section class="diet-variant-workout-group"><strong>${esc(group.name)}</strong><div class="diet-variant-workout-options">${group.rows.map(({choice,index})=>`<label class="diet-variant-workout-option"><input type="checkbox" data-diet-variant-workout="${index}" onchange="syncDietVariantDayTypeFromAssignments()" ${saved.some(ref=>key(ref)===key(choice))?'checked':''}/><span>${esc(choice.workoutDayName)}</span></label>`).join('')}</div></section>`).join('')+
+    saved.filter(ref=>!current.has(key(ref))).map(ref=>`<label class="diet-variant-workout-option"><input type="checkbox" data-diet-variant-workout-missing="1" checked/><span>${esc((ref.workoutName||'Treino anterior')+' — '+(ref.workoutDayName||'dia anterior'))} (inativo ou removido; desmarque ou reative antes de salvar)</span></label>`).join('')+
+    (!choices.length?'<div class="plan-help">Nenhum protocolo ativo com dias de treino. Ative o treino do aluno na aba Treinos para vinculá-lo.</div>':'');
   updateDietVariantWorkoutVisibility();
 }
-function syncDietVariantDaysFromWeekdays(){const field=document.getElementById('input-diet-variant-days');if(!field)return;const days=[...document.querySelectorAll('[data-diet-variant-weekday]:checked')];if(days.length){if(!field.disabled)field.dataset.manualValue=field.value;field.value=String(days.length);field.disabled=true;}else{field.disabled=false;field.value=field.dataset.manualValue||'0';}}
+function syncDietVariantDaysFromWeekdays(){
+  const field=document.getElementById('input-diet-variant-days');if(!field)return;
+  const fixed=document.querySelectorAll('[data-diet-variant-weekday]:checked').length;
+  const workouts=document.querySelectorAll('[data-diet-variant-workout]:checked').length;
+  const rests=Math.max(0,Math.min(7,Math.trunc(Number(document.getElementById('input-diet-variant-rest-days')?.value)||0)));
+  const allocated=workouts+rests;
+  if(fixed||allocated){if(!field.disabled)field.dataset.manualValue=field.value;field.value=String(fixed||allocated);field.disabled=true;}
+  else{field.disabled=false;field.value=field.dataset.manualValue||'0';}
+}
 function v104DietDistribution(plan){const total=(plan?.variants||[]).reduce((sum,item)=>sum+Number(item.daysPerWeek||0),0);return{total,remaining:7-total};}
 function renderDietVariantTabs(trainerMode=false){
   const plan=currentDiet(),host=document.getElementById(trainerMode?'ts-diet-variant-tabs':'diet-variant-tabs'),distribution=document.getElementById(trainerMode?'ts-diet-week-distribution':'diet-week-distribution');if(!plan||!host)return;
   const active=currentDietVariant();host.innerHTML=plan.variants.map((variant,index)=>`<div class="diet-variant-card ${variant.id===active?.id?'active':''}" onclick="selectDietVariant(${jsArg(variant.id)},${trainerMode})"><div><strong>${esc(variant.name)}</strong><span>${variant.daysPerWeek} ${variant.daysPerWeek===1?'dia':'dias'} por semana · ${variant.meals.length} refeições${dietVariantDayLabel(variant)?' · '+esc(dietVariantDayLabel(variant)):''}</span>${dietVariantWorkoutLabels(variant).length?`<span>Treinos vinculados: ${esc(dietVariantWorkoutLabels(variant).join(' · '))}</span>`:''}</div>${trainerMode?`<div class="diet-variant-actions"><button ${index===0?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},-1)">↑</button><button ${index===plan.variants.length-1?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},1)">↓</button><button onclick="event.stopPropagation();openEditDietVariantModal(${jsArg(variant.id)})" title="Editar divisão" aria-label="Editar divisão ${esc(variant.name)}">✎</button>${plan.variants.length>1?`<button type="button" onclick="event.stopPropagation();deleteDietVariant(${jsArg(variant.id)})" title="Excluir divisão" aria-label="Excluir divisão ${esc(variant.name)}" style="color:var(--danger)">✕</button>`:''}</div>`:''}</div>`).join('');
-  const d=v104DietDistribution(plan);if(distribution){const todayVariant=!trainerMode&&plan.isActive?plan.variants.find(item=>(item.weekdays||[]).includes(new Date().getDay())):null;const hasSpecificDays=plan.variants.some(item=>(item.weekdays||[]).length);distribution.innerHTML=`<span>Distribuição semanal: <b>${plan.variants.map(item=>`${esc(item.name)} ${item.daysPerWeek}×`).join(' · ')}</b></span><span class="${d.total===7?'ok':'warn'}">${d.total===7?'✓ 7 dias programados':d.total<7?`Faltam ${7-d.total} dia(s)`:`Excedeu em ${d.total-7} dia(s)`}</span>${!trainerMode&&hasSpecificDays?`<span class="${todayVariant?'ok':'warn'}">${todayVariant?'Hoje: '+esc(todayVariant.name):'Hoje sem divisão definida; confirme com o treinador.'}</span>`:''}`;}
+  const d=v104DietDistribution(plan);if(distribution){const todayVariant=!trainerMode&&plan.isActive?plan.variants.find(item=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(new Date().getDay())):null;const hasSpecificDays=plan.variants.some(item=>(item.weekdays||[]).length||(item.restWeekdays||[]).length);distribution.innerHTML=`<span>Distribuição semanal: <b>${plan.variants.map(item=>`${esc(item.name)} ${item.daysPerWeek}×`).join(' · ')}</b></span><span class="${d.total===7?'ok':'warn'}">${d.total===7?'✓ 7 dias programados':d.total<7?`Faltam ${7-d.total} dia(s)`:`Excedeu em ${d.total-7} dia(s)`}</span>${!trainerMode&&hasSpecificDays?`<span class="${todayVariant?'ok':'warn'}">${todayVariant?'Hoje: '+esc(todayVariant.name):'Hoje sem divisão definida; confirme com o treinador.'}</span>`:''}`;}
   renderDietEnergySummary(trainerMode?'ts-diet-energy-summary':'diet-energy-summary',plan,trainerMode&&dietCanEdit());
 }
 function v104ActivateVariantMeals(trainerMode){const plan=currentDiet(),variant=currentDietVariant();if(!plan||!variant)return;variant.meals=Array.isArray(variant.meals)?variant.meals:[];plan.meals=variant.meals;MEAL_PLAN_CACHE.meals=variant.meals;MEAL_CTX.listId=trainerMode?'ts-diet-meals-list':'diet-meals-list';MEAL_CTX.emptyId=trainerMode?'ts-diet-meals-empty':'diet-meals-empty';const label=document.getElementById(trainerMode?'ts-diet-meals-section-label':'diet-meals-section-label');if(label)label.textContent='Refeições — '+variant.name;renderMealsList();}
@@ -6670,7 +6697,7 @@ renderDietList=function(listId,emptyId,trainerMode){
 };
 openDietDetail=async function(id,trainerMode=false){
   DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);const plan=DIET_DOCUMENT.plans.find(item=>String(item.id)===String(id));if(!plan)return;CURRENT_DIET_ID=plan.id;if(!plan.variants.some(item=>item.id===CURRENT_DIET_VARIANT_ID))CURRENT_DIET_VARIANT_ID=plan.variants[0]?.id||'';
-  if(!trainerMode&&plan.isActive){const todayVariant=plan.variants.find(item=>(item.weekdays||[]).includes(new Date().getDay()));if(todayVariant)CURRENT_DIET_VARIANT_ID=todayVariant.id;}
+  if(!trainerMode&&plan.isActive){const todayVariant=plan.variants.find(item=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(new Date().getDay()));if(todayVariant)CURRENT_DIET_VARIANT_ID=todayVariant.id;}
   const targetUid=DIET_CONTEXT.targetUid,completions=MODE==='cloud'&&targetUid?await fetchCompletionsToday(targetUid):new Set();MEAL_COMPLETIONS_TODAY=completions;
   const cycle=`<span>INÍCIO <b>${esc(fmt(plan.startDate))}</b></span><span>ATUALIZAÇÃO <b>${esc(fmt(plan.updateDate))}</b></span><span>SEMANA <b>${v104CycleWeek(plan.startDate,today())}/8</b></span>`;
   if(trainerMode){MEAL_CTX={listId:'ts-diet-meals-list',emptyId:'ts-diet-meals-empty',canEditContent:true,canToggleDone:false,targetUid};document.getElementById('ts-diet-detail-title').textContent=plan.name.toUpperCase();document.getElementById('ts-diet-detail-status').innerHTML=dietStatusBadge(plan)+(plan.isActive?'<span>Plano atual do aluno</span>':'<span>Dieta anterior preservada</span>');document.getElementById('ts-diet-cycle-summary').innerHTML=cycle;renderDietVariantTabs(true);v104ActivateVariantMeals(true);renderDietSupportTables('ts-diet-support-tables',plan,true);showScreen('screen-ts-diet-detail');}
@@ -6683,17 +6710,26 @@ saveDietPlan=async function(){
   try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan){Object.assign(plan,{name,isActive:active,startDate,updateDate});}else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[]},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta salva');if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});}catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}finally{endAction('save-diet','modal-diet');}
 };
 persistMealPlan=async function(){const plan=currentDiet(),variant=currentDietVariant();if(plan&&variant){variant.meals=MEAL_PLAN_CACHE.meals;plan.meals=variant.meals;}await persistDietDocument();};
-function openAddDietVariantModal(){const plan=currentDiet();if(!dietCanEdit()||!plan)return;if((plan.variants||[]).length>=12){alert('Esta dieta já atingiu o limite seguro de 12 divisões.');return;}EDIT_DIET_VARIANT_ID='';document.getElementById('modal-diet-variant-title').textContent='Nova divisão';document.getElementById('input-diet-variant-name').value='';const days=document.getElementById('input-diet-variant-days');days.value='0';days.dataset.manualValue='0';document.getElementById('input-diet-variant-day-type').value='';document.querySelectorAll('[data-diet-variant-weekday]').forEach(field=>field.checked=false);syncDietVariantDaysFromWeekdays();populateDietVariantWorkoutChoices(null);document.getElementById('btn-delete-diet-variant').style.display='none';openModal('modal-diet-variant');}
-function openEditDietVariantModal(id){const plan=currentDiet(),variant=plan?.variants?.find(item=>item.id===id);if(!dietCanEdit()||!variant)return;EDIT_DIET_VARIANT_ID=id;document.getElementById('modal-diet-variant-title').textContent='Editar divisão';document.getElementById('input-diet-variant-name').value=variant.name;const days=document.getElementById('input-diet-variant-days');days.value=String(variant.daysPerWeek);days.dataset.manualValue=String(variant.daysPerWeek);document.getElementById('input-diet-variant-day-type').value=variant.dayType||'';document.querySelectorAll('[data-diet-variant-weekday]').forEach(field=>field.checked=(variant.weekdays||[]).includes(Number(field.value)));syncDietVariantDaysFromWeekdays();populateDietVariantWorkoutChoices(variant);document.getElementById('btn-delete-diet-variant').style.display=plan.variants.length>1?'block':'none';openModal('modal-diet-variant');}
+function openAddDietVariantModal(){const plan=currentDiet();if(!dietCanEdit()||!plan)return;if((plan.variants||[]).length>=12){alert('Esta dieta já atingiu o limite seguro de 12 divisões.');return;}EDIT_DIET_VARIANT_ID='';document.getElementById('modal-diet-variant-title').textContent='Nova divisão';document.getElementById('input-diet-variant-name').value='';const days=document.getElementById('input-diet-variant-days');days.value='0';days.dataset.manualValue='0';days.disabled=false;document.getElementById('input-diet-variant-day-type').value='';const rest=document.getElementById('input-diet-variant-rest-days');rest.value='0';rest.dataset.manualValue='0';rest.disabled=false;document.querySelectorAll('[data-diet-variant-weekday],[data-diet-variant-rest-weekday]').forEach(field=>field.checked=false);populateDietVariantWorkoutChoices(null);syncDietVariantDaysFromWeekdays();document.getElementById('btn-delete-diet-variant').style.display='none';openModal('modal-diet-variant');}
+function openEditDietVariantModal(id){const plan=currentDiet(),variant=plan?.variants?.find(item=>item.id===id);if(!dietCanEdit()||!variant)return;EDIT_DIET_VARIANT_ID=id;document.getElementById('modal-diet-variant-title').textContent='Editar divisão';document.getElementById('input-diet-variant-name').value=variant.name;const days=document.getElementById('input-diet-variant-days');days.value=String(variant.daysPerWeek);days.dataset.manualValue=String(variant.daysPerWeek);days.disabled=false;document.getElementById('input-diet-variant-day-type').value=variant.dayType||'';const rest=document.getElementById('input-diet-variant-rest-days');rest.value=String(variant.restDaysPerWeek||0);rest.dataset.manualValue=rest.value;rest.disabled=false;document.querySelectorAll('[data-diet-variant-weekday]').forEach(field=>field.checked=(variant.weekdays||[]).includes(Number(field.value)));document.querySelectorAll('[data-diet-variant-rest-weekday]').forEach(field=>field.checked=(variant.restWeekdays||[]).includes(Number(field.value)));populateDietVariantWorkoutChoices(variant);syncDietVariantRestWeekdays();syncDietVariantDaysFromWeekdays();document.getElementById('btn-delete-diet-variant').style.display=plan.variants.length>1?'block':'none';openModal('modal-diet-variant');}
 async function saveDietVariant(){
   const plan=currentDiet();if(!plan||!dietCanEdit()||!beginAction('save-diet-variant','modal-diet-variant'))return;
   const name=document.getElementById('input-diet-variant-name').value.trim(),weekdays=[...document.querySelectorAll('[data-diet-variant-weekday]:checked')].map(field=>Number(field.value));
-  const dayType=document.getElementById('input-diet-variant-day-type').value,days=weekdays.length||Math.max(0,Math.min(7,Math.trunc(Number(document.getElementById('input-diet-variant-days').value)||0)));
-  const choices=dietFreeMealWorkoutChoices(),workoutDays=dayType==='training'?[...document.querySelectorAll('[data-diet-variant-workout]:checked')].map(field=>choices[Number(field.dataset.dietVariantWorkout)]).filter(Boolean):[];
+  const restWeekdays=[...document.querySelectorAll('[data-diet-variant-rest-weekday]:checked')].map(field=>Number(field.value));
+  const restInput=Number(document.getElementById('input-diet-variant-rest-days').value),restDaysPerWeek=restWeekdays.length||restInput;
+  const choices=dietActiveWorkoutChoices(),workoutDays=[...document.querySelectorAll('[data-diet-variant-workout]:checked')].map(field=>choices[Number(field.dataset.dietVariantWorkout)]).filter(Boolean).map(({workoutId,workoutDayId,workoutName,workoutDayName})=>({workoutId,workoutDayId,workoutName,workoutDayName}));
+  const allocated=workoutDays.length+restDaysPerWeek;
+  const dayType=allocated?(workoutDays.length&&restDaysPerWeek?'mixed':workoutDays.length?'training':'rest'):document.getElementById('input-diet-variant-day-type').value;
+  const days=weekdays.length||(allocated||Math.max(0,Math.min(7,Math.trunc(Number(document.getElementById('input-diet-variant-days').value)||0))));
   if(!name){alert('Informe o nome da divisão.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(!Number.isInteger(restInput)||restInput<0||restInput>7){alert('Informe de 0 a 7 dias de descanso.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(allocated>7){alert('Treinos e descansos desta divisão ultrapassam 7 dias.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(weekdays.length&&allocated&&weekdays.length!==allocated){alert('Os dias da semana selecionados devem corresponder à soma dos treinos e descansos desta divisão.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(weekdays.length&&restWeekdays.some(day=>!weekdays.includes(day))){alert('Um dia de descanso fixo não está nos dias da semana desta divisão. Marque-o também na programação semanal ou deixe a programação sem dias fixos.');endAction('save-diet-variant','modal-diet-variant');return;}
   if(weekdays.length&&!dayType){alert('Escolha se os dias selecionados são de treino ou descanso.');endAction('save-diet-variant','modal-diet-variant');return;}
-  if(dayType==='training'&&document.querySelector('[data-diet-variant-workout-missing]:checked')){alert('Um treino vinculado não foi encontrado. Desmarque-o ou escolha o treino atual antes de salvar.');endAction('save-diet-variant','modal-diet-variant');return;}
-  const conflict=plan.variants.find(item=>item.id!==EDIT_DIET_VARIANT_ID&&weekdays.some(day=>(item.weekdays||[]).includes(day)));
+  if(document.querySelector('[data-diet-variant-workout-missing]:checked')){alert('Um treino vinculado está inativo ou não foi encontrado. Desmarque-o ou ative o protocolo atual antes de salvar.');endAction('save-diet-variant','modal-diet-variant');return;}
+  const occupied=[...new Set([...weekdays,...restWeekdays])];
+  const conflict=plan.variants.find(item=>item.id!==EDIT_DIET_VARIANT_ID&&occupied.some(day=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(day)));
   if(conflict){alert('Um dos dias selecionados já pertence à divisão “'+conflict.name+'”. Cada dia pode ter apenas uma dieta.');endAction('save-diet-variant','modal-diet-variant');return;}
   const workoutConflict=plan.variants.find(item=>item.id!==EDIT_DIET_VARIANT_ID&&(item.workoutDays||[]).some(ref=>workoutDays.some(choice=>choice.workoutId===ref.workoutId&&choice.workoutDayId===ref.workoutDayId)));
   if(workoutConflict){alert('Um treino selecionado já pertence à divisão “'+workoutConflict.name+'”. Escolha apenas uma divisão para cada treino.');endAction('save-diet-variant','modal-diet-variant');return;}
@@ -6703,9 +6739,9 @@ async function saveDietVariant(){
     if(variant){
       const summary=normalizeDietEnergySummary(plan.energySummary),legacy=v1010LegacyEnergyForVariant(plan,variant,summary);
       if(legacy&&!Object.prototype.hasOwnProperty.call(summary.variantEnergy,variant.id)){summary.variantEnergy[variant.id]=legacy;plan.energySummary=summary;}
-      Object.assign(variant,{name,daysPerWeek:days,weekdays,dayType,workoutDays});
+      Object.assign(variant,{name,daysPerWeek:days,weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays});
     }
-    else{variant=normalizeDietVariant({id:uid(),name,daysPerWeek:days,weekdays,dayType,workoutDays,order:plan.variants.length,meals:[]},plan.variants.length);plan.variants.push(variant);CURRENT_DIET_VARIANT_ID=variant.id;}
+    else{variant=normalizeDietVariant({id:uid(),name,daysPerWeek:days,weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays,order:plan.variants.length,meals:[]},plan.variants.length);plan.variants.push(variant);CURRENT_DIET_VARIANT_ID=variant.id;}
     const total=plan.variants.reduce((sum,item)=>sum+item.daysPerWeek,0);if(total>7)throw new Error('A distribuição ultrapassa 7 dias. Reduza outra divisão antes de salvar.');
     await persistDietDocument();closeModal('modal-diet-variant');renderDietVariantTabs(DIET_CONTEXT.trainer);v104ActivateVariantMeals(DIET_CONTEXT.trainer);showToast('✓ Divisão salva');
   }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(before));alert(error.message||cloudWriteError(error,'salvar a divisão'));}
@@ -7382,7 +7418,7 @@ function dietFreeMealPolicyText(policy){
 }
 function dietFreeMealWorkoutChoices(){
   const workouts=DIET_CONTEXT.trainer?(VIEW_STUDENT?.uid===DIET_CONTEXT.targetUid?VIEW_STUDENT.workouts||[]:[]):getWorkouts();
-  return(Array.isArray(workouts)?workouts:[]).flatMap(workout=>getWorkoutDays(workout).map(day=>({workoutId:String(workout.id),workoutDayId:String(day.id),workoutName:String(workout.name||'Treino'),workoutDayName:String(day.name)})));
+  return(Array.isArray(workouts)?workouts:[]).flatMap(workout=>getWorkoutDays(workout).map(day=>({workoutId:String(workout.id),workoutDayId:String(day.id),workoutName:String(workout.name||'Treino'),workoutDayName:String(day.name),active:workout.isActive===true})));
 }
 function updateDietFreeMealDayRule(){
   const rule=document.getElementById('input-diet-free-meal-day-rule')?.value,wrap=document.getElementById('diet-free-meal-workout-wrap');
