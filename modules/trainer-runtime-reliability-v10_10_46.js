@@ -69,7 +69,8 @@
       if(typeof showToast==='function')showToast('O editor de feedback ainda não está disponível. Tente novamente em instantes.',true);
       return false;
     }
-    openFeedbackModal('weekly_report',{
+    const feedbackType=report.reportType==='monthly'?'monthly_full':report.reportType==='standard-extra'||report.reportType==='custom'?'extra':'weekly_report';
+    openFeedbackModal(feedbackType,{
       sourceType:'questionnaire_report',
       sourceId:String(report.id),
       sourceDate,
@@ -83,7 +84,7 @@
     if(!trainer()||!fromTrainer||String(listId)!=='ts-quest-list')return false;
     const list=document.getElementById(listId);if(!list)return false;
     ensureQuestionnaireFeedbackStyles();
-    const reports=Array.isArray(cache)?cache:[];
+    const reports=(Array.isArray(cache)?cache:[]).filter(report=>!report.cancelledAt);
     const cards=[...list.children].filter(node=>node?.classList?.contains('quest-card'));
     let added=0;
     cards.forEach((card,index)=>{

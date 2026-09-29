@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026091701,
-  "revision": "runtime-delivery-integrity-1",
-  "publishedAt": "2026-09-18T00:51:00Z",
+  "build": 2026092901,
+  "revision": "mobile-feedback-notices-and-request-cancellation-1",
+  "publishedAt": "2026-09-29T17:30:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Sincroniza a entrega dos hotfixes atuais, a suíte de relatórios/inteligência, o runtime do treinador e a recuperação HEIC sem alterar as regras de dados."
+  "message": "Adiciona categorias de feedback, avisos no celular e cancelamento seguro de solicitações pendentes."
 }

@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   const CURRENT_VERSION='10.10.9';
-  const CURRENT_BUILD=2026091701;
+  const CURRENT_BUILD=2026092901;
   const CHECK_INTERVAL_MS=2*60*1000;
   const VERSION_URL='./version.json';
   const TECHNIQUE_COMPOSITION_MODULE='./modules/technique-composition-integrity-v10_10_12.js?v=10.10.12-techcombo1';

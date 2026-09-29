@@ -1352,6 +1352,7 @@ async function confirmLogout(){
       }catch(e){ console.warn('Erro ao copiar dados cloud para offline:', e); }
     }
     try{
+      if(CURRENT_USER?.role==='student')await withTimeout(window.TeamBullsDeviceNotices?.unregister?.()||Promise.resolve(),2500,'desativar avisos deste aparelho').catch(()=>{});
       if(auth) await withTimeout(auth.signOut(),4000,'saída da conta').catch(()=>{});
     }catch(e){}
     localStorage.removeItem('teamms_offline_pref');
@@ -6424,8 +6425,10 @@ async function loadTrainerCheckinSchedule(studentUid){
     if(VIEW_STUDENT?.uid!==studentUid)return;
     TRAINER_CHECKIN_SCHEDULE=doc.exists?{...doc.data(),studentId:studentUid}:{studentId:studentUid,nextDueDate:addDaysIso(today(),7),intervalDays:7,extraRequestId:'',extraRequestedAt:''};
     document.getElementById('trainer-checkin-date').value=validIsoDate(TRAINER_CHECKIN_SCHEDULE.nextDueDate)?TRAINER_CHECKIN_SCHEDULE.nextDueDate:addDaysIso(today(),7);document.getElementById('trainer-checkin-interval').value='7';
+    const cancelButton=document.getElementById('trainer-cancel-extra-checkin'),extraKey=checkinRequestKey('manual',TRAINER_CHECKIN_SCHEDULE.extraRequestedAt,TRAINER_CHECKIN_SCHEDULE.extraRequestId);
+    if(cancelButton)cancelButton.style.display=TRAINER_CHECKIN_SCHEDULE.extraRequestId&&!checkins.some(item=>item.requestKey===extraKey)?'':'none';
     const state=document.getElementById('trainer-checkin-state'),help=document.getElementById('trainer-checkin-help');state.textContent=doc.exists?'PROGRAMADO':'NÃO SALVO';state.className='quest-status '+(doc.exists?'answered':'pending');const last=checkins[0];help.textContent=last?`Último relatório: ${fmt(last.submittedDate||last.dueDate)}. A próxima data pode ser alterada quando necessário.`:'Nenhum relatório recebido ainda. Salve a primeira data para iniciar a cobrança semanal.';
-  }catch(error){document.getElementById('trainer-checkin-state').textContent='ERRO';document.getElementById('trainer-checkin-help').textContent='Não foi possível carregar a programação. Tente novamente.';}
+  }catch(error){document.getElementById('trainer-checkin-state').textContent='ERRO';document.getElementById('trainer-checkin-help').textContent='Não foi possível carregar a programação. Tente novamente.';const cancelButton=document.getElementById('trainer-cancel-extra-checkin');if(cancelButton)cancelButton.style.display='none';}
 }
 const V102_RENDER_TRAINER_STUDENT=renderTrainerStudent;
 renderTrainerStudent=async function(student){await V102_RENDER_TRAINER_STUDENT(student);if(student&&VIEW_STUDENT?.uid===student.uid)await loadTrainerCheckinSchedule(student.uid);};
@@ -8062,7 +8065,7 @@ async function ensureReportCycleRuntime(){
   }
   if(!window.TeamBullsMonthlyReports||!window.TeamBullsWeeklyReportIntegrity)throw new Error('Os relatórios ainda estão carregando. Aguarde e tente novamente.');
 }
-function questionnaireIsPending(report){return report?.answered!==true&&(report?.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(report)==='pending');}
+function questionnaireIsPending(report){return report?.answered!==true&&!report?.cancelledAt&&(report?.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(report)==='pending');}
 function v109ReportMode(report){
   const explicit=String(report?.requestMode||'').toLowerCase();if(V109_REPORT_MODES.has(explicit))return explicit;
   if(report?.requiresPhotos===false)return'written';
@@ -8127,17 +8130,61 @@ sendQuestionnaire=async function(){
 
 renderQuestList=function(cache,listId,emptyId,fromTrainer){
   const list=document.getElementById(listId),empty=document.getElementById(emptyId);if(!list||!empty)return;
-  if(!cache.length){list.innerHTML='';empty.style.display='block';return;}empty.style.display='none';
-  list.innerHTML=cache.map(report=>{
+  const visible=(cache||[]).filter(report=>!report.cancelledAt);
+  if(!visible.length){list.innerHTML='';empty.style.display='block';return;}empty.style.display='none';
+  list.innerHTML=visible.map(report=>{
     const mode=v109ReportMode(report),monthly=report.reportType==='monthly';
     const state=report.answered?'answered':monthly?(window.TeamBullsMonthlyReports?.status(report)||'loading'):'pending';
     const label=state==='answered'?'Respondido':state==='scheduled'?'Agendado':state==='superseded'?'Ciclo anterior':state==='loading'?'Atualizando':'Aguardando';
     const date=report.answered&&report.answeredAt?.seconds?new Date(report.answeredAt.seconds*1000).toLocaleDateString('pt-BR'):monthly?fmt(report.dueDate):report.createdAt?.seconds?new Date(report.createdAt.seconds*1000).toLocaleDateString('pt-BR'):'—';
     const tap=report.answered?`viewQuestionnaire(${jsArg(report.id)},${fromTrainer})`:(fromTrainer||state!=='pending'?'':`openAnswerQuestionnaire(${jsArg(report.id)})`),photoCount=Array.isArray(report.photoIds)?report.photoIds.length:0;
     const details=[];if(v109ModeRequiresAnswers(mode))details.push(`${report.questions?.length||0} perguntas obrigatórias`);if(v109ModeRequiresPhotos(mode))details.push(report.answered?`${photoCount||0} fotos`:'6 fotos obrigatórias');
-    return`<div class="quest-card" onclick="${tap}"><div class="quest-card-top"><span class="quest-card-date">${esc(date)} · ${esc(monthly?'Relatório mensal completo':v109ReportModeLabel(mode))}</span><span class="quest-status ${report.answered?'answered':'pending'}">${label}</span></div><div class="quest-card-preview">${details.join(' · ')||'Solicitação registrada'}</div></div>`;
+    const cancel=fromTrainer&&!report.answered?`<button type="button" class="btn-ghost" style="margin-top:8px" onclick="event.stopPropagation();cancelQuestionnaireRequest(${jsArg(report.id)})">CANCELAR SOLICITAÇÃO</button>`:'';
+    return`<div class="quest-card" onclick="${tap}"><div class="quest-card-top"><span class="quest-card-date">${esc(date)} · ${esc(monthly?'Relatório mensal completo':v109ReportModeLabel(mode))}</span><span class="quest-status ${report.answered?'answered':'pending'}">${label}</span></div><div class="quest-card-preview">${details.join(' · ')||'Solicitação registrada'}</div>${cancel}</div>`;
   }).join('');
 };
+
+function cancelQuestionnaireRequest(id){
+  const studentUid=VIEW_STUDENT?.uid,trainerUid=CURRENT_USER?.uid;
+  if(!studentUid||CURRENT_USER?.role!=='trainer'||!id)return;
+  showConfirm('Cancelar solicitação','Retirar este relatório ainda sem resposta da lista do aluno e do treinador? Relatórios enviados serão preservados.',async()=>{
+    if(!beginAction('cancel-questionnaire-request'))return;
+    try{
+      const ref=db.collection('questionnaires').doc(String(id));
+      await cloudWrite(db.runTransaction(async transaction=>{
+        const snap=await transaction.get(ref);
+        if(!snap.exists)throw new Error('A solicitação já não existe.');
+        const report=snap.data();
+        if(report.studentId!==studentUid||report.trainerId!==trainerUid)throw new Error('Esta solicitação não pertence ao aluno selecionado.');
+        if(report.answered||report.cancelledAt||report.answers!==null&&report.answers!==undefined||(report.photoIds||[]).length)throw new Error('Este relatório já foi respondido ou cancelado. Atualize a lista.');
+        transaction.update(ref,{cancelledAt:firebase.firestore.FieldValue.serverTimestamp(),cancelledBy:trainerUid});
+      }),'cancelar solicitação de relatório');
+      showToast('✓ Solicitação cancelada');
+      if(VIEW_STUDENT?.uid===studentUid)await openTsQuestionnaires();
+    }catch(error){alert(cloudWriteError(error,'cancelar a solicitação'));}
+    finally{endAction('cancel-questionnaire-request');}
+  });
+}
+function cancelExtraWeeklyCheckin(){
+  const studentUid=VIEW_STUDENT?.uid,trainerUid=CURRENT_USER?.uid,requestId=TRAINER_CHECKIN_SCHEDULE?.extraRequestId;
+  if(!studentUid||CURRENT_USER?.role!=='trainer'||!requestId)return;
+  showConfirm('Cancelar relatório extra','Retirar o pedido extra ainda sem resposta? O ciclo semanal programado continuará normalmente.',async()=>{
+    if(!beginAction('cancel-extra-checkin'))return;
+    try{
+      const ref=db.collection('checkinSchedules').doc(studentUid);
+      const completed=await withTimeout(db.collection('weeklyCheckins').where('studentId','==',studentUid).get({source:'server'}),10000,'verificar relatório extra');
+      if(completed.docs.some(doc=>doc.data().requestKey==='manual:'+requestId))throw new Error('O aluno já enviou este relatório. O histórico foi preservado.');
+      await cloudWrite(db.runTransaction(async transaction=>{
+        const snap=await transaction.get(ref),schedule=snap.data();
+        if(!snap.exists||schedule.studentId!==studentUid||schedule.extraRequestId!==requestId)throw new Error('O pedido mudou. Atualize a programação antes de cancelar.');
+        transaction.update(ref,{extraRequestId:'',extraRequestedAt:'',updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      }),'cancelar relatório extra');
+      showToast('✓ Relatório extra pendente cancelado');
+      if(VIEW_STUDENT?.uid===studentUid)await loadTrainerCheckinSchedule(studentUid);
+    }catch(error){alert(cloudWriteError(error,'cancelar o relatório extra'));}
+    finally{endAction('cancel-extra-checkin');}
+  });
+}
 
 function v109SetQuestionnaireAnswerUi(report){
   const mode=v109ReportMode(report),requiresAnswers=v109ModeRequiresAnswers(mode),requiresPhotos=v109ModeRequiresPhotos(mode);
@@ -8149,7 +8196,7 @@ function v109SetQuestionnaireAnswerUi(report){
 }
 openAnswerQuestionnaire=async function(qid){
   if(!qid)return;
-  try{const doc=await cloudGet(db.collection('questionnaires').doc(qid),'relatório');if(!doc.exists)return;const report={...doc.data(),id:doc.id};if(report.answered){showToast('Este relatório já foi enviado.',true);return;}
+  try{const doc=await cloudGet(db.collection('questionnaires').doc(qid),'relatório');if(!doc.exists)return;const report={...doc.data(),id:doc.id};if(report.cancelledAt){showToast('Esta solicitação foi cancelada pelo treinador.',true);return;}if(report.answered){showToast('Este relatório já foi enviado.',true);return;}
     await ensureReportCycleRuntime();
     if(report.studentId!==CURRENT_USER?.uid||auth?.currentUser?.uid!==CURRENT_USER?.uid)throw new Error('A sessão do aluno mudou.');
     await window.TeamBullsMonthlyReports.assertAvailable(report);
@@ -8164,7 +8211,7 @@ submitQuestionnaireAnswers=async function(){
   if(requiresAnswers){const missing=answers.findIndex(answer=>!answer);if(missing>=0){alert('Responda todas as perguntas antes de enviar o relatório.');areas[missing]?.focus();areas[missing]?.scrollIntoView({behavior:'smooth',block:'center'});return;}if(answers.length!==(report.questions||[]).length){alert('O relatório foi alterado. Feche e abra novamente antes de responder.');return;}}
   if(requiresPhotos&&QUESTIONNAIRE_REPORT_FILES.some(file=>!(file instanceof File))){alert('Envie obrigatoriamente as seis fotos: frente, costas, lado direito, lado esquerdo, frente contraída e costas contraída.');return;}
   if(!beginAction('answer-questionnaire','modal-answer-quest'))return;const photoIds=[],photoWrites=[],createdPaths=[];
-  try{const reportRef=db.collection('questionnaires').doc(reportId),fresh=await cloudGet(reportRef,'verificar relatório');if(!fresh.exists)throw new Error('Este relatório não está mais disponível.');if(fresh.data().answered)throw new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.');
+  try{const reportRef=db.collection('questionnaires').doc(reportId),fresh=await cloudGet(reportRef,'verificar relatório');if(!fresh.exists||fresh.data().cancelledAt)throw new Error('Esta solicitação foi cancelada pelo treinador.');if(fresh.data().answered)throw new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.');
     if(requiresPhotos)for(let index=0;index<6;index++){showToast('Preparando foto '+(index+1)+' de 6...');const photoId=(reportId+'-r'+(index+1)).slice(0,190),photoRef=db.collection('progressPhotos').doc(photoId);photoIds.push(photoId);const variants=await buildProgressPhotoVariants(QUESTIONNAIRE_REPORT_FILES[index]),photoPath=await uploadCloudPhoto('progressPhotos',studentUid,photoId,variants.full);if(photoPath)createdPaths.push(photoPath);const thumbPath=photoPath?await uploadCloudPhoto('progressPhotoThumbs',studentUid,photoId,variants.thumb):'';if(thumbPath)createdPaths.push(thumbPath);const payload={userId:studentUid,date:today(),reportId,questionnaireId:reportId,pose:CHECKIN_POSES[index],createdAt:firebase.firestore.FieldValue.serverTimestamp()};if(photoPath){payload.photoPath=photoPath;if(thumbPath)payload.thumbPath=thumbPath;}else payload.dataUrl=variants.full;photoWrites.push({ref:photoRef,payload});}
     const batch=db.batch();photoWrites.forEach(write=>batch.set(write.ref,write.payload));batch.update(reportRef,{answers,answered:true,answeredAt:firebase.firestore.FieldValue.serverTimestamp(),photoIds});
     try{await cloudWrite(batch.commit(),'enviar relatório');}catch(error){const verified=await cloudGet(reportRef,'confirmar relatório').catch(()=>null);if(!verified?.exists||!verified.data().answered){await Promise.allSettled(createdPaths.map(path=>deleteCloudPhoto(path)));throw error;}}
@@ -8475,15 +8522,15 @@ const V1010_OPEN_EDIT_DIET_SUPPORT_BASE=openEditDietSupportItem;
 openEditDietSupportItem=function(section,id){V1010_OPEN_EDIT_DIET_SUPPORT_BASE(section,id);configureDietSupportPrivateCatalog(section);};
 
 let V1010_FEEDBACK_LOADING=false,V1010_FEEDBACK_PREFILL='general';
-function v1010FeedbackType(value){return ['general','weekly_report','protocol_update'].includes(String(value))?String(value):'general';}
-function v1010FeedbackLabel(data){const type=v1010FeedbackType(data?.feedbackType),title=String(data?.title||'').trim();if(title)return title;if(type==='protocol_update')return'Feedback da atualização completa';if(type==='weekly_report')return'Feedback do relatório semanal';return'Transmissão recebida // treinador';}
+function v1010FeedbackType(value){const type=String(value||'');if(type==='protocol_update')return'monthly_full';if(type==='general')return'extra';return ['weekly_report','monthly_full','weekly_diet','weekly_training','extra'].includes(type)?type:'extra';}
+function v1010FeedbackLabel(data){const type=v1010FeedbackType(data?.feedbackType),title=String(data?.title||'').trim();if(title)return title;return{weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',extra:'Feedback extra'}[type];}
 checkFeedback=async function(){if(!CURRENT_USER||CURRENT_USER.role==='trainer'||V1010_FEEDBACK_LOADING)return;const studentUid=CURRENT_USER.uid,banner=document.getElementById('feedback-banner');V1010_FEEDBACK_LOADING=true;try{let docs;try{const ordered=await cloudGet(db.collection('feedback').where('studentId','==',studentUid).where('read','==',false).orderBy('createdAt','asc').limit(1),'feedback pendente');docs=ordered.docs;}catch(indexError){const fallback=await cloudGet(db.collection('feedback').where('studentId','==',studentUid).limit(200),'feedback do aluno');docs=fallback.docs.filter(doc=>doc.data().read!==true).sort((a,b)=>createdMillis(a.data())-createdMillis(b.data())||String(a.id).localeCompare(String(b.id))).slice(0,1);}if(CURRENT_USER?.uid!==studentUid)return;if(!docs.length){if(banner){banner.style.display='none';banner.dataset.fid='';}return;}const doc=docs[0];showFeedbackBanner(doc.id,doc.data());}catch(error){console.warn('checkFeedback',error.code||error.message);}finally{V1010_FEEDBACK_LOADING=false;}};
 showFeedbackBanner=function(fid,data){const banner=document.getElementById('feedback-banner'),label=document.getElementById('feedback-banner-label'),text=document.getElementById('feedback-banner-text');if(!banner||!text)return;const payload=typeof data==='string'?{message:data}:data||{};if(label)label.textContent=v1010FeedbackLabel(payload);text.textContent=String(payload.message||'');banner.dataset.fid=fid;banner.style.display='block';};
 dismissFeedback=async function(){const banner=document.getElementById('feedback-banner');if(!banner)return;const fid=banner.dataset.fid;banner.style.display='none';banner.dataset.fid='';if(fid&&db)try{await cloudWrite(db.collection('feedback').doc(fid).update({read:true}),'marcar feedback');}catch(error){console.warn('Não foi possível marcar a transmissão como lida',error);}await checkFeedback();};
 function updateFeedbackCharacterCount(){const input=document.getElementById('input-feedback'),counter=document.getElementById('feedback-character-count');if(counter)counter.textContent=`${(input?.value.length||0).toLocaleString('pt-BR')} / 30.000 caracteres`;}
-function syncFeedbackEditorType(){const select=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),modalTitle=document.getElementById('modal-feedback-title'),help=document.getElementById('feedback-editor-help'),type=v1010FeedbackType(select?.value);if(type==='protocol_update'){if(title&&!title.value.trim())title.value='Feedback da atualização completa';if(modalTitle)modalTitle.textContent='Feedback extenso da atualização';if(help)help.textContent='Registre uma análise detalhada da atualização completa de treino e dieta. O aluno receberá este conteúdo na Sala Vermelha.';}else if(type==='weekly_report'){if(title&&!title.value.trim())title.value='Feedback do relatório semanal';if(modalTitle)modalTitle.textContent='Feedback do relatório semanal';if(help)help.textContent='Envie as observações referentes ao relatório semanal. Transmissões pendentes serão exibidas ao aluno em ordem cronológica.';}else{if(modalTitle)modalTitle.textContent='Enviar transmissão';if(help)help.textContent='O aluno receberá esta transmissão na Sala Vermelha. Mensagens não lidas serão exibidas em ordem, uma após a outra.';}}
+function syncFeedbackEditorType(){const select=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),modalTitle=document.getElementById('modal-feedback-title'),help=document.getElementById('feedback-editor-help'),type=v1010FeedbackType(select?.value),label=v1010FeedbackLabel({feedbackType:type});if(title){if(!title.value.trim()||title.value===title.dataset.autoLabel)title.value=label;title.dataset.autoLabel=label;}if(modalTitle)modalTitle.textContent=label;if(help)help.textContent='O aluno receberá o feedback na Sala Vermelha e, se autorizar no celular, um aviso na barra de notificações.';}
 openFeedbackModal=function(type='general'){if(!VIEW_STUDENT)return;V1010_FEEDBACK_PREFILL=v1010FeedbackType(type);const typeInput=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),message=document.getElementById('input-feedback');if(typeInput)typeInput.value=V1010_FEEDBACK_PREFILL;if(title)title.value='';if(message)message.value='';syncFeedbackEditorType();updateFeedbackCharacterCount();openModal('modal-feedback');};
-sendFeedback=async function(){const message=document.getElementById('input-feedback').value.normalize('NFKC').trim(),type=v1010FeedbackType(document.getElementById('input-feedback-type')?.value),title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||v1010FeedbackLabel({feedbackType:type});if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;try{const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='protocol_update'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule?v109ProtocolState(schedule):null;await cloudWrite(db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='protocol_update'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='protocol_update'?Math.max(0,Number(state?.pendingCycle||state?.elapsedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false}),'enviar o feedback');clearIdempotentDraft(draftKey);closeModal('modal-feedback');alert('Feedback enviado. Se houver outras transmissões pendentes, o aluno verá cada uma em sequência.');}catch(error){alert(cloudWriteError(error,'enviar o feedback'));}finally{endAction('send-feedback','modal-feedback');}};
+sendFeedback=async function(){const message=document.getElementById('input-feedback').value.normalize('NFKC').trim(),type=v1010FeedbackType(document.getElementById('input-feedback-type')?.value),title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||v1010FeedbackLabel({feedbackType:type});if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;try{const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='monthly_full'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule?v109ProtocolState(schedule):null;await cloudWrite(db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.elapsedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false}),'enviar o feedback');clearIdempotentDraft(draftKey);closeModal('modal-feedback');alert('Feedback enviado. Se houver outras transmissões pendentes, o aluno verá cada uma em sequência.');}catch(error){alert(cloudWriteError(error,'enviar o feedback'));}finally{endAction('send-feedback','modal-feedback');}};
 
 const V1010_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){TRAINER_SUPPLEMENT_CATALOG={items:[]};TRAINER_SUPPLEMENT_CATALOG_UID='';EDIT_TRAINER_SUPPLEMENT_ID='';V1010_FEEDBACK_LOADING=false;return V1010_CONFIRM_LOGOUT_BASE();};

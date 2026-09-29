@@ -2351,3 +2351,6 @@ html.mobile-landscape-blocked #portrait-lock-overlay{display:flex;}
 .cardio-input-with-unit span{padding:0 10px;font-family:'DM Mono',monospace;font-size:8px;color:var(--text-muted);white-space:nowrap}
 @media(min-width:900px){body.trainer-desktop .cardio-options-list,body.student-desktop .cardio-options-list{grid-template-columns:repeat(2,minmax(0,1fr))}.cardio-timer-card{max-width:780px;margin-left:auto;margin-right:auto}}
 @media(max-width:600px){.cardio-prescription-card{flex-wrap:wrap}.cardio-card-actions{width:100%;flex-direction:row;justify-content:flex-end;padding-top:7px;border-top:1px solid rgba(81,69,58,.24)}.cardio-editor-grid{grid-template-columns:1fr}.cardio-timer-actions{grid-template-columns:1fr}.cardio-timer-clock{font-size:48px}}
+.tb-device-notice-panel{margin:14px 16px;padding:12px;border:1px solid #553338;border-radius:8px;background:#1b1113}
+.tb-device-notice-panel[hidden],.tb-device-notice-panel button[hidden]{display:none!important}
+.tb-device-notice-panel p{margin:8px 0 0;color:#c4aba9;font-size:12px;line-height:1.45}

@@ -77,7 +77,7 @@
   function showQuestionnaireSnapshot(snapshot,uid){
     if(!isCurrent(uid))return;
     questionnaireSnapshot=snapshot;
-    const pending=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(item=>item.answered!==true&&(item.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(item)==='pending')).sort((a,b)=>createdMs(a.createdAt)-createdMs(b.createdAt)||String(a.id).localeCompare(String(b.id)));
+    const pending=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).filter(item=>item.answered!==true&&!item.cancelledAt&&(item.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(item)==='pending')).sort((a,b)=>createdMs(a.createdAt)-createdMs(b.createdAt)||String(a.id).localeCompare(String(b.id)));
     const first=pending[0]||null,banner=document.getElementById('quest-banner');
     if(banner){if(first){banner.dataset.qid=first.id;banner.style.display='block';}else{banner.dataset.qid='';banner.style.display='none';}}
     const signature=pending.map(item=>item.id).join('|'),changed=changedAfterPrime(questionnairePrimed,lastQuestionnaireSignature,signature);
@@ -165,7 +165,10 @@
     const first=unread[0]||null,banner=document.getElementById('feedback-banner');
     if(first&&typeof showFeedbackBanner==='function')showFeedbackBanner(first.id,first);else if(banner){banner.style.display='none';banner.dataset.fid='';}
     const signature=unread.map(item=>item.id).join('|'),changed=changedAfterPrime(feedbackPrimed,lastFeedbackSignature,signature);
-    if(changed&&unread.length>counts.feedback)toast('Nova mensagem do treinador recebida.');
+    if(changed){
+      const previous=new Set(lastFeedbackSignature.split('|').filter(Boolean)),fresh=unread.filter(item=>!previous.has(item.id));
+      if(fresh.length){toast('Novo feedback do treinador recebido.');fresh.forEach(item=>window.TeamBullsDeviceNotices?.notifyFeedback?.(item.id,item));}
+    }
     counts.feedback=unread.length;lastFeedbackSignature=signature;feedbackPrimed=true;updateBadge();if(changed)refreshOpenCenter();
   }
   function attachFeedback(uid){
