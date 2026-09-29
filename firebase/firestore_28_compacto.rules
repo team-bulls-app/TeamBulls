@@ -246,7 +246,7 @@ service cloud.firestore {
         && request.resource.data.trainerId == request.auth.uid
         && requiredText(request.resource.data.message, 30000)
         && text(request.resource.data.get('title', ''), 160)
-        && request.resource.data.get('feedbackType', 'general') in ['general', 'weekly_report', 'protocol_update']
+        && request.resource.data.get('feedbackType', 'general') in ['general', 'weekly_report', 'protocol_update', 'monthly_full', 'weekly_diet', 'weekly_training', 'extra']
         && text(request.resource.data.get('protocolStartDate', ''), 10)
         && request.resource.data.get('protocolCycle', 0) is int
         && request.resource.data.get('protocolCycle', 0) >= 0
@@ -283,7 +283,8 @@ service cloud.firestore {
             && request.resource.data.get('allQuestionsRequired', true) == true)
         )
         && request.resource.data.createdAt is timestamp;
-      allow update: if activeOwner(resource.data.studentId)
+      allow update: if (activeOwner(resource.data.studentId)
+        && resource.data.get('cancelledAt', null) == null
         && immutable('studentId') && immutable('trainerId')
         && immutable('questions') && immutable('createdAt')
         && immutable('requiresPhotos') && immutable('requiredPhotoCount')
@@ -309,8 +310,31 @@ service cloud.firestore {
             && request.resource.data.answers.size() > 0
             && !request.resource.data.answers.hasAny([''])
             && request.resource.data.photoIds.size() == 6)
-        );
+        ))
+        || (trainerOwns(resource.data.studentId)
+          && resource.data.trainerId == request.auth.uid
+          && resource.data.answered == false
+          && resource.data.get('cancelledAt', null) == null
+          && resource.data.get('answers', null) == null
+          && resource.data.get('photoIds', []).size() == 0
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelledAt', 'cancelledBy'])
+          && request.resource.data.cancelledAt is timestamp
+          && request.resource.data.cancelledBy == request.auth.uid);
       allow delete: if false;
+    }
+
+    match /pushDevices/{uid}/tokens/{tokenId} {
+      allow read: if activeOwner(uid);
+      allow create: if activeOwner(uid)
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'createdAt', 'updatedAt'])
+        && requiredText(request.resource.data.token, 1024)
+        && request.resource.data.platform in ['android', 'ios']
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      allow update: if activeOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if activeOwner(uid);
     }
 
     match /trainerSupplementCatalog/{trainerUid} {

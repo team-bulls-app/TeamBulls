@@ -2,7 +2,9 @@
    A chave do App Check/reCAPTCHA Enterprise é pública por definição.
    Não coloque senhas, chaves privadas ou credenciais administrativas aqui. */
 window.TEAM_BULLS_PUBLIC_CONFIG=Object.freeze({
-  appCheckSiteKey: ['6Lc3','U28t','AAAA','AB6q','yxP8','GauR','DCg-','4ADi','y8oY','LKXL'].join('')
+  appCheckSiteKey: ['6Lc3','U28t','AAAA','AB6q','yxP8','GauR','DCg-','4ADi','y8oY','LKXL'].join(''),
+  // Chave pública em Firebase Console > Configurações > Cloud Messaging > Web Push.
+  webPushVapidKey: ''
 });
 
 if('caches' in window){

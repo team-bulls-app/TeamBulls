@@ -486,7 +486,7 @@
   openFeedbackModal=function(type='general',context=null){
     if(!VIEW_STUDENT)return;
     const normalized=typeof v1010FeedbackType==='function'?v1010FeedbackType(type):String(type||'general');
-    if(normalized==='protocol_update'&&!context){
+    if(normalized==='monthly_full'&&!context){
       const state=typeof v109ProtocolState==='function'?v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE):null;
       const cycle=state?.pendingCycle||state?.lastCompletedCycle||0;
       context={sourceType:'protocol_update',sourceId:cycle?'protocol-cycle-'+cycle:'protocol-update',sourceDate:state?.pending?state.nextDueDate:(V109_PROTOCOL_REVIEW_SCHEDULE?.lastCompletedDate||today()),title:cycle?`Feedback da atualização completa nº ${cycle}`:'Feedback da atualização completa'};
@@ -496,7 +496,7 @@
   window.openFeedbackForWeeklyReport=function(id){
     const item=(WEEKLY_CHECKINS||[]).find(report=>String(report.id)===String(id));if(!item||!VIEW_STUDENT)return;
     const date=item.submittedDate||item.dueDate||today();
-    openFeedbackModal('weekly_report',{sourceType:'weekly_report',sourceId:String(item.id),sourceDate:String(date),title:`Feedback do relatório semanal de ${fmt(date)}`});
+    openFeedbackModal(item.requestKind==='manual'?'extra':'weekly_report',{sourceType:'weekly_report',sourceId:String(item.id),sourceDate:String(date),title:item.requestKind==='manual'?`Feedback extra de ${fmt(date)}`:`Relatório semanal de ${fmt(date)}`});
   };
   if(typeof renderWeeklyCheckinHistory==='function'){
     renderWeeklyCheckinHistory=function(items,listId){
@@ -516,8 +516,8 @@
       const title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||(typeof v1010FeedbackLabel==='function'?v1010FeedbackLabel({feedbackType:type}):'Feedback');
       if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;
       try{
-        const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='protocol_update'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule&&typeof v109ProtocolState==='function'?v109ProtocolState(schedule):null;
-        const payload={studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='protocol_update'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='protocol_update'?Math.max(0,Number(state?.pendingCycle||state?.lastCompletedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false};
+        const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='monthly_full'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule&&typeof v109ProtocolState==='function'?v109ProtocolState(schedule):null;
+        const payload={studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.lastCompletedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false};
         if(feedbackContext){
           payload.sourceType=String(feedbackContext.sourceType||'').slice(0,40);
           payload.sourceId=String(feedbackContext.sourceId||'').slice(0,190);

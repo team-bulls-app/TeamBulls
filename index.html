@@ -548,7 +548,7 @@
 <div class="trainer-checkin-schedule" id="trainer-checkin-schedule">
 <div class="trainer-checkin-head"><div><span>RELATÓRIO SEMANAL</span><strong>Relatório + 6 fotos obrigatórias</strong></div><span class="quest-status pending" id="trainer-checkin-state">CARREGANDO</span></div>
 <div class="trainer-checkin-grid"><label class="form-group"><span class="form-label">Próxima data prescrita</span><input class="form-input" id="trainer-checkin-date" type="date"/></label><label class="form-group"><span class="form-label">Intervalo</span><select class="form-input" id="trainer-checkin-interval"><option value="7">A cada 7 dias</option></select></label></div>
-<div class="trainer-checkin-actions"><button class="btn-primary" onclick="saveTrainerCheckinSchedule()">SALVAR PROGRAMAÇÃO</button><button class="btn-add-set" onclick="requestExtraWeeklyCheckin()">PEDIR RELATÓRIO + FOTOS AGORA</button><button class="btn-add-set" onclick="openReportGuideManager()">GUIA GERAL DE FOTOS — TODOS OS ALUNOS</button></div>
+<div class="trainer-checkin-actions"><button class="btn-primary" onclick="saveTrainerCheckinSchedule()">SALVAR PROGRAMAÇÃO</button><button class="btn-add-set" onclick="requestExtraWeeklyCheckin()">PEDIR RELATÓRIO + FOTOS AGORA</button><button class="btn-ghost" id="trainer-cancel-extra-checkin" type="button" style="display:none" onclick="cancelExtraWeeklyCheckin()">CANCELAR RELATÓRIO EXTRA PENDENTE</button><button class="btn-add-set" onclick="openReportGuideManager()">GUIA GERAL DE FOTOS — TODOS OS ALUNOS</button></div>
 <div class="plan-help" id="trainer-checkin-help">O aluno receberá o relatório na aba Registros. Todas as perguntas e as seis fotos serão obrigatórias.</div>
 <div class="cycle-link-note" id="trainer-cycle-link-note">As datas do treino e da dieta ativos serão usadas para alinhar as semanas, os registros e a atualização do ciclo.</div>
 </div>
@@ -1029,7 +1029,7 @@
 <div class="modal-handle"></div>
 <div class="modal-title" id="modal-feedback-title">Enviar transmissão</div>
 <p class="feedback-editor-help" id="feedback-editor-help">O aluno receberá esta transmissão na Sala Vermelha. Mensagens não lidas serão exibidas em ordem, uma após a outra.</p>
-<div class="form-group"><label class="form-label">Tipo de feedback</label><select class="form-input" id="input-feedback-type" onchange="syncFeedbackEditorType()"><option value="general">Feedback geral</option><option value="weekly_report">Referente a um relatório semanal</option><option value="protocol_update">Referente à atualização completa de treino e dieta</option></select></div>
+<div class="form-group"><label class="form-label">Tipo de feedback</label><select class="form-input" id="input-feedback-type" onchange="syncFeedbackEditorType()"><option value="weekly_report">Relatório semanal</option><option value="monthly_full">Relatório mensal completo</option><option value="weekly_diet">Relatório semanal dieta</option><option value="weekly_training">Relatório semanal treino</option><option value="extra">Feedback extra</option></select></div>
 <div class="form-group"><label class="form-label">Título</label><input class="form-input" id="input-feedback-title" maxlength="160" placeholder="Ex.: Feedback da atualização — agosto"/></div>
 <div class="form-group"><label class="form-label">Mensagem extensa</label><textarea class="form-input feedback-long-text" id="input-feedback" maxlength="30000" placeholder="Descreva detalhadamente a evolução, os pontos positivos, os ajustes e as próximas orientações..." rows="12" oninput="updateFeedbackCharacterCount()"></textarea><div class="feedback-character-count" id="feedback-character-count">0 / 30.000 caracteres</div></div>
 <button class="btn-primary" onclick="sendFeedback()">TRANSMITIR FEEDBACK</button>
@@ -1458,6 +1458,7 @@
 <script defer src="config_v10_7.js?v=10.10.9"></script>
 <script defer src="update_v10_10_9.js?v=10.10.9"></script>
 <script defer src="app_v10_10_9_core.js?v=10.10.9-bc1"></script>
+<script defer src="modules/student-feedback-device-notices-v10_10_62.js?v=10.10.62-device-notices1"></script>
 <script defer src="modules/v107-core.js?v=10.10.9-snapshot1"></script>
 <script defer src="modules/v107-invites.js?v=10.10.9"></script>
 <script defer src="modules/v107-operations.js?v=10.10.9"></script>

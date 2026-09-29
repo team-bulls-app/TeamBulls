@@ -21,6 +21,7 @@ jobs:
       - name: Run Team Bulls regression checks
         run: |
           node scripts/quality-check.mjs
+          node scripts/feedback-notice-cancellation-check.mjs
           node scripts/prescription-propagation-check.mjs
           node scripts/diet-deletion-check.mjs
           node scripts/diet-division-deletion-check.mjs
