@@ -21,6 +21,7 @@ jobs:
         run: |
           node scripts/security-check.mjs
           node scripts/feedback-notice-cancellation-check.mjs
+          node scripts/cloudflare-feedback-push-check.mjs
           node scripts/exercise-ownership-rules-check.mjs
           node scripts/report-submit-contract-check.mjs
           node scripts/weekly-report-integrity-check.mjs
