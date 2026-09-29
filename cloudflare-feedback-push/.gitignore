@@ -1,0 +1,3 @@
+# Keep downloaded Google credentials and local Wrangler state out of the repository.
+*.json
+.wrangler/

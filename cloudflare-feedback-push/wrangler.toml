@@ -1,0 +1,12 @@
+name = "team-bulls-feedback-push"
+main = "src/index.mjs"
+compatibility_date = "2026-09-29"
+
+# Configure the D1 binding after creating the free database. Never commit secrets.
+[[d1_databases]]
+binding = "DB"
+database_name = "team-bulls-feedback-push"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[triggers]
+crons = ["* * * * *"]
