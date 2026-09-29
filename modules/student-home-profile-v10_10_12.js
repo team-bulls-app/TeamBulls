@@ -203,8 +203,9 @@
   function ensureNotificationScreen(){
     if(document.getElementById('screen-student-notifications'))return;
     const screen=document.createElement('div');screen.className='screen';screen.id='screen-student-notifications';
-    screen.innerHTML=`<div class="tb-notice-screen-head"><button class="btn-icon" type="button" onclick="goHome()">←</button><div><div class="tb-notice-meta">CENTRAL DO ALUNO</div><h1>NOTIFICAÇÕES</h1></div></div><div class="tb-notice-list" id="tb-notice-list"><div class="tb-notice-empty">Carregando notificações...</div></div>`;
+    screen.innerHTML=`<div class="tb-notice-screen-head"><button class="btn-icon" type="button" onclick="goHome()">←</button><div><div class="tb-notice-meta">CENTRAL DO ALUNO</div><h1>NOTIFICAÇÕES</h1></div></div><div id="tb-device-notice-panel" class="tb-device-notice-panel" hidden><button class="btn-primary" type="button" id="tb-device-notice-enable" onclick="TeamBullsDeviceNotices.enable()">ATIVAR AVISOS NO CELULAR</button><p id="tb-device-notice-status"></p></div><div class="tb-notice-list" id="tb-notice-list"><div class="tb-notice-empty">Carregando notificações...</div></div>`;
     document.getElementById('app')?.appendChild(screen);
+    window.TeamBullsDeviceNotices?.render?.();
   }
 
   async function loadNotifications({includeProtocol=true}={}){
@@ -227,7 +228,7 @@
     const monthly=window.TeamBullsMonthlyReports,protocol=value(5),schedule=protocol?.exists?{...protocol.data(),studentId:uid}:null;
     if(protocol)monthly?.remember(uid,schedule);
     value(2)?.docs.forEach(doc=>{
-      const data={...doc.data(),id:doc.id};if(data.answered)return;
+      const data={...doc.data(),id:doc.id};if(data.answered||data.cancelledAt)return;
       const isMonthly=data.reportType==='monthly';
       if(isMonthly&&(!protocol||monthly?.status(data,schedule)!=='pending'))return;
       items.push({id:doc.id,source:'questionnaire',title:isMonthly?'Relatório mensal pendente':data.reportType==='standard-extra'?'Relatório extra pendente':'Relatório pendente',body:isMonthly?('Relatório completo de '+fmt(data.dueDate)+', com todas as perguntas e 6 fotos.'):'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:isMonthly?'relatório mensal':'relatório',action:'questionnaire'});
@@ -277,6 +278,7 @@
 
   async function openNotifications(){
     ensureNotificationScreen();closeProfileMenu();showScreen('screen-student-notifications');
+    window.TeamBullsDeviceNotices?.render?.();
     await loadNotifications({includeProtocol:true});renderNotifications();
     badgeRefreshUid=studentUid();badgeRefreshAt=Date.now();applyNoticeBadge();
   }

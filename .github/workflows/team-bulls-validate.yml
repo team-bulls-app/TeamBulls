@@ -15,6 +15,7 @@ jobs:
       - name: Executar validação estática
         run: |
           node scripts/production-audit-check.mjs
+          node scripts/feedback-notice-cancellation-check.mjs
           node scripts/report-submit-contract-check.mjs
           node scripts/weekly-report-integrity-check.mjs
           node scripts/weekly-report-opening-chain-check.mjs

@@ -24,6 +24,7 @@
   function remember(uid,schedule){schedules.set(uid,schedule);}
   function status(report,schedule=schedules.get(report?.studentId),date=today()){
     if(report?.answered===true)return'answered';
+    if(report?.cancelledAt)return'cancelled';
     if(!monthly(report))return'pending';
     if(schedule===undefined)return trainer()&&iso(report.dueDate)?(report.dueDate<=date?'pending':'scheduled'):'loading';
     const current=cycle(schedule);
