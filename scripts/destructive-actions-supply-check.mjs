@@ -8,7 +8,7 @@ const core=read('app_v10_10_9_core.js');
 
 function assert(condition,message){if(!condition)throw new Error(message);}
 
-const moduleUrl='./modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply1';
+const moduleUrl='./modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply2';
 assert(config.includes(moduleUrl),'O módulo de correção não está carregado pelo runtime com URL nova.');
 
 // Exclusão de dieta deve preservar o editor/contexto até a confirmação e usar o persist canônico.
