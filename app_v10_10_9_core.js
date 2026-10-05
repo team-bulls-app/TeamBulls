@@ -1975,7 +1975,7 @@ async function hydrateHomeSessions(userId,loadSeq){
   try{
     const history=await fetchCloudSessions(userId);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId||MODE!=='cloud')return false;
-    hydrateWorkoutSessions(CLOUD_WORKOUTS,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);saveCloudBackup();renderHome();
+    hydrateWorkoutSessions(CLOUD_WORKOUTS,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);saveCloudBackup();renderHome();refreshVisibleSessionHistory('student');
     if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} do histórico protegido`);
     return true;
   }catch(error){console.warn('Histórico será mantido pelo arquivo local:',error?.code||error?.message);return false;}
@@ -2067,7 +2067,7 @@ let HISTORY_BY_NAME={};
 function buildHistoryByName(allSessions){
   const map={};
   for(const s of allSessions){
-    const norm=(s.exerciseName||'').trim().toLowerCase();
+    const norm=normalizedName(s.exerciseName);
     if(!norm) continue;
     (map[norm]=map[norm]||[]).push(s);
   }
@@ -2080,10 +2080,8 @@ function getSharedSessions(exerciseOrName,ws){
   const workouts=ws||getWorkouts();
   const liveMatches=[];
   for(const workout of workouts)for(const exercise of(workout.exercises||[]))if(normalizedName(exercise.name)===norm)liveMatches.push({workout,exercise});
-  const separateById=!!target&&liveMatches.length>1;
   const all=[];const seen=new Set();
   for(const {workout,exercise} of liveMatches){
-    if(separateById&&String(exercise.id)!==String(target.id))continue;
     for(const session of(exercise.sessions||[])){
       if(seen.has(session.id))continue;
       seen.add(session.id);
@@ -2092,11 +2090,20 @@ function getSharedSessions(exerciseOrName,ws){
   }
   for(const session of(HISTORY_BY_NAME[norm]||[])){
     if(seen.has(session.id))continue;
-    if(separateById&&String(session.exerciseId||'')!==String(target.id))continue;
     seen.add(session.id);
     all.push({...session,_archived:!liveMatches.some(({exercise})=>String(exercise.id)===String(session.exerciseId||''))});
   }
   return all.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)));
+}
+function refreshVisibleSessionHistory(role){
+  if(role==='student'&&document.getElementById('screen-exercise')?.classList.contains('active')){
+    renderExercise();return;
+  }
+  if(role==='trainer'&&document.getElementById('screen-ts-exercise')?.classList.contains('active')&&VIEW_STUDENT_EXERCISE){
+    const exercise=VIEW_STUDENT_EXERCISE,workouts=VIEW_STUDENT?.workouts;
+    buildSessions(exercise,'ts-sessions-list',true,VIEW_STUDENT_WORKOUT?.id,workouts);
+    requestAnimationFrame(()=>buildChart(exercise,'tsProgressChart',TS_CHART_MODE,null,workouts));
+  }
 }
 function sessionMaxWeight(session){
   const values=(session?.sets||[]).map(s=>Number(s.weight)).filter(Number.isFinite);
@@ -5095,7 +5102,7 @@ async function renderTrainerStudent(s){
     VIEW_STUDENT={...VIEW_STUDENT,workouts};
     HISTORY_BY_NAME=buildHistoryByName(archived);
     // O histórico completo é carregado depois da lista de protocolos, sem segurar a tela.
-    runWhenIdle(async()=>{try{const history=await fetchCloudSessions(studentUid);if(loadSeq!==TRAINER_STUDENT_LOAD_SEQ||VIEW_STUDENT?.uid!==studentUid)return;hydrateWorkoutSessions(VIEW_STUDENT.workouts,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} para este aluno`);}catch(error){console.warn('Histórico do aluno mantido em cache',error);}},1800);
+    runWhenIdle(async()=>{try{const history=await fetchCloudSessions(studentUid);if(loadSeq!==TRAINER_STUDENT_LOAD_SEQ||VIEW_STUDENT?.uid!==studentUid)return;hydrateWorkoutSessions(VIEW_STUDENT.workouts,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);refreshVisibleSessionHistory('trainer');if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} para este aluno`);}catch(error){console.warn('Histórico do aluno mantido em cache',error);}},1800);
     const list=document.getElementById('ts-workout-list');
     const empty=document.getElementById('ts-workout-empty');
     if(!workouts.length){list.innerHTML='';empty.style.display='block';return;}

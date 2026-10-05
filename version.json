@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026092901,
-  "revision": "mobile-feedback-notices-and-request-cancellation-1",
-  "publishedAt": "2026-09-29T17:30:00Z",
+  "build": 2026100501,
+  "revision": "student-session-delete-and-shared-history-1",
+  "publishedAt": "2026-10-05T16:33:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Adiciona categorias de feedback, avisos no celular e cancelamento seguro de solicitações pendentes."
+  "message": "Corrige a exclusão de registros pendentes e mostra o histórico de séries do mesmo exercício em todos os treinos."
 }
