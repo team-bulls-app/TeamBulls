@@ -1949,6 +1949,10 @@ async function fetchCloudStructure(userId){
   ]);
   return{workouts:buildCloudStructure(workoutResult.snapshot,exerciseResult.snapshot),source:workoutResult.source==='server'||exerciseResult.source==='server'?'server':'cache'};
 }
+function pendingSessionHistory(userId){
+  if(!userId||CURRENT_USER?.role!=='student'||CURRENT_USER.uid!==userId)return[];
+  try{return window.TeamBullsSessionPerformance?.sessions?.(userId)||[];}catch(error){return[];}
+}
 async function fetchCloudSessions(userId){
   const query=db.collection('sessions').where('userId','==',userId);
   let result;
@@ -1958,11 +1962,12 @@ async function fetchCloudSessions(userId){
     catch(cacheError){throw serverError;}
   }
   const remote=[];for(const d of result.snapshot.docs){const session=sanitizeHistorySession(d.data(),d.id);if(session)remote.push(session);}
-  const sessions=mergeHistorySessions(remote,loadSessionArchive(userId));
+  const sessions=mergeHistorySessions(pendingSessionHistory(userId),mergeHistorySessions(remote,loadSessionArchive(userId)));
   if(remote.length||result.source==='server')saveSessionArchive(userId,sessions);
   return{sessions,remoteSessionCount:remote.length,recoveredSessionCount:Math.max(0,sessions.length-remote.length),source:result.source};
 }
 function hydrateWorkoutSessions(workouts,sessions){
+  sessions=mergeHistorySessions(pendingSessionHistory(CURRENT_USER?.uid),sessions);
   attachSessionsWithoutLosingOrphans(workouts,sessions);
   workouts.forEach(w=>w.exercises.forEach(e=>e.sessions.sort((a,b)=>String(a.date).localeCompare(String(b.date))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)))));
   return workouts;
@@ -1986,19 +1991,19 @@ async function loadCloudHome(){
   await withTimeout(warmSessionArchive(userId),900,'abrir arquivo local').catch(()=>{});
   // Primeiro mostra o último estado bom sem esperar rede.
   if(!CLOUD_WORKOUTS.length){
-    CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=loadSessionArchive(userId);if(CLOUD_WORKOUTS.length)hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);renderHome();
+    CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));if(CLOUD_WORKOUTS.length)hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);renderHome();
   }
   try{
     const structure=await fetchCloudStructure(userId);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId||MODE!=='cloud')return false;
-    const archived=loadSessionArchive(userId);CLOUD_WORKOUTS=hydrateWorkoutSessions(structure.workouts,archived);HISTORY_BY_NAME=buildHistoryByName(archived);saveCloudBackup();renderHome();
+    const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));CLOUD_WORKOUTS=hydrateWorkoutSessions(structure.workouts,archived);HISTORY_BY_NAME=buildHistoryByName(archived);saveCloudBackup();renderHome();
     // Não bloqueia a navegação: histórico e banners são tarefas de fundo.
     runWhenIdle(()=>hydrateHomeSessions(userId,loadSeq),1800);
     return true;
   }catch(e){
     console.error('loadCloudHome error:',e.code,e.message);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId)return false;
-    if(!CLOUD_WORKOUTS.length){CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=loadSessionArchive(userId);hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);}
+    if(!CLOUD_WORKOUTS.length){CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);}
     renderHome();showToast('Sem conexão com o servidor — exibindo os últimos dados salvos.',true);return false;
   }
 }
@@ -4158,6 +4163,9 @@ async function viewQuestionnaire(qid,fromTrainer){
 /* ══════════════════════════════════════════════════
    SESSIONS RENDER
 ══════════════════════════════════════════════════ */
+function sessionSyncBadge(session){
+  return session?.pendingSync?'<span class="session-week-badge" style="color:var(--warn)">Aguardando sincronização</span>':'';
+}
 function buildSessions(e,elId,readonly,homeWid,ws){
   const el=document.getElementById(elId);
   const sessions=getSharedSessions(e,ws);
@@ -4190,7 +4198,7 @@ function buildSessions(e,elId,readonly,homeWid,ws){
     const noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';
     return`<div class="session-block">
       <div class="session-header">
-        <span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}
+        <span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">Vol: ${vol} kg</span>${del}</div>
       </div>
       <table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>Feito</th></tr></thead><tbody>${rows}</tbody></table>
@@ -6023,7 +6031,7 @@ function updateBackoffLoadSuggestion(){const rows=[...document.querySelectorAll(
 const openLogSessionModalV101=openLogSessionModal;
 openLogSessionModal=function(){const result=openLogSessionModalV101.apply(this,arguments);const exercise=getE(SESSION_WID,SESSION_EID);renderRestTimerPresetsForExercise(exercise);return result;};
 
-function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(Number(s.weight)||0)*(Number(s.reps)||0),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo/carga':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
+function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(Number(s.weight)||0)*(Number(s.reps)||0),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo/carga':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
 buildSessions=buildSessionsV102;
 
 const openEditSessionV101=openEditSession;

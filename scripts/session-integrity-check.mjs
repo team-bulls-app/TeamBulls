@@ -37,7 +37,8 @@ assert(!integrity.includes('setInterval('),'Integridade de sessão não pode adi
 assert(integrity.includes("if(studentCloud()&&!window.TeamBullsWeekSelectionFix)"),'Registro deve falhar fechado se a proteção de semana ainda não estiver pronta.');
 assert(integrity.includes("if(!window.TeamBullsSessionPerformance)"),'Registro cloud deve aguardar a fila idempotente estar pronta.');
 assert(sessionPerf.includes("const ref=db.collection('sessions').doc(entry.id)"),'Sincronização deve continuar usando documento com ID idempotente.');
-assert(sessionPerf.includes("const existing=await cloudGet(ref,'reconciliar registro de série')"),'Sincronização idempotente deve reconciliar uma confirmação anterior antes de decidir entre update e create.');
+assert(sessionPerf.indexOf('await ref.set(firestorePayload(entry))')<sessionPerf.indexOf("ref.get({source:'server'})"),'Criação deve anteceder o read: Rules 28 negam get de documento ausente.');
+assert(sessionPerf.includes("if(!String(error?.code||'').includes('permission-denied'))throw error;")&&sessionPerf.includes('assertExistingOwner(existing.data(),entry)'),'Somente rejeição de permissão é reconciliada, revalidando dono, treino e exercício.');
 assert(sessionPerf.includes('ref.update(mutablePayload(entry))')&&sessionPerf.includes('ref.set(firestorePayload(entry))'),'Reconciliação precisa preservar campos imutáveis em documento existente e usar o mesmo ID ao criar um documento ausente.');
 
 let modalIsOpen=false;

@@ -27,7 +27,7 @@ assert(session.includes('function scheduleLocalProjection(entry,exercise,wid,eid
 assert(session.includes("if(typeof requestAnimationFrame==='function')requestAnimationFrame(run);else setTimeout(run,0)"),'Projeção local não aguarda o próximo frame visual.');
 assert(!fastBlock.includes('ensureLocalSession(entry,exercise,true);'),'Salvar carga voltou a reconstruir histórico/renderização antes de liberar o modal.');
 const closeIndex=fastBlock.indexOf("closeModal('modal-session')");
-const toastIndex=fastBlock.indexOf("showToast('✓ Série, carga e repetições registradas')");
+const toastIndex=fastBlock.indexOf("showToast('✓ Registro guardado no aparelho. Aguardando sincronização.')");
 const projectionIndex=fastBlock.indexOf('scheduleLocalProjection(entry,exercise,wid,eid)');
 assert(closeIndex>=0&&toastIndex>closeIndex&&projectionIndex>toastIndex,'Modal e feedback precisam ser liberados antes da projeção pesada do treino.');
 assert(!session.includes('setInterval('),'O hot path de séries não pode introduzir polling permanente.');
