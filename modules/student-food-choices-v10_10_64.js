@@ -128,7 +128,7 @@
     if(inflight.has(key)){notify('Esta escolha ainda está sincronizando.');return false;}
     const current=recordsFor(ctx.studentUid)[key];
     // Guardar antes de iniciar a rede permite fechar o app sem perder a escolha.
-    const entry={...ctx,recordType:TYPE,foodId,date:valid(current,ctx)&&/^\d{4}-\d{2}-\d{2}$/.test(current.date)?current.date:today(),mutationId:crypto.randomUUID(),pending:true};
+    const entry={...ctx,recordType:TYPE,foodId,date:valid(current,ctx)&&/^\d{4}-\d{2}-\d{2}$/.test(current.date)?current.date:today(),mutationId:uid(),pending:true};
     try{store(ctx.studentUid,key,entry);}catch(error){throw new Error('Não foi possível guardar neste aparelho. Libere espaço e tente novamente.');}
     drafts.delete(key);errors.delete(key);paint();
     if(!canCloud(ctx.studentUid)){notify('Escolha guardada neste aparelho. Será sincronizada ao abrir a dieta com conexão.');return true;}

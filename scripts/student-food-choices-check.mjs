@@ -103,6 +103,7 @@ export async function checkFoodChoices(){
   assert.ok(failed.list.innerHTML.includes('Não foi possível sincronizar'));assert.ok(failed.list.innerHTML.includes('Tentar sincronizar'));
   const recovered=foodApp({local:failed.local,remote:failed.remote});await recovered.ready();assert.equal(recovered.remote.size,1);
   const full=foodApp({storageFailure:true});await full.ready();await assert.rejects(full.api.save(full.ctx(),full.chicken().id),/guardar neste aparelho/);assert.equal(full.writes.length,0);
+  const olderBrowser=foodApp();await olderBrowser.ready();olderBrowser.context.crypto={subtle:webcrypto.subtle};await olderBrowser.api.save(olderBrowser.ctx(),olderBrowser.chicken().id);assert.equal(olderBrowser.remote.size,1);
 
   // A fresh device with a failed read reconciles an existing immutable date.
   const race=foodApp({remote:a.remote,readFailure:true,date:'2026-10-10'});await race.ready();await race.api.save(race.ctx(),race.chicken().id);
