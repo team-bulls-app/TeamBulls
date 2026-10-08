@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026100601,
-  "revision": "student-session-durable-save-1",
-  "publishedAt": "2026-10-06T09:58:15Z",
+  "build": 2026100801,
+  "revision": "student-food-portion-choices-1",
+  "publishedAt": "2026-10-08T12:23:53Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Corrige o salvamento e a recuperação de séries, cargas e repetições; preserva registros pendentes ao fechar o app."
+  "message": "Permite escolher alimentos da tabela por porção prescrita, calcula as quantidades e guarda as escolhas para todos os dias."
 }

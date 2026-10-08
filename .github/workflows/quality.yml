@@ -50,6 +50,7 @@ jobs:
           node scripts/firestore-read-baseline-check.mjs
           node scripts/diet-calculation-evolution-check.mjs
           node scripts/diet-portion-presets-check.mjs
+          node scripts/student-food-choices-check.mjs
           node scripts/diet-copy-check.mjs
           node scripts/pdf-export-check.mjs
           node scripts/destructive-actions-supply-check.mjs

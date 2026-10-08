@@ -2576,7 +2576,8 @@ async function fetchCompletionsToday(uid){
       const fallback=await cloudGet(db.collection('mealCompletions').where('studentUid','==',uid),'histórico de refeições');
       docs=fallback.docs.filter(d=>d.data().date===today());
     }
-    docs.forEach(d=>completions.add(d.data().mealId));
+    // Escolhas recorrentes usam registros próprios; nunca são uma conclusão.
+    docs.filter(d=>d.data().recordType!=='food_choice').forEach(d=>completions.add(d.data().mealId));
   }catch(e){console.error('fetchCompletionsToday',e);}
   return completions;
 }
@@ -2596,7 +2597,7 @@ function renderMealsList(){
   const sorted=[...meals].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   list.innerHTML=sorted.map((m,index)=>{
     const done=isMealDoneToday(m);
-    const items=(m.items||'').split('\n').map(i=>i.trim()).filter(Boolean).map(i=>`<li>${esc(i)}</li>`).join('');
+    const items=window.TeamBullsStudentFoodChoices?.items(m)??(m.items||'').split('\n').map(i=>i.trim()).filter(Boolean).map(i=>`<li>${esc(i)}</li>`).join('');
     const editBtn=canEditContent?`<button class="meal-edit-btn" onclick="openEditMealModal(${jsArg(m.id)})">✏️</button>`:'';
     const doneBtn=canToggleDone
       ?`<button class="meal-done-btn${done?' done':''}" onclick="toggleMealDone(${jsArg(m.id)})">${done?'✓ Concluído hoje':'Marcar como concluído'}</button>`
