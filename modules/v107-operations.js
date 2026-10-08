@@ -165,7 +165,7 @@
     const [sessions,meals,checkins,photos,diet,schedule]=await Promise.all([
       cloudGet(refs[0],'sessões'),cloudGet(refs[1],'refeições concluídas'),cloudGet(refs[2],'relatórios semanais'),cloudGet(refs[3],'fotos'),loadDietDocument(studentId),cloudGet(db.collection('checkinSchedules').doc(studentId),'agenda de relatórios').catch(()=>null)
     ]);
-    return{sessions:sessions.docs.map(doc=>({...doc.data(),id:doc.id})),meals:meals.docs.map(doc=>doc.data()),checkins:checkins.docs.map(doc=>doc.data()),photos:photos.docs.map(doc=>doc.data()),diet,schedule:schedule?.exists?schedule.data():null};
+    return{sessions:sessions.docs.map(doc=>({...doc.data(),id:doc.id})),meals:meals.docs.map(doc=>doc.data()).filter(item=>item.recordType!=='food_choice'),checkins:checkins.docs.map(doc=>doc.data()),photos:photos.docs.map(doc=>doc.data()),diet,schedule:schedule?.exists?schedule.data():null};
   }
   function calculateAdherence(data){
     const from=daysAgo(27),recentSessions=data.sessions.filter(item=>String(item.date||'')>=from),trainingDays=new Set(recentSessions.map(item=>item.date)).size;
