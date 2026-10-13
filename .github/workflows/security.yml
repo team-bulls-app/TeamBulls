@@ -20,6 +20,7 @@ jobs:
       - name: Security regression checks
         run: |
           node scripts/security-check.mjs
+          node scripts/student-food-choices-check.mjs
           node scripts/feedback-notice-cancellation-check.mjs
           node scripts/student-session-delete-shared-history-check.mjs
           node scripts/session-durability-regression-check.mjs
