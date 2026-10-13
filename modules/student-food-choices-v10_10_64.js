@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices1',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
+  const VERSION='10.10.64-foodchoices2',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
   const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set();
   let loaded='',loading=null,epoch=0;
   const clean=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
@@ -82,6 +82,11 @@
       const busy=inflight.has(key),pending=!!(saved&&entry.pending);
       const status=errors.get(key)||(busy?'Sincronizando…':pending?'Guardado neste aparelho. Sincronização pendente.':saved?'Escolha guardada para todos os dias.':ready?'Escolha um alimento da tabela.':'Carregando tabela e escolhas…');
       const disabled=!ready||!food||busy||(saved?.id===selected&&!pending);
+      if(saved){
+        const notice=errors.get(key)||(busy?'Salvo no aparelho · Sincronizando…':pending?'Salvo no aparelho · Sincronização pendente.':'');
+        const actions=drafts.has(key)?'<div class="tb-food-actions"><button type="button" class="tb-food-small-btn" data-tb-food-save '+(disabled?'disabled':'')+'>Guardar</button><button type="button" class="tb-food-small-btn" data-tb-food-cancel>Cancelar</button></div>':pending&&!busy?'<div class="tb-food-actions"><button type="button" class="tb-food-small-btn" data-tb-food-save '+(!ready?'disabled':'')+'>Sincronizar</button></div>':'';
+        return '<li class="tb-food-choice tb-food-choice-compact" data-tb-food-compact="1" data-tb-food-row="'+escape(key)+'"><small class="tb-food-prescription">'+escape(row.text)+'</small><div class="tb-food-summary-line"><select data-tb-food-select aria-label="Trocar alimento para '+escape(row.text)+'" '+(!ready?'disabled':'')+'><option value="">Selecione um alimento</option>'+available.map(item=>'<option value="'+escape(item.id)+'" '+(item.id===selected?'selected':'')+'>'+escape(item.name)+'</option>').join('')+'</select><span class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</span></div>'+actions+(notice?'<small role="status" data-tb-food-status>'+escape(notice)+'</small>':'')+'</li>';
+      }
       return '<li class="tb-food-choice" data-tb-food-row="'+escape(key)+'"><strong>'+escape(row.text)+'</strong><label><span>Seu alimento</span><select data-tb-food-select aria-label="Alimento para '+escape(row.text)+'" '+(!ready||!available.length?'disabled':'')+'><option value="">Selecione um alimento</option>'+available.map(item=>'<option value="'+escape(item.id)+'" '+(item.id===selected?'selected':'')+'>'+escape(item.name)+'</option>').join('')+'</select></label><div class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</div><small>Quantidade para '+number(row.count)+' '+(row.count===1?'porção':'porções')+' da sua prescrição.</small><button type="button" class="tb-food-save" data-tb-food-save '+(disabled?'disabled':'')+'>'+ (busy?'Sincronizando…':pending&&saved?.id===selected?'Tentar sincronizar':'Guardar escolha')+'</button><small role="status" data-tb-food-status>'+escape(!available.length&&ready?'Nenhuma quantidade calculável nesta categoria. Consulte a tabela e seu treinador.':status)+'</small></li>';
     }).join('');
   }
@@ -182,14 +187,29 @@
     const open=openDietDetail;
     openDietDetail=async function(...args){loaded='';const result=await open.apply(this,args);if(context())await refresh();return result;};
     const style=document.createElement('style');style.id='tb-food-choices-style';style.textContent='.meal-card-items .tb-food-choice{list-style:none;margin:10px 0;padding:12px;border:1px solid var(--border,#333);border-radius:10px;display:grid;gap:8px}.tb-food-choice label{display:grid;gap:5px}.tb-food-choice select{width:100%;min-height:44px;background:var(--bg,#161616);color:var(--text,#eee);border:1px solid var(--border,#555);border-radius:8px;padding:8px;font-size:16px}.tb-food-quantity{font-weight:700;font-size:20px;color:var(--accent,#d4af37)}.tb-food-choice small{font-size:12px;line-height:1.5}.tb-food-save{min-height:44px;border-radius:8px;background:var(--accent,#d4af37);color:#111;font-weight:700;border:0;padding:10px}.tb-food-save:disabled{opacity:.5;cursor:default}';document.head.appendChild(style);
+    style.textContent+='.meal-card-items .tb-food-choice-compact{margin:6px 0;padding:8px 10px;gap:4px}.tb-food-summary-line{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;min-width:0}.tb-food-choice-compact .tb-food-prescription{display:block;font-size:11px;color:var(--text-dim,#888)}.tb-food-choice-compact select{flex:1;width:auto;min-width:100px;max-width:100%}.tb-food-choice-compact .tb-food-quantity{font-size:15px;line-height:1.35;white-space:nowrap}.tb-food-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.tb-food-small-btn{min-height:44px;padding:6px 10px;background:transparent;border:1px solid var(--border,#555);border-radius:8px;color:var(--text,#eee);font:inherit;font-size:12px;cursor:pointer}.tb-food-small-btn:disabled{opacity:.5;cursor:default}.tb-food-small-btn:focus-visible{outline:2px solid var(--accent,#e11d48);outline-offset:2px}';
     document.addEventListener('change',event=>{
       const select=event.target.closest?.('[data-tb-food-select]'),node=select?.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
       const row=live(ctx),key=entryKey(ctx),food=row&&foods(row).find(item=>item.id===select.value);drafts.set(key,select.value);errors.delete(key);
+      if(node.dataset.tbFoodCompact==='1'){
+        paint();
+        Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===key)?.querySelector('[data-tb-food-select]')?.focus();return;
+      }
       node.querySelector('[data-tb-food-quantity]').textContent=food?.quantity||'—';
       const entry=read(ctx.studentUid)[key],button=node.querySelector('[data-tb-food-save]');button.disabled=!food||inflight.has(key)||(entry?.foodId===select.value&&!entry.pending);button.textContent=entry?.pending&&entry.foodId===select.value?'Tentar sincronizar':'Guardar escolha';
       node.querySelector('[data-tb-food-status]').textContent=food?'Toque em Guardar escolha para usar este alimento todos os dias.':'Escolha um alimento da tabela.';
     });
     document.addEventListener('click',event=>{
+      const action=event.target.closest?.('[data-tb-food-cancel]');
+      if(action){
+        if(action.disabled)return;
+        const node=action.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
+        const key=entryKey(ctx);event.preventDefault();
+        drafts.delete(key);errors.delete(key);
+        paint();
+        const row=Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===key);
+        row?.querySelector('[data-tb-food-select]')?.focus();return;
+      }
       const button=event.target.closest?.('[data-tb-food-save]');if(!button||button.disabled)return;
       const node=button.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
       event.preventDefault();save(ctx,node.querySelector('[data-tb-food-select]').value).catch(error=>{errors.set(entryKey(ctx),error.message);paint();notify(error.message,true);});
