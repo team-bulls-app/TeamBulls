@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026100801,
-  "revision": "student-food-portion-choices-1",
-  "publishedAt": "2026-10-08T12:23:53Z",
+  "build": 2026101301,
+  "revision": "student-food-choice-compact-2",
+  "publishedAt": "2026-10-13T17:36:34Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Permite escolher alimentos da tabela por porção prescrita, calcula as quantidades e guarda as escolhas para todos os dias."
+  "message": "Compacta as escolhas de alimentos salvas, com alimento e quantidade na mesma linha e controles pequenos para trocar."
 }

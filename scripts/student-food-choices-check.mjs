@@ -100,7 +100,7 @@ export async function checkFoodChoices(){
   assert.ok(Object.values(JSON.parse([...reopened.local.values()][0]).records).every(entry=>!entry.pending));
 
   const failed=foodApp({writeFailure:true});await failed.ready();await failed.api.save(failed.ctx(),failed.chicken().id);assert.equal(failed.remote.size,0);
-  assert.ok(failed.list.innerHTML.includes('Não foi possível sincronizar'));assert.ok(failed.list.innerHTML.includes('Tentar sincronizar'));
+  assert.ok(failed.list.innerHTML.includes('Não foi possível sincronizar'));assert.ok(failed.list.innerHTML.includes('Sincronizar'));
   const recovered=foodApp({local:failed.local,remote:failed.remote});await recovered.ready();assert.equal(recovered.remote.size,1);
   const full=foodApp({storageFailure:true});await full.ready();await assert.rejects(full.api.save(full.ctx(),full.chicken().id),/guardar neste aparelho/);assert.equal(full.writes.length,0);
   const olderBrowser=foodApp();await olderBrowser.ready();olderBrowser.context.crypto={subtle:webcrypto.subtle};await olderBrowser.api.save(olderBrowser.ctx(),olderBrowser.chicken().id);assert.equal(olderBrowser.remote.size,1);
@@ -125,18 +125,33 @@ export async function checkFoodChoices(){
   // Exercise the actual delegated change/click callbacks, including retry.
   const buttons=foodApp({offline:true});await buttons.ready();const ctx=buttons.ctx(),select={value:buttons.chicken().id},button={disabled:true,textContent:''},quantity={textContent:''},status={textContent:''};
   const node={dataset:{tbFoodRow:JSON.stringify(Object.values(ctx))},querySelector:selector=>selector.includes('quantity')?quantity:selector.includes('status')?status:selector.includes('select')?select:button};
-  select.closest=selector=>selector.includes('select')?select:node;button.closest=selector=>selector.includes('save')?button:node;
+  select.closest=selector=>selector.includes('select')?select:selector.includes('row')?node:null;button.closest=selector=>selector.includes('save')?button:selector.includes('row')?node:null;
   buttons.emit('change',{target:select});assert.equal(quantity.textContent,'100 g');assert.equal(button.disabled,false);
   buttons.emit('click',{target:button,preventDefault(){}});await settle();assert.ok(buttons.list.innerHTML.includes('100 g'));
   const old=buttons.chicken().amount;buttons.context.FOOD_OPTIONS.categories.find(item=>item.id==='prot').items.find(item=>item.id===buttons.chicken().id).amount='65g';buttons.context.renderMealsList();assert.ok(buttons.list.innerHTML.includes('130 g'));
   assert.equal(old.replace(/\s/g,''),'50g');
+
+  // Saved rows stay compact while changing, cancelling and confirming a food.
+  const compact=foodApp();await compact.ready();await compact.api.save(compact.ctx(),compact.chicken().id);
+  const first=()=>compact.api.items(compact.meal).match(/<li[^>]*data-tb-food-row[^>]*>[\s\S]*?<\/li>/)[0];
+  assert.ok(first().includes('tb-food-choice-compact'));assert.ok(first().includes('data-tb-food-select'));assert.ok(first().includes('100 g</span>'));
+  for(const duplicate of ['Guardar escolha','Quantidade para','Escolha guardada para todos os dias'])assert.ok(!first().includes(duplicate));
+  const compactSelect={value:compact.fish().id},compactSave={disabled:false},cancel={disabled:false},compactNode={dataset:{tbFoodRow:JSON.stringify(Object.values(compact.ctx())),tbFoodCompact:'1'},querySelector:selector=>selector.includes('select')?compactSelect:null};
+  compactSelect.closest=selector=>selector.includes('select')?compactSelect:selector.includes('row')?compactNode:null;
+  compactSave.closest=selector=>selector.includes('save')?compactSave:selector.includes('row')?compactNode:null;
+  cancel.closest=selector=>selector.includes('cancel')?cancel:selector.includes('row')?compactNode:null;
+  compact.emit('change',{target:compactSelect});assert.ok(first().includes('120 g</span>'));assert.ok(first().includes('>Guardar</button>'));assert.equal(compact.writes.length,1);
+  compact.context.renderMealsList();assert.ok(first().includes('120 g</span>'));
+  compact.emit('click',{target:cancel,preventDefault(){}});assert.ok(first().includes('100 g</span>'));assert.ok(!first().includes('>Guardar</button>'));assert.equal(compact.writes.length,1);
+  compact.emit('change',{target:compactSelect});compact.emit('click',{target:compactSave,preventDefault(){}});await settle();
+  assert.ok(first().includes('120 g</span>'));assert.ok(!first().includes('>Guardar</button>'));assert.equal([...compact.remote.values()][0].foodId,compact.fish().id);
 
   // Choice records cannot become completion marks or inflate adherence.
   const completionContext={db:{collection:()=>({where(){return this;},get:async()=>({docs:[{data:()=>({mealId:'choice',recordType:'food_choice'})},{data:()=>({mealId:'done'})}]})})},cloudGet:ref=>ref.get(),today:()=> '2026-10-08',Set,console};
   vm.runInNewContext(core.slice(core.indexOf('async function fetchCompletionsToday('),core.indexOf('function isMealDoneToday(')),completionContext);
   assert.deepEqual([...await completionContext.fetchCompletionsToday('student-a')],['done']);
   assert.ok(fs.readFileSync('modules/v107-operations.js','utf8').includes("filter(item=>item.recordType!=='food_choice')"));
-  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices1';
+  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices2';
   for(const file of ['config_v10_7.js','sw.js','sw_47.js','update_v10_10_9.js'])assert.ok(fs.readFileSync(file,'utf8').includes(src),file);
   assert.ok(!source.includes('setInterval('));assert.ok(!source.includes("collection('mealPlans')"));
   console.log('APROVADO — escolhas por porção: tabela real, botões, quantidades, reabertura, offline, erro, confirmação tardia, isolamento e conclusão independente.');
