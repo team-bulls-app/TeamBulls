@@ -11,10 +11,10 @@
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity5'],
       ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports3'],
       ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox6'],
-      ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.43-inteldata2',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.42-inteldata1'],
+      ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.66-inteldata3',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.66-inteldata3'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.56-contextguard5',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.56-contextguard5'],
-      ['./modules/trainer-command-center-v10_10_42.js?v=10.10.42-command1',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.42-command1'],
-      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.43-studentinsights2',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.43-studentinsights2']
+      ['./modules/trainer-command-center-v10_10_42.js?v=10.10.66-command3',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.66-command3'],
+      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.66-studentinsights3',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.66-studentinsights3']
     ],
     student:[
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
@@ -22,7 +22,7 @@
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge2'],
       ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate7'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity5'],
-      ['./modules/student-progress-hub-v10_10_42.js?v=10.10.43-studentprogress2',()=>window.TeamBullsStudentProgressHub?.version==='10.10.43-studentprogress2']
+      ['./modules/student-progress-hub-v10_10_42.js?v=10.10.66-studentprogress3',()=>window.TeamBullsStudentProgressHub?.version==='10.10.66-studentprogress3']
     ]
   };
   const loading=new Map();let completedRole='';
