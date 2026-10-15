@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026092901,
-  "revision": "mobile-feedback-notices-and-request-cancellation-1",
-  "publishedAt": "2026-09-29T17:30:00Z",
+  "build": 2026101301,
+  "revision": "student-food-choice-compact-2",
+  "publishedAt": "2026-10-13T17:36:34Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Adiciona categorias de feedback, avisos no celular e cancelamento seguro de solicitações pendentes."
+  "message": "Compacta as escolhas de alimentos salvas, com alimento e quantidade na mesma linha e controles pequenos para trocar."
 }

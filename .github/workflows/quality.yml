@@ -23,6 +23,8 @@ jobs:
           node scripts/quality-check.mjs
           node scripts/feedback-notice-cancellation-check.mjs
           node scripts/cloudflare-feedback-push-check.mjs
+          node scripts/student-session-delete-shared-history-check.mjs
+          node scripts/session-durability-regression-check.mjs
           node scripts/prescription-propagation-check.mjs
           node scripts/diet-deletion-check.mjs
           node scripts/diet-division-deletion-check.mjs
@@ -49,6 +51,7 @@ jobs:
           node scripts/firestore-read-baseline-check.mjs
           node scripts/diet-calculation-evolution-check.mjs
           node scripts/diet-portion-presets-check.mjs
+          node scripts/student-food-choices-check.mjs
           node scripts/diet-copy-check.mjs
           node scripts/pdf-export-check.mjs
           node scripts/destructive-actions-supply-check.mjs

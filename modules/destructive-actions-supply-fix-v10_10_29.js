@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_DESTRUCTIVE_SUPPLY_FIX_101029__)return;
   window.__TEAM_BULLS_DESTRUCTIVE_SUPPLY_FIX_101029__=true;
 
-  const VERSION='10.10.29-destructive-supply1';
+  const VERSION='10.10.29-destructive-supply2';
   const SESSION_QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   let screenObserver=null;
 
@@ -133,6 +133,11 @@
     const wrapped=async function(sid){
       const sessionId=String(sid||'');
       if(sessionId&&student()&&typeof MODE!=='undefined'&&MODE==='cloud'){
+        // A camada de exclusão pendente já cancela a fila e resolve a corrida
+        // com uma criação em voo. Impedir seu acesso aqui prende o aluno no aviso
+        // "ainda não foi sincronizado" mesmo após confirmar a exclusão.
+        if(window.TeamBullsSessionPerformance?.hasPending?.(sessionId)&&base.__tbPendingSessionMutation)
+          return base.apply(this,arguments);
         if(!await settleQueuedSession(sessionId))return false;
       }
       return base.apply(this,arguments);
