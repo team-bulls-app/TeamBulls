@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SESSION_INTEGRITY_101039__)return;
   window.__TEAM_BULLS_SESSION_INTEGRITY_101039__=true;
 
-  const VERSION='10.10.39-sessionintegrity1';
+  const VERSION='10.10.63-sessionintegrity2';
   let logicalId='';
   let logicalContext='';
   let generation=0;
@@ -14,11 +14,16 @@
   const safeString=value=>String(value||'');
   const validIsoDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(safeString(value));
   const studentCloud=()=>{
-    try{return MODE==='cloud'&&CURRENT_USER?.role==='student'&&!!CURRENT_USER?.uid;}catch(error){return false;}
+    try{return CURRENT_USER?.role==='student'&&!!CURRENT_USER.uid&&(MODE==='cloud'||(MODE==='local'&&CURRENT_USER.offlineRegistered===true));}catch(error){return false;}
   };
   const modalOpen=()=>!!document.getElementById('modal-session')?.classList.contains('open');
   const sessionContext=()=>`${safeString(typeof SESSION_WID!=='undefined'&&SESSION_WID||typeof CUR_WORKOUT!=='undefined'&&CUR_WORKOUT)}|${safeString(typeof SESSION_EID!=='undefined'&&SESSION_EID||typeof CUR_EX!=='undefined'&&CUR_EX)}`;
   const runtimeRetry=()=>{try{window.TeamBullsRuntimeLoader?.retry?.();}catch(error){}};
+  function hasGuard(fn,marker){
+    const seen=new Set();
+    while(typeof fn==='function'&&!seen.has(fn)){if(fn[marker])return true;seen.add(fn);fn=fn.__tbBase;}
+    return false;
+  }
 
   function seedLogicalSubmission(){
     generation++;
@@ -61,7 +66,7 @@
 
   function installOpenGuard(){
     if(typeof openLogSessionModal!=='function')return false;
-    if(openLogSessionModal.__tbSessionIntegrity)return true;
+    if(hasGuard(openLogSessionModal,'__tbSessionIntegrity'))return true;
     const base=openLogSessionModal;
     const wrapped=function(){
       if(studentCloud()&&!window.TeamBullsWeekSelectionFix){
@@ -81,7 +86,7 @@
 
   function installSaveGuard(){
     if(typeof saveSession!=='function')return false;
-    if(saveSession.__tbSessionIntegrity)return true;
+    if(hasGuard(saveSession,'__tbSessionIntegrity'))return true;
     const base=saveSession;
     const wrapped=async function(){
       if(!studentCloud())return base.apply(this,arguments);
@@ -91,14 +96,19 @@
         return false;
       }
       const context=sessionContext();
-      if(!logicalId||logicalContext!==context){
+      const openedId=safeString(SESSION_CREATE_ID);
+      if(!logicalId||logicalContext!==context||(modalOpen()&&openedId&&openedId!==logicalId)){
         if(!modalOpen())return false;
         seedLogicalSubmission();
       }
       const id=logicalId;
       const currentGeneration=generation;
       if(!id)return false;
-      if(submitted||inFlightId===id||submissionExists(id)){
+      if(inFlightId===id){
+        if(typeof showToast==='function')showToast('O registro está sendo guardado. Aguarde um instante.');
+        return false;
+      }
+      if(submitted||submissionExists(id)){
         submitted=true;
         try{SESSION_CREATE_ID=id;}catch(error){}
         return true;
@@ -108,7 +118,7 @@
       try{
         const result=await base.apply(this,arguments);
         if(currentGeneration===generation){
-          const persisted=submissionExists(id)||!modalOpen();
+          const persisted=submissionExists(id);
           if(persisted)submitted=true;
           try{SESSION_CREATE_ID=id;}catch(error){}
         }

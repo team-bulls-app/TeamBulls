@@ -4,13 +4,16 @@
   if(window.__TEAM_BULLS_HEIC_REPORT_CONVERSION__)return;
   window.__TEAM_BULLS_HEIC_REPORT_CONVERSION__=true;
 
-  const VERSION='10.10.12-heic2';
+  const VERSION='10.10.12-heic4';
   const MAX_HEIC_BYTES=25*1024*1024;
-  const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker1';
+  const WORKER_URL='./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4';
   let workerPromise=null;
   let workerSeq=0;
   const pendingWorkerRequests=new Map();
   const batchInFlight=new WeakSet();
+  const preparedJpegInputs=new WeakMap();
+  const convertedHeicInputs=new WeakMap();
+  let reportPreviewDepth=0;
 
   const fileType=file=>{
     const raw=String(file?.type||'').toLowerCase().trim();
@@ -21,6 +24,26 @@
     return'';
   };
   const isHeic=file=>!!fileType(file);
+  const isJpeg=file=>{
+    const raw=String(file?.type||'').toLowerCase().trim();
+    if(raw==='image/jpeg'||raw==='image/jpg'||raw==='image/pjpeg')return true;
+    return /\.jpe?g$/i.test(String(file?.name||''));
+  };
+  const dataUrlToJpegBlob=value=>{
+    try{
+      const match=/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(value||''));if(!match)return null;
+      const raw=atob(match[1]),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+      return new Blob([bytes],{type:'image/jpeg'});
+    }catch(error){return null;}
+  };
+  const withReportPreview=async task=>{reportPreviewDepth++;try{return await task();}finally{reportPreviewDepth=Math.max(0,reportPreviewDepth-1);}};
+  const stageJpegInput=(file,decoded)=>{
+    if(!isJpeg(file)||!decoded?.width||!decoded?.height||typeof encodeImageVariant!=='function')return;
+    try{
+      const dataUrl=encodeImageVariant(decoded,1280,.78,850000),blob=dataUrlToJpegBlob(dataUrl);
+      if(blob?.size)preparedJpegInputs.set(file,blob);
+    }catch(error){console.warn('[Team Bulls] JPG seguirá pelo decode normal no envio.',error?.message||error);}
+  };
   const timeout=(promise,ms,label)=>new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error(`${label} demorou mais que o esperado.`)),ms);
     Promise.resolve(promise).then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
@@ -43,7 +66,7 @@
       try{worker=new Worker(WORKER_URL);}catch(error){reject(error);return;}
       const timer=setTimeout(()=>{
         if(settled)return;settled=true;try{worker.terminate();}catch(error){};reject(new Error('O decoder HEIC não respondeu a tempo.'));
-      },18000);
+      },35000);
       worker.addEventListener('message',event=>{
         const data=event.data||{};
         if(data.type==='ready'&&!settled){
@@ -107,11 +130,21 @@
     if(typeof decodeImageForCompression!=='function'||decodeImageForCompression.__tbHeicConversion)return false;
     const baseDecode=decodeImageForCompression;
     const wrapped=async function(file){
-      if(!isHeic(file))return baseDecode(file);
+      if(!isHeic(file)){
+        const prepared=preparedJpegInputs.get(file);
+        if(prepared){preparedJpegInputs.delete(file);return baseDecode(prepared);}
+        const decoded=await baseDecode(file);
+        if(reportPreviewDepth>0&&isJpeg(file))stageJpegInput(file,decoded);
+        return decoded;
+      }
+      const converted=convertedHeicInputs.get(file);
+      if(converted)return baseDecode(converted);
       try{return await baseDecode(file);}catch(nativeError){
         try{
           const jpeg=await convertHeic(file);
-          return await baseDecode(jpeg);
+          const decoded=await baseDecode(jpeg);
+          convertedHeicInputs.set(file,jpeg);
+          return decoded;
         }catch(error){
           const name=String(file?.name||'esta foto');
           const detail=String(error?.message||'').trim();
@@ -140,7 +173,9 @@
     try{
       for(let slot=0;slot<6;slot++){
         if(typeof showToast==='function')showToast(`Preparando foto ${slot+1} de 6...`);
-        await base(slot,syntheticEvent(selected[slot]));
+        await withReportPreview(()=>base(slot,syntheticEvent(selected[slot])));
+        const prepared=kind==='weekly'?(typeof WEEKLY_CHECKIN_FILES!=='undefined'?WEEKLY_CHECKIN_FILES[slot]:null):(typeof QUESTIONNAIRE_REPORT_FILES!=='undefined'?QUESTIONNAIRE_REPORT_FILES[slot]:null);
+        if(!(prepared instanceof File)){if(typeof showToast==='function')showToast(`Foto ${slot+1} não foi preparada. Escolha uma versão JPG/JPEG ou tente novamente.`,true);return false;}
         await nextPaint();
       }
       let complete=false;
@@ -162,12 +197,12 @@
     let changed=false;
     if(typeof previewWeeklyCheckinPhoto==='function'&&!previewWeeklyCheckinPhoto.__tbSixPhotoBatch){
       const base=previewWeeklyCheckinPhoto;
-      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'weekly');return base.apply(this,arguments);};
+      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'weekly');const args=arguments,context=this;return withReportPreview(()=>base.apply(context,args));};
       wrapped.__tbSixPhotoBatch=true;wrapped.__tbBase=base;previewWeeklyCheckinPhoto=wrapped;changed=true;
     }
     if(typeof previewQuestionnaireReportPhoto==='function'&&!previewQuestionnaireReportPhoto.__tbSixPhotoBatch){
       const base=previewQuestionnaireReportPhoto;
-      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'questionnaire');return base.apply(this,arguments);};
+      const wrapped=function(index,event){const count=Number(event?.target?.files?.length)||0;if(count>1)return processSixPhotoBatch(base,event,'questionnaire');const args=arguments,context=this;return withReportPreview(()=>base.apply(context,args));};
       wrapped.__tbSixPhotoBatch=true;wrapped.__tbBase=base;previewQuestionnaireReportPhoto=wrapped;changed=true;
     }
     return changed;

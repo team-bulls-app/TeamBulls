@@ -27,7 +27,8 @@ assert(moduleCode.includes('#screen-diet-detail #diet-cycle-summary'),'Datas nã
 assert(moduleCode.includes('grid-template-columns:repeat(3,minmax(0,1fr))'),'Datas/calorias perderam o alinhamento em três colunas.');
 assert(moduleCode.includes('#screen-diet-detail #diet-energy-summary .diet-energy-card-head{display:none!important}'),'Cabeçalho grande da tabela calórica reapareceu.');
 assert(moduleCode.includes('min-height:54px!important'),'Métricas calóricas voltaram a ocupar altura excessiva.');
-assert(moduleCode.includes("const labels=['GET','DIA DE TREINO','DIA SEM TREINO'];"),'Rótulos calóricos compactos foram alterados.');
+assert(moduleCode.includes("if(index===0)setTextIfChanged(metric.querySelector(':scope > span'),'GET');"),'O gasto energético total perdeu o rótulo compacto.');
+assert(!moduleCode.includes("const labels=['GET','DIA DE TREINO','DIA SEM TREINO'];"),'Nomes das divisões da dieta são substituídos por rótulos fixos.');
 assert(moduleCode.includes("setTextIfChanged(card.querySelector('.tb-guidance-head strong'),'ÁGUA')"),'Água não recebe o rótulo compacto.');
 assert(moduleCode.includes('.tb-hydration-note{display:none!important}'),'Texto redundante da hidratação voltou a poluir a tela.');
 assert(moduleCode.includes('grid-template-columns:repeat(2,minmax(0,1fr))!important'),'Ações de orientações não permanecem compactas lado a lado.');

@@ -4,11 +4,11 @@
   if(window.__TEAM_BULLS_PENDING_SESSION_MUTATIONS_101034__)return;
   window.__TEAM_BULLS_PENDING_SESSION_MUTATIONS_101034__=true;
 
-  const VERSION='10.10.34-pendingsession1';
+  const VERSION='10.10.63-pendingsession2';
 
   const perf=()=>window.TeamBullsSessionPerformance||null;
   const studentCloud=()=>{
-    try{return MODE==='cloud'&&CURRENT_USER?.role==='student'&&!!CURRENT_USER?.uid;}catch(error){return false;}
+    try{return CURRENT_USER?.role==='student'&&!!CURRENT_USER.uid&&(MODE==='cloud'||(MODE==='local'&&CURRENT_USER.offlineRegistered===true));}catch(error){return false;}
   };
   const pending=id=>studentCloud()&&!!perf()?.hasPending?.(String(id||''));
   const permissionLike=error=>{
@@ -58,7 +58,7 @@
       const performedTechniqueMode=selectedEditPerformedTechniqueMode(e);
       if(!beginAction('edit-session','modal-edit-session'))return;
       try{
-        const queued=perf()?.updatePending?.(sessionId,{date,week,note,sets,exerciseName:e.name,performedTechniqueMode,...variant});
+        const queued=await perf()?.updatePending?.(sessionId,{date,week,note,sets,exerciseName:e.name,performedTechniqueMode,...variant});
         // Se a fila desapareceu entre o toque e a edição, a sincronização terminou:
         // nesse caso o fluxo canônico remoto já pode editar o documento existente.
         if(!queued){
@@ -102,7 +102,7 @@
       if(!beginAction('delete-session-'+sessionId))return false;
       try{
         const sessionPerf=perf();
-        if(!sessionPerf?.discardPending?.(sessionId))throw new Error('Não foi possível retirar este registro da fila local.');
+        if(!await sessionPerf?.discardPending?.(sessionId))throw new Error('Não foi possível retirar este registro da fila local.');
 
         // Se uma criação já estava em voo no exato momento do toque, aguarda
         // somente essa operação já iniciada. Não dispara retry automático.

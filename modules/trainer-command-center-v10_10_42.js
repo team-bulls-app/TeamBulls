@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_COMMAND_CENTER_101042__)return;
   window.__TEAM_BULLS_TRAINER_COMMAND_CENTER_101042__=true;
 
-  const VERSION='10.10.42-command2';
+  const VERSION='10.10.66-command3';
   const SCREEN_ID='screen-trainer-command-center';
   const STYLE_ID='tb-trainer-command-center-style';
   const ENTRY_ID='tb-trainer-command-center-entry';
@@ -63,7 +63,7 @@
     catch(error){console.error('deepAnalyze',error);if(typeof showToast==='function')showToast('Não foi possível carregar o histórico deste aluno.',true);}
     finally{if(button?.isConnected){button.disabled=false;button.textContent=deepByStudent.has(sid)?'REANALISAR':'ANALISAR TREINO';}}
   }
-  async function load(force=false){if(!trainer()||!api()||loading)return;const run=++serial;loading=true;render();try{dashboard=await api().loadDashboard(force);if(run!==serial)return;recompute();}catch(error){if(run===serial){console.error('Trainer command center',error);dashboard=null;analyses=[];if(typeof showToast==='function')showToast('Não foi possível atualizar o radar.',true);}}finally{if(run===serial){loading=false;render();}}}
+  async function load(force=false){if(!trainer()||!api()||loading)return;const run=++serial;loading=true;render();try{const next=await api().loadDashboard(force);if(run!==serial||!trainer())return;dashboard=next;recompute();}catch(error){if(run===serial){console.error('Trainer command center',error);dashboard=null;analyses=[];if(typeof showToast==='function')showToast('Não foi possível atualizar o radar.',true);}}finally{if(run===serial){loading=false;render();}}}
   async function open(){if(!trainer())return;ensureEntry();if(typeof showScreen==='function')showScreen(SCREEN_ID);await load(false);}
   function patchTrainerRender(){if(typeof renderTrainer!=='function'||renderTrainer.__tbCommandCenter)return;const base=renderTrainer;const wrapped=async function(){const result=await base.apply(this,arguments);if(trainer()){ensureEntry();decorateStudentCards();}return result;};wrapped.__tbCommandCenter=true;wrapped.__tbBase=base;renderTrainer=wrapped;}
   function patchLogout(){if(typeof confirmLogout!=='function'||confirmLogout.__tbCommandCenter)return;const base=confirmLogout;const wrapped=function(){dashboard=null;analyses=[];deepByStudent.clear();filter='all';loading=false;serial++;return base.apply(this,arguments);};wrapped.__tbCommandCenter=true;wrapped.__tbBase=base;confirmLogout=wrapped;}

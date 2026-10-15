@@ -163,8 +163,14 @@
   function prefillDietField(kind){
     if(!trainer())return;const body=document.getElementById('tb-diet-calc-body');if(!body)return;const result=renderResults();if(!result)return;
     const value=kind==='training'?result.macros.totalKcal:result.finalGcdKcal;if(!value){toast('Preencha os macronutrientes antes de usar o VET do treino.',true);return;}
+    let variantId='';
+    if(kind==='training'){
+      const plan=typeof currentDiet==='function'?currentDiet():null,candidates=(plan?.variants||[]).filter(item=>item.dayType==='training'),active=typeof currentDietVariant==='function'?currentDietVariant():null;
+      variantId=String(active?.dayType==='training'?active.id:candidates.length===1?candidates[0].id:'');
+      if(!variantId){toast('Selecione uma divisão de treino antes de preencher o VET com as kcal dos macros.',true);return;}
+    }
     if(typeof openEditDietModal!=='function'){toast('Editor da dieta indisponível.',true);return;}openEditDietModal(typeof CURRENT_DIET_ID!=='undefined'?CURRENT_DIET_ID:'');
-    requestAnimationFrame(()=>setTimeout(()=>{const id=kind==='training'?'input-diet-training-energy':'input-diet-total-expenditure',field=document.getElementById(id);if(field){field.value=String(Math.round(value));field.dispatchEvent(new Event('input',{bubbles:true}));field.focus();toast(kind==='training'?'Kcal dos macros preenchidas no VET de treino. Revise e salve a dieta.':'GET preenchido na tabela da dieta. Revise e salve a dieta.');}},40));
+    requestAnimationFrame(()=>setTimeout(()=>{const field=kind==='training'?[...document.querySelectorAll('[data-diet-variant-energy]')].find(item=>item.dataset.dietVariantEnergy===variantId):document.getElementById('input-diet-total-expenditure');if(field){field.value=String(Math.round(value));field.dispatchEvent(new Event('input',{bubbles:true}));field.focus();toast(kind==='training'?'Kcal dos macros preenchidas no VET da divisão de treino. Revise e salve a dieta.':'GET preenchido na tabela da dieta. Revise e salve a dieta.');}},40));
   }
 
   function evolutionData(items,uid){

@@ -36,7 +36,13 @@ assert(update.includes(`const CURRENT_BUILD=${build};`),'Atualizador não está 
 assert(sw.includes(`const BUILD_REVISION=${build};`),'Service Worker não está no mesmo build publicado.');
 assert(sw47.includes(`const BUILD_REVISION=${build};`),'Service Worker legado não está no mesmo build publicado.');
 assert(sw===sw47,'sw.js e sw_47.js devem permanecer idênticos.');
-assert(sw.includes("const CACHE_HOTFIX='update-unblock1';"),'Performance não deve reativar uma navegação forçada de cache.');
+const cacheHotfix=sw.match(/const CACHE_HOTFIX='([^']+)'/)?.[1]||'';
+const heicRecovery=cacheHotfix==='heic-recovery1';
+assert(cacheHotfix==='update-unblock1'||heicRecovery,'Performance não deve reativar uma navegação forçada de cache sem recuperação explicitamente auditada.');
+if(heicRecovery){
+  assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'"),'Resgate HEIC exige conversor network-first.');
+  assert(sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'Resgate HEIC exige worker network-first.');
+}
 
 assert(update.includes("STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3'"),'Atualizador não conhece o perfil estabilizado.');
 assert(update.includes("STUDENT_HOME_LAYOUT_MODULE='./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'"),'Atualizador não conhece a Home otimizada.');
@@ -84,7 +90,7 @@ assert(config.includes('if(!sessionUiReady()||runtimeComplete())return;'),'Agend
 assert(config.includes("activeScreen()!=='screen-home'"),'Prioridade do aluno não está condicionada à Home realmente ativa.');
 assert(config.includes("screen!=='screen-loading'&&screen!=='screen-auth'"),'Fila pesada pode voltar a iniciar durante loading/auth.');
 assert(config.includes('await yieldUi();'),'Fila diferida não devolve o thread principal entre módulos.');
-assert(config.includes("version:'10.10.21-startup9'"),'Loader não expõe a revisão de performance por contexto.');
+assert(config.includes("version:'10.10.61-startup12'")&&config.includes("context:'role-aware-low-contention'"),'Loader não expõe a revisão de baixa contenção por contexto.');
 
 assert(sw.includes("./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3"),'Perfil estabilizado não está no shell PWA.');
 assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4"),'Home otimizada não está no shell PWA.');
@@ -136,7 +142,7 @@ for(const [collection,orderField] of [['feedback','createdAt'],['weeklyCheckins'
   assert(fields.some(field=>field.fieldPath===orderField&&field.order==='DESCENDING'),`Índice ${collection} não ordena ${orderField} desc.`);
 }
 
-assert(profile.includes("const VERSION='10.10.20-studenthome3'"),'Perfil do aluno não está na revisão estabilizada.');
+assert(profile.includes("const VERSION='10.10.43-studenthome4'"),'Perfil do aluno não está na revisão de Storage lazy estabilizada.');
 assert(profile.includes('body.student-desktop .student-desktop-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a sidebar antiga.');
 assert(profile.includes('#screen-home.tb-home-v2 .quick-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a grade antiga.');
 assert(profile.includes('data-tb-profile-logout="1"'),'Perfil não cria o logout diretamente.');

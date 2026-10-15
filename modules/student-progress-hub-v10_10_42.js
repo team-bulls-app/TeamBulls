@@ -1,10 +1,10 @@
-/* Team Bulls v10.10.42 — metas visuais do ciclo e conquistas reais do aluno. */
+/* Team Bulls v10.10.43 — metas visuais do ciclo e conquistas reais do aluno. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_STUDENT_PROGRESS_HUB_101042__)return;
   window.__TEAM_BULLS_STUDENT_PROGRESS_HUB_101042__=true;
 
-  const VERSION='10.10.42-studentprogress2';
+  const VERSION='10.10.66-studentprogress3';
   const SCREEN_ID='screen-student-progress-hub';
   const STYLE_ID='tb-student-progress-style';
   const ENTRY_ID='tb-student-progress-entry';
@@ -20,6 +20,8 @@
   const dayDiff=(a,b)=>{const parse=value=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));return m?new Date(+m[1],+m[2]-1,+m[3],12).getTime():0;},x=parse(a),y=parse(b);return x&&y?Math.round((y-x)/86400000):0;};
   const fmtDate=value=>{if(!iso(value))return'—';try{if(typeof fmt==='function')return fmt(value);}catch(error){}const[y,m,d]=value.split('-');return`${d}/${m}/${y}`;};
   const getRef=(reference,label)=>typeof cloudGet==='function'?cloudGet(reference,label):reference.get();
+  const sessionKey=session=>{const date=iso(session?.date);if(!date)return'';const workout=String(session?.workoutId||'').trim();return`${date}|${workout||'unknown'}`;};
+  const sessionCount=sessions=>new Set((Array.isArray(sessions)?sessions:[]).map(sessionKey).filter(Boolean)).size;
 
   function injectStyles(){
     if(document.getElementById(STYLE_ID))return;
@@ -68,13 +70,6 @@
     return{cycle,start,end,weeks:status.intervalWeeks,key:`${schedule.startDate}:${cycle}`};
   }
 
-  function workoutSessionKey(session){
-    const date=iso(session?.date);if(!date)return'';
-    const workout=String(session?.workoutId||session?._wid||session?.workoutName||'workout');
-    return`${date}|${workout}`;
-  }
-  function trainingSessionCount(sessions=[]){return new Set(sessions.map(workoutSessionKey).filter(Boolean)).size;}
-
   function weekKey(date){
     if(!iso(date))return'';const[y,m,d]=date.split('-').map(Number),dt=new Date(y,m-1,d,12),day=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-day);
     return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
@@ -101,7 +96,7 @@
   }
 
   function achievements(){
-    const sessions=state?.sessions||[],checkins=state?.checkins||[],schedule=state?.schedule||{},weeks=longestTrainingStreak(sessions),count=trainingSessionCount(sessions),reports=checkins.length,progress=hasHistoricalLoadProgress(sessions);
+    const sessions=state?.sessions||[],checkins=state?.checkins||[],schedule=state?.schedule||{},weeks=longestTrainingStreak(sessions),count=sessionCount(sessions),reports=checkins.length,progress=hasHistoricalLoadProgress(sessions);
     return[
       {icon:'✓',title:'Primeiro registro',text:'Primeira sessão registrada no Team Bulls.',ok:count>=1},
       {icon:'10',title:'10 sessões',text:'Dez sessões de treino registradas.',ok:count>=10},
@@ -122,7 +117,7 @@
     if(loading){body.innerHTML='<div class="tb-progress-loading">Carregando seus próprios registros para montar metas e conquistas...</div>';return;}
     if(!state){body.innerHTML='<div class="tb-progress-empty">Não foi possível carregar o progresso agora.</div>';return;}
     const schedule=state.schedule,bounds=cycleBounds(schedule),rawGoals=schedule?.cycleGoals&&typeof schedule.cycleGoals==='object'?schedule.cycleGoals:{},goalCycleMatches=!rawGoals.cycleKey||!bounds?.key||String(rawGoals.cycleKey)===bounds.key,goals=goalCycleMatches?rawGoals:{};
-    const cycleSessions=bounds?state.sessions.filter(item=>iso(item.date)&&item.date>=bounds.start&&item.date<=bounds.end):[],currentSessions=trainingSessionCount(cycleSessions),currentReports=bounds?state.checkins.filter(item=>{const d=iso(item.submittedDate||item.dueDate);return d&&d>=bounds.start&&d<=bounds.end;}).length:0,currentWeight=Number(state.checkins[0]?.weight||0),targetWeight=Number(goals.weightTargetKg)||0,startWeight=Number(goals.weightStartKg)||0;
+    const cycleSessions=bounds?state.sessions.filter(item=>iso(item.date)&&item.date>=bounds.start&&item.date<=bounds.end):[],currentSessions=sessionCount(cycleSessions),currentReports=bounds?state.checkins.filter(item=>{const d=iso(item.submittedDate||item.dueDate);return d&&d>=bounds.start&&d<=bounds.end;}).length:0,currentWeight=Number(state.checkins[0]?.weight||0),targetWeight=Number(goals.weightTargetKg)||0,startWeight=Number(goals.weightStartKg)||0;
     let weightPct=0;if(targetWeight&&startWeight&&currentWeight)weightPct=targetWeight===startWeight?(currentWeight===targetWeight?100:0):Math.max(0,Math.min(100,Math.round((currentWeight-startWeight)/(targetWeight-startWeight)*100)));
     const goalCards=`<div class="tb-student-goals"><div class="tb-student-goal"><span>PESO-ALVO</span><strong>${targetWeight?targetWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'—'}</strong><p>${currentWeight?'Atual: '+currentWeight.toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'Aguardando relatório com peso.'}</p><div class="tb-student-goal-bar"><i style="width:${weightPct}%"></i></div></div><div class="tb-student-goal"><span>SESSÕES NO CICLO</span><strong>${currentSessions}${Number(goals.sessionsTarget)>0?' / '+Number(goals.sessionsTarget):''}</strong><p>Sessões de treino distintas feitas dentro do ciclo atual.</p><div class="tb-student-goal-bar"><i style="width:${pct(currentSessions,Number(goals.sessionsTarget)||0)}%"></i></div></div><div class="tb-student-goal"><span>RELATÓRIOS NO CICLO</span><strong>${currentReports}${Number(goals.reportsTarget)>0?' / '+Number(goals.reportsTarget):''}</strong><p>Relatórios enviados durante o ciclo atual.</p><div class="tb-student-goal-bar"><i style="width:${pct(currentReports,Number(goals.reportsTarget)||0)}%"></i></div></div></div>`;
     const configured=targetWeight>0||Number(goals.sessionsTarget)>0||Number(goals.reportsTarget)>0||String(goals.note||'').trim().length>0,badges=achievements(),staleGoals=!goalCycleMatches&&Object.keys(rawGoals).length>0;

@@ -75,7 +75,7 @@
         <button onclick="v107Undo()"><strong>↶ DESFAZER</strong><span>Volta à estrutura anterior sem apagar sessões.</span></button>
         <button onclick="v107Redo()"><strong>↷ REFAZER</strong><span>Reaplica a alteração desfeita.</span></button>
         ${trainer&&VIEW_STUDENT?.uid?`<button onclick="v107CreateManualVersion()"><strong>◉ SALVAR VERSÃO</strong><span>Cria um ponto completo de restauração.</span></button>`:''}
-        ${!trainer&&'Notification' in window?`<button onclick="v107EnableDeviceNotices()"><strong>● AVISOS DO APARELHO</strong><span>Exibe alertas quando o app encontrar uma atualização ou relatório pendente.</span></button>`:''}
+        ${!trainer&&window.TeamBullsDeviceNotices?.available?.()?`<button onclick="TeamBullsDeviceNotices.enable()"><strong>● AVISOS DO APARELHO</strong><span>Mostra novos feedbacks na barra de notificações do celular.</span></button>`:''}
         <button onclick="v107SelectTab('sync')"><strong>⇄ SINCRONIZAÇÃO</strong><span>Verifica rede, cache, pendências e backup.</span></button>
       </div>
       <div class="v107-security-card"><strong>SEGURANÇA ATIVA</strong><span>Convites únicos, regras por coleção e auditoria do treinador.</span><small>App Check: ${escHtml(TB.state.appCheck||'chave não configurada')}</small></div>`;
@@ -165,7 +165,7 @@
     const [sessions,meals,checkins,photos,diet,schedule]=await Promise.all([
       cloudGet(refs[0],'sessões'),cloudGet(refs[1],'refeições concluídas'),cloudGet(refs[2],'relatórios semanais'),cloudGet(refs[3],'fotos'),loadDietDocument(studentId),cloudGet(db.collection('checkinSchedules').doc(studentId),'agenda de relatórios').catch(()=>null)
     ]);
-    return{sessions:sessions.docs.map(doc=>({...doc.data(),id:doc.id})),meals:meals.docs.map(doc=>doc.data()),checkins:checkins.docs.map(doc=>doc.data()),photos:photos.docs.map(doc=>doc.data()),diet,schedule:schedule?.exists?schedule.data():null};
+    return{sessions:sessions.docs.map(doc=>({...doc.data(),id:doc.id})),meals:meals.docs.map(doc=>doc.data()).filter(item=>item.recordType!=='food_choice'),checkins:checkins.docs.map(doc=>doc.data()),photos:photos.docs.map(doc=>doc.data()),diet,schedule:schedule?.exists?schedule.data():null};
   }
   function calculateAdherence(data){
     const from=daysAgo(27),recentSessions=data.sessions.filter(item=>String(item.date||'')>=from),trainingDays=new Set(recentSessions.map(item=>item.date)).size;
@@ -213,9 +213,8 @@
   }
   window.v107SendNotice=async function(){const title=window.prompt('Título do aviso:','Mensagem do treinador');if(!title)return;const body=window.prompt('Mensagem para o aluno:','');if(!body)return;try{await TB.createNotification({studentId:requireTrainerStudent(),title,body,type:'mensagem'});await TB.audit('Aviso enviado',{entity:'notificação',summary:title});showToast('✓ Aviso enviado');await renderNotices();}catch(error){alert(error.message);}};
   window.v107EnableDeviceNotices=async function(){
-    if(!('Notification' in window)){showToast('Este navegador não oferece avisos do aparelho.',true);return;}
-    const permission=await Notification.requestPermission();
-    if(permission==='granted'){showToast('✓ Avisos do aparelho ativados');await TB.refreshNoticeBadge(true);}else showToast('Permissão de avisos não concedida.',true);
+    if(!window.TeamBullsDeviceNotices?.available?.()){showToast('Avisos do aparelho estão disponíveis somente em celulares compatíveis.',true);return;}
+    await window.TeamBullsDeviceNotices.enable();
   };
   window.v107MarkNoticeRead=async function(index){const item=noticeCache[index];if(!item||CURRENT_USER?.role!=='student')return;try{await cloudWrite(db.collection('notifications').doc(item.id).update({readAt:firebase.firestore.FieldValue.serverTimestamp()}),'marcar aviso como lido');await renderNotices();}catch(error){alert(error.message);}};
 

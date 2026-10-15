@@ -132,6 +132,11 @@
     toast(message,true);return false;
   }
 
+  function hasWeeklyAccessGuard(fn){
+    for(let depth=0;depth<20&&typeof fn==='function';depth++,fn=fn.__tbBase){if(fn.__tbWeeklyAccess)return true;}
+    return false;
+  }
+
   function patchWeeklyRuntime(){
     if(typeof computeCheckinRequest==='function'&&!computeCheckinRequest.__tbWeeklyAccess){
       const base=computeCheckinRequest;const wrapped=function(schedule,checkins){if(schedule?.enabled===false)return null;return base.apply(this,arguments);};wrapped.__tbWeeklyAccess=true;wrapped.__tbBase=base;computeCheckinRequest=wrapped;
@@ -139,7 +144,7 @@
     if(typeof renderWeeklyCheckinCard==='function'&&!renderWeeklyCheckinCard.__tbWeeklyAccess){
       const base=renderWeeklyCheckinCard;const wrapped=function(){const result=base.apply(this,arguments);if(studentSchedule()?.enabled===false){const card=document.getElementById('weekly-checkin-card'),banner=document.getElementById('weekly-checkin-home-banner');if(card)card.style.display='none';if(banner)banner.style.display='none';}return result;};wrapped.__tbWeeklyAccess=true;wrapped.__tbBase=base;renderWeeklyCheckinCard=wrapped;
     }
-    if(typeof openWeeklyCheckinModal==='function'&&!openWeeklyCheckinModal.__tbWeeklyAccess){
+    if(typeof openWeeklyCheckinModal==='function'&&!hasWeeklyAccessGuard(openWeeklyCheckinModal)){
       const base=openWeeklyCheckinModal;const wrapped=function(){if(!currentStudentEnabled())return blockStudentAction();return base.apply(this,arguments);};wrapped.__tbWeeklyAccess=true;wrapped.__tbBase=base;openWeeklyCheckinModal=wrapped;
     }
     if(typeof submitWeeklyCheckin==='function'&&!submitWeeklyCheckin.__tbWeeklyAccess){

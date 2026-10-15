@@ -1,10 +1,10 @@
-/* Team Bulls v10.10.20 — perfil visual do aluno, central de notificações e Home resiliente. */
+/* Team Bulls v10.10.43 — perfil visual do aluno, central de notificações e Home resiliente. */
 'use strict';
 (()=>{
   if(window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__)return;
   window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__=true;
 
-  const VERSION='10.10.20-studenthome3';
+  const VERSION='10.10.43-studenthome4';
   const PROFILE_PREFIX='studentProfiles';
   const NICK_MAX=24;
   const BADGE_REFRESH_TTL=120000;
@@ -15,14 +15,24 @@
   let badgeRefreshAt=0;
   let badgeRefreshUid='';
   let badgeRefreshPromise=null;
+  let noticeActionBusy=false;
 
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const student=()=>CURRENT_USER?.role==='student'?CURRENT_USER:null;
   const uidOf=value=>String(value?.uid||value?.id||'');
   const studentUid=()=>uidOf(student());
-  const storageRoot=()=>{try{return typeof storage!=='undefined'&&storage?storage:firebase.storage();}catch(error){return null;}};
-  const profileRef=uid=>storageRoot()?.ref(`${PROFILE_PREFIX}/${uid}/profile.json`);
-  const avatarRef=uid=>storageRoot()?.ref(`${PROFILE_PREFIX}/${uid}/avatar.jpg`);
+  async function storageRoot(){
+    try{
+      if(typeof ensureStorageService==='function'){
+        const service=await ensureStorageService();
+        if(service)return service;
+      }
+      if(typeof firebase!=='undefined'&&typeof firebase.storage==='function')return firebase.storage();
+    }catch(error){console.warn('[Team Bulls] armazenamento do perfil ainda não está disponível',error?.code||error?.message||error);}
+    return null;
+  }
+  const profileRef=(root,uid)=>root?.ref(`${PROFILE_PREFIX}/${uid}/profile.json`);
+  const avatarRef=(root,uid)=>root?.ref(`${PROFILE_PREFIX}/${uid}/avatar.jpg`);
   const cleanNickname=value=>String(value||'').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,NICK_MAX);
   const timestamp=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.toDate)return value.toDate().getTime();return new Date(value||0).getTime()||0;}catch(error){return 0;}};
   const fmt=value=>{const ms=timestamp(value);return ms?new Date(ms).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'';};
@@ -52,22 +62,22 @@
     if(!uid)return{nickname:'',avatarUrl:''};
     if(!fresh&&profileCache.has(uid))return profileCache.get(uid);
     const result={nickname:'',avatarUrl:''};
-    const root=storageRoot();
-    if(!root){profileCache.set(uid,result);return result;}
+    const root=await storageRoot();
+    if(!root)return result;
     try{
-      const ref=profileRef(uid),url=ref?await ref.getDownloadURL():'';
+      const ref=profileRef(root,uid),url=ref?await ref.getDownloadURL():'';
       if(url){const response=await fetch(url,{cache:'no-store'});if(response.ok){const data=await response.json();result.nickname=cleanNickname(data?.nickname||'');}}
     }catch(error){}
-    try{const ref=avatarRef(uid);if(ref)result.avatarUrl=await ref.getDownloadURL();}catch(error){}
+    try{const ref=avatarRef(root,uid);if(ref)result.avatarUrl=await ref.getDownloadURL();}catch(error){}
     profileCache.set(uid,result);
     return result;
   }
 
   async function writeNickname(uid,nickname){
-    const root=storageRoot();
-    if(!root)throw new Error('Armazenamento indisponível.');
     await ensureProfileIdentity(uid);
-    const ref=profileRef(uid);if(!ref)throw new Error('Perfil do aluno indisponível.');
+    const root=await storageRoot();
+    if(!root)throw new Error('Não foi possível carregar o armazenamento do perfil agora. Tente novamente em instantes.');
+    const ref=profileRef(root,uid);if(!ref)throw new Error('Perfil do aluno indisponível.');
     const body=JSON.stringify({nickname:cleanNickname(nickname)});
     try{await ref.put(new Blob([body],{type:'application/json'}),{contentType:'application/json',cacheControl:'no-store'});}
     catch(error){throw profileError(error,'alterar o nome de exibição');}
@@ -105,7 +115,9 @@
     const user=student(),uid=uidOf(user);
     if(!user||!uid)throw new Error('Perfil do aluno indisponível. Entre novamente no app.');
     await ensureProfileIdentity(uid);
-    const ref=avatarRef(uid);if(!ref)throw new Error('Armazenamento da foto indisponível.');
+    const root=await storageRoot();
+    if(!root)throw new Error('Não foi possível carregar o armazenamento da foto agora. Tente novamente em instantes.');
+    const ref=avatarRef(root,uid);if(!ref)throw new Error('Armazenamento da foto indisponível.');
     const blob=await squareAvatar(file);
     try{await ref.put(blob,{contentType:'image/jpeg',cacheControl:'public,max-age=3600'});}
     catch(error){throw profileError(error,'atualizar a foto');}
@@ -114,7 +126,7 @@
   }
 
   async function removeAvatar(uid){
-    try{const ref=avatarRef(uid);if(!ref)throw new Error('Armazenamento indisponível.');await ref.delete();}
+    try{const root=await storageRoot();if(!root)throw new Error('Armazenamento indisponível.');const ref=avatarRef(root,uid);if(!ref)throw new Error('Armazenamento indisponível.');await ref.delete();}
     catch(error){if(!/object-not-found/i.test(String(error?.code||error?.message||'')))throw error;}
     profileCache.delete(uid);
   }
@@ -145,7 +157,7 @@
       #screen-home.tb-home-v2 #home-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}.tb-home-v2 #home-stats .stat-cell{min-height:92px}.tb-home-v2 #home-stats .lbl{font-size:10px}
       .tb-hero-status{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}.tb-confidential-badge{position:static!important;display:inline-flex!important;align-items:center;height:24px;padding:0 9px;border:1px solid rgba(225,29,72,.55);color:#c65b6f;font:600 8px 'DM Mono',monospace;letter-spacing:1px;vertical-align:middle;margin-left:8px}
       #screen-student-notifications{padding-bottom:90px}.tb-notice-screen-head{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #282020;position:sticky;top:0;background:#0c0c0c;z-index:4}.tb-notice-screen-head h1{font:800 25px 'Barlow Condensed',sans-serif;margin:0}
-      .tb-notice-list{padding:14px 16px;display:grid;gap:10px}.tb-notice-card{border:1px solid #302427;background:linear-gradient(135deg,#141112,#0d0d0d);padding:14px;border-radius:9px;display:grid;gap:8px}.tb-notice-card.unread{border-color:rgba(225,29,72,.62);box-shadow:inset 3px 0 #e11d48}.tb-notice-card strong{font:800 15px 'Barlow Condensed',sans-serif;letter-spacing:.3px}.tb-notice-card p{margin:0;color:#c5b9b2;font:400 13px/1.5 'Barlow',sans-serif}.tb-notice-meta{font:500 8px 'DM Mono',monospace;color:#786b66;text-transform:uppercase;letter-spacing:.7px}.tb-notice-actions{display:flex;gap:8px;flex-wrap:wrap}.tb-notice-actions button{padding:8px 10px;border:1px solid #4a252c;background:#201114;color:#f1dfdc;font:700 9px 'DM Mono',monospace}.tb-notice-empty{padding:40px 18px;text-align:center;color:#786b66;font:500 11px 'DM Mono',monospace}
+      .tb-notice-list{padding:14px 16px;display:grid;gap:10px}.tb-notice-card{border:1px solid #302427;background:linear-gradient(135deg,#141112,#0d0d0d);padding:14px;border-radius:9px;display:grid;gap:8px}.tb-notice-card[data-notice-index]{cursor:pointer}.tb-notice-card[data-notice-index]:focus-visible{outline:2px solid #e11d48;outline-offset:3px}.tb-notice-card.unread{border-color:rgba(225,29,72,.62);box-shadow:inset 3px 0 #e11d48}.tb-notice-card strong{font:800 15px 'Barlow Condensed',sans-serif;letter-spacing:.3px}.tb-notice-card p{margin:0;color:#c5b9b2;font:400 13px/1.5 'Barlow',sans-serif}.tb-notice-meta{font:500 8px 'DM Mono',monospace;color:#786b66;text-transform:uppercase;letter-spacing:.7px}.tb-notice-actions{display:flex;gap:8px;flex-wrap:wrap}.tb-notice-actions button{padding:8px 10px;border:1px solid #4a252c;background:#201114;color:#f1dfdc;font:700 9px 'DM Mono',monospace}.tb-notice-empty{padding:40px 18px;text-align:center;color:#786b66;font:500 11px 'DM Mono',monospace}
       .tb-trainer-profile-card{margin:10px 18px 0;padding:12px;border:1px solid #302427;background:#111;display:flex;align-items:center;gap:12px}.tb-trainer-profile-card img,.tb-trainer-profile-avatar{width:54px;height:54px;border-radius:50%;object-fit:cover;border:1px solid #6b2734;background:#1b1315;display:grid;place-items:center;font:800 18px 'Barlow Condensed',sans-serif}.tb-trainer-profile-copy{min-width:0;flex:1}.tb-trainer-profile-copy strong,.tb-trainer-profile-copy span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tb-trainer-profile-copy strong{font:800 17px 'Barlow Condensed',sans-serif}.tb-trainer-profile-copy span{font:500 9px 'DM Mono',monospace;color:#aa9b93;margin-top:3px}.tb-trainer-profile-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.tb-trainer-profile-actions button{border:1px solid #4a252c;background:#171112;color:#ddd;padding:7px 8px;font:600 8px 'DM Mono',monospace}
       @media(max-width:480px){#screen-home.tb-home-v2 .header-title{font-size:20px}.tb-home-actions{gap:8px}.tb-avatar-button{width:48px;height:48px}.tb-profile-name{max-width:90px}.tb-notice-button{width:40px;height:40px}}
     `;
@@ -191,43 +203,58 @@
   function ensureNotificationScreen(){
     if(document.getElementById('screen-student-notifications'))return;
     const screen=document.createElement('div');screen.className='screen';screen.id='screen-student-notifications';
-    screen.innerHTML=`<div class="tb-notice-screen-head"><button class="btn-icon" type="button" onclick="goHome()">←</button><div><div class="tb-notice-meta">CENTRAL DO ALUNO</div><h1>NOTIFICAÇÕES</h1></div></div><div class="tb-notice-list" id="tb-notice-list"><div class="tb-notice-empty">Carregando notificações...</div></div>`;
+    screen.innerHTML=`<div class="tb-notice-screen-head"><button class="btn-icon" type="button" onclick="goHome()">←</button><div><div class="tb-notice-meta">CENTRAL DO ALUNO</div><h1>NOTIFICAÇÕES</h1></div></div><div id="tb-device-notice-panel" class="tb-device-notice-panel" hidden><button class="btn-primary" type="button" id="tb-device-notice-enable" onclick="TeamBullsDeviceNotices.enable()">ATIVAR AVISOS NO CELULAR</button><p id="tb-device-notice-status"></p></div><div class="tb-notice-list" id="tb-notice-list"><div class="tb-notice-empty">Carregando notificações...</div></div>`;
     document.getElementById('app')?.appendChild(screen);
+    window.TeamBullsDeviceNotices?.render?.();
   }
 
   async function loadNotifications({includeProtocol=true}={}){
     const user=student(),uid=uidOf(user);if(!user||!uid||MODE!=='cloud'||!db)return[];
-    const items=[];
-    try{
-      const snap=await cloudGet(db.collection('notifications').where('studentId','==',uid).limit(120),'notificações do aluno');
-      snap.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'notification',title:data.title||'Aviso',body:data.body||'',createdAt:data.createdAt,read:!!data.readAt,type:data.type||'aviso'});});
-    }catch(error){console.warn('[Team Bulls] notificações',error);}
-    try{
-      const snap=await cloudGet(db.collection('feedback').where('studentId','==',uid).limit(80),'mensagens da central');
-      snap.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'feedback',title:data.title||'Mensagem da central',body:data.message||'',createdAt:data.createdAt,read:!!data.read,type:data.feedbackType||'central'});});
-    }catch(error){}
-    try{
-      const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',uid).limit(80),'relatórios pendentes');
-      snap.docs.forEach(doc=>{const data=doc.data();if(data.answered)return;items.push({id:doc.id,source:'questionnaire',title:'Relatório pendente',body:'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:'relatório',action:'questionnaire'});});
-    }catch(error){}
-    try{
-      const doc=await cloudGet(db.collection('checkinSchedules').doc(uid),'relatório semanal');
-      if(doc.exists){const data=doc.data(),extra=String(data.extraRequestId||''),due=String(data.nextDueDate||'');if(extra||(due&&due<=todayIso()))items.push({id:'weekly-checkin',source:'virtual',title:extra?'Relatório extra solicitado':'Relatório semanal pendente',body:extra?'Seu treinador solicitou um relatório extra com as fotos obrigatórias.':`Seu relatório semanal de ${due} está pendente.`,createdAt:data.updatedAt||data.extraRequestedAt||0,read:false,type:'relatório semanal',action:'weekly'});}
-    }catch(error){}
-    if(includeProtocol){
-      try{
-        const doc=await cloudGet(db.collection('protocolReviewSchedules').doc(uid),'cronograma de protocolos');
-        if(doc.exists){const data=doc.data();items.push({id:'protocol-review',source:'virtual',title:'Cronograma dos protocolos',body:`Próxima atualização programada: ${data.nextReviewDate||data.startDate||'consulte o cronograma'}.`,createdAt:data.updatedAt||data.createdAt||0,read:true,type:'protocolo',action:'protocol'});}
-      }catch(error){}
+    const requests=[
+      ['avisos',()=>cloudGet(db.collection('notifications').where('studentId','==',uid).limit(120),'notificações do aluno')],
+      ['mensagens',()=>cloudGet(db.collection('feedback').where('studentId','==',uid).limit(80),'mensagens da central')],
+      ['relatórios solicitados',()=>cloudGet(db.collection('questionnaires').where('studentId','==',uid),'relatórios pendentes')],
+      ['agenda semanal',()=>cloudGet(db.collection('checkinSchedules').doc(uid),'relatório semanal')],
+      ['histórico semanal',()=>cloudGet(db.collection('weeklyCheckins').where('studentId','==',uid),'histórico semanal')],
+      ['ciclo mensal',()=>cloudGet(db.collection('protocolReviewSchedules').doc(uid),'cronograma de protocolos')],
+      ['carregamento dos relatórios',()=>ensureReportCycleRuntime()]
+    ];
+    const results=await Promise.allSettled(requests.map(([,read])=>read()));
+    if(studentUid()!==uid)return[];
+    const items=[],value=index=>results[index].status==='fulfilled'?results[index].value:null;
+    results.forEach((result,index)=>{if(result.status==='rejected')items.push({id:'load-error-'+index,source:'error',title:'Não foi possível verificar '+requests[index][0],body:'Toque em atualizar para consultar suas pendências novamente.',read:true,type:'conexão',action:'retry'});});
+    value(0)?.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'notification',title:data.title||'Aviso',body:data.body||'',createdAt:data.createdAt,read:!!data.readAt,type:data.type||'aviso'});});
+    value(1)?.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'feedback',title:data.title||'Mensagem da central',body:data.message||'',createdAt:data.createdAt,read:!!data.read,type:data.feedbackType||'central'});});
+    const monthly=window.TeamBullsMonthlyReports,protocol=value(5),schedule=protocol?.exists?{...protocol.data(),studentId:uid}:null;
+    if(protocol)monthly?.remember(uid,schedule);
+    value(2)?.docs.forEach(doc=>{
+      const data={...doc.data(),id:doc.id};if(data.answered||data.cancelledAt)return;
+      const isMonthly=data.reportType==='monthly';
+      if(isMonthly&&(!protocol||monthly?.status(data,schedule)!=='pending'))return;
+      items.push({id:doc.id,source:'questionnaire',title:isMonthly?'Relatório mensal pendente':data.reportType==='standard-extra'?'Relatório extra pendente':'Relatório pendente',body:isMonthly?('Relatório completo de '+fmt(data.dueDate)+', com todas as perguntas e 6 fotos.'):'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:isMonthly?'relatório mensal':'relatório',action:'questionnaire'});
+    });
+    const weekly=value(3),history=value(4);
+    if(weekly?.exists&&history&&results[6].status==='fulfilled'){
+      const data=weekly.data(),request=computeCheckinRequest(data,history.docs.map(doc=>({...doc.data(),id:doc.id})));
+      if(request?.pending)items.push({id:'weekly-checkin',source:'virtual',title:request.kind==='manual'?'Relatório extra solicitado':'Relatório semanal pendente',body:request.kind==='manual'?'Seu treinador solicitou um relatório extra com as fotos obrigatórias.':('Seu relatório semanal de '+fmt(request.dueDate)+' está pendente.'),createdAt:data.updatedAt||0,read:false,type:'relatório semanal',action:'weekly'});
     }
-    notifications=items.sort((a,b)=>timestamp(b.createdAt)-timestamp(a.createdAt));
-    return notifications;
+    if(includeProtocol&&schedule){
+      const current=monthly?.cycle(schedule),forms=value(2);
+      if(current&&forms&&!forms.docs.some(doc=>doc.id===current.id))items.push({id:'monthly-not-prepared',source:'virtual',title:'Programação mensal incompleta',body:'Seu relatório mensal ainda não foi preparado. Avise seu treinador.',read:true,type:'relatório mensal'});
+      items.push({id:'protocol-review',source:'virtual',title:'Revisão de treino e dieta pelo treinador',body:'Acompanhe o cronograma. Enviar seu relatório não conclui a revisão dos protocolos.',createdAt:schedule.updatedAt||0,read:true,type:'protocolo',action:'protocol'});
+    }
+    notifications=items.sort((a,b)=>timestamp(b.createdAt)-timestamp(a.createdAt));return notifications;
   }
 
   function renderNotifications(){
     const host=document.getElementById('tb-notice-list');if(!host)return;
     if(!notifications.length){host.innerHTML='<div class="tb-notice-empty">Nenhuma notificação no momento.</div>';return;}
-    host.innerHTML=notifications.map((item,index)=>`<article class="tb-notice-card ${item.read?'':'unread'}"><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`).join('');
+    host.innerHTML=notifications.map((item,index)=>{
+      const actionable=['questionnaire','weekly','retry','protocol'].includes(item.action);
+      return`<article class="tb-notice-card ${item.read?'':'unread'}"${actionable?` data-notice-index="${index}" role="button" tabindex="0"`:''}><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='retry'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ATUALIZAR</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`;
+    }).join('');
+    host.onclick=event=>{if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(card&&host.contains(card))openNotice(Number(card.dataset.noticeIndex));};
+    host.onkeydown=event=>{if(event.key!=='Enter'&&event.key!==' ')return;if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(!card||!host.contains(card))return;event.preventDefault();openNotice(Number(card.dataset.noticeIndex));};
   }
 
   function applyNoticeBadge(){
@@ -251,6 +278,7 @@
 
   async function openNotifications(){
     ensureNotificationScreen();closeProfileMenu();showScreen('screen-student-notifications');
+    window.TeamBullsDeviceNotices?.render?.();
     await loadNotifications({includeProtocol:true});renderNotifications();
     badgeRefreshUid=studentUid();badgeRefreshAt=Date.now();applyNoticeBadge();
   }
@@ -263,12 +291,50 @@
       item.read=true;renderNotifications();applyNoticeBadge();
     }catch(error){showToast?.('Não foi possível marcar como lida.',true);}
   }
+  function noticeActionButton(index){return document.querySelector(`#tb-notice-list .tb-notice-card:nth-child(${Number(index)+1}) .tb-notice-actions button`);}
   async function openNotice(index){
-    const item=notifications[index];if(!item)return;
-    if(item.action==='questionnaire'){goHome();setTimeout(()=>{try{openAnswerQuestionnaire(item.id);}catch(error){openMyQuestionnaires?.();}},60);return;}
-    if(item.action==='weekly'){goHome();setTimeout(()=>openWeeklyCheckinModal?.(),60);return;}
-    if(item.action==='protocol'){goHome();setTimeout(()=>openProtocolReviewInfo?.(),60);return;}
-    await markRead(index);
+    const item=notifications[index];if(!item||noticeActionBusy)return;
+    const button=noticeActionButton(index),originalLabel=button?.textContent||'';
+    const busy=label=>{if(!button)return;button.disabled=true;button.textContent=label;button.setAttribute('aria-busy','true');};
+    noticeActionBusy=true;
+    try{
+      if(item.action==='retry'){busy('ATUALIZANDO...');await loadNotifications({includeProtocol:true});renderNotifications();applyNoticeBadge();return;}
+      if(item.action==='questionnaire'){
+        busy('CARREGANDO RELATÓRIO...');
+        if(typeof openAnswerQuestionnaire!=='function')throw new Error('Relatório ainda não carregado.');
+        await openAnswerQuestionnaire(item.id);
+        if(!document.getElementById('modal-answer-quest')?.classList.contains('open')){
+          await loadNotifications({includeProtocol:true});renderNotifications();applyNoticeBadge();
+          showToast?.('Este relatório não está mais disponível ou já foi atualizado.',true);
+        }
+        return;
+      }
+      if(item.action==='weekly'){
+        busy('CARREGANDO RELATÓRIO...');
+        const loadSuite=window.TeamBullsIntelligenceBootstrap?.load||window.TeamBullsIntelligenceSuiteLoader?.load;
+        if(typeof loadSuite==='function')await loadSuite();
+        if(!window.TeamBullsWeeklyReportIntegrity?.canOpenForm||typeof openWeeklyCheckinModal!=='function')throw new Error('Relatório semanal ainda não carregado.');
+        await openWeeklyCheckinModal();
+        if(!document.getElementById('modal-weekly-checkin')?.classList.contains('open')){
+          await loadNotifications({includeProtocol:true});renderNotifications();applyNoticeBadge();
+          showToast?.('O relatório extra não abriu. Confira a conexão e toque novamente para tentar.',true);
+        }
+        return;
+      }
+      if(item.action==='protocol'){
+        busy('ABRINDO CRONOGRAMA...');
+        if(typeof openProtocolReviewInfo!=='function')throw new Error('Cronograma ainda não carregado.');
+        await openProtocolReviewInfo();
+        return;
+      }
+      await markRead(index);
+    }catch(error){
+      console.warn('[Team Bulls] ação da notificação não abriu',item.action||item.type,error?.code||error?.message||error);
+      showToast?.('Não foi possível abrir agora. Aguarde alguns segundos e tente novamente.',true);
+    }finally{
+      noticeActionBusy=false;
+      if(button?.isConnected){button.disabled=false;button.removeAttribute('aria-busy');button.textContent=originalLabel;}
+    }
   }
 
   function ensureStatsShell(stats){

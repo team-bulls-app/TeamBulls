@@ -61,7 +61,7 @@ assert(viewport.includes("const LAST_EMAIL_KEY='team_bulls_last_login_email_v1';
 assert(viewport.includes("profile=JSON.parse(safeGet('team_bulls_profile_v9_5_'+uid)||'null')"),'E-mail não possui fallback pelo perfil já conhecido do próprio usuário.');
 assert(!/safeSet\([^\n]{0,80}(?:password|login-pass)/i.test(viewport),'Camada nova não pode persistir senha em texto puro.');
 
-assert(core.includes("const cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});"),'Fluxo canônico de restauração rápida mudou sem atualizar a proteção.');
+assert(core.includes("cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});"),'Fluxo canônico de restauração rápida mudou sem atualizar a proteção.');
 assert(viewport.includes("reason?.code==='team-bulls/fast-session'&&options?.silent===true&&navigator.onLine!==false"),'Restauração online ainda pode abrir Home em modo offline antes de validar o perfil.');
 assert(viewport.includes("setPending(true,'validating-online-profile');return false"),'Gate online não mantém a sessão em validação.');
 assert(viewport.includes("accessMode()!=='offline-registered'"),'Recuperação de conexão não está limitada ao fallback offline registrado.');

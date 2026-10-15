@@ -23,10 +23,10 @@
     const summary=activePlan?.energySummary&&typeof activePlan.energySummary==='object'?activePlan.energySummary:{};
     let get=n(summary.totalExpenditure);
     if(!(get>0)){const body=document.getElementById('tb-diet-calc-body'),fromCalc=n(body?.dataset?.finalGcd);if(fromCalc>0)get=fromCalc;}
-    const training=n(summary.trainingDayEnergy),rest=n(summary.restDayEnergy),name=norm(activeVariant?.name);let target=0;
-    if(/sem treino|descanso|rest/.test(name))target=rest;
-    else if(/treino|training/.test(name))target=training;
-    else if(Array.isArray(activePlan?.variants)&&activePlan.variants.length===2&&training>0&&rest>0){const index=activePlan.variants.findIndex(item=>String(item?.id||'')===String(activeVariant?.id||''));target=index===1?rest:training;}
+    const training=n(summary.trainingDayEnergy),rest=n(summary.restDayEnergy),name=norm(activeVariant?.name),id=String(activeVariant?.id||''),byVariant=summary.variantEnergy||{};let target=0;
+    if(Object.prototype.hasOwnProperty.call(byVariant,id))target=n(byVariant[id]);
+    else if(name==='dia de treino')target=training;
+    else if(name==='dia sem treino')target=rest;
     return{get,target};
   }
   function totalWithDraft(){

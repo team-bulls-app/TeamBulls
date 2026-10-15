@@ -38,6 +38,12 @@ has(firestore,'trainerOwns(request.resource.data.studentId)','Criações do trei
 has(firestore,'trainerOwns(resource.data.userId) || activeOwner(resource.data.userId)','Dados pessoais ainda não estão isolados por treinador.');
 has(firestore,'safeColor(request.resource.data.color)','Cor de protocolo não é validada por whitelist.');
 has(firestore,"(request.resource.data.get('dataUrl', '') != '' || request.resource.data.get('photoPath', '') != '')",'Regra ainda permite registro de foto vazio.');
+has(firestore,'function questionnaireMode(data)','Relatórios legados não possuem inferência canônica de modo.');
+has(firestore,"data.get('requiresPhotos', true) == false",'Relatório escrito legado não é inferido pelos campos imutáveis existentes.');
+has(firestore,"data.get('questions', []) is list && data.get('questions', []).size() == 0",'Relatório antigo somente de fotos não é reconhecido quando requestMode está ausente.');
+has(firestore,"questionnaireMode(resource.data) == 'photos'",'Envio de seis fotos ainda depende de requestMode existir no documento histórico.');
+has(firestore,"questionnaireMode(resource.data) == 'written'",'Envio escrito legado ainda depende de requestMode existir no documento histórico.');
+has(firestore,"questionnaireMode(resource.data) == 'full'",'Envio completo não usa a inferência canônica de modo.');
 lacks(firestore,'allow read: if isTrainer() || activeOwner(resource.data.userId);','Regra ampla de leitura de fotos/sessões por qualquer treinador reapareceu.');
 lacks(firestore,'allow read: if isTrainer() || activeOwner(resource.data.studentId);','Regra ampla de leitura de relatórios por qualquer treinador reapareceu.');
 lacks(firestore,"|| (isTrainer() && resource.data.role == 'student')",'Leitura global permanente de alunos por qualquer treinador reapareceu.');
@@ -76,8 +82,11 @@ has(invites,"if(state==='committed')",'Cadastro não reconcilia commit confirmad
 has(invites,'TB.inviteHash=sha256','Fluxo canônico não expõe o hash criptográfico dos convites.');
 has(invites,'authListenerSuspended=suspendAuthListenerForRegistration()','Cadastro não pausa o listener global antes da criação Auth.');
 has(invites,'cred.user.getIdTokenResult(true)','Cadastro não renova a credencial/claims antes da transação protegida.');
-has(invites,'await ensureRegistrationAppCheck()','Cadastro não valida App Check antes de criar a conta Auth.');
-has(invites,'service.getToken(true)','Cadastro não força token App Check válido antes do convite.');
+has(invites,'await ensureRegistrationAppCheck({forceRefresh:false})','Cadastro não valida App Check antes de criar a conta Auth.');
+has(invites,"withTimeout(initOptionalAppCheck(),8000,'App Check do cadastro')",'Cadastro voltou a herdar o timeout curto de App Check usado apenas no boot.');
+has(invites,'service.getToken(!!forceRefresh)','Cadastro não usa a política App Check cached-first com refresh explícito.');
+has(invites,'await ensureRegistrationAppCheck({forceRefresh:true})','Recuperação de permission-denied não força nova atestação antes do retry único.');
+has(invites,"doRegister.__tbRegistrationAppCheck='cached-first'",'Política App Check do cadastro não está marcada para diagnóstico.');
 has(invites,"window.TeamBullsRegistrationDiagnostics=registrationDiagnostic",'Cadastro não expõe diagnóstico seguro por etapa.');
 has(invites,'doRegister.__tbCanonicalInviteRegistration=true','Cadastro seguro não está marcado como implementação canônica.');
 

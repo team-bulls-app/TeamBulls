@@ -52,6 +52,33 @@ service cloud.firestore {
       return isTrainer() && workoutExists(workoutId)
         && trainerOwns(workoutData(workoutId).userId);
     }
+    function trainerOwnsExercise(data) {
+      return trainerOwns(data.get('userId', ''))
+        || trainerOwnsWorkout(data.get('workoutId', ''));
+    }
+    function questionnaireExists(questionnaireId) {
+      return questionnaireId is string && questionnaireId != ''
+        && exists(/databases/$(database)/documents/questionnaires/$(questionnaireId));
+    }
+    function questionnaireData(questionnaireId) {
+      return get(/databases/$(database)/documents/questionnaires/$(questionnaireId)).data;
+    }
+    function trainerOwnsQuestionnaire(questionnaireId) {
+      return isTrainer() && questionnaireExists(questionnaireId)
+        && questionnaireData(questionnaireId).trainerId == request.auth.uid;
+    }
+    function checkinScheduleExists(uid) {
+      return uid is string && uid != ''
+        && exists(/databases/$(database)/documents/checkinSchedules/$(uid));
+    }
+    function checkinScheduleData(uid) {
+      return get(/databases/$(database)/documents/checkinSchedules/$(uid)).data;
+    }
+    function trainerOwnsCheckinSchedule(uid) {
+      return isTrainer() && checkinScheduleExists(uid)
+        && checkinScheduleData(uid).studentId == uid
+        && checkinScheduleData(uid).get('updatedBy', '') == request.auth.uid;
+    }
     function text(value, max) { return value is string && value.size() <= max; }
     function requiredText(value, max) {
       return value is string && value.size() > 0 && value.size() <= max;
@@ -62,6 +89,39 @@ service cloud.firestore {
     }
     function immutable(field) {
       return request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+    function questionnaireMode(data) {
+      return data.get('requestMode', '') in ['full', 'written', 'photos']
+        ? data.get('requestMode', '')
+        : (data.get('requiresPhotos', true) == false
+          ? 'written'
+          : (data.get('questions', []) is list && data.get('questions', []).size() == 0
+            ? 'photos'
+            : 'full'));
+    }
+    function weeklyPhotoIdsMatch(id, data) {
+      return data.photoIds is list
+        && data.photoIds.size() == 6
+        && data.photoIds[0] == id + '-p1'
+        && data.photoIds[1] == id + '-p2'
+        && data.photoIds[2] == id + '-p3'
+        && data.photoIds[3] == id + '-p4'
+        && data.photoIds[4] == id + '-p5'
+        && data.photoIds[5] == id + '-p6';
+    }
+    function weeklyRequestMatchesSchedule(data) {
+      return checkinScheduleExists(data.studentId)
+        && checkinScheduleData(data.studentId).studentId == data.studentId
+        && checkinScheduleData(data.studentId).get('enabled', true) != false
+        && (
+          (data.requestKind == 'scheduled'
+            && data.requestKey == 'scheduled:' + data.dueDate)
+          || (data.requestKind == 'manual'
+            && checkinScheduleData(data.studentId).get('extraRequestId', '') is string
+            && checkinScheduleData(data.studentId).get('extraRequestId', '') != ''
+            && data.requestKey == 'manual:' + checkinScheduleData(data.studentId).get('extraRequestId', '')
+            && data.dueDate == checkinScheduleData(data.studentId).get('extraRequestedAt', ''))
+        );
     }
     function safeColor(value) {
       return value in ['#e11d48', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#ef4444', '#64748b'];
@@ -133,9 +193,8 @@ service cloud.firestore {
     }
 
     match /exercises/{id} {
-      allow read: if trainerOwns(resource.data.userId)
-        || trainerOwnsWorkout(resource.data.workoutId)
-        || activeOwner(resource.data.userId);
+      allow read: if trainerOwnsExercise(resource.data)
+        || activeOwner(resource.data.get('userId', ''));
       allow create: if trainerOwns(request.resource.data.userId)
         && request.resource.data.workoutId is string
         && workoutExists(request.resource.data.workoutId)
@@ -149,7 +208,7 @@ service cloud.firestore {
         && request.resource.data.get('weeklyPlan', {}) is map
         && request.resource.data.get('weeklyTechniquePlan', {}) is map
         && request.resource.data.createdAt is timestamp;
-      allow update: if trainerOwns(resource.data.userId)
+      allow update: if trainerOwnsExercise(resource.data)
         && immutable('userId') && immutable('workoutId')
         && immutable('createdAt')
         && requiredText(request.resource.data.name, 180)
@@ -160,7 +219,7 @@ service cloud.firestore {
         && request.resource.data.get('optionalTechniqueIds', []).size() <= 100
         && request.resource.data.get('weeklyPlan', {}) is map
         && request.resource.data.get('weeklyTechniquePlan', {}) is map;
-      allow delete: if trainerOwns(resource.data.userId);
+      allow delete: if trainerOwnsExercise(resource.data);
     }
 
     match /sessions/{id} {
@@ -187,7 +246,7 @@ service cloud.firestore {
         && request.resource.data.trainerId == request.auth.uid
         && requiredText(request.resource.data.message, 30000)
         && text(request.resource.data.get('title', ''), 160)
-        && request.resource.data.get('feedbackType', 'general') in ['general', 'weekly_report', 'protocol_update']
+        && request.resource.data.get('feedbackType', 'general') in ['general', 'weekly_report', 'protocol_update', 'monthly_full', 'weekly_diet', 'weekly_training', 'extra']
         && text(request.resource.data.get('protocolStartDate', ''), 10)
         && request.resource.data.get('protocolCycle', 0) is int
         && request.resource.data.get('protocolCycle', 0) >= 0
@@ -198,7 +257,9 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /questionnaires/{id} {
-      allow read: if trainerOwns(resource.data.studentId) || activeOwner(resource.data.studentId);
+      allow read: if trainerOwns(resource.data.studentId)
+        || activeOwner(resource.data.studentId)
+        || (isTrainer() && resource.data.trainerId == request.auth.uid);
       allow create: if trainerOwns(request.resource.data.studentId)
         && request.resource.data.trainerId == request.auth.uid
         && request.resource.data.get('requestMode', 'full') in ['full', 'written', 'photos']
@@ -222,7 +283,8 @@ service cloud.firestore {
             && request.resource.data.get('allQuestionsRequired', true) == true)
         )
         && request.resource.data.createdAt is timestamp;
-      allow update: if activeOwner(resource.data.studentId)
+      allow update: if (activeOwner(resource.data.studentId)
+        && resource.data.get('cancelledAt', null) == null
         && immutable('studentId') && immutable('trainerId')
         && immutable('questions') && immutable('createdAt')
         && immutable('requiresPhotos') && immutable('requiredPhotoCount')
@@ -235,21 +297,44 @@ service cloud.firestore {
         && request.resource.data.answered == true
         && request.resource.data.answeredAt is timestamp
         && (
-          (resource.data.get('requestMode', 'full') == 'photos'
+          (questionnaireMode(resource.data) == 'photos'
             && request.resource.data.answers.size() == 0
             && request.resource.data.photoIds.size() == 6)
-          || (resource.data.get('requestMode', 'full') == 'written'
+          || (questionnaireMode(resource.data) == 'written'
             && request.resource.data.answers.size() == resource.data.questions.size()
             && request.resource.data.answers.size() > 0
             && !request.resource.data.answers.hasAny([''])
             && request.resource.data.photoIds.size() == 0)
-          || (resource.data.get('requestMode', 'full') == 'full'
+          || (questionnaireMode(resource.data) == 'full'
             && request.resource.data.answers.size() == resource.data.questions.size()
             && request.resource.data.answers.size() > 0
             && !request.resource.data.answers.hasAny([''])
             && request.resource.data.photoIds.size() == 6)
-        );
+        ))
+        || (trainerOwns(resource.data.studentId)
+          && resource.data.trainerId == request.auth.uid
+          && resource.data.answered == false
+          && resource.data.get('cancelledAt', null) == null
+          && resource.data.get('answers', null) == null
+          && resource.data.get('photoIds', []).size() == 0
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['cancelledAt', 'cancelledBy'])
+          && request.resource.data.cancelledAt is timestamp
+          && request.resource.data.cancelledBy == request.auth.uid);
       allow delete: if false;
+    }
+
+    match /pushDevices/{uid}/tokens/{tokenId} {
+      allow read: if activeOwner(uid);
+      allow create: if activeOwner(uid)
+        && request.resource.data.keys().hasOnly(['token', 'platform', 'createdAt', 'updatedAt'])
+        && requiredText(request.resource.data.token, 1024)
+        && request.resource.data.platform in ['android', 'ios']
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp;
+      allow update: if activeOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt'])
+        && request.resource.data.updatedAt is timestamp;
+      allow delete: if activeOwner(uid);
     }
 
     match /trainerSupplementCatalog/{trainerUid} {
@@ -321,21 +406,35 @@ service cloud.firestore {
         && request.resource.data.intervalDays is int
         && request.resource.data.intervalDays >= 1
         && request.resource.data.intervalDays <= 90
+        && request.resource.data.updatedBy == request.auth.uid
         && request.resource.data.updatedAt is timestamp;
       allow delete: if false;
     }
 
     match /weeklyCheckins/{id} {
-      allow read: if trainerOwns(resource.data.studentId) || activeOwner(resource.data.studentId);
+      allow read: if trainerOwns(resource.data.studentId)
+        || activeOwner(resource.data.studentId)
+        || trainerOwnsCheckinSchedule(resource.data.studentId);
       allow create: if activeOwner(request.resource.data.studentId)
+        && request.resource.data.keys().hasOnly([
+          'studentId','requestKey','requestKind','dueDate','submittedDate','weight',
+          'questions','sectionAt','answers','photoIds','createdAt'
+        ])
+        && requiredText(request.resource.data.requestKey, 220)
+        && request.resource.data.requestKind in ['scheduled', 'manual']
+        && isoDate(request.resource.data.dueDate)
+        && isoDate(request.resource.data.submittedDate)
+        && weeklyRequestMatchesSchedule(request.resource.data)
         && request.resource.data.questions is list
+        && request.resource.data.questions.size() > 0
+        && request.resource.data.questions.size() <= 60
+        && request.resource.data.sectionAt is map
+        && request.resource.data.sectionAt.keys().size() <= 60
         && request.resource.data.answers is list
         && request.resource.data.answers.size() == request.resource.data.questions.size()
         && request.resource.data.answers.size() > 0
         && !request.resource.data.answers.hasAny([''])
-        && request.resource.data.questions.size() <= 60
-        && request.resource.data.photoIds is list
-        && request.resource.data.photoIds.size() == 6
+        && weeklyPhotoIdsMatch(id, request.resource.data)
         && request.resource.data.weight is number
         && request.resource.data.weight >= 20
         && request.resource.data.weight <= 500
@@ -344,7 +443,10 @@ service cloud.firestore {
     }
 
     match /progressPhotos/{id} {
-      allow read: if trainerOwns(resource.data.userId) || activeOwner(resource.data.userId);
+      allow read: if trainerOwns(resource.data.userId)
+        || activeOwner(resource.data.userId)
+        || (trainerOwnsQuestionnaire(resource.data.get('questionnaireId', ''))
+          && questionnaireData(resource.data.questionnaireId).studentId == resource.data.userId);
       allow create: if activeOwner(request.resource.data.userId)
         && isoDate(request.resource.data.date)
         && request.resource.data.get('dataUrl', '') is string
@@ -507,8 +609,6 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Cálculos internos da dieta: somente o treinador vinculado pode ler ou alterar.
-    // Nenhum valor desta coleção é exposto ao aluno; a dieta prescrita continua em mealPlans.
     match /dietCalculations/{uid} {
       allow read: if trainerOwns(uid);
       allow create: if trainerOwns(uid)
@@ -585,8 +685,6 @@ service cloud.firestore {
         && resource.data.trainerId == request.auth.uid;
     }
 
-    // Caixa de entrada privada do treinador. O aluno só pode criar um evento
-    // para o próprio relatório e somente dentro da caixa do treinador vinculado.
     match /trainerActivity/{trainerUid} {
       allow read, write: if false;
 
@@ -642,8 +740,6 @@ service cloud.firestore {
       }
     }
 
-    // Controle financeiro estritamente privado do treinador. O aluno não recebe
-    // acesso de leitura nem escrita aos valores, vencimentos ou comprovantes.
     match /trainerBilling/{trainerUid} {
       allow read, write: if false;
 
@@ -691,8 +787,6 @@ service cloud.firestore {
       }
     }
 
-    // Projeção financeira mínima para o próprio aluno. O domínio privado do
-    // treinador continua fechado; comprovantes e observações não são copiados.
     match /studentBilling/{studentUid} {
       allow read: if (
           trainerOwns(studentUid)

@@ -26,6 +26,34 @@ service firebase.storage {
         && profile(request.auth.uid).status == 'active'
         && profile(request.auth.uid).trainerId == trainerUid;
     }
+    function progressPhotoData(photoId) {
+      return firestore.get(/databases/(default)/documents/progressPhotos/$(photoId)).data;
+    }
+    function questionnaireData(questionnaireId) {
+      return firestore.get(/databases/(default)/documents/questionnaires/$(questionnaireId)).data;
+    }
+    function trainerCanReadProgressPhoto(uid, photoId) {
+      /* Este ramo é usado apenas quando quem lê NÃO é o próprio aluno.
+         Documento 1: metadado progressPhotos. Documento 2 é escolhido pelo ternário:
+         - questionário imutavelmente pertencente ao treinador, ou
+         - perfil atual do aluno para fotos semanais/legadas sem questionnaireId.
+         Nunca são consultados os três documentos na mesma avaliação. */
+      let photo = progressPhotoData(photoId);
+      let questionnaireId = photo.get('questionnaireId', '');
+      return photo.userId == uid
+        && (questionnaireId != ''
+          ? questionnaireData(questionnaireId).studentId == uid
+            && questionnaireData(questionnaireId).trainerId == request.auth.uid
+          : profile(uid).role == 'student'
+            && profile(uid).trainerId == request.auth.uid);
+    }
+    function canReadProgressPhoto(uid, photoId) {
+      return signedIn() && (
+        request.auth.uid == uid
+          ? profile(uid).role == 'student' && profile(uid).status == 'active'
+          : trainerCanReadProgressPhoto(uid, photoId)
+      );
+    }
     function validOptimizedJpegUpload(maxBytes) {
       return request.resource != null
         && request.resource.size > 0
@@ -52,17 +80,17 @@ service firebase.storage {
     }
 
     match /progressPhotos/{uid}/{photoId}.jpg {
-      allow read: if trainerOwns(uid) || activeOwner(uid);
+      allow read: if canReadProgressPhoto(uid, photoId);
       allow create, update: if activeOwner(uid) && validOptimizedJpegUpload(2 * 1024 * 1024);
       allow delete: if activeOwner(uid);
     }
     match /progressPhotoThumbs/{uid}/{photoId}.jpg {
-      allow read: if trainerOwns(uid) || activeOwner(uid);
+      allow read: if canReadProgressPhoto(uid, photoId);
       allow create, update: if activeOwner(uid) && validOptimizedJpegUpload(350 * 1024);
       allow delete: if activeOwner(uid);
     }
     match /progressPhotoOriginals/{uid}/{photoId} {
-      allow read: if trainerOwns(uid) || activeOwner(uid);
+      allow read: if canReadProgressPhoto(uid, photoId);
       allow create, update: if activeOwner(uid) && validOriginalProgressPhoto(25 * 1024 * 1024);
       allow delete: if activeOwner(uid);
     }

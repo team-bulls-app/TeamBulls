@@ -2,38 +2,60 @@
 'use strict';
 
 const LIBHEIF_URL='https://cdn.jsdelivr.net/npm/libheif-js@1.19.8/libheif/libheif.js';
+const LIBHEIF_FALLBACK_URL='https://cdn.jsdelivr.net/npm/libheif-js@1.19.8/libheif-wasm/libheif-bundle.js';
 const MAX_PIXELS=32000000;
 let ready=false;
 let initError='';
 let HEIF=null;
 
 function fail(message){initError=String(message||'Falha ao inicializar o decoder HEIC.');}
-function resolveLibheif(){
+function libheifCandidates(){
   const candidates=[];
   try{if(typeof libheif!=='undefined')candidates.push(libheif);}catch(error){}
   try{if(self.libheif)candidates.push(self.libheif);}catch(error){}
   try{if(self.module?.exports)candidates.push(self.module.exports);}catch(error){}
   try{if(self.exports)candidates.push(self.exports);}catch(error){}
-  for(const candidate of candidates){
+  return candidates;
+}
+function resolveLibheif(){
+  for(const candidate of libheifCandidates()){
     if(candidate&&typeof candidate.HeifDecoder==='function')return candidate;
     if(candidate?.default&&typeof candidate.default.HeifDecoder==='function')return candidate.default;
   }
   return null;
 }
-
-try{
-  importScripts(LIBHEIF_URL);
-  HEIF=resolveLibheif();
-  if(HEIF&&(!self.libheif||typeof self.libheif.HeifDecoder!=='function')){
-    try{self.libheif=HEIF;}catch(error){}
+async function waitForLibheif(milliseconds){
+  const deadline=Date.now()+milliseconds,attempted=new Set();
+  while(Date.now()<deadline){
+    const available=resolveLibheif();if(available)return available;
+    for(const candidate of libheifCandidates()){
+      if(typeof candidate!=='function'||attempted.has(candidate))continue;
+      attempted.add(candidate);
+      try{
+        const factory=Promise.resolve(candidate()).then(loaded=>{if(loaded&&typeof loaded.HeifDecoder==='function')self.libheif=loaded;return loaded;});
+        const loaded=await Promise.race([factory,new Promise(resolve=>setTimeout(()=>resolve(null),1500))]);
+        if(loaded&&typeof loaded.HeifDecoder==='function')return loaded;
+        if(loaded?.default&&typeof loaded.default.HeifDecoder==='function')return loaded.default;
+      }catch(error){}
+    }
+    await new Promise(resolve=>setTimeout(resolve,75));
   }
-  ready=!!(HEIF&&typeof HEIF.HeifDecoder==='function');
-  if(!ready)fail('A biblioteca libheif foi carregada, mas o decoder não ficou disponível.');
-}catch(error){
-  fail(error?.message||'Não foi possível carregar o decoder HEIC.');
+  return resolveLibheif();
 }
-
-self.postMessage({type:'ready',ok:ready,error:initError});
+async function initializeDecoder(){
+  try{
+    try{importScripts(LIBHEIF_URL);HEIF=await waitForLibheif(8000);}catch(error){HEIF=null;}
+    if(!HEIF){
+      importScripts(LIBHEIF_FALLBACK_URL);
+      HEIF=await waitForLibheif(8000);
+    }
+    ready=!!(HEIF&&typeof HEIF.HeifDecoder==='function');
+    if(ready){try{self.libheif=HEIF;}catch(error){}}
+    else fail('O decoder HEIC não ficou disponível. Escolha fotos JPG/JPEG ou tente novamente com o aplicativo atualizado.');
+  }catch(error){fail(error?.message||'Não foi possível carregar o decoder HEIC.');}
+  self.postMessage({type:'ready',ok:ready,error:initError});
+}
+void initializeDecoder();
 
 self.addEventListener('message',event=>{
   const id=String(event.data?.id||'');

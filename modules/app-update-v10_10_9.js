@@ -130,7 +130,8 @@
   function resetBulkStatus(kind){const input=document.getElementById('tb-'+kind+'-bulk-input');if(input)input.value='';const status=document.getElementById('tb-'+kind+'-bulk-status');if(status)status.textContent='Nenhuma seleção em lote ainda.';}
   function prepareBulkPhotoUi(){
     ensureBulkPicker('weekly');ensureBulkPicker('questionnaire');patchPoseLabels(document);
-    const baseWeekly=window.openWeeklyCheckinModal;if(typeof baseWeekly==='function'&&!baseWeekly.__tbBulk){const wrapped=async function(...args){const value=await baseWeekly.apply(this,args);resetBulkStatus('weekly');ensureBulkPicker('weekly');patchPoseLabels(document);return value;};wrapped.__tbBulk=true;window.openWeeklyCheckinModal=wrapped;}
+    const hasBulkWrapper=fn=>{for(let depth=0;depth<20&&typeof fn==='function';depth++,fn=fn.__tbBase)if(fn.__tbBulk)return true;return false;};
+    const baseWeekly=window.openWeeklyCheckinModal;if(typeof baseWeekly==='function'&&!hasBulkWrapper(baseWeekly)){const wrapped=async function(...args){const value=await baseWeekly.apply(this,args);resetBulkStatus('weekly');ensureBulkPicker('weekly');patchPoseLabels(document);return value;};wrapped.__tbBulk=true;wrapped.__tbBase=baseWeekly;window.openWeeklyCheckinModal=wrapped;}
     const baseQuestionnaire=window.openAnswerQuestionnaire;if(typeof baseQuestionnaire==='function'&&!baseQuestionnaire.__tbBulk){const wrapped=async function(...args){const value=await baseQuestionnaire.apply(this,args);resetBulkStatus('questionnaire');ensureBulkPicker('questionnaire');patchPoseLabels(document);return value;};wrapped.__tbBulk=true;window.openAnswerQuestionnaire=wrapped;}
     ['viewWeeklyCheckin','viewQuestionnaire'].forEach(wrapPoseView);
   }

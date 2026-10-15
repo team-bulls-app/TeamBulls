@@ -1,0 +1,133 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+const read=p=>fs.readFileSync(p,'utf8');
+const context={console,Date,setTimeout:()=>0,clearTimeout(){},CURRENT_USER:{role:'trainer'},MODE:'cloud',db:{},window:{addEventListener(){}},document:{addEventListener(){},getElementById(){return null;}}};
+vm.createContext(context);
+vm.runInContext(read('modules/weekly-report-integrity-v10_10_58.js'),context);
+const integrity=context.window.TeamBullsWeeklyReportIntegrity;
+const photos=Array.from({length:6},(_,i)=>'photo-'+i);
+const row={id:'a',studentId:'student-a',requestKey:'scheduled:2026-09-14',requestKind:'scheduled',submittedDate:'2026-09-14',dueDate:'2026-09-14',weight:82.5,questions:['Como foi?'],answers:['Bem'],photoIds:photos,createdAt:{seconds:new Date('2026-09-14T15:00:00Z').getTime()/1000}};
+const later={...row,id:'b',createdAt:{seconds:new Date('2026-09-20T15:00:00Z').getTime()/1000},photoIds:photos.map(p=>p+'-new')};
+assert.equal(integrity.dedupe([row,later]).length,2,'different submissions with stale requestKey must survive');
+assert.equal(integrity.dedupe([row,later])[0].submittedDate,'2026-09-20');
+assert.equal(integrity.dedupe([row,{...row,id:'copy'}]).length,1);
+assert.equal(integrity.dedupe([{...row,requestKey:''},{...row,id:'copy',requestKey:''}]).length,1);
+assert.equal(integrity.dedupe([row,{...row,id:'other',answers:['Diferente']}]).length,2);
+assert.equal(integrity.dedupe([row,{...row,id:'other',studentId:'student-b'}]).length,2);
+assert.equal(row.submittedDate,'2026-09-14','source data stays untouched');
+// Execute the real cycle implementation, then its shared normalization wrapper.
+const core=read('app_v10_10_9_core.js');
+vm.runInContext(core.slice(core.indexOf('function stableHash('),core.indexOf('function sessionFingerprint(')),context);
+vm.runInContext(core.match(/function weeklyCheckinDocId[^\n]+/)[0],context);
+const recoveryId=context.weeklyCheckinDocId('student-a','scheduled:2026-09-21:recovery:v1');
+assert.equal(recoveryId,context.weeklyCheckinDocId('student-a','scheduled:2026-09-21:recovery:v1'));
+assert.notEqual(recoveryId,context.weeklyCheckinDocId('student-a','scheduled:2026-09-21'));
+assert.notEqual(recoveryId,context.weeklyCheckinDocId('student-b','scheduled:2026-09-21:recovery:v1'));
+vm.runInContext(core.slice(core.indexOf('function addDaysIso('),core.indexOf('async function fetchWeeklyCheckins(')),context);
+context.today=()=> '2026-09-22';
+const workflow=read('modules/workflow-controls-v10_10_10.js');
+vm.runInContext(workflow.slice(workflow.indexOf('  function latestScheduledCheckin('),workflow.indexOf("  if(typeof renderWeeklyCheckinCard==='function')")),context);
+integrity.install();
+const next=context.computeCheckinRequest({nextDueDate:'2026-09-14',intervalDays:7},[row,later]);
+assert.equal(next.dueDate,'2026-09-27');
+assert.equal(context.computeCheckinRequest({nextDueDate:'2026-09-14',enabled:false},[]),null);
+// Reproduce the production pattern using synthetic identities: two submissions
+// on the 14th, one consuming the 21st early. A real new submission must be possible.
+const earlyRows=[{...row,id:'old-1',dueDate:'2026-09-13',requestKey:'scheduled:2026-09-13'},
+  {...row,id:'old-2',dueDate:'2026-09-21',requestKey:'scheduled:2026-09-21',photoIds:photos.map(p=>p+'-copy')}];
+for(const storedDue of ['2026-09-13','2026-09-21']){
+  const recovery=context.computeCheckinRequest({nextDueDate:storedDue,intervalDays:7},earlyRows);
+  assert.equal(recovery.dueDate,'2026-09-21');assert.equal(recovery.pending,true);
+  assert.equal(recovery.documentKey,'scheduled:2026-09-21:recovery:v1');
+  assert.equal(recovery.requestKey,'scheduled:2026-09-21','Rules 28 requestKey schema stays valid');
+  const recovered={...row,id:'recovered',dueDate:recovery.dueDate,requestKey:recovery.requestKey,submittedDate:'2026-09-22',createdAt:{seconds:new Date('2026-09-22T15:00:00Z').getTime()/1000}};
+  const after=context.computeCheckinRequest({nextDueDate:storedDue,intervalDays:7},[...earlyRows,recovered]);
+  assert.equal(after.dueDate,'2026-09-29');assert.equal(after.pending,false);
+  assert.equal(integrity.dedupe([...earlyRows,recovered]).length,3,'recovery never erases historical documents');
+}
+assert.equal(context.computeCheckinRequest({nextDueDate:'2026-09-30'},earlyRows).dueDate,'2026-09-30','explicit unfulfilled trainer reschedule wins');
+const extra=context.computeCheckinRequest({nextDueDate:'2026-09-21',extraRequestId:'extra-a',extraRequestedAt:'2026-09-22'},earlyRows);
+assert.equal(extra.requestKey,'manual:extra-a');assert.equal(extra.pending,true);
+context.today=()=> '2026-09-14';
+assert.equal(context.computeCheckinRequest({nextDueDate:'2026-09-13'},earlyRows).pending,false,'cannot consume next period on same day');
+context.today=()=> '2026-09-22';
+// Run the real Central merge against canonical documents and stale secondary IDs.
+let central=read('modules/trainer-canonical-inbox-v10_10_58.js');
+central=central.replace('  start();[150,700,1800]', '  window.testMerge=mergeRows;\n  [150,700,1800]');
+vm.runInContext(central,context);
+const centralRow=r=>({id:'w-'+r.id,type:'weekly_checkin',sourceId:r.id,studentId:r.studentId,_weeklyFingerprint:integrity.fingerprint(r),submittedDate:integrity.effectiveSubmittedDate(r)});
+assert.equal(context.window.testMerge([centralRow(row),centralRow(later)],[{id:'legacy-event',type:'weekly_checkin',sourceId:row.id}]).length,2);
+assert.equal(context.window.testMerge([centralRow(row),centralRow({...row,id:'copy'})],[]).length,1);
+assert.equal(context.window.testMerge([centralRow(row)],[{id:'legacy-event',type:'weekly_checkin',sourceId:row.id,read:true}])[0].read,true);
+// Concurrent taps must share the preflight lock, before the REST action lock.
+let releaseRead,submits=0;
+let readBarrier=Promise.resolve();
+context.CURRENT_USER={uid:'student-a',role:'student'};context.auth={currentUser:{uid:'student-a'}};context.navigator={onLine:true};
+context.db={collection:name=>({doc:()=>({get:async()=>{await readBarrier;return {exists:true,data:()=>({nextDueDate:'2026-09-14'})};}}),where:()=>({get:async()=>({docs:[]})})})};
+context.submitWeeklyCheckin=Object.assign(async()=>{submits++;return true;},{__tbRestCanonical101057:true,__tbWeeklyAttempt6:true});
+context.openWeeklyCheckinModal=()=>true;
+context.WEEKLY_CHECKIN_REQUEST={requestKey:'scheduled:2026-09-14'};
+context.WEEKLY_CHECKIN_SCHEDULE=null;context.WEEKLY_CHECKINS=[];context.WEEKLY_CHECKIN_STATE_UID='';
+integrity.install();
+assert.equal(await context.openWeeklyCheckinModal(),true);
+readBarrier=new Promise(resolve=>{releaseRead=resolve;});
+const first=context.submitWeeklyCheckin();
+assert.equal(await context.submitWeeklyCheckin(),false);
+releaseRead();assert.equal(await first,true);assert.equal(submits,1);
+assert.equal(await context.submitWeeklyCheckin(),false,'completed form cannot be reused');
+// A fresh server snapshot changing the request must reject this form, not retarget it.
+readBarrier=Promise.resolve();let serverSchedule={nextDueDate:'2026-09-14'};
+context.db={collection:()=>({doc:()=>({get:async()=>({exists:true,data:()=>serverSchedule})}),where:()=>({get:async()=>({docs:[]})})})};
+assert.equal(await context.openWeeklyCheckinModal(),true);
+serverSchedule={nextDueDate:'2026-09-15'};
+assert.equal(await context.submitWeeklyCheckin(),false);assert.equal(submits,1);
+serverSchedule={nextDueDate:'2026-09-30'};
+assert.equal(await context.openWeeklyCheckinModal(),false,'future period cannot open');
+serverSchedule={nextDueDate:'2026-09-14',enabled:false};
+assert.equal(await context.openWeeklyCheckinModal(),false,'disabled schedule cannot open');
+serverSchedule={nextDueDate:'2026-09-14'};
+assert.equal(await context.openWeeklyCheckinModal(),true);
+context.CURRENT_USER={uid:'student-b',role:'student'};context.auth.currentUser.uid='student-b';
+assert.equal(await context.submitWeeklyCheckin(),false,'another student cannot submit the open form');
+// Exercise the canonical submit: denied create must not confirm an old document;
+// uncertain delivery only succeeds if all seven persisted writes match.
+const submitContext={...context,window:{addEventListener(){}},CURRENT_USER:{uid:'student-a',role:'student'},auth:{currentUser:{uid:'student-a'}},navigator:{onLine:true},File:class File{},beginAction:()=>true,endAction(){},weeklyCheckinDocId:()=> 'weekly-id',today:()=> '2026-09-20',buildWeeklyCheckinQuestions:()=>({questions:['Como foi?'],sectionAt:{}}),CHECKIN_POSES:photos,loadWeeklyCheckinState:async()=>{},renderCalendar(){},showToast(){},alert(){},CFG:{projectId:'test'},setTimeout:fn=>{queueMicrotask(fn);return 0;},clearTimeout(){},document:{getElementById:()=>({value:'82.5'}),querySelectorAll:()=>[{value:'Bem'}]}};
+submitContext.WEEKLY_CHECKIN_REQUEST={requestKey:row.requestKey,kind:'scheduled',dueDate:row.dueDate};
+submitContext.window.TeamBullsWeeklyReportIntegrity={submissionRequest:()=>({...submitContext.WEEKLY_CHECKIN_REQUEST,studentId:'student-a',pending:true})};
+submitContext.WEEKLY_CHECKIN_FILES=photos.map(()=>new submitContext.File());
+vm.createContext(submitContext);
+let submit=read('modules/student-report-submit-reconciliation-v10_10_57.js');
+submit=submit.replace('  install();[120,500,1400].forEach(delay=>setTimeout(install,delay));',`  window.testSubmit=robustWeeklySubmit;
+  window.configure=(commit,get)=>{restCommit=commit;restGet=get;preparePhoto=async(file,options)=>({data:{userId:options.userId,dataUrl:'new-photo',...options.extra}});};`);
+vm.runInContext(submit,submitContext);
+let reads=0;
+submitContext.window.configure(async()=>{throw {definite:true,status:409};},async()=>{reads++;return {fields:{}};});
+assert.equal(await submitContext.window.testSubmit(),false);
+assert.equal(reads,0,'definite rejection cannot become success by reading an old ID');
+let saved=[];
+submitContext.window.configure(async writes=>{saved=writes;throw {definite:false};},async(collection,id)=>{const w=saved.find(w=>w.update.name.endsWith('/'+collection+'/'+id));return {name:w.update.name,fields:w.update.fields};});
+assert.equal(await submitContext.window.testSubmit(),true);
+assert.equal(saved.length,7);
+assert.ok(saved.every(write=>write.currentDocument.exists===false),'all atomic creates reject concurrent overwrites');
+submitContext.WEEKLY_CHECKIN_FILES=photos.map(()=>new submitContext.File());
+submitContext.window.configure(async writes=>{saved=writes;throw {definite:false};},async(collection,id)=>{const w=saved.find(w=>w.update.name.endsWith('/'+collection+'/'+id));return {name:w.update.name,fields:{...w.update.fields,dataUrl:{stringValue:'old-photo'}}};});
+assert.equal(await submitContext.window.testSubmit(),false,'same IDs with old photos are not confirmation');
+// A realtime period change cannot turn an unconfirmed attempt into a new create.
+let commits=0;
+submitContext.WEEKLY_CHECKIN_REQUEST={requestKey:'scheduled:2026-09-27',kind:'scheduled',dueDate:'2026-09-27'};
+submitContext.window.configure(async()=>{commits++;},async()=>null);
+assert.equal(await submitContext.window.testSubmit(),false);
+assert.equal(commits,0);
+// The secondary index must use the confirmed recovery ID and do nothing on failure.
+const indexed=[];
+let bridgeResult=false;
+const bridgeContext={console,MODE:'cloud',db:{},CURRENT_USER:{uid:'student-a',role:'student'},setTimeout:()=>0,window:{addEventListener(){},TeamBullsStudentReportSubmitReconciliation:{weeklyReceipt:()=>({studentId:'student-a',sourceId:recoveryId})}},submitWeeklyCheckin:async()=>bridgeResult};
+vm.createContext(bridgeContext);
+let bridge=read('modules/student-trainer-activity-bridge-v10_10_47.js');
+bridge=bridge.replace('  install();','  indexWeekly=id=>recordIndex(id);\n  install();');
+bridgeContext.recordIndex=id=>indexed.push(id);
+vm.runInContext(bridge,bridgeContext);
+await bridgeContext.submitWeeklyCheckin();assert.equal(indexed.length,0);
+bridgeResult=true;await bridgeContext.submitWeeklyCheckin();assert.deepEqual(indexed,[recoveryId]);
+console.log('APROVADO — execução de datas, ciclos, histórico, Central e confirmação atômica semanal.');

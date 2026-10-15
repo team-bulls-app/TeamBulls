@@ -21,10 +21,19 @@ jobs:
       - name: Run Team Bulls regression checks
         run: |
           node scripts/quality-check.mjs
+          node scripts/feedback-notice-cancellation-check.mjs
+          node scripts/student-session-delete-shared-history-check.mjs
+          node scripts/session-durability-regression-check.mjs
           node scripts/prescription-propagation-check.mjs
           node scripts/diet-deletion-check.mjs
+          node scripts/diet-division-deletion-check.mjs
+          node scripts/diet-division-schedule-energy-check.mjs
+          node scripts/diet-mixed-workout-rest-check.mjs
+          node scripts/diet-free-meal-day-rule-check.mjs
           node scripts/student-guidance-check.mjs
+          node scripts/student-extra-report-notice-check.mjs
           node scripts/session-performance-check.mjs
+          node scripts/session-hotpath-performance-check.mjs
           node scripts/week-selection-check.mjs
           node scripts/session-integrity-check.mjs
           node scripts/usability-check.mjs
@@ -33,14 +42,29 @@ jobs:
           node scripts/trainer-student-list-check.mjs
           node scripts/workflow-controls-check.mjs
           node scripts/report-usability-audit-check.mjs
+          node scripts/report-submit-contract-check.mjs
+          node scripts/weekly-report-integrity-check.mjs
+          node scripts/weekly-report-opening-chain-check.mjs
+          node scripts/monthly-report-cycle-check.mjs
+          node scripts/questionnaire-confirmation-check.mjs
           node scripts/firestore-read-baseline-check.mjs
           node scripts/diet-calculation-evolution-check.mjs
           node scripts/diet-portion-presets-check.mjs
+          node scripts/student-food-choices-check.mjs
           node scripts/diet-copy-check.mjs
           node scripts/pdf-export-check.mjs
           node scripts/destructive-actions-supply-check.mjs
           node scripts/pending-session-mutations-check.mjs
           node scripts/startup-runtime-light-check.mjs
+          node scripts/startup-entry-behavior-check.mjs
+          node scripts/exercise-video-performance-check.mjs
+          node scripts/trainer-runtime-reliability-check.mjs
+          node scripts/trainer-activity-recovery-check.mjs
+          node scripts/trainer-canonical-inbox-check.mjs
+          node scripts/inbox-card-opening-check.mjs
+          node scripts/workout-rename-save-check.mjs
+          node scripts/bc-technique-target-check.mjs
+          node scripts/trainer-legacy-report-visibility-check.mjs
           node scripts/session-recovery-home-dates-check.mjs
           node scripts/student-request-realtime-check.mjs
           node scripts/student-weekly-report-entry-check.mjs
@@ -48,6 +72,7 @@ jobs:
           node scripts/trainer-feedback-archive-check.mjs
           node scripts/trainer-update-organizer-check.mjs
           node scripts/intelligence-suite-check.mjs
+          node scripts/runtime-stability-audit-check.mjs
           node scripts/trainer-overdue-report-status-check.mjs
           node scripts/loader-retry-check.mjs
           node scripts/production-audit-check.mjs
@@ -65,6 +90,9 @@ jobs:
           node scripts/student-week-workout-layout-check.mjs
           node scripts/weekly-report-access-check.mjs
           node scripts/startup-cache-recovery-check.mjs
+          node scripts/runtime-delivery-coherence-check.mjs
           node scripts/mobile-touch-freeze-check.mjs
           node scripts/runtime-stabilization-check.mjs
+          node scripts/desktop-runtime-hygiene-check.mjs
+          node scripts/runtime-hygiene-smoke-check.mjs
           node testes/testar_cadastro_convite_v10_10_9.js

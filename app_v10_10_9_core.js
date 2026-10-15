@@ -1266,12 +1266,10 @@ async function doLogin(){
   const btn=document.getElementById('btn-login');
   if(btn.disabled)return;
   btn.disabled=true;btn.textContent='ENTRANDO...';
-  if(navigator.onLine&&!auth){btn.textContent='CONECTANDO...';await ensureFirebaseReady();}
-  if(!navigator.onLine||!auth){
-    await offlineRegisteredLogin(email,pass);
-    btn.disabled=false;btn.textContent='ACESSAR SISTEMA';return;
-  }
   try{
+    if(navigator.onLine&&!auth){btn.textContent='CONECTANDO...';await ensureFirebaseReady();}
+    if(!navigator.onLine||!auth){await offlineRegisteredLogin(email,pass);return;}
+    startAuthListener();
     AUTH_HANDLED=false;startBootWatchdog();setLoadingMessage('validando acesso...');
     const cred=await withTimeout(auth.signInWithEmailAndPassword(email,pass),12000,'login');
     await rememberOfflineCredential(email,pass,cred.user.uid);
@@ -1354,6 +1352,7 @@ async function confirmLogout(){
       }catch(e){ console.warn('Erro ao copiar dados cloud para offline:', e); }
     }
     try{
+      if(CURRENT_USER?.role==='student')await withTimeout(window.TeamBullsDeviceNotices?.unregister?.()||Promise.resolve(),2500,'desativar avisos deste aparelho').catch(()=>{});
       if(auth) await withTimeout(auth.signOut(),4000,'saída da conta').catch(()=>{});
     }catch(e){}
     localStorage.removeItem('teamms_offline_pref');
@@ -1445,8 +1444,8 @@ async function getUserProfileWithRetry(userId){
       const snap=await withTimeout(db.collection('users').doc(userId).get(),PROFILE_READ_TIMEOUT_MS,'leitura do perfil');
       if(snap.exists)return snap;
       if(attempt===attempts-1)return null;
-    }catch(error){lastError=error;if(!navigator.onLine||error?.code==='team-bulls/timeout')break;}
-    await new Promise(resolve=>setTimeout(resolve,250));
+    }catch(error){lastError=error;if(!navigator.onLine||!isNetworkLikeError(error))break;}
+    if(attempt<attempts-1)await new Promise(resolve=>setTimeout(resolve,250));
   }
   if(lastError)throw lastError;
   return null;
@@ -1454,9 +1453,12 @@ async function getUserProfileWithRetry(userId){
 
 let AUTH_CALLBACK_SEEN=false;
 let AUTH_PROCESSING_UID='';
+let AUTH_STATE_REVISION=0;
+let AUTH_LISTENER_SERVICE=null;
 async function handleAuthStateUser(user){
   AUTH_CALLBACK_SEEN=true;
   if(!user){
+    AUTH_STATE_REVISION++;
     AUTH_HANDLED=false;
     AUTH_PROCESSING_UID='';
     if(AUTH_EXPECTED_LOCAL_SIGNOUT)return;
@@ -1467,17 +1469,21 @@ async function handleAuthStateUser(user){
   if(AUTH_PROCESSING_UID===user.uid)return;
   if(AUTH_HANDLED&&CURRENT_USER?.uid===user.uid&&ACCESS_MODE!=='offline-registered')return;
   AUTH_PROCESSING_UID=user.uid;
+  const revision=++AUTH_STATE_REVISION,service=auth;
+  const current=()=>revision===AUTH_STATE_REVISION&&auth===service&&auth?.currentUser?.uid===user.uid;
   AUTH_HANDLED=true;
   setLoadingMessage('validando perfil...');
 
   // Assim que o Firebase confirma qual usuário está autenticado, o aluno pode
   // abrir imediatamente o último plano local. Vídeos e gravações na nuvem só são
   // liberados depois que o perfil remoto é validado.
-  const cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});
+  let cachedShellOpened=false;
   try{
+    cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});
     let snap;
     try{snap=await getUserProfileWithRetry(user.uid);}
-    catch(profileError){if(cachedShellOpened||restoreCachedStudentAccess(user,profileError))return;throw profileError;}
+    catch(profileError){if(!current())return;if(cachedShellOpened||restoreCachedStudentAccess(user,profileError))return;throw profileError;}
+    if(!current())return;
     if(!snap){
       AUTH_HANDLED=false;
       await withTimeout(auth.signOut(),2500,'saída de conta sem perfil').catch(()=>{});
@@ -1520,29 +1526,40 @@ async function handleAuthStateUser(user){
     const hasPending=storageGet('teamms_migration_pending')==='1'&&(!pendingOwner||pendingOwner===user.uid);
     const legacyNeedsCheck=hasOffline&&!storageGet('teamms_cloud_mirror_'+user.uid)&&(!pendingOwner||pendingOwner===user.uid);
     (async()=>{
+      if(!current())return;
       if(hasPending||legacyNeedsCheck)await migrateLocalToCloud(user.uid,{background:true});
+      if(!current())return;
       await loadCloudHome();
     })().catch(error=>console.warn('Sincronização pós-login:',error));
   }catch(error){
+    if(!current())return;
     console.error('Auth handler error:',error);
     AUTH_HANDLED=false;
     if(cachedShellOpened||restoreCachedStudentAccess(user,error))return;
     bootToAuth(isNetworkLikeError(error)?'O servidor não respondeu. Treinadores precisam de conexão; alunos podem usar o acesso offline já validado.':'Não foi possível validar este perfil. Entre novamente.');
   }finally{
-    if(AUTH_PROCESSING_UID===user.uid)AUTH_PROCESSING_UID='';
+    if(revision===AUTH_STATE_REVISION&&AUTH_PROCESSING_UID===user.uid)AUTH_PROCESSING_UID='';
   }
 }
 function startAuthListener(){
   if(!auth){bootToAuth('O serviço de autenticação não foi carregado. Tente corrigir a atualização.');return;}
+  if(AUTH_UNSUBSCRIBE&&AUTH_LISTENER_SERVICE===auth){
+    // Retomar o app reutiliza a assinatura; somente uma validação pendente/falha é retomada.
+    if(auth.currentUser&&!AUTH_PROCESSING_UID&&(!AUTH_HANDLED||ACCESS_MODE==='offline-registered'))handleAuthStateUser(auth.currentUser);
+    return;
+  }
   if(AUTH_UNSUBSCRIBE){AUTH_UNSUBSCRIBE();AUTH_UNSUBSCRIBE=null;}
+  const service=auth;AUTH_LISTENER_SERVICE=service;
   AUTH_CALLBACK_SEEN=false;
-  AUTH_UNSUBSCRIBE=auth.onAuthStateChanged(handleAuthStateUser,error=>{
+  AUTH_UNSUBSCRIBE=service.onAuthStateChanged(user=>{if(AUTH_LISTENER_SERVICE===service&&auth===service)handleAuthStateUser(user);},error=>{
+    if(AUTH_LISTENER_SERVICE!==service||auth!==service)return;
+    AUTH_UNSUBSCRIBE?.();AUTH_UNSUBSCRIBE=null;AUTH_LISTENER_SERVICE=null;AUTH_STATE_REVISION++;
     console.error('Auth state error:',error);AUTH_HANDLED=false;AUTH_PROCESSING_UID='';
     bootToAuth('Falha ao consultar a sessão. Você já pode tentar entrar novamente ou usar o modo local.');
   });
   // Em alguns navegadores currentUser já está restaurado antes do primeiro
   // callback. Usá-lo reduz uma espera desnecessária sem liberar dados de treinador.
-  queueMicrotask(()=>{if(!AUTH_CALLBACK_SEEN&&auth.currentUser)handleAuthStateUser(auth.currentUser);});
+  queueMicrotask(()=>{if(AUTH_LISTENER_SERVICE===service&&auth===service&&!AUTH_CALLBACK_SEEN&&service.currentUser)handleAuthStateUser(service.currentUser);});
 }
 
 /* ══════════════════════════════════════════════════
@@ -1658,7 +1675,7 @@ function lastDate(w){let b=null;(w.exercises||[]).forEach(e=>(e.sessions||[]).fo
 function pdfEscape(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
 function workoutPdfHtml(workout,studentName){
   const days=groupExercisesByDay(workout.exercises||[],getWorkoutDays(workout));
-  const sections=days.map(([day,items])=>`<section><h2>${pdfEscape(day)}</h2>${items.map(ex=>`<article><h3>${pdfEscape(ex.name)}</h3>${String(ex.instructions||'').trim()?`<div class="instruction"><b>Instruções:</b> ${pdfEscape(ex.instructions).replace(/\n/g,'<br>')}</div>`:''}<table><thead><tr><th>Semana</th><th>Prescrição</th></tr></thead><tbody>${[1,2,3,4,5,6,7,8].map(week=>{const rx=resolveWeekPrescription(ex,week);const text=rx.sets.length?rx.sets.map((set,i)=>`${i+1}ª: ${set.targetMin}-${set.targetMax} reps · GER ${String(set.ger).padStart(2,'0')}`).join('<br>'):'Sem exercício';return`<tr><td>Semana ${week}</td><td>${text}</td></tr>`;}).join('')}</tbody></table></article>`).join('')}</section>`).join('');
+  const sections=days.map(([day,items])=>`<section><h2>${pdfEscape(day)}</h2>${items.map(ex=>`<article><h3>${pdfEscape(ex.name)}</h3>${String(ex.instructions||'').trim()?`<div class="instruction"><b>Instruções:</b> ${pdfEscape(ex.instructions).replace(/\n/g,'<br>')}</div>`:''}<table><thead><tr><th>Semana</th><th>Prescrição</th></tr></thead><tbody>${[1,2,3,4,5,6,7,8].map(week=>{const rx=resolveWeekPrescription(ex,week);const text=rx.sets.length?rx.sets.map((set,i)=>`${i+1}ª: ${exerciseHasBcTechnique(ex,week)?BC_PRESCRIPTION_TARGET:set.targetMin+'-'+set.targetMax+' reps'} · GER ${String(set.ger).padStart(2,'0')}`).join('<br>'):'Sem exercício';return`<tr><td>Semana ${week}</td><td>${text}</td></tr>`;}).join('')}</tbody></table></article>`).join('')}</section>`).join('');
   return`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>${pdfEscape(workout.name)}</title><style>@page{size:A4;margin:14mm}body{font-family:Arial,sans-serif;color:#161616}header{border-bottom:3px solid #9b2024;padding-bottom:10px;margin-bottom:18px}h1{font-size:25px;margin:0;text-transform:uppercase}header p{margin:5px 0 0;color:#555}h2{font-size:19px;background:#111;color:#fff;padding:8px 10px;margin:18px 0 8px}article{break-inside:avoid;margin-bottom:14px}h3{font-size:16px;margin:0 0 6px;color:#8f1e22}.instruction{font-size:11px;line-height:1.45;background:#f3eeee;border-left:3px solid #9b2024;padding:7px 9px;margin:0 0 7px}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #bbb;padding:6px;text-align:left;vertical-align:top}th{background:#eee}footer{margin-top:20px;font-size:9px;color:#777;text-align:center}</style></head><body><header><h1>TEAM BULLS — ${pdfEscape(workout.name)}</h1><p>Aluno: ${pdfEscape(studentName||'Modo local')} · Treino completo organizado por dias</p></header>${sections||'<p>Nenhum exercício cadastrado.</p>'}<footer>Gerado pelo Team Bulls v10.1. No diálogo de impressão, escolha “Salvar como PDF”.</footer></body></html>`;
 }
 function exportWorkoutPdf(workout,studentName){
@@ -1932,6 +1949,10 @@ async function fetchCloudStructure(userId){
   ]);
   return{workouts:buildCloudStructure(workoutResult.snapshot,exerciseResult.snapshot),source:workoutResult.source==='server'||exerciseResult.source==='server'?'server':'cache'};
 }
+function pendingSessionHistory(userId){
+  if(!userId||CURRENT_USER?.role!=='student'||CURRENT_USER.uid!==userId)return[];
+  try{return window.TeamBullsSessionPerformance?.sessions?.(userId)||[];}catch(error){return[];}
+}
 async function fetchCloudSessions(userId){
   const query=db.collection('sessions').where('userId','==',userId);
   let result;
@@ -1941,11 +1962,12 @@ async function fetchCloudSessions(userId){
     catch(cacheError){throw serverError;}
   }
   const remote=[];for(const d of result.snapshot.docs){const session=sanitizeHistorySession(d.data(),d.id);if(session)remote.push(session);}
-  const sessions=mergeHistorySessions(remote,loadSessionArchive(userId));
+  const sessions=mergeHistorySessions(pendingSessionHistory(userId),mergeHistorySessions(remote,loadSessionArchive(userId)));
   if(remote.length||result.source==='server')saveSessionArchive(userId,sessions);
   return{sessions,remoteSessionCount:remote.length,recoveredSessionCount:Math.max(0,sessions.length-remote.length),source:result.source};
 }
 function hydrateWorkoutSessions(workouts,sessions){
+  sessions=mergeHistorySessions(pendingSessionHistory(CURRENT_USER?.uid),sessions);
   attachSessionsWithoutLosingOrphans(workouts,sessions);
   workouts.forEach(w=>w.exercises.forEach(e=>e.sessions.sort((a,b)=>String(a.date).localeCompare(String(b.date))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)))));
   return workouts;
@@ -1958,7 +1980,7 @@ async function hydrateHomeSessions(userId,loadSeq){
   try{
     const history=await fetchCloudSessions(userId);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId||MODE!=='cloud')return false;
-    hydrateWorkoutSessions(CLOUD_WORKOUTS,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);saveCloudBackup();renderHome();
+    hydrateWorkoutSessions(CLOUD_WORKOUTS,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);saveCloudBackup();renderHome();refreshVisibleSessionHistory('student');
     if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} do histórico protegido`);
     return true;
   }catch(error){console.warn('Histórico será mantido pelo arquivo local:',error?.code||error?.message);return false;}
@@ -1969,19 +1991,19 @@ async function loadCloudHome(){
   await withTimeout(warmSessionArchive(userId),900,'abrir arquivo local').catch(()=>{});
   // Primeiro mostra o último estado bom sem esperar rede.
   if(!CLOUD_WORKOUTS.length){
-    CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=loadSessionArchive(userId);if(CLOUD_WORKOUTS.length)hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);renderHome();
+    CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));if(CLOUD_WORKOUTS.length)hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);renderHome();
   }
   try{
     const structure=await fetchCloudStructure(userId);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId||MODE!=='cloud')return false;
-    const archived=loadSessionArchive(userId);CLOUD_WORKOUTS=hydrateWorkoutSessions(structure.workouts,archived);HISTORY_BY_NAME=buildHistoryByName(archived);saveCloudBackup();renderHome();
+    const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));CLOUD_WORKOUTS=hydrateWorkoutSessions(structure.workouts,archived);HISTORY_BY_NAME=buildHistoryByName(archived);saveCloudBackup();renderHome();
     // Não bloqueia a navegação: histórico e banners são tarefas de fundo.
     runWhenIdle(()=>hydrateHomeSessions(userId,loadSeq),1800);
     return true;
   }catch(e){
     console.error('loadCloudHome error:',e.code,e.message);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId)return false;
-    if(!CLOUD_WORKOUTS.length){CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=loadSessionArchive(userId);hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);}
+    if(!CLOUD_WORKOUTS.length){CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);}
     renderHome();showToast('Sem conexão com o servidor — exibindo os últimos dados salvos.',true);return false;
   }
 }
@@ -2050,7 +2072,7 @@ let HISTORY_BY_NAME={};
 function buildHistoryByName(allSessions){
   const map={};
   for(const s of allSessions){
-    const norm=(s.exerciseName||'').trim().toLowerCase();
+    const norm=normalizedName(s.exerciseName);
     if(!norm) continue;
     (map[norm]=map[norm]||[]).push(s);
   }
@@ -2063,10 +2085,8 @@ function getSharedSessions(exerciseOrName,ws){
   const workouts=ws||getWorkouts();
   const liveMatches=[];
   for(const workout of workouts)for(const exercise of(workout.exercises||[]))if(normalizedName(exercise.name)===norm)liveMatches.push({workout,exercise});
-  const separateById=!!target&&liveMatches.length>1;
   const all=[];const seen=new Set();
   for(const {workout,exercise} of liveMatches){
-    if(separateById&&String(exercise.id)!==String(target.id))continue;
     for(const session of(exercise.sessions||[])){
       if(seen.has(session.id))continue;
       seen.add(session.id);
@@ -2075,11 +2095,20 @@ function getSharedSessions(exerciseOrName,ws){
   }
   for(const session of(HISTORY_BY_NAME[norm]||[])){
     if(seen.has(session.id))continue;
-    if(separateById&&String(session.exerciseId||'')!==String(target.id))continue;
     seen.add(session.id);
     all.push({...session,_archived:!liveMatches.some(({exercise})=>String(exercise.id)===String(session.exerciseId||''))});
   }
   return all.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)));
+}
+function refreshVisibleSessionHistory(role){
+  if(role==='student'&&document.getElementById('screen-exercise')?.classList.contains('active')){
+    renderExercise();return;
+  }
+  if(role==='trainer'&&document.getElementById('screen-ts-exercise')?.classList.contains('active')&&VIEW_STUDENT_EXERCISE){
+    const exercise=VIEW_STUDENT_EXERCISE,workouts=VIEW_STUDENT?.workouts;
+    buildSessions(exercise,'ts-sessions-list',true,VIEW_STUDENT_WORKOUT?.id,workouts);
+    requestAnimationFrame(()=>buildChart(exercise,'tsProgressChart',TS_CHART_MODE,null,workouts));
+  }
 }
 function sessionMaxWeight(session){
   const values=(session?.sets||[]).map(s=>Number(s.weight)).filter(Number.isFinite);
@@ -2547,7 +2576,8 @@ async function fetchCompletionsToday(uid){
       const fallback=await cloudGet(db.collection('mealCompletions').where('studentUid','==',uid),'histórico de refeições');
       docs=fallback.docs.filter(d=>d.data().date===today());
     }
-    docs.forEach(d=>completions.add(d.data().mealId));
+    // Escolhas recorrentes usam registros próprios; nunca são uma conclusão.
+    docs.filter(d=>d.data().recordType!=='food_choice').forEach(d=>completions.add(d.data().mealId));
   }catch(e){console.error('fetchCompletionsToday',e);}
   return completions;
 }
@@ -2567,7 +2597,7 @@ function renderMealsList(){
   const sorted=[...meals].sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   list.innerHTML=sorted.map((m,index)=>{
     const done=isMealDoneToday(m);
-    const items=(m.items||'').split('\n').map(i=>i.trim()).filter(Boolean).map(i=>`<li>${esc(i)}</li>`).join('');
+    const items=window.TeamBullsStudentFoodChoices?.items(m)??(m.items||'').split('\n').map(i=>i.trim()).filter(Boolean).map(i=>`<li>${esc(i)}</li>`).join('');
     const editBtn=canEditContent?`<button class="meal-edit-btn" onclick="openEditMealModal(${jsArg(m.id)})">✏️</button>`:'';
     const doneBtn=canToggleDone
       ?`<button class="meal-done-btn${done?' done':''}" onclick="toggleMealDone(${jsArg(m.id)})">${done?'✓ Concluído hoje':'Marcar como concluído'}</button>`
@@ -4008,23 +4038,14 @@ async function checkQuestionnaires(){
   if(!CURRENT_USER||CURRENT_USER.role==='trainer')return;
   const studentUid=CURRENT_USER.uid;
   try{
-    let docs;
-    try{
-      const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid).where('answered','==',false).limit(1),'relatório pendente');
-      docs=snap.docs;
-    }catch(indexError){
-      const fallback=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid),'relatórios');
-      docs=fallback.docs.filter(d=>!d.data().answered).slice(0,1);
-    }
+    const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid),'relatórios pendentes');
+    let rows=snap.docs.map(doc=>({...doc.data(),id:doc.id}));
+    if(rows.some(report=>report.reportType==='monthly')){await ensureReportCycleRuntime();rows=await window.TeamBullsMonthlyReports.pending(rows,studentUid);}
+    const pending=rows.filter(questionnaireIsPending);
     if(CURRENT_USER?.uid!==studentUid)return;
-    const b=document.getElementById('quest-banner');
-    if(docs.length){
-      b.dataset.qid=docs[0].id;
-      b.style.display='block';
-    }else{
-      b.style.display='none';
-    }
-  }catch(e){}
+    const banner=document.getElementById('quest-banner');if(!banner)return;
+    banner.dataset.qid=pending[0]?.id||'';banner.style.display=pending.length?'block':'none';
+  }catch(error){console.warn('[Team Bulls] pendências não confirmadas',error?.code||error?.message);}
 }
 function clearQuestionnaireReportPreviews(){
   QUESTIONNAIRE_REPORT_PREVIEW_URLS.forEach(url=>{if(url)try{URL.revokeObjectURL(url);}catch(error){}});
@@ -4107,13 +4128,18 @@ async function submitQuestionnaireAnswers(){
 async function openMyQuestionnaires(){
   if(MODE==='local'){ alert('Relatórios exigem login (recurso do modo nuvem).'); return; }
   const navigation=beginAsyncNavigation(),studentUid=CURRENT_USER.uid;
-  let questionnaires=[];
+  let questionnaires=[],loadError=null;
   try{
     const snap=await cloudGet(db.collection('questionnaires').where('studentId','==',studentUid),'relatórios');
     questionnaires=snap.docs.map(d=>({...d.data(),id:d.id}));
+    if(questionnaires.some(report=>report.reportType==='monthly')){await ensureReportCycleRuntime();await window.TeamBullsMonthlyReports.loadSchedule(studentUid);}
     questionnaires.sort((a,b)=>(b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  }catch(e){questionnaires=[];}
+  }catch(e){loadError=e;}
   if(!isNavigationCurrent(navigation)||CURRENT_USER?.uid!==studentUid)return;
+  if(loadError){
+    document.getElementById('my-quest-list').innerHTML='<div class="no-data-inline">Não foi possível consultar seus relatórios. <button class="btn-ghost" onclick="openMyQuestionnaires()">TENTAR NOVAMENTE</button></div>';
+    document.getElementById('my-quest-empty').style.display='none';showScreen('screen-my-quest',navigation);return;
+  }
   MY_QUEST_CACHE=questionnaires;
   renderQuestList(MY_QUEST_CACHE,'my-quest-list','my-quest-empty',false);
   showScreen('screen-my-quest',navigation);
@@ -4138,6 +4164,9 @@ async function viewQuestionnaire(qid,fromTrainer){
 /* ══════════════════════════════════════════════════
    SESSIONS RENDER
 ══════════════════════════════════════════════════ */
+function sessionSyncBadge(session){
+  return session?.pendingSync?'<span class="session-week-badge" style="color:var(--warn)">Aguardando sincronização</span>':'';
+}
 function buildSessions(e,elId,readonly,homeWid,ws){
   const el=document.getElementById(elId);
   const sessions=getSharedSessions(e,ws);
@@ -4170,7 +4199,7 @@ function buildSessions(e,elId,readonly,homeWid,ws){
     const noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';
     return`<div class="session-block">
       <div class="session-header">
-        <span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}
+        <span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}
         <div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">Vol: ${vol} kg</span>${del}</div>
       </div>
       <table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>Feito</th></tr></thead><tbody>${rows}</tbody></table>
@@ -4366,7 +4395,10 @@ async function deleteTsExercise(eid){
 /* ══════════════════════════════════════════════════
    MODALS
 ══════════════════════════════════════════════════ */
-function openModal(id){document.getElementById(id).classList.add('open');}
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='modal-workout')setWorkoutSaveStatus('');
+}
 function closeModal(id){
   const modal=document.getElementById(id);if(!modal)return;
   if(id==='modal-catalog-video'){const body=document.getElementById('catalog-video-body');if(body)body.innerHTML='';}
@@ -4376,6 +4408,22 @@ function closeModal(id){
 }
 
 // Workout
+function setWorkoutSaveStatus(message,isError=false){
+  const status=document.getElementById('workout-save-status');
+  if(!status)return;
+  status.textContent=message;
+  status.style.color=isError?'#fca5a5':'';
+}
+async function saveWorkoutFromButton(){
+  try{await saveWorkout();}
+  catch(error){
+    // Inclui erros nas camadas de proteção que envolvem saveWorkout.
+    if(ACTION_LOCKS.has('save-workout'))endAction('save-workout','modal-workout');
+    const message='Não foi possível salvar o treino: '+String(error?.message||error);
+    setWorkoutSaveStatus(message,true);
+    console.error('saveWorkout',error);
+  }
+}
 function buildColorPicker(){
   document.getElementById('color-picker-row').innerHTML=PALETTE.map(c=>
     `<div class="color-swatch ${c===SEL_COLOR?'active':''}" style="background:${c}" data-color="${c}" onclick="pickColor('${c}')"></div>`
@@ -4393,20 +4441,24 @@ async function saveWorkout(){
   const name=document.getElementById('input-workout-name').value.trim();
   const startDate=document.getElementById('input-workout-start-date')?.value||today();
   const updateDate=document.getElementById('input-workout-update-date')?.value||addDaysIso(startDate,28);
-  if(!name){alert('Digite o nome do treino!');return;}
-  if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){alert('Confira as datas do ciclo. A atualização não pode ser anterior ao início.');return;}
+  if(!name){setWorkoutSaveStatus('Digite o nome do treino.',true);return;}
+  if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){setWorkoutSaveStatus('Confira as datas do ciclo: a atualização deve ser no início ou depois.',true);return;}
+  const editingWorkoutId=EDIT_W,modalTarget=MODAL_TARGET,studentUid=modalTarget==='student'?VIEW_STUDENT?.uid:null,color=SEL_COLOR;
   const targetWorkouts=MODAL_TARGET==='student'?(VIEW_STUDENT?.workouts||[]):getWorkouts();
   if(targetWorkouts.some(w=>w.id!==EDIT_W&&normalizedName(w.name)===normalizedName(name))){
-    alert('Já existe um treino com esse nome. Edite o treino existente para evitar duplicações.');
+    setWorkoutSaveStatus('Já existe um treino com esse nome.',true);
     return;
   }
-  if(!beginAction('save-workout','modal-workout'))return;
+  if(!beginAction('save-workout','modal-workout')){setWorkoutSaveStatus('Aguarde o salvamento anterior terminar.',true);return;}
+  setWorkoutSaveStatus('Salvando o treino…');
   try{
     if(MODE==='cloud'){
       const targetUid=MODAL_TARGET==='student'?VIEW_STUDENT?.uid:CURRENT_USER?.uid;
       const serverWorkouts=await cloudGet(db.collection('workouts').where('userId','==',targetUid),'treinos existentes');
+      if(MODAL_TARGET!==modalTarget||EDIT_W!==editingWorkoutId||(modalTarget==='student'&&VIEW_STUDENT?.uid!==studentUid))throw new Error('O aluno ou o treino aberto mudou. Abra o treino novamente e tente salvar.');
+      if(editingWorkoutId&&!serverWorkouts.docs.some(doc=>doc.id===editingWorkoutId))throw new Error('Este treino não pertence ao aluno aberto ou não está mais disponível. Atualize a lista.');
       if(serverWorkouts.docs.some(d=>d.id!==EDIT_W&&normalizedName(d.data().name)===normalizedName(name))){
-        alert('Esse treino já foi salvo. A lista será atualizada para evitar uma duplicação.');
+        setWorkoutSaveStatus('Esse nome já foi salvo em outro treino. Atualize a lista antes de tentar novamente.',true);
         if(MODAL_TARGET==='student')await renderTrainerStudent(VIEW_STUDENT);else await loadCloudHome();
         return;
       }
@@ -4415,7 +4467,11 @@ async function saveWorkout(){
     if(MODAL_TARGET==='student'){
       if(!VIEW_STUDENT)return;
       if(EDIT_W){
-        await cloudWrite(db.collection('workouts').doc(EDIT_W).update({name,color:SEL_COLOR,startDate,updateDate}),'editar treino');
+        await cloudWrite(db.collection('workouts').doc(EDIT_W).update({name,color,startDate,updateDate}),'editar treino');
+        if(VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId)return;
+        const edited=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
+        if(edited)Object.assign(edited,{name,color,startDate,updateDate});
+        if(VIEW_STUDENT_WORKOUT?.id===editingWorkoutId)Object.assign(VIEW_STUDENT_WORKOUT,{name,color,startDate,updateDate});
       }else{
         const docId=WORKOUT_CREATE_ID||(WORKOUT_CREATE_ID=stableEntityId('w',VIEW_STUDENT.uid,normalizedName(name)));
         const existing=normalizeWorkoutCollection(VIEW_STUDENT.workouts||[]),batch=db.batch();
@@ -4424,9 +4480,23 @@ async function saveWorkout(){
         await cloudWrite(batch.commit(),'salvar alterações');
       }
       WORKOUT_CREATE_ID=null;
+      if(editingWorkoutId){
+        const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
+        const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
+        if(card)card.style.setProperty('--wcard-color',color);
+      }
       closeModal('modal-workout');
       showToast('✓ Treino salvo');
       await renderTrainerStudent(VIEW_STUDENT);
+      // A leitura de retorno pode vir do cache durante uma falha temporária.
+      // Preserve na tela a alteração já confirmada pela escrita no servidor.
+      if(editingWorkoutId&&VIEW_STUDENT?.uid===studentUid){
+        const refreshed=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
+        if(refreshed)Object.assign(refreshed,{name,color,startDate,updateDate});
+        const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
+        const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
+        if(card)card.style.setProperty('--wcard-color',color);
+      }
       return;
     }
     const __localSnapshot=JSON.stringify(LOCAL_DB);
@@ -4456,7 +4526,7 @@ async function saveWorkout(){
       closeModal('modal-workout');renderHome();
     }
   }catch(e){
-    alert('Erro ao salvar treino: '+(e.code?e.code+' — ':'')+e.message);
+    setWorkoutSaveStatus('Erro ao salvar treino: '+(e.code?e.code+' — ':'')+e.message,true);
     console.error(e);
   }finally{
     endAction('save-workout','modal-workout');
@@ -4475,7 +4545,8 @@ function openEditDayModal(dayName,target='self'){
   DAY_MODAL_TARGET=target;EDIT_DAY_NAME=day.name;document.getElementById('modal-day-title').textContent='Renomear dia — '+workout.name;document.getElementById('input-day-name').value=day.name;openModal('modal-day');focusEditorField('input-day-name',180);
 }
 function dayListAfterRename(workout,oldName,newName){
-  const days=getWorkoutDays(workout).map(day=>normalizedName(day.name)===normalizedName(oldName)?{...day,id:dayIdFromName(newName),name:newName}:day);
+  // O ID é a referência das divisões da dieta; renomear a pasta não pode quebrá-la.
+  const days=getWorkoutDays(workout).map(day=>normalizedName(day.name)===normalizedName(oldName)?{...day,name:newName}:day);
   if(!oldName)days.push({id:dayIdFromName(newName),name:newName,order:days.length});
   return normalizeWorkoutDays(days,[]);
 }
@@ -5040,7 +5111,7 @@ async function renderTrainerStudent(s){
     VIEW_STUDENT={...VIEW_STUDENT,workouts};
     HISTORY_BY_NAME=buildHistoryByName(archived);
     // O histórico completo é carregado depois da lista de protocolos, sem segurar a tela.
-    runWhenIdle(async()=>{try{const history=await fetchCloudSessions(studentUid);if(loadSeq!==TRAINER_STUDENT_LOAD_SEQ||VIEW_STUDENT?.uid!==studentUid)return;hydrateWorkoutSessions(VIEW_STUDENT.workouts,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} para este aluno`);}catch(error){console.warn('Histórico do aluno mantido em cache',error);}},1800);
+    runWhenIdle(async()=>{try{const history=await fetchCloudSessions(studentUid);if(loadSeq!==TRAINER_STUDENT_LOAD_SEQ||VIEW_STUDENT?.uid!==studentUid)return;hydrateWorkoutSessions(VIEW_STUDENT.workouts,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);refreshVisibleSessionHistory('trainer');if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} para este aluno`);}catch(error){console.warn('Histórico do aluno mantido em cache',error);}},1800);
     const list=document.getElementById('ts-workout-list');
     const empty=document.getElementById('ts-workout-empty');
     if(!workouts.length){list.innerHTML='';empty.style.display='block';return;}
@@ -5056,7 +5127,7 @@ async function renderTrainerStudent(s){
       const meta=last?'Último: '+fmt(last):dayCount+' '+(dayCount===1?'dia':'dias');
       const wid=jsArg(w.id),isActive=String(w.id)===currentActiveId;
       const orderControls=`<div class="workout-order-controls"><button class="order-btn" ${index===0?'disabled':''} onclick="event.stopPropagation();moveTrainerWorkout(${wid},-1)" title="Mover protocolo para cima">↑</button><button class="order-btn" ${index===workouts.length-1?'disabled':''} onclick="event.stopPropagation();moveTrainerWorkout(${wid},1)" title="Mover protocolo para baixo">↓</button></div>`;
-      return`<div class="workout-card ${isActive?'is-active':'is-inactive'}" style="--wcard-color:${w.color}" onclick="openTsWorkout(${wid})">
+      return`<div class="workout-card ${isActive?'is-active':'is-inactive'}" data-workout-id="${esc(w.id)}" style="--wcard-color:${w.color}" onclick="openTsWorkout(${wid})">
         <div class="workout-card-info"><div class="protocol-state-badge ${isActive?'active':'inactive'}">${isActive?'● TREINO ATIVO':'○ DESATIVADO'}</div><div class="workout-card-name">${esc(w.name)}</div><div class="workout-card-meta">${meta} · ${esc(v104CycleMeta(w))} · ${w.exercises.length} exerc.${isActive?' · plano atual':' · aluno mantém acesso'}</div></div>
         <div class="workout-card-actions">
           ${orderControls}
@@ -5961,7 +6032,7 @@ function updateBackoffLoadSuggestion(){const rows=[...document.querySelectorAll(
 const openLogSessionModalV101=openLogSessionModal;
 openLogSessionModal=function(){const result=openLogSessionModalV101.apply(this,arguments);const exercise=getE(SESSION_WID,SESSION_EID);renderRestTimerPresetsForExercise(exercise);return result;};
 
-function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(Number(s.weight)||0)*(Number(s.reps)||0),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo/carga':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
+function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(Number(s.weight)||0)*(Number(s.reps)||0),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo/carga':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
 buildSessions=buildSessionsV102;
 
 const openEditSessionV101=openEditSession;
@@ -6297,7 +6368,7 @@ function renderWeeklyCheckinCard(loadError=false){
   const title=document.getElementById('weekly-checkin-title'),status=document.getElementById('weekly-checkin-status'),meta=document.getElementById('weekly-checkin-meta'),action=document.getElementById('weekly-checkin-action');
   if(loadError){title.textContent='Relatório + 6 fotos';status.textContent='OFFLINE';status.className='quest-status pending';meta.textContent='Não foi possível consultar a programação agora. Tente novamente quando a conexão estabilizar.';action.disabled=true;if(homeBanner)homeBanner.style.display='none';return;}
   if(!WEEKLY_CHECKIN_SCHEDULE||!WEEKLY_CHECKIN_REQUEST){title.textContent='Aguardando programação';status.textContent='NÃO PROGRAMADO';status.className='quest-status';meta.textContent='O treinador ainda não definiu a primeira data do relatório semanal.';action.disabled=true;if(homeBanner)homeBanner.style.display='none';return;}
-  const request=WEEKLY_CHECKIN_REQUEST;title.textContent=request.kind==='manual'?'Relatório extra solicitado':'Relatório + 6 fotos';status.textContent=request.pending?'PENDENTE':'AGENDADO';status.className='quest-status '+(request.pending?'pending':'answered');meta.textContent=request.kind==='manual'?`Solicitação extra feita em ${fmt(request.dueDate)}.`:`Próxima entrega: ${fmt(request.dueDate)} · frequência de 7 dias.`;action.disabled=false;action.textContent=request.pending?'ENVIAR RELATÓRIO E 6 FOTOS':'ENVIAR ANTECIPADAMENTE';
+  const request=WEEKLY_CHECKIN_REQUEST;title.textContent=request.kind==='manual'?'Relatório extra solicitado':'Relatório + 6 fotos';status.textContent=request.pending?'PENDENTE':'AGENDADO';status.className='quest-status '+(request.pending?'pending':'answered');meta.textContent=request.kind==='manual'?`Solicitação extra feita em ${fmt(request.dueDate)}.`:`Próxima entrega: ${fmt(request.dueDate)} · frequência de 7 dias.`;action.disabled=!request.pending;action.textContent=request.pending?'ENVIAR RELATÓRIO E 6 FOTOS':'AGUARDANDO A DATA';
   if(homeBanner){homeBanner.style.display=request.pending?'block':'none';document.getElementById('weekly-checkin-home-text').textContent=request.kind==='manual'?'Seu treinador solicitou um relatório extra com todas as perguntas e seis fotos obrigatórias.':`Seu relatório semanal de ${fmt(request.dueDate)} está pendente.`;}
 }
 const V102_OPEN_CALENDAR=openCalendar;
@@ -6310,6 +6381,7 @@ function buildWeeklyCheckinQuestions(){
   return{questions:filtered,sectionAt};
 }
 function openWeeklyCheckinModal(){
+  if(!window.TeamBullsWeeklyReportIntegrity?.canOpenForm?.()){showToast('O relatório ainda está carregando. Aguarde e tente novamente.',true);return;}
   if(MODE!=='cloud'||CURRENT_USER?.role!=='student'){alert('O relatório semanal exige login ativo.');return;}
   if(!WEEKLY_CHECKIN_REQUEST){loadWeeklyCheckinState(true).then(request=>{if(request)openWeeklyCheckinModal();else alert('Seu treinador ainda não programou o relatório semanal.');});return;}
   const request=WEEKLY_CHECKIN_REQUEST,{questions,sectionAt}=buildWeeklyCheckinQuestions();
@@ -6369,8 +6441,10 @@ async function loadTrainerCheckinSchedule(studentUid){
     if(VIEW_STUDENT?.uid!==studentUid)return;
     TRAINER_CHECKIN_SCHEDULE=doc.exists?{...doc.data(),studentId:studentUid}:{studentId:studentUid,nextDueDate:addDaysIso(today(),7),intervalDays:7,extraRequestId:'',extraRequestedAt:''};
     document.getElementById('trainer-checkin-date').value=validIsoDate(TRAINER_CHECKIN_SCHEDULE.nextDueDate)?TRAINER_CHECKIN_SCHEDULE.nextDueDate:addDaysIso(today(),7);document.getElementById('trainer-checkin-interval').value='7';
+    const cancelButton=document.getElementById('trainer-cancel-extra-checkin'),extraKey=checkinRequestKey('manual',TRAINER_CHECKIN_SCHEDULE.extraRequestedAt,TRAINER_CHECKIN_SCHEDULE.extraRequestId);
+    if(cancelButton)cancelButton.style.display=TRAINER_CHECKIN_SCHEDULE.extraRequestId&&!checkins.some(item=>item.requestKey===extraKey)?'':'none';
     const state=document.getElementById('trainer-checkin-state'),help=document.getElementById('trainer-checkin-help');state.textContent=doc.exists?'PROGRAMADO':'NÃO SALVO';state.className='quest-status '+(doc.exists?'answered':'pending');const last=checkins[0];help.textContent=last?`Último relatório: ${fmt(last.submittedDate||last.dueDate)}. A próxima data pode ser alterada quando necessário.`:'Nenhum relatório recebido ainda. Salve a primeira data para iniciar a cobrança semanal.';
-  }catch(error){document.getElementById('trainer-checkin-state').textContent='ERRO';document.getElementById('trainer-checkin-help').textContent='Não foi possível carregar a programação. Tente novamente.';}
+  }catch(error){document.getElementById('trainer-checkin-state').textContent='ERRO';document.getElementById('trainer-checkin-help').textContent='Não foi possível carregar a programação. Tente novamente.';const cancelButton=document.getElementById('trainer-cancel-extra-checkin');if(cancelButton)cancelButton.style.display='none';}
 }
 const V102_RENDER_TRAINER_STUDENT=renderTrainerStudent;
 renderTrainerStudent=async function(student){await V102_RENDER_TRAINER_STUDENT(student);if(student&&VIEW_STUDENT?.uid===student.uid)await loadTrainerCheckinSchedule(student.uid);};
@@ -6552,7 +6626,19 @@ openBulkPrescriptionModal=function(){V104_OPEN_BULK();const all=document.getElem
 /* Dietas com subdivisões livres e distribuição semanal. */
 function normalizeDietVariant(value,index=0){
   const raw=value&&typeof value==='object'?value:{},meals=(Array.isArray(raw.meals)?raw.meals:[]).map(normalizeDietMeal);
-  return{id:String(raw.id||uid()),name:String(raw.name||('Divisão '+(index+1))).trim().slice(0,100)||('Divisão '+(index+1)),daysPerWeek:Math.max(0,Math.min(7,Math.trunc(Number(raw.daysPerWeek)||0))),order:Number.isFinite(Number(raw.order))?Math.max(0,Math.trunc(Number(raw.order))):index,meals};
+  const name=String(raw.name||('Divisão '+(index+1))).trim().slice(0,100)||('Divisão '+(index+1));
+  const weekdays=Array.isArray(raw.weekdays)?[...new Set(raw.weekdays.map(Number).filter(day=>Number.isInteger(day)&&day>=0&&day<=6))].sort((a,b)=>(a+6)%7-(b+6)%7):[];
+  const dayType=['training','rest','mixed'].includes(raw.dayType)?raw.dayType:name==='Dia de treino'?'training':name==='Dia sem treino'?'rest':'';
+  const workoutDays=[],seenWorkoutDays=new Set();
+  for(const entry of Array.isArray(raw.workoutDays)?raw.workoutDays:[]){
+    const workoutId=String(entry?.workoutId||'').slice(0,180),workoutDayId=String(entry?.workoutDayId||'').slice(0,180);
+    const key=workoutId+'\u0000'+workoutDayId;if(!workoutId||!workoutDayId||seenWorkoutDays.has(key))continue;
+    seenWorkoutDays.add(key);workoutDays.push({workoutId,workoutDayId,workoutName:String(entry?.workoutName||'').slice(0,100),workoutDayName:String(entry?.workoutDayName||'').slice(0,60)});
+  }
+  const restWeekdays=Array.isArray(raw.restWeekdays)?[...new Set(raw.restWeekdays.map(Number).filter(day=>Number.isInteger(day)&&day>=0&&day<=6))].sort((a,b)=>(a+6)%7-(b+6)%7):dayType==='rest'?weekdays.slice():[];
+  const legacyRest=dayType==='rest'&&!Object.prototype.hasOwnProperty.call(raw,'restDaysPerWeek')?(weekdays.length||Number(raw.daysPerWeek)||0):0;
+  const restDaysPerWeek=restWeekdays.length||Math.max(0,Math.min(7,Math.trunc(Number(raw.restDaysPerWeek??legacyRest)||0)));
+  return{id:String(raw.id||uid()),name,daysPerWeek:weekdays.length||Math.max(0,Math.min(7,Math.trunc(Number(raw.daysPerWeek)||0))),weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays,order:Number.isFinite(Number(raw.order))?Math.max(0,Math.trunc(Number(raw.order))):index,meals};
 }
 normalizeDietPlan=function(plan,index=0){
   const raw=plan&&typeof plan==='object'?plan:{},start=v104DateOr(raw.startDate,today()),update=v104DateOr(raw.updateDate,addDaysIso(start,28));
@@ -6569,11 +6655,58 @@ normalizeDietDocument=function(source){
   plans=plans.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'pt-BR')).map((plan,index)=>({...plan,order:index}));if(plans.length&&!plans.some(plan=>plan.isActive))plans[0].isActive=true;if(plans.filter(plan=>plan.isActive).length>1){let found=false;plans.forEach(plan=>{if(plan.isActive&&!found)found=true;else if(plan.isActive)plan.isActive=false;});}return{plans};
 };
 function currentDietVariant(){const plan=currentDiet();if(!plan)return null;let found=plan.variants.find(item=>item.id===CURRENT_DIET_VARIANT_ID);if(!found)found=plan.variants[0]||null;if(found)CURRENT_DIET_VARIANT_ID=found.id;return found;}
+const DIET_WEEKDAY_LABELS=['DOM','SEG','TER','QUA','QUI','SEX','SÁB'];
+function dietVariantDayLabel(variant){const type=variant.dayType==='training'?'Treino':variant.dayType==='rest'?'Descanso':variant.dayType==='mixed'?'Treino e descanso':'';const rest=Number(variant.restDaysPerWeek)||0;const days=(variant.weekdays||[]).map(day=>DIET_WEEKDAY_LABELS[day]).filter(Boolean).join(', ');const fixedRest=(variant.restWeekdays||[]).map(day=>DIET_WEEKDAY_LABELS[day]).filter(Boolean).join(', ');if(type==='Descanso'&&fixedRest&&fixedRest===days)return type+' · '+days;return[type,rest&&variant.dayType!=='rest'?`${rest} ${rest===1?'descanso':'descansos'}`:'',fixedRest?'descanso: '+fixedRest:'',days?'semana: '+days:''].filter(Boolean).join(' · ');}
+function dietVariantWorkoutLabels(variant){
+  const choices=dietFreeMealWorkoutChoices();
+  return(variant.workoutDays||[]).map(ref=>{
+    const match=choices.find(item=>item.workoutId===ref.workoutId&&item.workoutDayId===ref.workoutDayId);
+    return(match?match.workoutName+' — '+match.workoutDayName+(match.active?'':' (protocolo inativo)'):(ref.workoutName||'Treino anterior')+' — '+(ref.workoutDayName||'dia anterior')+' (não encontrado)');
+  });
+}
+function updateDietVariantWorkoutVisibility(){
+  const wrap=document.getElementById('diet-variant-workout-wrap');if(wrap)wrap.style.display='block';
+  syncDietVariantDayTypeFromAssignments();
+}
+function dietActiveWorkoutChoices(){return dietFreeMealWorkoutChoices().filter(choice=>choice.active);}
+function syncDietVariantDayTypeFromAssignments(){
+  const rest=document.getElementById('input-diet-variant-rest-days');if(rest&&!rest.disabled)rest.dataset.manualValue=rest.value;
+  const hasWorkout=!!document.querySelector('[data-diet-variant-workout]:checked'),hasRest=Number(rest?.value)>0;
+  const type=document.getElementById('input-diet-variant-day-type');if(type&&(hasWorkout||hasRest))type.value=hasWorkout&&hasRest?'mixed':hasWorkout?'training':'rest';
+  syncDietVariantDaysFromWeekdays();
+}
+function syncDietVariantRestWeekdays(){
+  const field=document.getElementById('input-diet-variant-rest-days');if(!field)return;
+  const fixed=document.querySelectorAll('[data-diet-variant-rest-weekday]:checked').length;
+  if(fixed){if(!field.disabled)field.dataset.manualValue=field.value;field.value=String(fixed);field.disabled=true;}
+  else{field.disabled=false;field.value=field.dataset.manualValue||'0';}
+  syncDietVariantDayTypeFromAssignments();
+}
+function populateDietVariantWorkoutChoices(variant){
+  const host=document.getElementById('diet-variant-workout-options');if(!host)return;
+  const choices=dietActiveWorkoutChoices(),saved=variant?.workoutDays||[],key=ref=>ref.workoutId+'\u0000'+ref.workoutDayId;
+  const current=new Set(choices.map(key));
+  const groups=new Map();choices.forEach((choice,index)=>{if(!groups.has(choice.workoutId))groups.set(choice.workoutId,{name:choice.workoutName,rows:[]});groups.get(choice.workoutId).rows.push({choice,index});});
+  host.innerHTML=[...groups.values()].map(group=>`<section class="diet-variant-workout-group"><strong>${esc(group.name)}</strong><div class="diet-variant-workout-options">${group.rows.map(({choice,index})=>`<label class="diet-variant-workout-option"><input type="checkbox" data-diet-variant-workout="${index}" onchange="syncDietVariantDayTypeFromAssignments()" ${saved.some(ref=>key(ref)===key(choice))?'checked':''}/><span>${esc(choice.workoutDayName)}</span></label>`).join('')}</div></section>`).join('')+
+    saved.filter(ref=>!current.has(key(ref))).map(ref=>`<label class="diet-variant-workout-option"><input type="checkbox" data-diet-variant-workout-missing="1" checked/><span>${esc((ref.workoutName||'Treino anterior')+' — '+(ref.workoutDayName||'dia anterior'))} (inativo ou removido; desmarque ou reative antes de salvar)</span></label>`).join('')+
+    (!choices.length?'<div class="plan-help">Nenhum protocolo ativo com dias de treino. Ative o treino do aluno na aba Treinos para vinculá-lo.</div>':'');
+  updateDietVariantWorkoutVisibility();
+}
+function syncDietVariantDaysFromWeekdays(){
+  const field=document.getElementById('input-diet-variant-days');if(!field)return;
+  const fixed=document.querySelectorAll('[data-diet-variant-weekday]:checked').length;
+  const workouts=document.querySelectorAll('[data-diet-variant-workout]:checked').length;
+  const rests=Math.max(0,Math.min(7,Math.trunc(Number(document.getElementById('input-diet-variant-rest-days')?.value)||0)));
+  const allocated=workouts+rests;
+  if(fixed||allocated){if(!field.disabled)field.dataset.manualValue=field.value;field.value=String(fixed||allocated);field.disabled=true;}
+  else{field.disabled=false;field.value=field.dataset.manualValue||'0';}
+}
 function v104DietDistribution(plan){const total=(plan?.variants||[]).reduce((sum,item)=>sum+Number(item.daysPerWeek||0),0);return{total,remaining:7-total};}
 function renderDietVariantTabs(trainerMode=false){
   const plan=currentDiet(),host=document.getElementById(trainerMode?'ts-diet-variant-tabs':'diet-variant-tabs'),distribution=document.getElementById(trainerMode?'ts-diet-week-distribution':'diet-week-distribution');if(!plan||!host)return;
-  const active=currentDietVariant();host.innerHTML=plan.variants.map((variant,index)=>`<div class="diet-variant-card ${variant.id===active?.id?'active':''}" onclick="selectDietVariant(${jsArg(variant.id)},${trainerMode})"><div><strong>${esc(variant.name)}</strong><span>${variant.daysPerWeek} ${variant.daysPerWeek===1?'dia':'dias'} por semana · ${variant.meals.length} refeições</span></div>${trainerMode?`<div class="diet-variant-actions"><button ${index===0?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},-1)">↑</button><button ${index===plan.variants.length-1?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},1)">↓</button><button onclick="event.stopPropagation();openEditDietVariantModal(${jsArg(variant.id)})">✎</button></div>`:''}</div>`).join('');
-  const d=v104DietDistribution(plan);if(distribution)distribution.innerHTML=`<span>Distribuição semanal: <b>${plan.variants.map(item=>`${esc(item.name)} ${item.daysPerWeek}×`).join(' · ')}</b></span><span class="${d.total===7?'ok':'warn'}">${d.total===7?'✓ 7 dias programados':d.total<7?`Faltam ${7-d.total} dia(s)`:`Excedeu em ${d.total-7} dia(s)`}</span>`;
+  const active=currentDietVariant();host.innerHTML=plan.variants.map((variant,index)=>`<div class="diet-variant-card ${variant.id===active?.id?'active':''}" onclick="selectDietVariant(${jsArg(variant.id)},${trainerMode})"><div><strong>${esc(variant.name)}</strong><span>${variant.daysPerWeek} ${variant.daysPerWeek===1?'dia':'dias'} por semana · ${variant.meals.length} refeições${dietVariantDayLabel(variant)?' · '+esc(dietVariantDayLabel(variant)):''}</span>${dietVariantWorkoutLabels(variant).length?`<span>Treinos vinculados: ${esc(dietVariantWorkoutLabels(variant).join(' · '))}</span>`:''}</div>${trainerMode?`<div class="diet-variant-actions"><button ${index===0?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},-1)">↑</button><button ${index===plan.variants.length-1?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},1)">↓</button><button onclick="event.stopPropagation();openEditDietVariantModal(${jsArg(variant.id)})" title="Editar divisão" aria-label="Editar divisão ${esc(variant.name)}">✎</button>${plan.variants.length>1?`<button type="button" onclick="event.stopPropagation();deleteDietVariant(${jsArg(variant.id)})" title="Excluir divisão" aria-label="Excluir divisão ${esc(variant.name)}" style="color:var(--danger)">✕</button>`:''}</div>`:''}</div>`).join('');
+  const d=v104DietDistribution(plan);if(distribution){const todayVariant=!trainerMode&&plan.isActive?plan.variants.find(item=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(new Date().getDay())):null;const hasSpecificDays=plan.variants.some(item=>(item.weekdays||[]).length||(item.restWeekdays||[]).length);distribution.innerHTML=`<span>Distribuição semanal: <b>${plan.variants.map(item=>`${esc(item.name)} ${item.daysPerWeek}×`).join(' · ')}</b></span><span class="${d.total===7?'ok':'warn'}">${d.total===7?'✓ 7 dias programados':d.total<7?`Faltam ${7-d.total} dia(s)`:`Excedeu em ${d.total-7} dia(s)`}</span>${!trainerMode&&hasSpecificDays?`<span class="${todayVariant?'ok':'warn'}">${todayVariant?'Hoje: '+esc(todayVariant.name):'Hoje sem divisão definida; confirme com o treinador.'}</span>`:''}`;}
+  renderDietEnergySummary(trainerMode?'ts-diet-energy-summary':'diet-energy-summary',plan,trainerMode&&dietCanEdit());
 }
 function v104ActivateVariantMeals(trainerMode){const plan=currentDiet(),variant=currentDietVariant();if(!plan||!variant)return;variant.meals=Array.isArray(variant.meals)?variant.meals:[];plan.meals=variant.meals;MEAL_PLAN_CACHE.meals=variant.meals;MEAL_CTX.listId=trainerMode?'ts-diet-meals-list':'diet-meals-list';MEAL_CTX.emptyId=trainerMode?'ts-diet-meals-empty':'diet-meals-empty';const label=document.getElementById(trainerMode?'ts-diet-meals-section-label':'diet-meals-section-label');if(label)label.textContent='Refeições — '+variant.name;renderMealsList();}
 function selectDietVariant(id,trainerMode=false){CURRENT_DIET_VARIANT_ID=String(id||'');renderDietVariantTabs(trainerMode);v104ActivateVariantMeals(trainerMode);}
@@ -6583,6 +6716,7 @@ renderDietList=function(listId,emptyId,trainerMode){
 };
 openDietDetail=async function(id,trainerMode=false){
   DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);const plan=DIET_DOCUMENT.plans.find(item=>String(item.id)===String(id));if(!plan)return;CURRENT_DIET_ID=plan.id;if(!plan.variants.some(item=>item.id===CURRENT_DIET_VARIANT_ID))CURRENT_DIET_VARIANT_ID=plan.variants[0]?.id||'';
+  if(!trainerMode&&plan.isActive){const todayVariant=plan.variants.find(item=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(new Date().getDay()));if(todayVariant)CURRENT_DIET_VARIANT_ID=todayVariant.id;}
   const targetUid=DIET_CONTEXT.targetUid,completions=MODE==='cloud'&&targetUid?await fetchCompletionsToday(targetUid):new Set();MEAL_COMPLETIONS_TODAY=completions;
   const cycle=`<span>INÍCIO <b>${esc(fmt(plan.startDate))}</b></span><span>ATUALIZAÇÃO <b>${esc(fmt(plan.updateDate))}</b></span><span>SEMANA <b>${v104CycleWeek(plan.startDate,today())}/8</b></span>`;
   if(trainerMode){MEAL_CTX={listId:'ts-diet-meals-list',emptyId:'ts-diet-meals-empty',canEditContent:true,canToggleDone:false,targetUid};document.getElementById('ts-diet-detail-title').textContent=plan.name.toUpperCase();document.getElementById('ts-diet-detail-status').innerHTML=dietStatusBadge(plan)+(plan.isActive?'<span>Plano atual do aluno</span>':'<span>Dieta anterior preservada</span>');document.getElementById('ts-diet-cycle-summary').innerHTML=cycle;renderDietVariantTabs(true);v104ActivateVariantMeals(true);renderDietSupportTables('ts-diet-support-tables',plan,true);showScreen('screen-ts-diet-detail');}
@@ -6595,10 +6729,75 @@ saveDietPlan=async function(){
   try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan){Object.assign(plan,{name,isActive:active,startDate,updateDate});}else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[]},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta salva');if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});}catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}finally{endAction('save-diet','modal-diet');}
 };
 persistMealPlan=async function(){const plan=currentDiet(),variant=currentDietVariant();if(plan&&variant){variant.meals=MEAL_PLAN_CACHE.meals;plan.meals=variant.meals;}await persistDietDocument();};
-function openAddDietVariantModal(){const plan=currentDiet();if(!dietCanEdit()||!plan)return;if((plan.variants||[]).length>=12){alert('Esta dieta já atingiu o limite seguro de 12 divisões.');return;}EDIT_DIET_VARIANT_ID='';document.getElementById('modal-diet-variant-title').textContent='Nova divisão';document.getElementById('input-diet-variant-name').value='';document.getElementById('input-diet-variant-days').value='0';document.getElementById('btn-delete-diet-variant').style.display='none';openModal('modal-diet-variant');}
-function openEditDietVariantModal(id){const plan=currentDiet(),variant=plan?.variants?.find(item=>item.id===id);if(!dietCanEdit()||!variant)return;EDIT_DIET_VARIANT_ID=id;document.getElementById('modal-diet-variant-title').textContent='Editar divisão';document.getElementById('input-diet-variant-name').value=variant.name;document.getElementById('input-diet-variant-days').value=String(variant.daysPerWeek);document.getElementById('btn-delete-diet-variant').style.display=plan.variants.length>1?'block':'none';openModal('modal-diet-variant');}
-async function saveDietVariant(){const plan=currentDiet();if(!plan||!dietCanEdit()||!beginAction('save-diet-variant','modal-diet-variant'))return;const name=document.getElementById('input-diet-variant-name').value.trim(),days=Math.max(0,Math.min(7,Math.trunc(Number(document.getElementById('input-diet-variant-days').value)||0)));if(!name){alert('Informe o nome da divisão.');endAction('save-diet-variant','modal-diet-variant');return;}const before=JSON.stringify(DIET_DOCUMENT);try{let variant=plan.variants.find(item=>item.id===EDIT_DIET_VARIANT_ID);if(variant)Object.assign(variant,{name,daysPerWeek:days});else{variant=normalizeDietVariant({id:uid(),name,daysPerWeek:days,order:plan.variants.length,meals:[]},plan.variants.length);plan.variants.push(variant);CURRENT_DIET_VARIANT_ID=variant.id;}const total=plan.variants.reduce((sum,item)=>sum+item.daysPerWeek,0);if(total>7)throw new Error('A distribuição ultrapassa 7 dias. Reduza outra divisão antes de salvar.');await persistDietDocument();closeModal('modal-diet-variant');renderDietVariantTabs(DIET_CONTEXT.trainer);v104ActivateVariantMeals(DIET_CONTEXT.trainer);showToast('✓ Divisão salva');}catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(before));alert(error.message||cloudWriteError(error,'salvar a divisão'));}finally{endAction('save-diet-variant','modal-diet-variant');}}
-function deleteDietVariant(){const plan=currentDiet(),id=EDIT_DIET_VARIANT_ID;if(!plan||plan.variants.length<=1||!id)return;closeModal('modal-diet-variant');showConfirm('Excluir divisão','Excluir esta divisão e suas refeições? As outras divisões da dieta serão preservadas.',async()=>{const before=JSON.stringify(DIET_DOCUMENT);try{plan.variants=plan.variants.filter(item=>item.id!==id);CURRENT_DIET_VARIANT_ID=plan.variants[0]?.id||'';await persistDietDocument();renderDietVariantTabs(DIET_CONTEXT.trainer);v104ActivateVariantMeals(DIET_CONTEXT.trainer);}catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(before));alert(cloudWriteError(error,'excluir a divisão'));}});}
+function openAddDietVariantModal(){const plan=currentDiet();if(!dietCanEdit()||!plan)return;if((plan.variants||[]).length>=12){alert('Esta dieta já atingiu o limite seguro de 12 divisões.');return;}EDIT_DIET_VARIANT_ID='';document.getElementById('modal-diet-variant-title').textContent='Nova divisão';document.getElementById('input-diet-variant-name').value='';const days=document.getElementById('input-diet-variant-days');days.value='0';days.dataset.manualValue='0';days.disabled=false;document.getElementById('input-diet-variant-day-type').value='';const rest=document.getElementById('input-diet-variant-rest-days');rest.value='0';rest.dataset.manualValue='0';rest.disabled=false;document.querySelectorAll('[data-diet-variant-weekday],[data-diet-variant-rest-weekday]').forEach(field=>field.checked=false);populateDietVariantWorkoutChoices(null);syncDietVariantDaysFromWeekdays();document.getElementById('btn-delete-diet-variant').style.display='none';openModal('modal-diet-variant');}
+function openEditDietVariantModal(id){const plan=currentDiet(),variant=plan?.variants?.find(item=>item.id===id);if(!dietCanEdit()||!variant)return;EDIT_DIET_VARIANT_ID=id;document.getElementById('modal-diet-variant-title').textContent='Editar divisão';document.getElementById('input-diet-variant-name').value=variant.name;const days=document.getElementById('input-diet-variant-days');days.value=String(variant.daysPerWeek);days.dataset.manualValue=String(variant.daysPerWeek);days.disabled=false;document.getElementById('input-diet-variant-day-type').value=variant.dayType||'';const rest=document.getElementById('input-diet-variant-rest-days');rest.value=String(variant.restDaysPerWeek||0);rest.dataset.manualValue=rest.value;rest.disabled=false;document.querySelectorAll('[data-diet-variant-weekday]').forEach(field=>field.checked=(variant.weekdays||[]).includes(Number(field.value)));document.querySelectorAll('[data-diet-variant-rest-weekday]').forEach(field=>field.checked=(variant.restWeekdays||[]).includes(Number(field.value)));populateDietVariantWorkoutChoices(variant);syncDietVariantRestWeekdays();syncDietVariantDaysFromWeekdays();document.getElementById('btn-delete-diet-variant').style.display=plan.variants.length>1?'block':'none';openModal('modal-diet-variant');}
+async function saveDietVariant(){
+  const plan=currentDiet();if(!plan||!dietCanEdit()||!beginAction('save-diet-variant','modal-diet-variant'))return;
+  const name=document.getElementById('input-diet-variant-name').value.trim(),weekdays=[...document.querySelectorAll('[data-diet-variant-weekday]:checked')].map(field=>Number(field.value));
+  const restWeekdays=[...document.querySelectorAll('[data-diet-variant-rest-weekday]:checked')].map(field=>Number(field.value));
+  const restInput=Number(document.getElementById('input-diet-variant-rest-days').value),restDaysPerWeek=restWeekdays.length||restInput;
+  const choices=dietActiveWorkoutChoices(),workoutDays=[...document.querySelectorAll('[data-diet-variant-workout]:checked')].map(field=>choices[Number(field.dataset.dietVariantWorkout)]).filter(Boolean).map(({workoutId,workoutDayId,workoutName,workoutDayName})=>({workoutId,workoutDayId,workoutName,workoutDayName}));
+  const allocated=workoutDays.length+restDaysPerWeek;
+  const dayType=allocated?(workoutDays.length&&restDaysPerWeek?'mixed':workoutDays.length?'training':'rest'):document.getElementById('input-diet-variant-day-type').value;
+  const days=weekdays.length||(allocated||Math.max(0,Math.min(7,Math.trunc(Number(document.getElementById('input-diet-variant-days').value)||0))));
+  if(!name){alert('Informe o nome da divisão.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(!Number.isInteger(restInput)||restInput<0||restInput>7){alert('Informe de 0 a 7 dias de descanso.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(allocated>7){alert('Treinos e descansos desta divisão ultrapassam 7 dias.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(weekdays.length&&allocated&&weekdays.length!==allocated){alert('Os dias da semana selecionados devem corresponder à soma dos treinos e descansos desta divisão.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(weekdays.length&&restWeekdays.some(day=>!weekdays.includes(day))){alert('Um dia de descanso fixo não está nos dias da semana desta divisão. Marque-o também na programação semanal ou deixe a programação sem dias fixos.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(weekdays.length&&!dayType){alert('Escolha se os dias selecionados são de treino ou descanso.');endAction('save-diet-variant','modal-diet-variant');return;}
+  if(document.querySelector('[data-diet-variant-workout-missing]:checked')){alert('Um treino vinculado está inativo ou não foi encontrado. Desmarque-o ou ative o protocolo atual antes de salvar.');endAction('save-diet-variant','modal-diet-variant');return;}
+  const occupied=[...new Set([...weekdays,...restWeekdays])];
+  const conflict=plan.variants.find(item=>item.id!==EDIT_DIET_VARIANT_ID&&occupied.some(day=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(day)));
+  if(conflict){alert('Um dos dias selecionados já pertence à divisão “'+conflict.name+'”. Cada dia pode ter apenas uma dieta.');endAction('save-diet-variant','modal-diet-variant');return;}
+  const workoutConflict=plan.variants.find(item=>item.id!==EDIT_DIET_VARIANT_ID&&(item.workoutDays||[]).some(ref=>workoutDays.some(choice=>choice.workoutId===ref.workoutId&&choice.workoutDayId===ref.workoutDayId)));
+  if(workoutConflict){alert('Um treino selecionado já pertence à divisão “'+workoutConflict.name+'”. Escolha apenas uma divisão para cada treino.');endAction('save-diet-variant','modal-diet-variant');return;}
+  const before=JSON.stringify(DIET_DOCUMENT);
+  try{
+    let variant=plan.variants.find(item=>item.id===EDIT_DIET_VARIANT_ID);
+    if(variant){
+      const summary=normalizeDietEnergySummary(plan.energySummary),legacy=v1010LegacyEnergyForVariant(plan,variant,summary);
+      if(legacy&&!Object.prototype.hasOwnProperty.call(summary.variantEnergy,variant.id)){summary.variantEnergy[variant.id]=legacy;plan.energySummary=summary;}
+      Object.assign(variant,{name,daysPerWeek:days,weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays});
+    }
+    else{variant=normalizeDietVariant({id:uid(),name,daysPerWeek:days,weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays,order:plan.variants.length,meals:[]},plan.variants.length);plan.variants.push(variant);CURRENT_DIET_VARIANT_ID=variant.id;}
+    const total=plan.variants.reduce((sum,item)=>sum+item.daysPerWeek,0);if(total>7)throw new Error('A distribuição ultrapassa 7 dias. Reduza outra divisão antes de salvar.');
+    await persistDietDocument();closeModal('modal-diet-variant');renderDietVariantTabs(DIET_CONTEXT.trainer);v104ActivateVariantMeals(DIET_CONTEXT.trainer);showToast('✓ Divisão salva');
+  }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(before));alert(error.message||cloudWriteError(error,'salvar a divisão'));}
+  finally{endAction('save-diet-variant','modal-diet-variant');}
+}
+function deleteDietVariant(id=EDIT_DIET_VARIANT_ID){
+  const plan=currentDiet(),variant=plan?.variants?.find(item=>String(item.id)===String(id));
+  if(!dietCanEdit()||!plan||!variant||plan.variants.length<=1)return false;
+  const context={targetUid:String(DIET_CONTEXT.targetUid||''),trainer:!!DIET_CONTEXT.trainer,local:!!DIET_CONTEXT.local,dietId:plan.id,variantId:String(variant.id)};
+  const editorOpen=!!document.getElementById('modal-diet-variant')?.classList.contains('open');
+  const historyNote=context.local?'Os registros locais das refeições desta divisão também serão removidos.':'Os registros de refeições concluídas serão preservados.';
+  showConfirm('Excluir divisão',`Excluir “${variant.name}” e suas ${variant.meals.length} refeições? As outras divisões serão preservadas. ${historyNote} Depois, ajuste os dias da semana se necessário.`,async()=>{
+    const current=currentDiet(),sameStudent=String(DIET_CONTEXT.targetUid||'')===context.targetUid&&!!DIET_CONTEXT.trainer===context.trainer&&!!DIET_CONTEXT.local===context.local;
+    if(!dietCanEdit()||!sameStudent||current?.id!==context.dietId||current.variants.length<=1||!current.variants.some(item=>String(item.id)===context.variantId)){
+      alert('A dieta ou a divisão mudou. Feche a confirmação e abra a divisão novamente.');return false;
+    }
+    const actionKey='delete-diet-variant-'+context.variantId;
+    if(!beginAction(actionKey))return false;
+    const before=JSON.stringify(DIET_DOCUMENT),selected=CURRENT_DIET_VARIANT_ID;
+    try{
+      const removedIndex=current.variants.findIndex(item=>String(item.id)===context.variantId);
+      current.variants=current.variants.filter(item=>String(item.id)!==context.variantId);
+      current.variants.forEach((item,index)=>item.order=index);
+      CURRENT_DIET_VARIANT_ID=selected===context.variantId?current.variants[Math.min(removedIndex,current.variants.length-1)].id:selected;
+      current.meals=current.variants[0].meals;
+      await persistDietDocument();
+    }catch(error){
+      DIET_DOCUMENT=normalizeDietDocument(JSON.parse(before));CURRENT_DIET_VARIANT_ID=selected;
+      try{v104ActivateVariantMeals(context.trainer);renderDietVariantTabs(context.trainer);}catch(inner){console.warn('[Team Bulls] não foi possível atualizar a dieta após a falha',inner);}
+      alert(cloudWriteError(error,'excluir a divisão'));return false;
+    }finally{endAction(actionKey);}
+    if(editorOpen){EDIT_DIET_VARIANT_ID='';closeModal('modal-diet-variant');}
+    try{renderDietVariantTabs(context.trainer);v104ActivateVariantMeals(context.trainer);}catch(error){console.warn('[Team Bulls] divisão excluída; atualize a dieta para ver o resultado',error);}
+    showToast('✓ Divisão excluída');return true;
+  });
+  return true;
+}
 async function moveDietVariant(id,delta){const plan=currentDiet(),index=plan?.variants.findIndex(item=>item.id===id),target=index+Number(delta);if(!plan||index<0||target<0||target>=plan.variants.length)return;[plan.variants[index],plan.variants[target]]=[plan.variants[target],plan.variants[index]];plan.variants.forEach((item,i)=>item.order=i);try{await persistDietDocument();renderDietVariantTabs(DIET_CONTEXT.trainer);}catch(error){showToast(cloudWriteError(error,'alterar a ordem das divisões'),true);}}
 const V104_ACTIVATE_DIET_BASE=activateDietPlan;
 activateDietPlan=async function(id){await V104_ACTIVATE_DIET_BASE(id);const plan=DIET_DOCUMENT.plans.find(item=>item.id===id);if(DIET_CONTEXT.trainer&&plan)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,plan.startDate,plan.updateDate,'diet').catch(()=>{});};
@@ -7211,10 +7410,16 @@ renderTsDay=function(){
 
 function normalizeDietFreeMealPolicy(value){
   const raw=value&&typeof value==='object'?value:{};
+  const dayRule=['free','rest','training','workout'].includes(raw.dayRule)?raw.dayRule:'free';
   return{
     maxCalories:Math.max(0,Math.min(10000,Math.round(Number(raw.maxCalories)||1000))),
     mealsToReplace:Math.max(0,Math.min(10,Math.round(Number(raw.mealsToReplace)||2))),
-    intervalDays:Math.max(1,Math.min(365,Math.round(Number(raw.intervalDays)||7)))
+    intervalDays:Math.max(1,Math.min(365,Math.round(Number(raw.intervalDays)||7))),
+    dayRule,
+    workoutId:dayRule==='workout'?String(raw.workoutId||'').slice(0,128):'',
+    workoutDayId:dayRule==='workout'?String(raw.workoutDayId||'').slice(0,128):'',
+    workoutName:dayRule==='workout'?String(raw.workoutName||'').slice(0,60):'',
+    workoutDayName:dayRule==='workout'?String(raw.workoutDayName||'').slice(0,60):''
   };
 }
 const V10513_BASE_NORMALIZE_DIET_PLAN=normalizeDietPlan;
@@ -7227,7 +7432,25 @@ function dietFreeMealPolicyText(policy){
   const p=normalizeDietFreeMealPolicy(policy);
   const meals=p.mealsToReplace===1?'1 refeição':`${p.mealsToReplace} refeições`;
   const interval=p.intervalDays===1?'1 dia':`${p.intervalDays} dias`;
-  return `Até ${p.maxCalories.toLocaleString('pt-BR')} kcal · substituir ${meals} do dia · intervalo mínimo de ${interval}`;
+  const day=p.dayRule==='rest'?'em dia de descanso':p.dayRule==='training'?'em dia de treino':p.dayRule==='workout'?`no treino ${p.workoutName||'não definido'}${p.workoutDayName?' — '+p.workoutDayName:''}`:'em dia escolhido pelo aluno';
+  return `Até ${p.maxCalories.toLocaleString('pt-BR')} kcal · substituir ${meals} do dia · intervalo mínimo de ${interval} · ${day}`;
+}
+function dietFreeMealWorkoutChoices(){
+  const workouts=DIET_CONTEXT.trainer?(VIEW_STUDENT?.uid===DIET_CONTEXT.targetUid?VIEW_STUDENT.workouts||[]:[]):getWorkouts();
+  return(Array.isArray(workouts)?workouts:[]).flatMap(workout=>getWorkoutDays(workout).map(day=>({workoutId:String(workout.id),workoutDayId:String(day.id),workoutName:String(workout.name||'Treino'),workoutDayName:String(day.name),active:workout.isActive===true})));
+}
+function updateDietFreeMealDayRule(){
+  const rule=document.getElementById('input-diet-free-meal-day-rule')?.value,wrap=document.getElementById('diet-free-meal-workout-wrap');
+  if(wrap)wrap.style.display=rule==='workout'?'block':'none';
+}
+function populateDietFreeMealWorkoutChoices(policy){
+  const select=document.getElementById('input-diet-free-meal-workout');if(!select)return;
+  const choices=dietFreeMealWorkoutChoices(),saved=normalizeDietFreeMealPolicy(policy);
+  const current=choices.findIndex(item=>item.workoutId===saved.workoutId&&item.workoutDayId===saved.workoutDayId);
+  select.innerHTML='<option value="">Escolha um treino...</option>'+choices.map((item,index)=>`<option value="${index}">${esc(item.workoutName+' — '+item.workoutDayName)}</option>`).join('');
+  if(current>=0)select.value=String(current);
+  else if(saved.dayRule==='workout'&&saved.workoutId&&saved.workoutDayId){select.innerHTML+=`<option value="saved">${esc((saved.workoutName||'Treino anterior')+' — '+(saved.workoutDayName||'dia anterior')+' (não encontrado; escolha outro)')}</option>`;select.value='saved';}
+  updateDietFreeMealDayRule();
 }
 function renderDietFreeMealPolicy(hostId,plan,canEdit=false){
   const host=document.getElementById(hostId);if(!host||!plan)return;
@@ -7243,6 +7466,7 @@ openAddDietModal=function(){
     'input-diet-free-meal-interval':7
   };
   Object.entries(values).forEach(([id,value])=>{const el=document.getElementById(id);if(el)el.value=String(value);});
+  document.getElementById('input-diet-free-meal-day-rule').value='free';populateDietFreeMealWorkoutChoices({dayRule:'free'});
 };
 const V10513_BASE_OPEN_EDIT_DIET=openEditDietModal;
 openEditDietModal=function(id=CURRENT_DIET_ID){
@@ -7255,6 +7479,7 @@ openEditDietModal=function(id=CURRENT_DIET_ID){
     'input-diet-free-meal-interval':p.intervalDays
   };
   Object.entries(values).forEach(([field,value])=>{const el=document.getElementById(field);if(el)el.value=String(value);});
+  document.getElementById('input-diet-free-meal-day-rule').value=p.dayRule;populateDietFreeMealWorkoutChoices(p);
 };
 saveDietPlan=async function(){
   if(!dietCanEdit()||!beginAction('save-diet','modal-diet'))return;
@@ -7640,6 +7865,8 @@ cloudWriteError=function(error,action='concluir a operação'){
    possibilidade de nova tentativa depois de uma falha. A implementação antiga
    podia aguardar para sempre quando uma tag <script> já havia falhado. */
 const V106_SDK_TIMEOUT_MS=9000;
+// firebase-app carrega primeiro; auth e firestore compartilham a segunda etapa.
+const FIREBASE_CORE_TIMEOUT_MS=2*V106_SDK_TIMEOUT_MS+800;
 let V106_FIREBASE_READY_PROMISE=null;
 loadSdkOnce=function(src,globalReady){
   if(globalReady?.())return Promise.resolve(true);
@@ -7671,7 +7898,7 @@ ensureFirebaseReady=function(){
   if(auth&&db)return Promise.resolve(true);
   if(V106_FIREBASE_READY_PROMISE)return V106_FIREBASE_READY_PROMISE;
   V106_FIREBASE_READY_PROMISE=(async()=>{
-    const ready=await withTimeout(ensureFirebaseCore(),V106_SDK_TIMEOUT_MS+800,'carregar conexão segura').catch(()=>false);
+    const ready=await withTimeout(ensureFirebaseCore(),FIREBASE_CORE_TIMEOUT_MS,'carregar conexão segura').catch(()=>false);
     return !!(ready&&initFirebase());
   })().finally(()=>{if(!(auth&&db))V106_FIREBASE_READY_PROMISE=null;});
   return V106_FIREBASE_READY_PROMISE;
@@ -7847,6 +8074,14 @@ buildDefaultQuestionnaire=function(){
   return{questions,sectionAt};
 };
 
+async function ensureReportCycleRuntime(){
+  if(!window.TeamBullsMonthlyReports||!window.TeamBullsWeeklyReportIntegrity){
+    const load=window.TeamBullsIntelligenceBootstrap?.load||window.TeamBullsIntelligenceSuiteLoader?.load;
+    if(typeof load==='function')await load();
+  }
+  if(!window.TeamBullsMonthlyReports||!window.TeamBullsWeeklyReportIntegrity)throw new Error('Os relatórios ainda estão carregando. Aguarde e tente novamente.');
+}
+function questionnaireIsPending(report){return report?.answered!==true&&!report?.cancelledAt&&(report?.reportType!=='monthly'||window.TeamBullsMonthlyReports?.status(report)==='pending');}
 function v109ReportMode(report){
   const explicit=String(report?.requestMode||'').toLowerCase();if(V109_REPORT_MODES.has(explicit))return explicit;
   if(report?.requiresPhotos===false)return'written';
@@ -7911,28 +8146,80 @@ sendQuestionnaire=async function(){
 
 renderQuestList=function(cache,listId,emptyId,fromTrainer){
   const list=document.getElementById(listId),empty=document.getElementById(emptyId);if(!list||!empty)return;
-  if(!cache.length){list.innerHTML='';empty.style.display='block';return;}empty.style.display='none';
-  list.innerHTML=cache.map(report=>{const mode=v109ReportMode(report),date=report.createdAt?.seconds?new Date(report.createdAt.seconds*1000).toLocaleDateString('pt-BR'):'—',tap=report.answered?`viewQuestionnaire(${jsArg(report.id)},${fromTrainer})`:(fromTrainer?'':`openAnswerQuestionnaire(${jsArg(report.id)})`),photoCount=Array.isArray(report.photoIds)?report.photoIds.length:0;
+  const visible=(cache||[]).filter(report=>!report.cancelledAt);
+  if(!visible.length){list.innerHTML='';empty.style.display='block';return;}empty.style.display='none';
+  list.innerHTML=visible.map(report=>{
+    const mode=v109ReportMode(report),monthly=report.reportType==='monthly';
+    const state=report.answered?'answered':monthly?(window.TeamBullsMonthlyReports?.status(report)||'loading'):'pending';
+    const label=state==='answered'?'Respondido':state==='scheduled'?'Agendado':state==='superseded'?'Ciclo anterior':state==='loading'?'Atualizando':'Aguardando';
+    const date=report.answered&&report.answeredAt?.seconds?new Date(report.answeredAt.seconds*1000).toLocaleDateString('pt-BR'):monthly?fmt(report.dueDate):report.createdAt?.seconds?new Date(report.createdAt.seconds*1000).toLocaleDateString('pt-BR'):'—';
+    const tap=report.answered?`viewQuestionnaire(${jsArg(report.id)},${fromTrainer})`:(fromTrainer||state!=='pending'?'':`openAnswerQuestionnaire(${jsArg(report.id)})`),photoCount=Array.isArray(report.photoIds)?report.photoIds.length:0;
     const details=[];if(v109ModeRequiresAnswers(mode))details.push(`${report.questions?.length||0} perguntas obrigatórias`);if(v109ModeRequiresPhotos(mode))details.push(report.answered?`${photoCount||0} fotos`:'6 fotos obrigatórias');
-    return`<div class="quest-card" onclick="${tap}"><div class="quest-card-top"><span class="quest-card-date">${date} · ${esc(v109ReportModeLabel(mode))}</span><span class="quest-status ${report.answered?'answered':'pending'}">${report.answered?'Respondido':'Aguardando'}</span></div><div class="quest-card-preview">${details.join(' · ')||'Solicitação registrada'}</div></div>`;
+    const cancel=fromTrainer&&!report.answered?`<button type="button" class="btn-ghost" style="margin-top:8px" onclick="event.stopPropagation();cancelQuestionnaireRequest(${jsArg(report.id)})">CANCELAR SOLICITAÇÃO</button>`:'';
+    return`<div class="quest-card" onclick="${tap}"><div class="quest-card-top"><span class="quest-card-date">${esc(date)} · ${esc(monthly?'Relatório mensal completo':v109ReportModeLabel(mode))}</span><span class="quest-status ${report.answered?'answered':'pending'}">${label}</span></div><div class="quest-card-preview">${details.join(' · ')||'Solicitação registrada'}</div>${cancel}</div>`;
   }).join('');
 };
+
+function cancelQuestionnaireRequest(id){
+  const studentUid=VIEW_STUDENT?.uid,trainerUid=CURRENT_USER?.uid;
+  if(!studentUid||CURRENT_USER?.role!=='trainer'||!id)return;
+  showConfirm('Cancelar solicitação','Retirar este relatório ainda sem resposta da lista do aluno e do treinador? Relatórios enviados serão preservados.',async()=>{
+    if(!beginAction('cancel-questionnaire-request'))return;
+    try{
+      const ref=db.collection('questionnaires').doc(String(id));
+      await cloudWrite(db.runTransaction(async transaction=>{
+        const snap=await transaction.get(ref);
+        if(!snap.exists)throw new Error('A solicitação já não existe.');
+        const report=snap.data();
+        if(report.studentId!==studentUid||report.trainerId!==trainerUid)throw new Error('Esta solicitação não pertence ao aluno selecionado.');
+        if(report.answered||report.cancelledAt||report.answers!==null&&report.answers!==undefined||(report.photoIds||[]).length)throw new Error('Este relatório já foi respondido ou cancelado. Atualize a lista.');
+        transaction.update(ref,{cancelledAt:firebase.firestore.FieldValue.serverTimestamp(),cancelledBy:trainerUid});
+      }),'cancelar solicitação de relatório');
+      showToast('✓ Solicitação cancelada');
+      if(VIEW_STUDENT?.uid===studentUid)await openTsQuestionnaires();
+    }catch(error){alert(cloudWriteError(error,'cancelar a solicitação'));}
+    finally{endAction('cancel-questionnaire-request');}
+  });
+}
+function cancelExtraWeeklyCheckin(){
+  const studentUid=VIEW_STUDENT?.uid,trainerUid=CURRENT_USER?.uid,requestId=TRAINER_CHECKIN_SCHEDULE?.extraRequestId;
+  if(!studentUid||CURRENT_USER?.role!=='trainer'||!requestId)return;
+  showConfirm('Cancelar relatório extra','Retirar o pedido extra ainda sem resposta? O ciclo semanal programado continuará normalmente.',async()=>{
+    if(!beginAction('cancel-extra-checkin'))return;
+    try{
+      const ref=db.collection('checkinSchedules').doc(studentUid);
+      const completed=await withTimeout(db.collection('weeklyCheckins').where('studentId','==',studentUid).get({source:'server'}),10000,'verificar relatório extra');
+      if(completed.docs.some(doc=>doc.data().requestKey==='manual:'+requestId))throw new Error('O aluno já enviou este relatório. O histórico foi preservado.');
+      await cloudWrite(db.runTransaction(async transaction=>{
+        const snap=await transaction.get(ref),schedule=snap.data();
+        if(!snap.exists||schedule.studentId!==studentUid||schedule.extraRequestId!==requestId)throw new Error('O pedido mudou. Atualize a programação antes de cancelar.');
+        transaction.update(ref,{extraRequestId:'',extraRequestedAt:'',updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      }),'cancelar relatório extra');
+      showToast('✓ Relatório extra pendente cancelado');
+      if(VIEW_STUDENT?.uid===studentUid)await loadTrainerCheckinSchedule(studentUid);
+    }catch(error){alert(cloudWriteError(error,'cancelar o relatório extra'));}
+    finally{endAction('cancel-extra-checkin');}
+  });
+}
 
 function v109SetQuestionnaireAnswerUi(report){
   const mode=v109ReportMode(report),requiresAnswers=v109ModeRequiresAnswers(mode),requiresPhotos=v109ModeRequiresPhotos(mode);
   const written=document.getElementById('questionnaire-written-section'),photos=document.getElementById('questionnaire-photo-section'),requirements=document.getElementById('quest-answer-requirements'),button=document.getElementById('questionnaire-submit-button'),title=document.getElementById('quest-answer-title');
   if(written)written.style.display=requiresAnswers?'block':'none';if(photos)photos.style.display=requiresPhotos?'block':'none';
-  if(title)title.textContent=v109ReportModeLabel(mode);
+  if(title)title.textContent=report.reportType==='monthly'?'Relatório mensal completo':v109ReportModeLabel(mode);
   if(requirements)requirements.textContent=mode==='photos'?'Envie as seis fotos obrigatórias seguindo o guia do treinador.':mode==='written'?'Responda obrigatoriamente todas as perguntas antes de enviar.':'Todas as perguntas e as seis fotos são obrigatórias para concluir o envio.';
   if(button)button.textContent=mode==='photos'?'ENVIAR 6 FOTOS':mode==='written'?'ENVIAR RELATÓRIO ESCRITO':'ENVIAR RELATÓRIO + 6 FOTOS';
 }
 openAnswerQuestionnaire=async function(qid){
   if(!qid)return;
-  try{const doc=await cloudGet(db.collection('questionnaires').doc(qid),'relatório');if(!doc.exists)return;const report={...doc.data(),id:doc.id};if(report.answered){showToast('Este relatório já foi enviado.',true);return;}
+  try{const doc=await cloudGet(db.collection('questionnaires').doc(qid),'relatório');if(!doc.exists)return;const report={...doc.data(),id:doc.id};if(report.cancelledAt){showToast('Esta solicitação foi cancelada pelo treinador.',true);return;}if(report.answered){showToast('Este relatório já foi enviado.',true);return;}
+    await ensureReportCycleRuntime();
+    if(report.studentId!==CURRENT_USER?.uid||auth?.currentUser?.uid!==CURRENT_USER?.uid)throw new Error('A sessão do aluno mudou.');
+    await window.TeamBullsMonthlyReports.assertAvailable(report);
     CUR_ANSWER_QUEST_ID=qid;CURRENT_ANSWER_REPORT=report;const mode=v109ReportMode(report),form=document.getElementById('quest-answer-form');
     form.innerHTML=v109ModeRequiresAnswers(mode)?(report.questions||[]).map((question,index)=>`${report.sectionAt&&report.sectionAt[index]?`<div class="quest-section-title">${esc(report.sectionAt[index])}</div>`:''}<div class="quest-answer-item"><label>${index+1}. ${esc(question)} <span aria-hidden="true">*</span></label><textarea class="form-input" data-qi="${index}" required aria-required="true" rows="2" maxlength="5000" style="resize:vertical;min-height:50px"></textarea></div>`).join(''):'';
     resetQuestionnaireReportPhotos();v109SetQuestionnaireAnswerUi(report);openModal('modal-answer-quest');if(v109ModeRequiresPhotos(mode))await renderReportGuideBlocks(report.trainerId);
-  }catch(error){alert('Erro ao carregar o relatório.');}
+  }catch(error){alert(error?.message||'Erro ao carregar o relatório.');}
 };
 submitQuestionnaireAnswers=async function(){
   const reportId=CUR_ANSWER_QUEST_ID,report=CURRENT_ANSWER_REPORT,studentUid=CURRENT_USER?.uid;if(!reportId||!report||!studentUid||CURRENT_USER?.role!=='student')return;
@@ -7940,7 +8227,7 @@ submitQuestionnaireAnswers=async function(){
   if(requiresAnswers){const missing=answers.findIndex(answer=>!answer);if(missing>=0){alert('Responda todas as perguntas antes de enviar o relatório.');areas[missing]?.focus();areas[missing]?.scrollIntoView({behavior:'smooth',block:'center'});return;}if(answers.length!==(report.questions||[]).length){alert('O relatório foi alterado. Feche e abra novamente antes de responder.');return;}}
   if(requiresPhotos&&QUESTIONNAIRE_REPORT_FILES.some(file=>!(file instanceof File))){alert('Envie obrigatoriamente as seis fotos: frente, costas, lado direito, lado esquerdo, frente contraída e costas contraída.');return;}
   if(!beginAction('answer-questionnaire','modal-answer-quest'))return;const photoIds=[],photoWrites=[],createdPaths=[];
-  try{const reportRef=db.collection('questionnaires').doc(reportId),fresh=await cloudGet(reportRef,'verificar relatório');if(!fresh.exists)throw new Error('Este relatório não está mais disponível.');if(fresh.data().answered)throw new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.');
+  try{const reportRef=db.collection('questionnaires').doc(reportId),fresh=await cloudGet(reportRef,'verificar relatório');if(!fresh.exists||fresh.data().cancelledAt)throw new Error('Esta solicitação foi cancelada pelo treinador.');if(fresh.data().answered)throw new Error('Este relatório já foi enviado. Atualize a página para ver o histórico.');
     if(requiresPhotos)for(let index=0;index<6;index++){showToast('Preparando foto '+(index+1)+' de 6...');const photoId=(reportId+'-r'+(index+1)).slice(0,190),photoRef=db.collection('progressPhotos').doc(photoId);photoIds.push(photoId);const variants=await buildProgressPhotoVariants(QUESTIONNAIRE_REPORT_FILES[index]),photoPath=await uploadCloudPhoto('progressPhotos',studentUid,photoId,variants.full);if(photoPath)createdPaths.push(photoPath);const thumbPath=photoPath?await uploadCloudPhoto('progressPhotoThumbs',studentUid,photoId,variants.thumb):'';if(thumbPath)createdPaths.push(thumbPath);const payload={userId:studentUid,date:today(),reportId,questionnaireId:reportId,pose:CHECKIN_POSES[index],createdAt:firebase.firestore.FieldValue.serverTimestamp()};if(photoPath){payload.photoPath=photoPath;if(thumbPath)payload.thumbPath=thumbPath;}else payload.dataUrl=variants.full;photoWrites.push({ref:photoRef,payload});}
     const batch=db.batch();photoWrites.forEach(write=>batch.set(write.ref,write.payload));batch.update(reportRef,{answers,answered:true,answeredAt:firebase.firestore.FieldValue.serverTimestamp(),photoIds});
     try{await cloudWrite(batch.commit(),'enviar relatório');}catch(error){const verified=await cloudGet(reportRef,'confirmar relatório').catch(()=>null);if(!verified?.exists||!verified.data().answered){await Promise.allSettled(createdPaths.map(path=>deleteCloudPhoto(path)));throw error;}}
@@ -8123,17 +8410,19 @@ async function saveProtocolReviewSchedule(){
   const studentUid=VIEW_STUDENT?.uid;if(!studentUid||CURRENT_USER?.role!=='trainer')return;const startDate=document.getElementById('trainer-protocol-start-date').value,intervalWeeks=Math.trunc(Number(document.getElementById('trainer-protocol-interval-weeks').value));
   if(!validIsoDate(startDate)){alert('Escolha uma data de início válida.');return;}if(!Number.isInteger(intervalWeeks)||intervalWeeks<1||intervalWeeks>52){alert('Escolha um intervalo entre 1 e 52 semanas.');return;}if(!beginAction('save-protocol-review-schedule'))return;
   try{
+    await ensureReportCycleRuntime();
     const previous=await loadProtocolReviewSchedule(studentUid,true)||{},lastDate=validIsoDate(previous.lastCompletedDate)?previous.lastCompletedDate:'';
     const lastCompletedCycle=lastDate?Math.max(0,Math.floor(Math.max(0,v104DateDiffDays(startDate,lastDate))/(intervalWeeks*7))):0;
     const payload={studentId:studentUid,trainerId:CURRENT_USER.uid,startDate,intervalWeeks,lastCompletedCycle,lastCompletedDate:lastDate,updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).set(payload,{merge:true}),'salvar ciclo de atualização');V109_PROTOCOL_REVIEW_SCHEDULE={...previous,...payload,_exists:true};V109_PROTOCOL_REVIEW_STUDENT=studentUid;
+    await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);
     const state=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,startDate,state.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,startDate,state.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Ciclo de atualização completa salvo');loadTrainerProtocolReviewAlerts().catch(()=>{});
   }catch(error){alert(cloudWriteError(error,'salvar o ciclo de atualização'));}finally{endAction('save-protocol-review-schedule');}
 }
 function markProtocolReviewCompleted(){
   const studentUid=VIEW_STUDENT?.uid,state=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);if(!studentUid||CURRENT_USER?.role!=='trainer'||!state)return;if(!state.pending){showToast('A próxima atualização completa ainda não venceu.',true);return;}
   showConfirm('Confirmar atualização completa',`Marcar a atualização completa nº ${state.pendingCycle} de treino e dieta como realizada? Use esta confirmação apenas após a revisão detalhada dos protocolos; ajustes semanais não entram aqui.`,async()=>{
-    if(!beginAction('complete-protocol-review'))return;try{const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).update(payload),'concluir atualização completa');V109_PROTOCOL_REVIEW_SCHEDULE={...V109_PROTOCOL_REVIEW_SCHEDULE,...payload,_exists:true};const nextState=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Atualização completa registrada');loadTrainerProtocolReviewAlerts().catch(()=>{});}catch(error){alert(cloudWriteError(error,'registrar a atualização completa'));}finally{endAction('complete-protocol-review');}
+    if(!beginAction('complete-protocol-review'))return;try{await ensureReportCycleRuntime();const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).update(payload),'concluir atualização completa');V109_PROTOCOL_REVIEW_SCHEDULE={...V109_PROTOCOL_REVIEW_SCHEDULE,...payload,_exists:true};await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);const nextState=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Atualização completa registrada');loadTrainerProtocolReviewAlerts().catch(()=>{});}catch(error){alert(cloudWriteError(error,'registrar a atualização completa'));}finally{endAction('complete-protocol-review');}
   });
 }
 async function loadStudentProtocolReview(){
@@ -8175,24 +8464,54 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 ═══════════════════════════════════════════════════════════════ */
 const V1010_VERSION='10.10.9';
 function v1010EnergyValue(value){const number=Math.round(Number(value)||0);return Number.isFinite(number)?Math.max(0,Math.min(20000,number)):0;}
-function normalizeDietEnergySummary(value){const raw=value&&typeof value==='object'?value:{};return{totalExpenditure:v1010EnergyValue(raw.totalExpenditure),trainingDayEnergy:v1010EnergyValue(raw.trainingDayEnergy),restDayEnergy:v1010EnergyValue(raw.restDayEnergy)};}
+function normalizeDietEnergySummary(value,variants=null){
+  const raw=value&&typeof value==='object'?value:{},source=raw.variantEnergy&&typeof raw.variantEnergy==='object'&&!Array.isArray(raw.variantEnergy)?raw.variantEnergy:{},variantEnergy={};
+  const allowed=Array.isArray(variants)?new Set(variants.map(item=>String(item.id))):null;
+  Object.entries(source).forEach(([id,energy])=>{if(/^[A-Za-z0-9_-]{1,180}$/.test(id)&&(!allowed||allowed.has(id)))variantEnergy[id]=v1010EnergyValue(energy);});
+  return{totalExpenditure:v1010EnergyValue(raw.totalExpenditure),trainingDayEnergy:v1010EnergyValue(raw.trainingDayEnergy),restDayEnergy:v1010EnergyValue(raw.restDayEnergy),variantEnergy};
+}
 const V1010_NORMALIZE_DIET_PLAN_BASE=normalizeDietPlan;
-normalizeDietPlan=function(plan,index=0){const result=V1010_NORMALIZE_DIET_PLAN_BASE(plan,index);result.energySummary=normalizeDietEnergySummary(plan?.energySummary||result.energySummary);return result;};
+normalizeDietPlan=function(plan,index=0){const result=V1010_NORMALIZE_DIET_PLAN_BASE(plan,index);result.energySummary=normalizeDietEnergySummary(plan?.energySummary||result.energySummary,result.variants);return result;};
 function v1010EnergyText(value){return value?`${Number(value).toLocaleString('pt-BR')} kcal/dia`:'Não informado';}
 function v1010EnergyDifference(total,value){if(!total||!value)return'';const difference=value-total,sign=difference>0?'+':'';return`${sign}${difference.toLocaleString('pt-BR')} kcal em relação ao GET`;}
-function renderDietEnergySummary(hostId,plan,canEdit=false){const host=document.getElementById(hostId);if(!host||!plan)return;const values=normalizeDietEnergySummary(plan.energySummary),has=values.totalExpenditure||values.trainingDayEnergy||values.restDayEnergy;host.innerHTML=`<section class="diet-energy-card"><div class="diet-energy-card-head"><span>TABELA CALÓRICA DA DIETA</span>${canEdit?`<button class="section-mini-btn" type="button" onclick="openEditDietModal(${jsArg(plan.id)})">EDITAR</button>`:''}</div>${has?`<div class="diet-energy-grid"><div class="diet-energy-metric"><span>Gasto energético total do aluno</span><strong>${esc(v1010EnergyText(values.totalExpenditure))}</strong><small>GET estimado</small></div><div class="diet-energy-metric"><span>Valor energético total — dia de treino</span><strong>${esc(v1010EnergyText(values.trainingDayEnergy))}</strong><small class="energy-difference ${values.trainingDayEnergy-values.totalExpenditure<0?'negative':'positive'}">${esc(v1010EnergyDifference(values.totalExpenditure,values.trainingDayEnergy)||'VET do dia de treino')}</small></div><div class="diet-energy-metric"><span>Valor energético total — dia sem treino</span><strong>${esc(v1010EnergyText(values.restDayEnergy))}</strong><small class="energy-difference ${values.restDayEnergy-values.totalExpenditure<0?'negative':'positive'}">${esc(v1010EnergyDifference(values.totalExpenditure,values.restDayEnergy)||'VET do dia sem treino')}</small></div></div>`:`<div class="diet-energy-empty">O treinador ainda não informou o GET e os valores energéticos desta dieta.</div>`}</section>`;}
+function v1010LegacyEnergyForVariant(plan,variant,summary){
+  const name=String(variant?.name||'');
+  if(name==='Dia de treino'&&plan.variants.filter(item=>item.name==='Dia de treino').length===1)return summary.trainingDayEnergy;
+  if(name==='Dia sem treino'&&plan.variants.filter(item=>item.name==='Dia sem treino').length===1)return summary.restDayEnergy;
+  return 0;
+}
+function v1010EnergyForVariant(plan,variant,summary=normalizeDietEnergySummary(plan.energySummary)){
+  const id=String(variant?.id||'');
+  return Object.prototype.hasOwnProperty.call(summary.variantEnergy,id)?summary.variantEnergy[id]:v1010LegacyEnergyForVariant(plan,variant,summary);
+}
+function renderDietEnergySummary(hostId,plan,canEdit=false){
+  const host=document.getElementById(hostId);if(!host||!plan)return;
+  const values=normalizeDietEnergySummary(plan.energySummary,plan.variants),metric=(label,value,detail)=>`<div class="diet-energy-metric"><span>${esc(label)}</span><strong>${esc(v1010EnergyText(value))}</strong><small class="energy-difference ${value-values.totalExpenditure<0?'negative':'positive'}">${esc(detail)}</small></div>`;
+  const rows=(plan.variants||[]).map(variant=>{const energy=v1010EnergyForVariant(plan,variant,values);return metric(variant.name,energy,[dietVariantDayLabel(variant),v1010EnergyDifference(values.totalExpenditure,energy)].filter(Boolean).join(' · ')||'VET da divisão');});
+  host.innerHTML=`<section class="diet-energy-card"><div class="diet-energy-card-head"><span>TABELA CALÓRICA DA DIETA</span>${canEdit?`<button class="section-mini-btn" type="button" onclick="openEditDietModal(${jsArg(plan.id)})">EDITAR</button>`:''}</div><div class="diet-energy-grid">${metric('Gasto energético total do aluno',values.totalExpenditure,'GET estimado')}${rows.join('')}</div></section>`;
+}
 const V1010_OPEN_ADD_DIET_BASE=openAddDietModal;
-openAddDietModal=function(){V1010_OPEN_ADD_DIET_BASE();['input-diet-total-expenditure','input-diet-training-energy','input-diet-rest-energy'].forEach(id=>{const element=document.getElementById(id);if(element)element.value='';});};
+function v1010RenderVariantEnergyEditor(plan){
+  const host=document.getElementById('diet-energy-variant-fields');if(!host||!plan)return;
+  const values=normalizeDietEnergySummary(plan.energySummary,plan.variants);
+  host.innerHTML=(plan.variants||[]).map(variant=>{const energy=v1010EnergyForVariant(plan,variant,values);return`<label class="form-group"><span class="form-label">Valor energético total — ${esc(variant.name)}</span><input class="form-input" type="number" min="0" max="20000" step="1" inputmode="numeric" data-diet-variant-energy="${esc(variant.id)}" value="${energy||''}" placeholder="Ex.: 2400"/><small>${esc(dietVariantDayLabel(variant)||'VET em kcal/dia')}</small></label>`;}).join('');
+  const note=document.getElementById('diet-energy-legacy-note');if(note){const legacy=values.trainingDayEnergy||values.restDayEnergy;note.textContent=legacy?`Valores antigos preservados: treino ${v1010EnergyText(values.trainingDayEnergy)}; descanso ${v1010EnergyText(values.restDayEnergy)}. Confira a associação às divisões antes de salvar.`:'Informe um VET para cada divisão. Use zero ou deixe vazio quando ainda não houver cálculo definido.';}
+}
+openAddDietModal=function(){V1010_OPEN_ADD_DIET_BASE();EDIT_DIET_PLAN_ID=uid();const get=document.getElementById('input-diet-total-expenditure');if(get)get.value='';v1010RenderVariantEnergyEditor(normalizeDietPlan({id:EDIT_DIET_PLAN_ID,variants:[],energySummary:{}},0));};
 const V1010_OPEN_EDIT_DIET_BASE=openEditDietModal;
-openEditDietModal=function(id=CURRENT_DIET_ID){V1010_OPEN_EDIT_DIET_BASE(id);const plan=DIET_DOCUMENT.plans.find(item=>String(item.id)===String(id));if(!plan)return;const energy=normalizeDietEnergySummary(plan.energySummary),map={'input-diet-total-expenditure':energy.totalExpenditure,'input-diet-training-energy':energy.trainingDayEnergy,'input-diet-rest-energy':energy.restDayEnergy};Object.entries(map).forEach(([field,value])=>{const element=document.getElementById(field);if(element)element.value=value?String(value):'';});};
+openEditDietModal=function(id=CURRENT_DIET_ID){V1010_OPEN_EDIT_DIET_BASE(id);const plan=DIET_DOCUMENT.plans.find(item=>String(item.id)===String(id));if(!plan)return;const energy=normalizeDietEnergySummary(plan.energySummary,plan.variants),get=document.getElementById('input-diet-total-expenditure');if(get)get.value=energy.totalExpenditure?String(energy.totalExpenditure):'';v1010RenderVariantEnergyEditor(plan);};
 saveDietPlan=async function(){
   if(!dietCanEdit()||!beginAction('save-diet','modal-diet'))return;
   const name=document.getElementById('input-diet-name').value.trim(),active=document.getElementById('input-diet-active').value==='true',startDate=document.getElementById('input-diet-start-date').value,updateDate=document.getElementById('input-diet-update-date').value;
-  const freeMealPolicy=normalizeDietFreeMealPolicy({maxCalories:document.getElementById('input-diet-free-meal-max-calories')?.value,mealsToReplace:document.getElementById('input-diet-free-meal-replacements')?.value,intervalDays:document.getElementById('input-diet-free-meal-interval')?.value});
-  const energySummary=normalizeDietEnergySummary({totalExpenditure:document.getElementById('input-diet-total-expenditure')?.value,trainingDayEnergy:document.getElementById('input-diet-training-energy')?.value,restDayEnergy:document.getElementById('input-diet-rest-energy')?.value});
+  const dayRule=document.getElementById('input-diet-free-meal-day-rule')?.value||'free',workoutSelection=document.getElementById('input-diet-free-meal-workout')?.value||'',workoutChoice=dayRule==='workout'?dietFreeMealWorkoutChoices()[Number(workoutSelection)]:null;
+  if(dayRule==='workout'&&(!workoutChoice||workoutSelection==='')){alert('Escolha um treino atual para a refeição livre. Se o treino anterior não aparece, selecione outro.');endAction('save-diet','modal-diet');return;}
+  const freeMealPolicy=normalizeDietFreeMealPolicy({maxCalories:document.getElementById('input-diet-free-meal-max-calories')?.value,mealsToReplace:document.getElementById('input-diet-free-meal-replacements')?.value,intervalDays:document.getElementById('input-diet-free-meal-interval')?.value,dayRule,...workoutChoice});
+  const editingPlan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID),variantEnergy={};
+  document.querySelectorAll('[data-diet-variant-energy]').forEach(field=>{variantEnergy[String(field.dataset.dietVariantEnergy||'')]=v1010EnergyValue(field.value);});
+  const energySummary=normalizeDietEnergySummary({...editingPlan?.energySummary,totalExpenditure:document.getElementById('input-diet-total-expenditure')?.value,variantEnergy},editingPlan?.variants||normalizeDietPlan({id:EDIT_DIET_PLAN_ID,variants:[]},0).variants);
   if(!name){alert('Informe o nome da dieta.');endAction('save-diet','modal-diet');return;}if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){alert('Confira as datas da dieta.');endAction('save-diet','modal-diet');return;}
   const snapshot=JSON.stringify(DIET_DOCUMENT);
-  try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan)Object.assign(plan,{name,isActive:active,startDate,updateDate,freeMealPolicy,energySummary});else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[],freeMealPolicy,energySummary},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta e tabela calórica salvas');if(CURRENT_DIET_ID===plan.id){renderDietEnergySummary(trainer?'ts-diet-energy-summary':'diet-energy-summary',plan,trainer);renderDietFreeMealPolicy(trainer?'ts-diet-free-meal-policy':'diet-free-meal-policy',plan,trainer);}if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});
+  try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan)Object.assign(plan,{name,isActive:active,startDate,updateDate,freeMealPolicy,energySummary});else{plan=normalizeDietPlan({id:EDIT_DIET_PLAN_ID||uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[],freeMealPolicy,energySummary},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta e tabela calórica salvas');if(CURRENT_DIET_ID===plan.id){renderDietEnergySummary(trainer?'ts-diet-energy-summary':'diet-energy-summary',plan,trainer);renderDietFreeMealPolicy(trainer?'ts-diet-free-meal-policy':'diet-free-meal-policy',plan,trainer);}if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});
   }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}finally{endAction('save-diet','modal-diet');}
 };
 const V1010_OPEN_DIET_DETAIL_BASE=openDietDetail;
@@ -8219,15 +8538,15 @@ const V1010_OPEN_EDIT_DIET_SUPPORT_BASE=openEditDietSupportItem;
 openEditDietSupportItem=function(section,id){V1010_OPEN_EDIT_DIET_SUPPORT_BASE(section,id);configureDietSupportPrivateCatalog(section);};
 
 let V1010_FEEDBACK_LOADING=false,V1010_FEEDBACK_PREFILL='general';
-function v1010FeedbackType(value){return ['general','weekly_report','protocol_update'].includes(String(value))?String(value):'general';}
-function v1010FeedbackLabel(data){const type=v1010FeedbackType(data?.feedbackType),title=String(data?.title||'').trim();if(title)return title;if(type==='protocol_update')return'Feedback da atualização completa';if(type==='weekly_report')return'Feedback do relatório semanal';return'Transmissão recebida // treinador';}
+function v1010FeedbackType(value){const type=String(value||'');if(type==='protocol_update')return'monthly_full';if(type==='general')return'extra';return ['weekly_report','monthly_full','weekly_diet','weekly_training','extra'].includes(type)?type:'extra';}
+function v1010FeedbackLabel(data){const type=v1010FeedbackType(data?.feedbackType),title=String(data?.title||'').trim();if(title)return title;return{weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',extra:'Feedback extra'}[type];}
 checkFeedback=async function(){if(!CURRENT_USER||CURRENT_USER.role==='trainer'||V1010_FEEDBACK_LOADING)return;const studentUid=CURRENT_USER.uid,banner=document.getElementById('feedback-banner');V1010_FEEDBACK_LOADING=true;try{let docs;try{const ordered=await cloudGet(db.collection('feedback').where('studentId','==',studentUid).where('read','==',false).orderBy('createdAt','asc').limit(1),'feedback pendente');docs=ordered.docs;}catch(indexError){const fallback=await cloudGet(db.collection('feedback').where('studentId','==',studentUid).limit(200),'feedback do aluno');docs=fallback.docs.filter(doc=>doc.data().read!==true).sort((a,b)=>createdMillis(a.data())-createdMillis(b.data())||String(a.id).localeCompare(String(b.id))).slice(0,1);}if(CURRENT_USER?.uid!==studentUid)return;if(!docs.length){if(banner){banner.style.display='none';banner.dataset.fid='';}return;}const doc=docs[0];showFeedbackBanner(doc.id,doc.data());}catch(error){console.warn('checkFeedback',error.code||error.message);}finally{V1010_FEEDBACK_LOADING=false;}};
 showFeedbackBanner=function(fid,data){const banner=document.getElementById('feedback-banner'),label=document.getElementById('feedback-banner-label'),text=document.getElementById('feedback-banner-text');if(!banner||!text)return;const payload=typeof data==='string'?{message:data}:data||{};if(label)label.textContent=v1010FeedbackLabel(payload);text.textContent=String(payload.message||'');banner.dataset.fid=fid;banner.style.display='block';};
 dismissFeedback=async function(){const banner=document.getElementById('feedback-banner');if(!banner)return;const fid=banner.dataset.fid;banner.style.display='none';banner.dataset.fid='';if(fid&&db)try{await cloudWrite(db.collection('feedback').doc(fid).update({read:true}),'marcar feedback');}catch(error){console.warn('Não foi possível marcar a transmissão como lida',error);}await checkFeedback();};
 function updateFeedbackCharacterCount(){const input=document.getElementById('input-feedback'),counter=document.getElementById('feedback-character-count');if(counter)counter.textContent=`${(input?.value.length||0).toLocaleString('pt-BR')} / 30.000 caracteres`;}
-function syncFeedbackEditorType(){const select=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),modalTitle=document.getElementById('modal-feedback-title'),help=document.getElementById('feedback-editor-help'),type=v1010FeedbackType(select?.value);if(type==='protocol_update'){if(title&&!title.value.trim())title.value='Feedback da atualização completa';if(modalTitle)modalTitle.textContent='Feedback extenso da atualização';if(help)help.textContent='Registre uma análise detalhada da atualização completa de treino e dieta. O aluno receberá este conteúdo na Sala Vermelha.';}else if(type==='weekly_report'){if(title&&!title.value.trim())title.value='Feedback do relatório semanal';if(modalTitle)modalTitle.textContent='Feedback do relatório semanal';if(help)help.textContent='Envie as observações referentes ao relatório semanal. Transmissões pendentes serão exibidas ao aluno em ordem cronológica.';}else{if(modalTitle)modalTitle.textContent='Enviar transmissão';if(help)help.textContent='O aluno receberá esta transmissão na Sala Vermelha. Mensagens não lidas serão exibidas em ordem, uma após a outra.';}}
+function syncFeedbackEditorType(){const select=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),modalTitle=document.getElementById('modal-feedback-title'),help=document.getElementById('feedback-editor-help'),type=v1010FeedbackType(select?.value),label=v1010FeedbackLabel({feedbackType:type});if(title){if(!title.value.trim()||title.value===title.dataset.autoLabel)title.value=label;title.dataset.autoLabel=label;}if(modalTitle)modalTitle.textContent=label;if(help)help.textContent='O aluno receberá o feedback na Sala Vermelha e, se autorizar no celular, um aviso na barra de notificações.';}
 openFeedbackModal=function(type='general'){if(!VIEW_STUDENT)return;V1010_FEEDBACK_PREFILL=v1010FeedbackType(type);const typeInput=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),message=document.getElementById('input-feedback');if(typeInput)typeInput.value=V1010_FEEDBACK_PREFILL;if(title)title.value='';if(message)message.value='';syncFeedbackEditorType();updateFeedbackCharacterCount();openModal('modal-feedback');};
-sendFeedback=async function(){const message=document.getElementById('input-feedback').value.normalize('NFKC').trim(),type=v1010FeedbackType(document.getElementById('input-feedback-type')?.value),title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||v1010FeedbackLabel({feedbackType:type});if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;try{const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='protocol_update'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule?v109ProtocolState(schedule):null;await cloudWrite(db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='protocol_update'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='protocol_update'?Math.max(0,Number(state?.pendingCycle||state?.elapsedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false}),'enviar o feedback');clearIdempotentDraft(draftKey);closeModal('modal-feedback');alert('Feedback enviado. Se houver outras transmissões pendentes, o aluno verá cada uma em sequência.');}catch(error){alert(cloudWriteError(error,'enviar o feedback'));}finally{endAction('send-feedback','modal-feedback');}};
+sendFeedback=async function(){const message=document.getElementById('input-feedback').value.normalize('NFKC').trim(),type=v1010FeedbackType(document.getElementById('input-feedback-type')?.value),title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||v1010FeedbackLabel({feedbackType:type});if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;try{const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='monthly_full'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule?v109ProtocolState(schedule):null;await cloudWrite(db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.elapsedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false}),'enviar o feedback');clearIdempotentDraft(draftKey);closeModal('modal-feedback');alert('Feedback enviado. Se houver outras transmissões pendentes, o aluno verá cada uma em sequência.');}catch(error){alert(cloudWriteError(error,'enviar o feedback'));}finally{endAction('send-feedback','modal-feedback');}};
 
 const V1010_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){TRAINER_SUPPLEMENT_CATALOG={items:[]};TRAINER_SUPPLEMENT_CATALOG_UID='';EDIT_TRAINER_SUPPLEMENT_ID='';V1010_FEEDBACK_LOADING=false;return V1010_CONFIRM_LOGOUT_BASE();};
@@ -8337,3 +8656,83 @@ async function moveCardioSubstitution(id,delta){if(!cardioCanEdit())return;const
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCardioTimerDisplay();},{passive:true});
 const V10109_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){if(CARDIO_TIMER_INTERVAL){clearInterval(CARDIO_TIMER_INTERVAL);CARDIO_TIMER_INTERVAL=0;}CARDIO_DOCUMENT={main:null,substitutions:[]};CARDIO_CONTEXT={targetUid:'',trainer:false,local:false,source:'workout'};CURRENT_CARDIO_ITEM_ID='';return V10109_CONFIRM_LOGOUT_BASE();};
+
+/* BC é uma técnica criada no catálogo pelo treinador. O alvo é uma orientação
+   textual; os números já salvos continuam intactos para as outras técnicas. */
+const BC_PRESCRIPTION_TARGET='Carga para 5 a 6';
+function bcTechniqueId(){
+  return TECHNIQUE_CATALOG?.items?.find(item=>String(item.code||'').trim().toUpperCase()==='BC')?.id||'';
+}
+function exerciseHasBcTechnique(exercise,week){
+  const id=bcTechniqueId();
+  return !!id&&!!exercise&&exerciseTechniqueIds(exercise,week).includes(id);
+}
+function bcSelectedInPrescriptionEditor(useSavedWeek=false){
+  const exercise=getPlanEditExercise(),week=Number(document.getElementById('input-prescription-week')?.value)||1,id=bcTechniqueId();
+  if(!id||!exercise)return false;
+  if(useSavedWeek)return exerciseHasBcTechnique(exercise,week);
+  const picker=document.getElementById('week-technique-picker');
+  if(!picker?.querySelector('input[type="checkbox"]'))return exerciseHasBcTechnique(exercise,week);
+  return [...picker.querySelectorAll('input[type="checkbox"]:checked')].some(input=>input.value===id);
+}
+function syncBcPrescriptionEditor(useSavedWeek=false){
+  const modal=document.getElementById('modal-prescription'),editor=document.getElementById('prescription-editor');
+  if(!modal||!editor)return;
+  const selected=bcSelectedInPrescriptionEditor(useSavedWeek),minLabel=document.getElementById('prescription-min-label'),maxLabel=document.getElementById('prescription-max-label');
+  modal.classList.toggle('bc-target-active',selected);
+  if(selected&&minLabel)minLabel.textContent='REPETIÇÕES';
+  if(!selected){
+    const exercise=getPlanEditExercise(),week=Number(document.getElementById('input-prescription-week')?.value)||1,time=exercise&&exerciseUsesResistedTime(exercise,week);
+    if(minLabel)minLabel.textContent=time?'Tempo mín.':'Reps mín.';
+    if(maxLabel)maxLabel.textContent=time?'Tempo máx.':'Reps máx.';
+  }
+  editor.querySelectorAll('.plan-set-row').forEach(row=>{
+    row.classList.toggle('bc-target-row',selected);
+    [...row.querySelectorAll('input.set-edit-input')].slice(0,2).forEach(input=>input.classList.toggle('bc-hidden-target',selected));
+    let label=row.querySelector('.bc-target-value');
+    if(selected){
+      if(!label){label=document.createElement('span');label.className='bc-target-value';row.insertBefore(label,row.querySelector('select')||row.querySelector('.btn-rm-set'));}
+      label.textContent=BC_PRESCRIPTION_TARGET;
+    }else label?.remove();
+  });
+}
+function replaceBcRangeText(target){
+  if(!target)return;
+  const backoff=target.querySelector('.backoff-label')?.cloneNode(true);
+  target.textContent=BC_PRESCRIPTION_TARGET;
+  if(backoff)target.appendChild(backoff);
+}
+{
+  const style=document.createElement('style');style.id='bc-prescription-target-style';
+  style.textContent='#modal-prescription.bc-target-active #prescription-min-label{grid-column:2/4;text-align:center}#modal-prescription.bc-target-active #prescription-max-label,#modal-prescription.bc-target-active .bc-hidden-target{display:none!important}#modal-prescription .bc-target-value{grid-column:2/4;min-width:0;padding:8px 6px;border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;text-align:center}';
+  document.head.appendChild(style);
+}
+const BC_BASE_WEEK_SELECTION=onWeekTechniqueSelectionChange;
+onWeekTechniqueSelectionChange=function(){const result=BC_BASE_WEEK_SELECTION.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_LOAD_PRESCRIPTION=loadPrescriptionEditor;
+loadPrescriptionEditor=function(){const result=BC_BASE_LOAD_PRESCRIPTION.apply(this,arguments);syncBcPrescriptionEditor(true);return result;};
+const BC_BASE_ADD_PRESCRIPTION_ROW=addPrescriptionSetRow;
+addPrescriptionSetRow=function(){const result=BC_BASE_ADD_PRESCRIPTION_ROW.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_REMOVE_PRESCRIPTION_ROW=removePrescriptionSet;
+removePrescriptionSet=function(){const result=BC_BASE_REMOVE_PRESCRIPTION_ROW.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_COPY_PRESCRIPTION=copyPreviousPrescription;
+copyPreviousPrescription=function(){const result=BC_BASE_COPY_PRESCRIPTION.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_REFRESH_BACKOFF=refreshBackoffPrescriptionRow;
+refreshBackoffPrescriptionRow=function(){const result=BC_BASE_REFRESH_BACKOFF.apply(this,arguments);syncBcPrescriptionEditor();return result;};
+const BC_BASE_COMPACT_SUMMARY=prescriptionCompactSummary;
+prescriptionCompactSummary=function(exercise,week){
+  const summary=BC_BASE_COMPACT_SUMMARY.apply(this,arguments);
+  return summary?.rx?.sets?.length&&exerciseHasBcTechnique(exercise,week)?{...summary,reps:BC_PRESCRIPTION_TARGET}:summary;
+};
+const BC_BASE_RENDER_PRESCRIPTION=renderExercisePrescription;
+renderExercisePrescription=function(exercise,elId,week){
+  const result=BC_BASE_RENDER_PRESCRIPTION.apply(this,arguments);
+  if(exerciseHasBcTechnique(exercise,week))document.getElementById(elId)?.querySelectorAll('.prescription-set-row .prescription-range').forEach(replaceBcRangeText);
+  return result;
+};
+const BC_BASE_POPULATE_SESSION=populateSessionEditorForWeek;
+populateSessionEditorForWeek=function(week){
+  const result=BC_BASE_POPULATE_SESSION.apply(this,arguments),exercise=getE(SESSION_WID,SESSION_EID);
+  if(exerciseHasBcTechnique(exercise,week))document.querySelectorAll('#sets-editor .performed-set-row[data-target-min] .performed-target').forEach(replaceBcRangeText);
+  return result;
+};

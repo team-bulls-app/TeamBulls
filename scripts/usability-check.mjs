@@ -17,7 +17,8 @@ const modal=read('modules/modal-stack-stability-v10_10_9.js');
 
 has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.20-usability3','Camada de usabilidade estabilizada não está carregada.');
 has(config,"setTimeout(()=>finish(false,'tempo limite')",'Loader opcional não possui limite de espera.');
-has(config,'deferredBatchCount%4===0','Loader não devolve tempo de pintura à interface entre lotes.');
+has(config,'const DEFERRED_YIELD_EVERY=2;','Loader deve devolver tempo de pintura em lotes curtos.');
+has(config,'deferredBatchCount%DEFERRED_YIELD_EVERY===0','Loader não usa a política explícita de yield entre lotes.');
 assert(config.indexOf('usability-checkup-v10_10_9.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Estabilidade de modais deve continuar sendo a última camada de UI.');
 
 has(usability,'scrollByHistoryKey','Navegação não preserva posição por entrada do histórico.');
@@ -43,4 +44,4 @@ const rendered=modal.indexOf('if(renderedPanel(top))',recovery);
 assert(recovery>=0&&keyboard>recovery&&rendered>keyboard,'Recuperação de modal força layout antes de verificar se o usuário está digitando.');
 
 if(fail.length){console.error(fail.join('\n'));process.exit(1);}
-console.log('Usability check-up OK — perfil event-driven e sem observer global.');
+console.log('Usability check-up OK — perfil event-driven, sem observer global e loader cedendo frames em lotes curtos.');
