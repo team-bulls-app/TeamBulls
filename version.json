@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026101301,
-  "revision": "student-food-choice-compact-2",
-  "publishedAt": "2026-10-13T17:36:34Z",
+  "build": 2026101901,
+  "revision": "light-theme-settings-1",
+  "publishedAt": "2026-10-19T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Compacta as escolhas de alimentos salvas, com alimento e quantidade na mesma linha e controles pequenos para trocar."
+  "message": "Adiciona tema claro com alternância nas configurações e mantém sua preferência neste dispositivo."
 }

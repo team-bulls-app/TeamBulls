@@ -138,7 +138,7 @@ const CFG = {
 ══════════════════════════════════════════════════ */
 const SETTINGS_KEY='team_bulls_settings_v9_4';
 const SETTINGS_LEGACY_KEY='team_bulls_settings_v9';
-const SETTINGS_DEFAULTS={background:100,text:100,font:100,clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:true,musicDock:false};
+const SETTINGS_DEFAULTS={background:100,text:100,font:100,theme:'dark',clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:true,musicDock:false};
 const MUSIC_VOLUME_MIGRATION_KEY='team_bulls_music_volume_reduced_v10_5_4';
 let APP_SETTINGS=loadAppSettings();
 function loadAppSettings(){
@@ -165,14 +165,19 @@ function adjustHex(hex,pct){
 }
 function applyAppSettings(){
   const root=document.documentElement.style;
-  root.setProperty('--bg',adjustHex('#0c0c0c',APP_SETTINGS.background));
-  root.setProperty('--surface',adjustHex('#141414',APP_SETTINGS.background));
-  root.setProperty('--card',adjustHex('#1c1c1c',APP_SETTINGS.background));
-  root.setProperty('--border',adjustHex('#282828',APP_SETTINGS.background));
-  root.setProperty('--border-l',adjustHex('#333333',APP_SETTINGS.background));
-  root.setProperty('--text',adjustHex('#efefef',APP_SETTINGS.text));
-  root.setProperty('--text-dim',adjustHex('#888888',APP_SETTINGS.text));
-  root.setProperty('--text-muted',adjustHex('#5a5a5a',APP_SETTINGS.text));
+  const light=APP_SETTINGS.theme==='light';
+  const textBrightness=light?Math.min(110,APP_SETTINGS.text):APP_SETTINGS.text;
+  document.documentElement.dataset.theme=light?'light':'dark';
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',light?'#ffffff':'#000000');
+  document.querySelector('meta[name="msapplication-TileColor"]')?.setAttribute('content',light?'#ffffff':'#000000');
+  root.setProperty('--bg',light?'#ffffff':adjustHex('#0c0c0c',APP_SETTINGS.background));
+  root.setProperty('--surface',light?'#f3f4f6':adjustHex('#141414',APP_SETTINGS.background));
+  root.setProperty('--card',light?'#ffffff':adjustHex('#1c1c1c',APP_SETTINGS.background));
+  root.setProperty('--border',light?'#d1d5db':adjustHex('#282828',APP_SETTINGS.background));
+  root.setProperty('--border-l',light?'#9ca3af':adjustHex('#333333',APP_SETTINGS.background));
+  root.setProperty('--text',light?adjustHex('#1f2937',textBrightness):adjustHex('#efefef',APP_SETTINGS.text));
+  root.setProperty('--text-dim',light?adjustHex('#4b5563',textBrightness):adjustHex('#888888',APP_SETTINGS.text));
+  root.setProperty('--text-muted',light?adjustHex('#596273',textBrightness):adjustHex('#5a5a5a',APP_SETTINGS.text));
   root.setProperty('--font-scale',String(APP_SETTINGS.font/100));
   root.setProperty('--click-volume',String(APP_SETTINGS.clickVolume/100));
   syncSettingsUi();
@@ -256,6 +261,7 @@ class MiniChart {
     const cv=this.cv,dpr=Math.min(window.devicePixelRatio||1,2),W=cv.parentElement.clientWidth,H=160;
     cv.style.width=W+'px';cv.style.height=H+'px';cv.width=W*dpr;cv.height=H*dpr;
     const ctx=cv.getContext('2d');ctx.scale(dpr,dpr);
+    const css=getComputedStyle(document.documentElement),chartGrid=css.getPropertyValue('--chart-grid').trim()||'#222',chartLabel=css.getPropertyValue('--chart-label').trim()||'#5a5a5a',chartSurface=css.getPropertyValue('--chart-surface').trim()||'#1c1c1c',chartBorder=css.getPropertyValue('--chart-border').trim()||'#333';
     const D=this.data,n=D.length;if(!n)return;
     const pad={t:14,r:14,b:40,l:46},cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
     const mn=Math.min(...D),mx=Math.max(...D),rng=mx-mn||1;
@@ -265,9 +271,9 @@ class MiniChart {
     ctx.clearRect(0,0,W,H);
     for(let i=0;i<=4;i++){
       const gy=pad.t+(i/4)*ch,val=maxV-(i/4)*(maxV-minV);
-      ctx.strokeStyle='#222';ctx.lineWidth=1;
+      ctx.strokeStyle=chartGrid;ctx.lineWidth=1;
       ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(pad.l+cw,gy);ctx.stroke();
-      ctx.fillStyle='#5a5a5a';ctx.font="10px 'DM Mono',monospace";ctx.textAlign='right';
+      ctx.fillStyle=chartLabel;ctx.font="10px 'DM Mono',monospace";ctx.textAlign='right';
       ctx.fillText(Math.round(val),pad.l-5,gy+4);
     }
     ctx.beginPath();ctx.moveTo(xp(0),yp(D[0]));
@@ -279,8 +285,8 @@ class MiniChart {
     ctx.beginPath();ctx.moveTo(xp(0),yp(D[0]));
     for(let i=1;i<n;i++){const px=xp(i-1),py=yp(D[i-1]),cx2=xp(i),cy2=yp(D[i]),mpx=(px+cx2)/2;ctx.bezierCurveTo(mpx,py,mpx,cy2,cx2,cy2);}
     ctx.strokeStyle='#e11d48';ctx.lineWidth=2;ctx.stroke();
-    for(let i=0;i<n;i++){ctx.beginPath();ctx.arc(xp(i),yp(D[i]),4.5,0,Math.PI*2);ctx.fillStyle='#e11d48';ctx.fill();ctx.strokeStyle='#0c0c0c';ctx.lineWidth=2;ctx.stroke();}
-    ctx.fillStyle='#5a5a5a';ctx.font="9px 'DM Mono',monospace";ctx.textAlign='center';
+    for(let i=0;i<n;i++){ctx.beginPath();ctx.arc(xp(i),yp(D[i]),4.5,0,Math.PI*2);ctx.fillStyle='#e11d48';ctx.fill();ctx.strokeStyle=css.getPropertyValue('--chart-border').trim()||'#0c0c0c';ctx.lineWidth=2;ctx.stroke();}
+    ctx.fillStyle=chartLabel;ctx.font="9px 'DM Mono',monospace";ctx.textAlign='center';
     const step=Math.max(1,Math.ceil(n/6));const shown=new Set();
     for(let i=0;i<n;i+=step){this._xl(ctx,this.labels[i],xp(i),H-pad.b+8);shown.add(i);}
     if(!shown.has(n-1))this._xl(ctx,this.labels[n-1],xp(n-1),H-pad.b+8);
@@ -288,7 +294,7 @@ class MiniChart {
       const ti=this._tip.idx,tx=xp(ti),ty=yp(D[ti]),txt=D[ti]+' '+this.unit;
       ctx.font="bold 11px 'DM Mono',monospace";const tw=ctx.measureText(txt).width+18;
       const bx=Math.max(4,Math.min(W-tw-4,tx-tw/2)),by=Math.max(4,ty-34);
-      ctx.fillStyle='#1c1c1c';ctx.strokeStyle='#333';ctx.lineWidth=1;
+      ctx.fillStyle=chartSurface;ctx.strokeStyle=chartBorder;ctx.lineWidth=1;
       this._rr(ctx,bx,by,tw,22,5);ctx.fill();ctx.stroke();
       ctx.fillStyle='#e11d48';ctx.textAlign='left';ctx.fillText(txt,bx+9,by+15);
       ctx.strokeStyle='rgba(225,29,72,.3)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
@@ -5525,7 +5531,10 @@ function syncSettingsUi(){
   const labels={background:'setting-bg-value',text:'setting-text-value',font:'setting-font-value',clickVolume:'setting-click-value',musicVolume:'setting-music-value'};for(const [key,id] of Object.entries(labels)){const el=document.getElementById(id);if(el)el.textContent=APP_SETTINGS[key]+'%';}
   document.getElementById('click-on')?.classList.toggle('active',!!APP_SETTINGS.clickEnabled);document.getElementById('click-off')?.classList.toggle('active',!APP_SETTINGS.clickEnabled);document.getElementById('music-on')?.classList.toggle('active',!!APP_SETTINGS.musicEnabled);document.getElementById('music-off')?.classList.toggle('active',!APP_SETTINGS.musicEnabled);
   document.getElementById('music-panel-on')?.classList.toggle('active',!!APP_SETTINGS.musicDock);document.getElementById('music-panel-off')?.classList.toggle('active',!APP_SETTINGS.musicDock);
+  document.getElementById('theme-light')?.classList.toggle('active',APP_SETTINGS.theme==='light');document.getElementById('theme-dark')?.classList.toggle('active',APP_SETTINGS.theme!=='light');
+  document.getElementById('theme-light')?.setAttribute('aria-pressed',String(APP_SETTINGS.theme==='light'));document.getElementById('theme-dark')?.setAttribute('aria-pressed',String(APP_SETTINGS.theme!=='light'));
 }
+function setAppTheme(theme){APP_SETTINGS.theme=theme==='light'?'light':'dark';saveAppSettings();applyAppSettings();if(miniChart&&CUR_EX){const exercise=getE(CUR_WORKOUT,CUR_EX);if(exercise)buildChart(exercise,'progressChart',CHART_MODE,null);}if(tsMiniChart&&VIEW_STUDENT_EXERCISE)buildChart(VIEW_STUDENT_EXERCISE,'tsProgressChart',TS_CHART_MODE,null,VIEW_STUDENT?.workouts);}
 function updateSettingsFromUi(){
   const val=id=>Number(document.getElementById(id)?.value);APP_SETTINGS.background=val('setting-bg')||100;APP_SETTINGS.text=val('setting-text')||100;APP_SETTINGS.font=val('setting-font')||100;APP_SETTINGS.clickVolume=Math.max(0,val('setting-click'));APP_SETTINGS.musicVolume=Math.max(0,val('setting-music'));saveAppSettings();applyAppSettings();
 }

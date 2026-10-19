@@ -195,7 +195,7 @@ has(core,'function refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week)','R
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='guidance2'",'Service Worker não criou revisão guidance2.');
+has(sw,"const CACHE_REVISION='lighttheme1'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
