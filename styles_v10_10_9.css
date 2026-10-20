@@ -2391,6 +2391,7 @@ html[data-theme="light"] .workout-card.is-inactive:hover,
 html[data-theme="light"] .workout-card.is-inactive:focus-within{opacity:1;filter:none}
 html[data-theme="light"] .workout-card-meta,
 html[data-theme="light"] .diet-folder-meta{color:#c7bdb2}
+html[data-theme="light"] .diet-folder-name{color:#f0e8de}
 html[data-theme="light"] .workout-card::after{color:#bdb1a2}
 html[data-theme="light"] .diet-folder-card.is-active{border-color:#a51e20}
 html[data-theme="light"] .diet-folder-card.is-inactive{background-color:#2b2927;background-image:none;opacity:1;filter:none}
