@@ -2433,8 +2433,8 @@ html[data-theme="light"] input[type="reset"]{
   --accent:#e11d48;
   --accent-dim:rgba(225,29,72,.12);
   --text:#efefef;
-  --text-dim:#888888;
-  --text-muted:#5a5a5a;
+  --text-dim:#d0c7bc;
+  --text-muted:#bdb1a2;
   --danger:#ef4444;
   --success:#22c55e;
   --warn:#f59e0b;
@@ -2483,6 +2483,8 @@ html[data-theme="light"] .v107-sync-grid article{
 }
 html[data-theme="light"] .workout-card.is-active,
 html[data-theme="light"] .cardio-prescription-card.selected{background-color:#301d1e;background-image:none;border-color:var(--tb-light-brand)}
+html[data-theme="light"] .workout-card,
+html[data-theme="light"] .diet-folder-card{opacity:1;filter:none}
 html[data-theme="light"] .workout-card.is-inactive,
 html[data-theme="light"] .diet-folder-card.is-inactive{background-color:var(--tb-light-panel-raised);background-image:none;border-color:#665a50;opacity:1;filter:none}
 html[data-theme="light"] .workout-card.is-inactive:hover,
@@ -2507,6 +2509,7 @@ html[data-theme="light"] .diet-support-table td,
 html[data-theme="light"] .food-options-table td{background:var(--tb-light-panel-raised);color:var(--tb-light-panel-muted);border-color:var(--tb-light-panel-border)}
 html[data-theme="light"] .diet-support-table td:first-child,
 html[data-theme="light"] .food-options-table .food-table-name{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .food-options-table .food-table-amount{color:var(--tb-light-panel-muted)}
 html[data-theme="light"] .diet-support-table tr.editable-row:hover td{background:#3a2526}
 html[data-theme="light"] .diet-support-table .diet-table-empty,
 html[data-theme="light"] .food-options-table .food-table-empty{background:#252321;color:var(--tb-light-panel-subtle)!important;opacity:1}
@@ -2540,6 +2543,7 @@ html[data-theme="light"] .v107-sync-grid article span{color:var(--tb-light-panel
 html[data-theme="light"] .auth-tabs,
 html[data-theme="light"] .context-section-tabs,
 html[data-theme="light"] .diet-variant-tabs,
+html[data-theme="light"] .chart-toggle,
 html[data-theme="light"] .v107-tabs{
   background:var(--tb-light-panel);
   border:1px solid var(--tb-light-panel-border);
@@ -2548,6 +2552,7 @@ html[data-theme="light"] .v107-tabs{
 }
 html[data-theme="light"] .auth-tabs,
 html[data-theme="light"] .diet-variant-tabs{padding:7px}
+html[data-theme="light"] .chart-toggle{padding:5px}
 html[data-theme="light"] .auth-tab,
 html[data-theme="light"] .context-section-tabs button,
 html[data-theme="light"] .chart-toggle button,
