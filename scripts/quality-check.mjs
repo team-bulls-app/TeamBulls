@@ -201,6 +201,7 @@ has(themeCss,'html[data-theme="light"] .toggle-btn,html[data-theme="light"] .cha
 has(themeCss,'html[data-theme="light"] .setting-switch button.active{background:rgba(134,25,27,.18)','Botão de configuração ativo perdeu a cor de destaque original.');
 has(themeCss,'html[data-theme="light"] .tb-hub-tab.active,html[data-theme="light"] .tb-hub-tab:hover{border-color:rgba(225,29,72,.72);background:#a51e20;color:#fff}','Aba ativa do painel do treinador perdeu contraste no tema claro.');
 has(themeCss,'html[data-theme="light"] .v107-command-button{color:#e2d2c1}','Botão da central de operações perdeu contraste no tema claro.');
+has(themeCss,'html[data-theme="light"] #screen-trainer>.content>button.btn-add-set{background:#303030!important','Atalhos retangulares do treinador não ficaram cinza-escuros no tema claro.');
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
