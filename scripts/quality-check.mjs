@@ -187,6 +187,15 @@ has(prescriptionActions,'@media(max-width:899px)','Central de ações não possu
 lacks(prescriptionActions,'MutationObserver','Central de ações não deve observar DOM permanentemente.');
 
 const core=read('app_v10_10_9_core.js');
+has(core,"const SETTINGS_DEFAULTS={background:100,lightBackground:70,text:100,font:100,theme:'dark'",'A configuração inicial do tema escuro ou a preferência clara foi alterada.');
+has(core,"loaded.lightBackground=loaded.theme==='light'&&Number.isFinite(savedBackground)&&savedBackground!==100?savedBackground:70",'Preferências claras antigas não recebem uma migração separada do tema escuro.');
+has(core,'function adjustLightSurfaceHex(hex,brightness)','Brilho do canvas claro não tem uma transformação própria.');
+has(core,"root.setProperty('--tb-light-canvas',canvas)",'Brilho do canvas claro não atualiza a superfície em tempo real.');
+has(core,'function adjustLightTextHex(base,minimum,maximum,brightness)','Brilho do texto claro não atualiza a escala tipográfica.');
+has(core,'function prepareFontScaleRules()','Escala da fonte não prepara os estilos do app.');
+has(core,"rule.style.setProperty('font-size',`calc(${value} * var(--font-scale))`,priority)",'Escala da fonte não alcança os estilos fixos em pixels.');
+has(core,"APP_SETTINGS[backgroundKey]=background",'O controle de brilho não mantém a preferência do tema selecionado.');
+has(core,"APP_SETTINGS.theme==='light'?APP_SETTINGS.lightBackground:APP_SETTINGS.background",'O brilho claro está alterando a preferência do tema escuro.');
 has(core,'const BASE_APPLY_APP_SETTINGS=applyAppSettings;','Aplicador final de configurações precisa preservar a lógica compartilhada do tema.');
 has(core,'BASE_APPLY_APP_SETTINGS();','Trocar o tema deve atualizar os tokens visuais imediatamente.');
 has(core,"if(APP_SETTINGS.theme!=='light')",'A paleta escura deve ser aplicada somente enquanto o tema escuro estiver selecionado.');
@@ -198,6 +207,10 @@ has(core,'function resetCardioTimer()','Reset do cardio ausente.');
 has(core,'function resolveWeekPrescription(exercise,week)','Resolução de prescrição herdada ausente.');
 has(core,'function refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week)','Refresh seguro de prescrição ausente.');
 const themeCss=read('styles_v10_10_9.css');
+const settingsHtml=read('index.html');
+has(settingsHtml,'id="setting-bg" max="180" min="35" oninput="updateSettingsFromUi()"','Controle de brilho do fundo não atualiza imediatamente.');
+has(settingsHtml,'id="setting-text" max="180" min="45" oninput="updateSettingsFromUi()"','Controle de brilho do texto não atualiza imediatamente.');
+has(settingsHtml,'id="setting-font" max="135" min="85" oninput="updateSettingsFromUi()"','Controle de tamanho da fonte não atualiza imediatamente.');
 const lightThemeStart=themeCss.indexOf('/* Paleta clara Team Bulls: branco no canvas, tinta escura na página, carvão nas áreas de conteúdo. */');
 const lightThemeCss=(lightThemeStart>=0?themeCss.slice(lightThemeStart):'').replace(/\r\n/g,'\n');
 has(lightThemeCss,'--tb-light-canvas:#ffffff;','Tema claro perdeu o branco do canvas.');
@@ -207,17 +220,26 @@ has(lightThemeCss,'--tb-light-panel-ink:#f0e8de;','Texto dos painéis escuros pe
 has(lightThemeCss,'--chart-label:#d0c7bc;','Rótulos de gráficos perderam contraste no tema claro.');
 const luminance=hex=>{const channels=hex.match(/[0-9a-f]{2}/gi).map(value=>parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4);return .2126*channels[0]+.7152*channels[1]+.0722*channels[2];};
 const contrast=(a,b)=>{const values=[luminance(a),luminance(b)].sort((x,y)=>y-x);return(values[0]+.05)/(values[1]+.05);};
+const encodeLinear=channel=>{const value=Math.max(0,Math.min(1,channel));return Math.round(255*(value<=.0031308?value*12.92:1.055*Math.pow(value,1/2.4)-.055)).toString(16).padStart(2,'0');};
+const defaultLightCanvas='#'+[255,255,255].map(value=>encodeLinear((value/255<=.04045?value/255/12.92:((value/255+.055)/1.055)**2.4)*.7)).join('');
+assert(defaultLightCanvas==='#dadada','O brilho padrão do fundo claro não representa uma redução de 30%.');
 [
-  ['#25211e','#ffffff','texto principal sobre o canvas'],
-  ['#625a53','#ffffff','texto secundário sobre o canvas'],
+  ['#25211e','#dadada','texto principal sobre o canvas claro a 70%'],
+  ['#625a53','#dadada','texto secundário sobre o canvas claro a 70%'],
+  ['#5d554f','#dadada','metadados sobre o canvas claro a 70%'],
   ['#f0e8de','#262422','texto principal nos painéis'],
   ['#d0c7bc','#262422','texto secundário nos painéis'],
   ['#bdb1a2','#262422','metadados nos painéis'],
-  ['#a51e20','#ffffff','marca sobre o canvas'],
+  ['#a51e20','#dadada','marca sobre o canvas claro a 70%'],
   ['#ed7779','#262422','marca sobre os painéis']
 ].forEach(([foreground,background,label])=>assert(contrast(foreground,background)>=4.5,`Contraste insuficiente para ${label}.`));
 has(lightThemeCss,'html[data-theme="light"] .modal-sheet,','Formulários perderam uma superfície clara legível.');
 has(lightThemeCss,'html[data-theme="light"] .modal-dialog{background:var(--tb-light-canvas-soft);','Modais perderam uma superfície clara legível.');
+has(lightThemeCss,'html[data-theme="light"] .context-section-tabs,','Abas de treino precisam de uma superfície opaca no tema claro.');
+has(lightThemeCss,'html[data-theme="light"] .v107-tabs{background:#171615}','Abas administrativas precisam de uma superfície escura e opaca.');
+has(lightThemeCss,'html[data-theme="light"] .diet-variant-card.active,','Abas de divisões de dieta precisam de um estado ativo opaco.');
+has(lightThemeCss,'background-image:none;','Estados ativos das abas não podem manter gradientes translúcidos.');
+has(lightThemeCss,'color:var(--tb-light-panel-ink);','Rótulos das abas escuras precisam de texto legível.');
 const controlPaletteStart=lightThemeCss.indexOf('html[data-theme="light"] button,');
 const controlPaletteEnd=lightThemeCss.indexOf('\n}',controlPaletteStart);
 const controlPalette=controlPaletteStart>=0&&controlPaletteEnd>controlPaletteStart?lightThemeCss.slice(controlPaletteStart,controlPaletteEnd+2):'';
@@ -234,7 +256,7 @@ assert(!lightThemeCss.includes('.supplements-free-meal-card'),'Tema claro repint
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme8'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme9'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [

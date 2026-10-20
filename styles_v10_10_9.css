@@ -2363,8 +2363,8 @@ html[data-theme="light"]{
   --tb-light-ink:#25211e;
   --tb-light-muted:#625a53;
   --tb-light-subtle:#71685f;
-  --tb-light-line:#ded8d2;
-  --tb-light-line-strong:#bcb2a8;
+  --tb-light-line:#bcb2a8;
+  --tb-light-line-strong:#8e8175;
   --tb-light-panel:#262422;
   --tb-light-panel-raised:#2b2927;
   --tb-light-panel-border:#554a42;
@@ -2535,3 +2535,45 @@ html[data-theme="light"] .protocol-review-home-banner{background:var(--tb-light-
 html[data-theme="light"] .protocol-review-info-grid>div{background:var(--tb-light-panel-raised)}
 html[data-theme="light"] .v107-kpi-grid article span,
 html[data-theme="light"] .v107-sync-grid article span{color:var(--tb-light-panel-subtle)}
+
+/* Abas do tema claro usam superfícies sólidas para separar navegação e conteúdo. */
+html[data-theme="light"] .auth-tabs,
+html[data-theme="light"] .context-section-tabs,
+html[data-theme="light"] .diet-variant-tabs,
+html[data-theme="light"] .v107-tabs{
+  background:var(--tb-light-panel);
+  border:1px solid var(--tb-light-panel-border);
+  border-radius:6px;
+  opacity:1;
+}
+html[data-theme="light"] .auth-tabs,
+html[data-theme="light"] .diet-variant-tabs{padding:7px}
+html[data-theme="light"] .auth-tab,
+html[data-theme="light"] .context-section-tabs button,
+html[data-theme="light"] .chart-toggle button,
+html[data-theme="light"] .diet-variant-card,
+html[data-theme="light"] .v107-tabs button{
+  background:var(--tb-light-panel-raised);
+  background-image:none;
+  border:1px solid var(--tb-light-panel-border);
+  color:var(--tb-light-panel-ink);
+  opacity:1;
+}
+html[data-theme="light"] .auth-tab.active,
+html[data-theme="light"] .context-section-tabs button.active,
+html[data-theme="light"] .chart-toggle button.active,
+html[data-theme="light"] .diet-variant-card.active,
+html[data-theme="light"] .v107-tabs button.active{
+  background:#3a2526;
+  background-image:none;
+  border-color:var(--tb-light-brand-on-panel);
+  color:var(--tb-light-panel-ink);
+  box-shadow:inset 0 -2px 0 var(--tb-light-brand-on-panel);
+}
+html[data-theme="light"] .diet-variant-card span{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .context-section-tabs button:not(.active):hover,
+html[data-theme="light"] .chart-toggle button:not(.active):hover,
+html[data-theme="light"] .diet-variant-card:hover,
+html[data-theme="light"] .v107-tabs button:not(.active):hover{border-color:var(--tb-light-panel-border-strong);color:#ffffff}
+html[data-theme="light"] .v107-tabs{background:#171615}
+html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-light-panel-muted)}

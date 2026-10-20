@@ -138,21 +138,32 @@ const CFG = {
 ══════════════════════════════════════════════════ */
 const SETTINGS_KEY='team_bulls_settings_v9_4';
 const SETTINGS_LEGACY_KEY='team_bulls_settings_v9';
-const SETTINGS_DEFAULTS={background:100,text:100,font:100,theme:'dark',clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:true,musicDock:false};
+const SETTINGS_DEFAULTS={background:100,lightBackground:70,text:100,font:100,theme:'dark',clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:true,musicDock:false};
 const MUSIC_VOLUME_MIGRATION_KEY='team_bulls_music_volume_reduced_v10_5_4';
+const LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY='team_bulls_light_background_default_70_v1';
 let APP_SETTINGS=loadAppSettings();
 function loadAppSettings(){
   try{
     const current=localStorage.getItem(SETTINGS_KEY);
     const legacyRaw=localStorage.getItem(SETTINGS_LEGACY_KEY);
     const hadSavedSettings=!!(current||legacyRaw);
+    const currentSettings=current?JSON.parse(current):null,legacySettings=!current?JSON.parse(legacyRaw||'{}'):null;
     const loaded=current
-      ? {...SETTINGS_DEFAULTS,...JSON.parse(current)}
-      : {...SETTINGS_DEFAULTS,...JSON.parse(legacyRaw||'{}'),musicDock:false};
+      ? {...SETTINGS_DEFAULTS,...currentSettings}
+      : {...SETTINGS_DEFAULTS,...legacySettings,musicDock:false};
     if(hadSavedSettings&&!localStorage.getItem(MUSIC_VOLUME_MIGRATION_KEY)){
       loaded.musicVolume=Math.max(0,Math.min(100,Math.round((Number(loaded.musicVolume)||35)*0.8)));
       localStorage.setItem(MUSIC_VOLUME_MIGRATION_KEY,'1');
       localStorage.setItem(SETTINGS_KEY,JSON.stringify(loaded));
+    }
+    const savedSettings=currentSettings||legacySettings||{};
+    if(!Object.prototype.hasOwnProperty.call(savedSettings,'lightBackground')){
+      const savedBackground=Number(loaded.background);
+      loaded.lightBackground=loaded.theme==='light'&&Number.isFinite(savedBackground)&&savedBackground!==100?savedBackground:70;
+      localStorage.setItem(SETTINGS_KEY,JSON.stringify(loaded));
+    }
+    if(loaded.theme==='light'&&!localStorage.getItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY)){
+      localStorage.setItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY,'1');
     }
     return loaded;
   }catch(e){return{...SETTINGS_DEFAULTS};}
@@ -173,8 +184,8 @@ function applyAppSettings(){
   root.setProperty('--bg',light?'#ffffff':adjustHex('#0c0c0c',APP_SETTINGS.background));
   root.setProperty('--surface',light?'#f5f3f1':adjustHex('#141414',APP_SETTINGS.background));
   root.setProperty('--card',light?'#ffffff':adjustHex('#1c1c1c',APP_SETTINGS.background));
-  root.setProperty('--border',light?'#ded8d2':adjustHex('#282828',APP_SETTINGS.background));
-  root.setProperty('--border-l',light?'#bcb2a8':adjustHex('#333333',APP_SETTINGS.background));
+  root.setProperty('--border',light?'#bcb2a8':adjustHex('#282828',APP_SETTINGS.background));
+  root.setProperty('--border-l',light?'#8e8175':adjustHex('#333333',APP_SETTINGS.background));
   root.setProperty('--text',light?adjustHex('#25211e',textBrightness):adjustHex('#efefef',APP_SETTINGS.text));
   root.setProperty('--text-dim',light?adjustHex('#625a53',textBrightness):adjustHex('#888888',APP_SETTINGS.text));
   root.setProperty('--text-muted',light?adjustHex('#71685f',textBrightness):adjustHex('#5a5a5a',APP_SETTINGS.text));
@@ -5536,16 +5547,26 @@ window.addEventListener('resize',()=>{
 ══════════════════════════════════════════════════ */
 
 function syncSettingsUi(){
-  const ids={background:'setting-bg',text:'setting-text',font:'setting-font',clickVolume:'setting-click',musicVolume:'setting-music'};for(const [key,id] of Object.entries(ids)){const el=document.getElementById(id);if(el)el.value=APP_SETTINGS[key];}
-  const labels={background:'setting-bg-value',text:'setting-text-value',font:'setting-font-value',clickVolume:'setting-click-value',musicVolume:'setting-music-value'};for(const [key,id] of Object.entries(labels)){const el=document.getElementById(id);if(el)el.textContent=APP_SETTINGS[key]+'%';}
+  const uiSettings={...APP_SETTINGS,background:APP_SETTINGS.theme==='light'?APP_SETTINGS.lightBackground:APP_SETTINGS.background};
+  const ids={background:'setting-bg',text:'setting-text',font:'setting-font',clickVolume:'setting-click',musicVolume:'setting-music'};for(const [key,id] of Object.entries(ids)){const el=document.getElementById(id);if(el)el.value=uiSettings[key];}
+  const labels={background:'setting-bg-value',text:'setting-text-value',font:'setting-font-value',clickVolume:'setting-click-value',musicVolume:'setting-music-value'};for(const [key,id] of Object.entries(labels)){const el=document.getElementById(id);if(el)el.textContent=uiSettings[key]+'%';}
   document.getElementById('click-on')?.classList.toggle('active',!!APP_SETTINGS.clickEnabled);document.getElementById('click-off')?.classList.toggle('active',!APP_SETTINGS.clickEnabled);document.getElementById('music-on')?.classList.toggle('active',!!APP_SETTINGS.musicEnabled);document.getElementById('music-off')?.classList.toggle('active',!APP_SETTINGS.musicEnabled);
   document.getElementById('music-panel-on')?.classList.toggle('active',!!APP_SETTINGS.musicDock);document.getElementById('music-panel-off')?.classList.toggle('active',!APP_SETTINGS.musicDock);
   document.getElementById('theme-light')?.classList.toggle('active',APP_SETTINGS.theme==='light');document.getElementById('theme-dark')?.classList.toggle('active',APP_SETTINGS.theme!=='light');
   document.getElementById('theme-light')?.setAttribute('aria-pressed',String(APP_SETTINGS.theme==='light'));document.getElementById('theme-dark')?.setAttribute('aria-pressed',String(APP_SETTINGS.theme!=='light'));
 }
-function setAppTheme(theme){APP_SETTINGS.theme=theme==='light'?'light':'dark';saveAppSettings();applyAppSettings();if(miniChart&&CUR_EX){const exercise=getE(CUR_WORKOUT,CUR_EX);if(exercise)buildChart(exercise,'progressChart',CHART_MODE,null);}if(tsMiniChart&&VIEW_STUDENT_EXERCISE)buildChart(VIEW_STUDENT_EXERCISE,'tsProgressChart',TS_CHART_MODE,null,VIEW_STUDENT?.workouts);}
+function setAppTheme(theme){
+  APP_SETTINGS.theme=theme==='light'?'light':'dark';
+  try{if(APP_SETTINGS.theme==='light'&&!localStorage.getItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY))localStorage.setItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY,'1');}catch(e){}
+  saveAppSettings();applyAppSettings();if(miniChart&&CUR_EX){const exercise=getE(CUR_WORKOUT,CUR_EX);if(exercise)buildChart(exercise,'progressChart',CHART_MODE,null);}if(tsMiniChart&&VIEW_STUDENT_EXERCISE)buildChart(VIEW_STUDENT_EXERCISE,'tsProgressChart',TS_CHART_MODE,null,VIEW_STUDENT?.workouts);
+}
 function updateSettingsFromUi(){
-  const val=id=>Number(document.getElementById(id)?.value);APP_SETTINGS.background=val('setting-bg')||100;APP_SETTINGS.text=val('setting-text')||100;APP_SETTINGS.font=val('setting-font')||100;APP_SETTINGS.clickVolume=Math.max(0,val('setting-click'));APP_SETTINGS.musicVolume=Math.max(0,val('setting-music'));saveAppSettings();applyAppSettings();
+  const val=(id,fallback,min,max)=>{const raw=Number(document.getElementById(id)?.value);return Math.max(min,Math.min(max,Number.isFinite(raw)?raw:fallback));};
+  const background=val('setting-bg',APP_SETTINGS.theme==='light'?70:100,35,180),text=val('setting-text',100,45,180),font=val('setting-font',100,85,135),backgroundKey=APP_SETTINGS.theme==='light'?'lightBackground':'background';
+  const visualChanged=background!==APP_SETTINGS[backgroundKey]||text!==APP_SETTINGS.text||font!==APP_SETTINGS.font;
+  APP_SETTINGS[backgroundKey]=background;APP_SETTINGS.text=text;APP_SETTINGS.font=font;APP_SETTINGS.clickVolume=val('setting-click',120,0,180);APP_SETTINGS.musicVolume=val('setting-music',28,0,100);saveAppSettings();applyAppSettings();
+  if(visualChanged&&miniChart&&CUR_EX){const exercise=getE(CUR_WORKOUT,CUR_EX);if(exercise)buildChart(exercise,'progressChart',CHART_MODE,null);}
+  if(visualChanged&&tsMiniChart&&VIEW_STUDENT_EXERCISE)buildChart(VIEW_STUDENT_EXERCISE,'tsProgressChart',TS_CHART_MODE,null,VIEW_STUDENT?.workouts);
 }
 function setClickEnabled(enabled){APP_SETTINGS.clickEnabled=!!enabled;saveAppSettings();applyAppSettings();if(enabled)playSurvivalTone(120,.06);}
 function setMusicEnabled(enabled){
@@ -5556,7 +5577,7 @@ function setMusicPanelVisible(visible){
   APP_SETTINGS.musicDock=!!visible;saveAppSettings();applyAppSettings();
   if(visible){initLocalMusic();updateMusicUi();}
 }
-function resetAppSettings(){APP_SETTINGS={...SETTINGS_DEFAULTS};saveAppSettings();applyAppSettings();showToast('Configurações restauradas');}
+function resetAppSettings(){APP_SETTINGS={...SETTINGS_DEFAULTS};try{localStorage.removeItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY);}catch(e){}saveAppSettings();applyAppSettings();showToast('Configurações restauradas');}
 // Para adicionar novas músicas, inclua outro objeto nesta lista; a fila aleatória se adapta automaticamente.
 const MUSIC_TRACKS=[
   {id:'option-screen',url:'team-bulls-music-01-option-screen.mp3',title:'OPTION SCREEN — EXTENDED'},
@@ -6549,17 +6570,52 @@ adjustHex=function(hex,pct){
   const c=shift=>Math.max(0,Math.min(255,Math.round(((n>>shift)&255)*amount))).toString(16).padStart(2,'0');
   return'#'+c(16)+c(8)+c(0);
 };
+function themeHexChannels(hex){const raw=hex.replace('#','');const full=raw.length===3?raw.split('').map(c=>c+c).join(''):raw;return[parseInt(full.slice(0,2),16),parseInt(full.slice(2,4),16),parseInt(full.slice(4,6),16)];}
+function blendThemeHex(from,to,amount){const a=themeHexChannels(from),b=themeHexChannels(to),t=Math.max(0,Math.min(1,amount));return'#'+a.map((value,index)=>Math.round(value+(b[index]-value)*t).toString(16).padStart(2,'0')).join('');}
+function adjustLightSurfaceHex(hex,brightness){
+  const amount=Math.max(.35,Math.min(1.8,(Number(brightness)||70)/100));
+  const linear=value=>{const channel=value/255;return channel<=.04045?channel/12.92:Math.pow((channel+.055)/1.055,2.4);};
+  const encoded=value=>{const channel=Math.max(0,Math.min(1,value));return Math.round(255*(channel<=.0031308?channel*12.92:1.055*Math.pow(channel,1/2.4)-.055)).toString(16).padStart(2,'0');};
+  return'#'+themeHexChannels(hex).map(value=>{const source=linear(value),target=amount<=1?source*amount:source+(1-source)*((amount-1)/.8);return encoded(target);}).join('');
+}
+function adjustLightTextHex(base,minimum,maximum,brightness){
+  const amount=Math.max(45,Math.min(180,Number(brightness)||100));
+  return amount<=100?blendThemeHex(minimum,base,(amount-45)/55):blendThemeHex(base,maximum,(amount-100)/80);
+}
+let FONT_SCALE_RULES_PREPARED=false;
+function prepareFontScaleRules(){
+  if(FONT_SCALE_RULES_PREPARED)return;
+  const visit=rules=>{for(const rule of rules){if(rule.style&&typeof rule.selectorText==='string'){const value=rule.style.getPropertyValue('font-size'),priority=rule.style.getPropertyPriority('font-size');if(value&&!value.includes('--font-scale'))rule.style.setProperty('font-size',`calc(${value} * var(--font-scale))`,priority);}if(rule.cssRules)visit(rule.cssRules);}};
+  Array.from(document.styleSheets).forEach(sheet=>{try{visit(sheet.cssRules);}catch(e){}});
+  FONT_SCALE_RULES_PREPARED=true;
+}
 const BASE_APPLY_APP_SETTINGS=applyAppSettings;
 applyAppSettings=function(){
-  const root=document.documentElement.style,bg=Math.max(35,Math.min(180,Number(APP_SETTINGS.background)||100));
+  const root=document.documentElement.style,bg=Math.max(35,Math.min(180,Number(APP_SETTINGS.theme==='light'?APP_SETTINGS.lightBackground:APP_SETTINGS.background)||100));
   BASE_APPLY_APP_SETTINGS();
   if(APP_SETTINGS.theme!=='light'){
     const text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
     root.setProperty('--bg',adjustHex('#070706',bg));root.setProperty('--surface',adjustHex('#11100f',bg));root.setProperty('--card',adjustHex('#171513',bg));root.setProperty('--border',adjustHex('#342e29',bg));root.setProperty('--border-l',adjustHex('#51453a',bg));
     root.setProperty('--text',adjustHex('#e8e0d3',text));root.setProperty('--text-dim',adjustHex('#aaa095',text));root.setProperty('--text-muted',adjustHex('#766d63',text));
+  }else{
+    const text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
+    const canvas=adjustLightSurfaceHex('#ffffff',bg),canvasSoft=adjustLightSurfaceHex('#f7f5f3',bg);
+    const ink=adjustLightTextHex('#25211e','#0c0b0a','#625a53',text),muted=adjustLightTextHex('#574f49','#28231f','#625a53',text),subtle=adjustLightTextHex('#5d554f','#2b2723','#625a53',text);
+    const panelInk=adjustLightTextHex('#f0e8de','#aaa9a8','#ffffff',text),panelMuted=adjustLightTextHex('#d0c7bc','#9f9f9f','#f0ece6',text),panelSubtle=adjustLightTextHex('#bdb1a2','#929292','#ddd8d0',text);
+    root.setProperty('--tb-light-canvas',canvas);root.setProperty('--tb-light-canvas-soft',canvasSoft);
+    root.setProperty('--tb-light-line','#bcb2a8');root.setProperty('--tb-light-line-strong','#8e8175');
+    root.setProperty('--tb-light-ink',ink);root.setProperty('--tb-light-muted',muted);root.setProperty('--tb-light-subtle',subtle);
+    root.setProperty('--tb-light-panel-ink',panelInk);root.setProperty('--tb-light-panel-muted',panelMuted);root.setProperty('--tb-light-panel-subtle',panelSubtle);
+    root.setProperty('--bg',canvas);root.setProperty('--surface',canvasSoft);root.setProperty('--card',canvas);
+    root.setProperty('--border','#bcb2a8');root.setProperty('--border-l','#8e8175');
+    root.setProperty('--text',ink);root.setProperty('--text-dim',muted);root.setProperty('--text-muted',subtle);
+    root.setProperty('--chart-label',panelMuted);
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',canvas);
+    document.querySelector('meta[name="msapplication-TileColor"]')?.setAttribute('content',canvas);
   }
   root.setProperty('--font-scale',String(APP_SETTINGS.font/100));root.setProperty('--click-volume',String(APP_SETTINGS.clickVolume/100));
   root.setProperty('--ui-glow',String(Math.max(.55,Math.min(1.55,bg/100))));root.setProperty('--auth-shade',String(Math.max(.05,Math.min(.78,.58-(bg-100)/150))));
+  prepareFontScaleRules();
 };
 
 /* Desktop responsivo também para aluno e modo local. */
