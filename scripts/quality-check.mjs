@@ -187,6 +187,9 @@ has(prescriptionActions,'@media(max-width:899px)','Central de ações não possu
 lacks(prescriptionActions,'MutationObserver','Central de ações não deve observar DOM permanentemente.');
 
 const core=read('app_v10_10_9_core.js');
+has(core,'const BASE_APPLY_APP_SETTINGS=applyAppSettings;','Aplicador final de configurações precisa preservar a lógica compartilhada do tema.');
+has(core,'BASE_APPLY_APP_SETTINGS();','Trocar o tema deve atualizar os tokens visuais imediatamente.');
+has(core,"if(APP_SETTINGS.theme!=='light')",'A paleta escura deve ser aplicada somente enquanto o tema escuro estiver selecionado.');
 has(core,'state.endAt=Date.now()+state.remainingSeconds*1000','Fluxo principal não persiste endAt do cardio.');
 has(core,'function pauseCardioTimer()','Pausa do cardio ausente.');
 has(core,'function resetCardioTimer()','Reset do cardio ausente.');
@@ -195,7 +198,7 @@ has(core,'function refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week)','R
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme1'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme2'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [

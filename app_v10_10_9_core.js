@@ -6540,14 +6540,17 @@ adjustHex=function(hex,pct){
   const c=shift=>Math.max(0,Math.min(255,Math.round(((n>>shift)&255)*amount))).toString(16).padStart(2,'0');
   return'#'+c(16)+c(8)+c(0);
 };
+const BASE_APPLY_APP_SETTINGS=applyAppSettings;
 applyAppSettings=function(){
-  const root=document.documentElement.style,bg=Math.max(35,Math.min(180,Number(APP_SETTINGS.background)||100)),text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
-  root.setProperty('--bg',adjustHex('#070706',bg));root.setProperty('--surface',adjustHex('#11100f',bg));root.setProperty('--card',adjustHex('#171513',bg));root.setProperty('--border',adjustHex('#342e29',bg));root.setProperty('--border-l',adjustHex('#51453a',bg));
-  root.setProperty('--text',adjustHex('#e8e0d3',text));root.setProperty('--text-dim',adjustHex('#aaa095',text));root.setProperty('--text-muted',adjustHex('#766d63',text));
+  const root=document.documentElement.style,bg=Math.max(35,Math.min(180,Number(APP_SETTINGS.background)||100));
+  BASE_APPLY_APP_SETTINGS();
+  if(APP_SETTINGS.theme!=='light'){
+    const text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
+    root.setProperty('--bg',adjustHex('#070706',bg));root.setProperty('--surface',adjustHex('#11100f',bg));root.setProperty('--card',adjustHex('#171513',bg));root.setProperty('--border',adjustHex('#342e29',bg));root.setProperty('--border-l',adjustHex('#51453a',bg));
+    root.setProperty('--text',adjustHex('#e8e0d3',text));root.setProperty('--text-dim',adjustHex('#aaa095',text));root.setProperty('--text-muted',adjustHex('#766d63',text));
+  }
   root.setProperty('--font-scale',String(APP_SETTINGS.font/100));root.setProperty('--click-volume',String(APP_SETTINGS.clickVolume/100));
   root.setProperty('--ui-glow',String(Math.max(.55,Math.min(1.55,bg/100))));root.setProperty('--auth-shade',String(Math.max(.05,Math.min(.78,.58-(bg-100)/150))));
-  syncSettingsUi();const dock=document.getElementById('music-dock');if(dock)dock.classList.toggle('active',!!APP_SETTINGS.musicDock);
-  if(LOCAL_MUSIC){if(MUSIC_FADE_FRAME)cancelMusicFade();LOCAL_MUSIC.volume=APP_SETTINGS.musicEnabled&&!LOCAL_MUSIC.paused?getMusicTargetVolume():0;}
 };
 
 /* Desktop responsivo também para aluno e modo local. */
