@@ -2373,3 +2373,42 @@ html[data-theme="light"] #screen-auth{background:#fff}
 html[data-theme="light"] #screen-auth .auth-logo{color:#27221f;text-shadow:none}
 html[data-theme="light"] #screen-auth .auth-logo .dim{color:var(--accent)}
 html[data-theme="light"] #screen-auth::before,html[data-theme="light"] #screen-auth::after{color:#665e57}
+
+/* No canvas claro, os painéis de conteúdo continuam sólidos e com leitura clara. */
+html[data-theme="light"] .diet-page-intro,
+html[data-theme="light"] .workout-card,
+html[data-theme="light"] .diet-folder-card{
+  background-color:#262422;
+  background-image:none;
+  border-color:#554a42;
+}
+html[data-theme="light"] .diet-page-intro{border-left-color:#a51e20}
+html[data-theme="light"] .diet-page-intro strong{color:#f0e8de}
+html[data-theme="light"] .diet-page-intro span{color:#cfc5ba}
+html[data-theme="light"] .workout-card.is-active{background-color:#301d1e;background-image:none;border-color:#a51e20}
+html[data-theme="light"] .workout-card.is-inactive{background-color:#2b2927;background-image:none;border-color:#665a50;opacity:1;filter:none}
+html[data-theme="light"] .workout-card.is-inactive:hover,
+html[data-theme="light"] .workout-card.is-inactive:focus-within{opacity:1;filter:none}
+html[data-theme="light"] .workout-card-meta,
+html[data-theme="light"] .diet-folder-meta{color:#c7bdb2}
+html[data-theme="light"] .workout-card::after{color:#bdb1a2}
+html[data-theme="light"] .diet-folder-card.is-active{border-color:#a51e20}
+html[data-theme="light"] .diet-folder-card.is-inactive{background-color:#2b2927;background-image:none;opacity:1;filter:none}
+html[data-theme="light"] .workout-card .protocol-state-badge.inactive,
+html[data-theme="light"] .diet-folder-card .protocol-state-badge.inactive{border-color:#6e6258;background:#1b1a19;color:#c4b9aa}
+html[data-theme="light"] .diet-folder-card .exercise-row-arrow{color:#c4b9aa}
+html[data-theme="light"] .free-meal-intro{background:#26211f;border-color:#554a42;border-left-color:#a51e20}
+html[data-theme="light"] .free-meal-intro-title{color:#f0e8de}
+html[data-theme="light"] .free-meal-intro-sub{color:#cfc5ba}
+html[data-theme="light"] .diet-table-scroll{background:#262422;border-color:#554a42}
+html[data-theme="light"] .diet-support-table th{background:#171615;color:#ed7779;border-color:#554a42}
+html[data-theme="light"] .diet-support-table td{background:#2b2927;color:#ded7ce;border-color:#554a42}
+html[data-theme="light"] .diet-support-table td:first-child{color:#f0e8de}
+html[data-theme="light"] .diet-support-table tr.editable-row:hover td{background:#3a2526}
+html[data-theme="light"] .diet-support-table .diet-table-empty{color:#c4b9aa!important}
+html[data-theme="light"] .food-options-table{background:#262422}
+html[data-theme="light"] .food-options-table th{background:#171615;color:#ed7779;border-color:#554a42}
+html[data-theme="light"] .food-options-table td{background:#2b2927;border-color:#554a42}
+html[data-theme="light"] .food-options-table .food-table-name{color:#f0e8de}
+html[data-theme="light"] .food-options-table .food-table-amount{color:#c7bdb2}
+html[data-theme="light"] .food-options-table .food-table-empty{background:#252321;background-image:none;opacity:1}
