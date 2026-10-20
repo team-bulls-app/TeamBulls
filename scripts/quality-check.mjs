@@ -209,6 +209,11 @@ has(opaquePanelsCss,'html[data-theme="light"] .workout-card.is-active{background
 has(opaquePanelsCss,'html[data-theme="light"] .workout-card.is-inactive{background-color:#2b2927;background-image:none;border-color:#665a50;opacity:1;filter:none}','Protocolos desativados ficaram translúcidos ou sem contraste.');
 has(opaquePanelsCss,'html[data-theme="light"] .diet-folder-card.is-inactive{background-color:#2b2927;background-image:none;opacity:1;filter:none}','Planos desativados ficaram translúcidos ou sem contraste.');
 has(opaquePanelsCss,'html[data-theme="light"] .diet-folder-name{color:#f0e8de}','Nome da dieta perdeu contraste sobre o cartão escuro.');
+has(opaquePanelsCss,'html[data-theme="light"] .workout-card-name{color:#f0e8de}','Nome do treino perdeu contraste sobre o cartão escuro.');
+has(opaquePanelsCss,'html[data-theme="light"] .global-report-guide-panel{background-color:#262422;background-image:none;border-color:#554a42}','Painel do guia de fotos ficou translúcido no tema claro.');
+has(opaquePanelsCss,'html[data-theme="light"] .global-report-guide-panel>p{color:#ded7ce}','Descrição do guia de fotos perdeu contraste.');
+has(opaquePanelsCss,'html[data-theme="light"] .quest-card-preview{color:#ded7ce}','Histórico de relatórios perdeu contraste.');
+has(opaquePanelsCss,'html[data-theme="light"] #tb-weekly-report-current .tb-weekly-current-meta{color:#ded7ce}','Texto do relatório semanal perdeu contraste.');
 has(opaquePanelsCss,'html[data-theme="light"] .diet-support-table td{background:#2b2927;color:#ded7ce;border-color:#554a42}','Tabela de dieta perdeu fundo sólido ou legibilidade.');
 has(opaquePanelsCss,'html[data-theme="light"] .food-options-table td{background:#2b2927;border-color:#554a42}','Tabela de alimentos deixou de usar células escuras sólidas.');
 has(opaquePanelsCss,'html[data-theme="light"] .food-options-table .food-table-empty{background:#252321;background-image:none;opacity:1}','Células vazias da tabela de alimentos ficaram claras ou translúcidas.');
@@ -217,7 +222,7 @@ assert(!/rgba?\(/.test(opaquePanelsCss),'Painéis do tema claro passaram a usar 
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme6'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme7'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [

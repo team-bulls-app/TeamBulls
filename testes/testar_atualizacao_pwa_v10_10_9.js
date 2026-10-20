@@ -12,7 +12,7 @@ const worker=read('sw.js');
 const bridge=read('sw_47.js');
 const manifest=JSON.parse(read('manifest.json'));
 const version=JSON.parse(read('version.json'));
-const BUILD=2026102005;
+const BUILD=2026102006;
 
 assert(version.version==='10.10.9','version.json incorreto');
 assert(version.build===BUILD,'version.json não informa o build atual');
