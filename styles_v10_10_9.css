@@ -2355,109 +2355,21 @@ html.mobile-landscape-blocked #portrait-lock-overlay{display:flex;}
 .tb-device-notice-panel[hidden],.tb-device-notice-panel button[hidden]{display:none!important}
 .tb-device-notice-panel p{margin:8px 0 0;color:#c4aba9;font-size:12px;line-height:1.45}
 
-/* Tema claro: sobrescreve a paleta survival sem alterar o padrão escuro. */
-html[data-theme="light"]{
-  color-scheme:light;
-  --bg:#fff;--surface:#f3f4f6;--card:#fff;--border:#d1d5db;--border-l:#9ca3af;
-  --text:#1f2937;--text-muted:#596273;--text-dim:#4b5563;--paper:#1f2937;--ink:#fff;
-  --accent:#a51e20;--accent-dim:rgba(165,30,32,.09);--chart-grid:#d1d5db;--chart-label:#596273;
-  --chart-surface:#fff;--chart-border:#9ca3af;
-}
-html[data-theme="light"],html[data-theme="light"] body{background:#fff;color:var(--text)}
+/* Tema claro: canvas branco, componentes e controles mantêm a paleta original. */
+html[data-theme="light"]{color-scheme:dark;background:#fff}
+html[data-theme="light"] body{background:#fff}
 html[data-theme="light"] body::before,html[data-theme="light"] body::after{display:none}
 html[data-theme="light"] #app,html[data-theme="light"] .screen.active{background:#fff}
-html[data-theme="light"] .header,html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav,html[data-theme="light"] body.student-desktop .student-desktop-nav{background:#f3f4f6;border-color:var(--border)}
-html[data-theme="light"] .header-title,html[data-theme="light"] .home-hero-title,html[data-theme="light"] .trainer-title,
-html[data-theme="light"] .workout-card-name,html[data-theme="light"] .exercise-row-name,html[data-theme="light"] .day-folder-name,
-html[data-theme="light"] .day-block-title,html[data-theme="light"] .protocol-summary-title,html[data-theme="light"] .meal-card-name,
-html[data-theme="light"] .student-name,html[data-theme="light"] .modal-title,html[data-theme="light"] .settings-card h3,
-html[data-theme="light"] .setting-label,html[data-theme="light"] .weekly-plan-title,html[data-theme="light"] .prescription-title,
-html[data-theme="light"] .cardio-prescription-name,html[data-theme="light"] .technique-detail-text{color:var(--text);text-shadow:none}
-html[data-theme="light"] .header{background:rgba(255,255,255,.96);border-bottom-color:var(--border)}
-html[data-theme="light"] .header::before{opacity:.45}
-html[data-theme="light"] .home-hero,html[data-theme="light"] .trainer-header-info{background:linear-gradient(90deg,rgba(165,30,32,.045),transparent 60%);border-color:var(--border)}
-html[data-theme="light"] .home-hero::after,html[data-theme="light"] .trainer-header-info::after{color:var(--accent);border-color:rgba(165,30,32,.3)}
-html[data-theme="light"] .settings-card,html[data-theme="light"] .stat-cell,html[data-theme="light"] .quick-nav-btn,
-html[data-theme="light"] .workout-card,html[data-theme="light"] .exercise-row,html[data-theme="light"] .weekly-plan-shell,
-html[data-theme="light"] .prescription-card,html[data-theme="light"] .session-block,html[data-theme="light"] .meal-card,
-html[data-theme="light"] .quest-card,html[data-theme="light"] .student-card,html[data-theme="light"] .chart-container,
-html[data-theme="light"] .day-block,html[data-theme="light"] .day-folder-card,html[data-theme="light"] .protocol-summary,
-html[data-theme="light"] .diet-folder-card,html[data-theme="light"] .diet-support-card,html[data-theme="light"] .weekly-checkin-card,
-html[data-theme="light"] .trainer-checkin-schedule,html[data-theme="light"] .instruction-folder,html[data-theme="light"] .technique-card,
-html[data-theme="light"] .exercise-instructions-card,html[data-theme="light"] .exercise-technique-panel,html[data-theme="light"] .myo-optional-config,
-html[data-theme="light"] .week-technique-editor,html[data-theme="light"] .cardio-prescription-card,html[data-theme="light"] .cardio-timer-card,
-html[data-theme="light"] .cardio-empty,html[data-theme="light"] .settings-card{background:#fff;border-color:var(--border);color:var(--text);box-shadow:0 4px 16px rgba(15,23,42,.06)}
-html[data-theme="light"] body [class$="-card"],html[data-theme="light"] .card{background:#fff;border-color:var(--border);color:var(--text);box-shadow:0 4px 16px rgba(15,23,42,.06)}
-html[data-theme="light"] .stat-cell{background:#f8fafc}
-html[data-theme="light"] .workout-card.is-active,html[data-theme="light"] .workout-card.is-inactive,html[data-theme="light"] .diet-folder-card.is-inactive{background:#f8fafc;border-color:var(--border);filter:none}
-html[data-theme="light"] .workout-card.is-inactive{opacity:.72}
-html[data-theme="light"] .workout-card-meta,html[data-theme="light"] .exercise-row-last,html[data-theme="light"] .student-meta,
-html[data-theme="light"] .day-folder-meta,html[data-theme="light"] .protocol-summary-meta,html[data-theme="light"] .day-block-count,
-html[data-theme="light"] .setting-value,html[data-theme="light"] .pdf-note,html[data-theme="light"] .section-label,
-html[data-theme="light"] .chart-title-text,html[data-theme="light"] .chart-empty-msg,html[data-theme="light"] .weekly-plan-hint,
-html[data-theme="light"] .prescription-source,html[data-theme="light"] .cardio-prescription-notes{color:var(--text-dim)}
-html[data-theme="light"] .section-label{color:var(--text-muted)}
-html[data-theme="light"] .section-header::after{background:linear-gradient(90deg,var(--border),transparent)}
-html[data-theme="light"] .header .btn-icon,html[data-theme="light"] .btn-icon,html[data-theme="light"] .btn-offline,
-html[data-theme="light"] .btn-ghost,html[data-theme="light"] .btn-cancel,html[data-theme="light"] .toggle-btn,
-html[data-theme="light"] .chart-toggle button,html[data-theme="light"] .setting-switch button,
-html[data-theme="light"] .workout-actions-row button,html[data-theme="light"] .cardio-card-actions button,
-html[data-theme="light"] .cardio-timer-actions button{background:#f3f4f6;border-color:var(--border);color:var(--text)}
-html[data-theme="light"] .setting-switch button.active{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
-html[data-theme="light"] .btn-primary,html[data-theme="light"] .fab{background:var(--accent);color:#fff;border-color:var(--accent)}
-html[data-theme="light"] .btn-view-student,html[data-theme="light"] .btn-ger-info,html[data-theme="light"] .ger-pill{color:var(--accent)}
-html[data-theme="light"] .form-input,html[data-theme="light"] .set-edit-input,html[data-theme="light"] .auth-card,
-html[data-theme="light"] select,html[data-theme="light"] textarea{background:#fff;border-color:var(--border-l);color:var(--text);color-scheme:light}
-html[data-theme="light"] input[type="date"].form-input{color-scheme:light}
-html[data-theme="light"] .modal-backdrop{background:rgba(15,23,42,.38)}
-html[data-theme="light"] .modal-sheet,html[data-theme="light"] .modal-dialog{background:#fff;border-color:var(--border-l);color:var(--text)}
-html[data-theme="light"] .weekly-plan-table th,html[data-theme="light"] .weekly-plan-table td,
-html[data-theme="light"] .weekly-plan-table thead th,html[data-theme="light"] .weekly-plan-table th:first-child,
-html[data-theme="light"] .weekly-plan-table td:first-child,html[data-theme="light"] .diet-support-table th{background:#f3f4f6;border-color:var(--border);color:var(--text)}
-html[data-theme="light"] .weekly-plan-table td{background:#fff}
-html[data-theme="light"] .weekly-exercise-name,html[data-theme="light"] .weekly-cell-btn,html[data-theme="light"] .weekly-rx{color:var(--text)}
-html[data-theme="light"] .form-label,html[data-theme="light"] .sets-table thead tr th,html[data-theme="light"] .sets-col-lbl{color:var(--text-muted)}
-html[data-theme="light"] .session-week-badge,html[data-theme="light"] .protocol-cycle-strip,html[data-theme="light"] .diet-week-distribution,
-html[data-theme="light"] .prescription-set-row,html[data-theme="light"] .prescription-week-techniques,
-html[data-theme="light"] .technique-picker,html[data-theme="light"] .technique-picker-option{background:#f3f4f6;color:var(--text);border-color:var(--border)}
-html[data-theme="light"] .technique-card-name,html[data-theme="light"] .techniques-intro strong,
-html[data-theme="light"] .technique-picker-code,html[data-theme="light"] .technique-picker-name{color:var(--text)}
-html[data-theme="light"] .chart-container{--chart-grid:#d1d5db;--chart-label:#596273;--chart-surface:#fff;--chart-border:#9ca3af}
-html[data-theme="light"] .settings-gear-btn:hover,html[data-theme="light"] .settings-gear-btn:focus-visible{color:#fff;background:var(--accent)}
+html[data-theme="light"] #app{border-left-color:#e5e2df;border-right-color:#e5e2df}
+html[data-theme="light"] .home-hero,html[data-theme="light"] .trainer-header-info{
+  background:linear-gradient(90deg,rgba(165,30,32,.055),transparent 62%),#fff;
+  border-bottom:1px solid #e7e2dc;
+}
+html[data-theme="light"] .home-hero-title,html[data-theme="light"] .trainer-title{color:#27221f;text-shadow:none}
+html[data-theme="light"] .home-hero-title .dim,html[data-theme="light"] .trainer-title .dim{color:var(--accent)}
+html[data-theme="light"] .section-header::after{background:linear-gradient(90deg,#d9d2ca,transparent)}
+html[data-theme="light"] .section-header .section-label{color:#665e57}
 html[data-theme="light"] #screen-auth{background:#fff}
-html[data-theme="light"] #screen-auth::before,html[data-theme="light"] #screen-auth::after{color:var(--text-muted)}
-html[data-theme="light"] .auth-card{box-shadow:0 12px 36px rgba(15,23,42,.12)}
-html[data-theme="light"] .auth-logo{color:var(--text);text-shadow:none}
-html[data-theme="light"] .auth-sub,html[data-theme="light"] .auth-help{color:var(--text-dim);text-shadow:none}
-html[data-theme="light"] .archive-file-kicker{color:var(--text-muted)}
-html[data-theme="light"] .archive-file-name{color:var(--text);text-shadow:none}
-html[data-theme="light"] .archive-file-meta{color:var(--text-dim)}
-html[data-theme="light"] .badge-active{background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.25);color:#166534}
-html[data-theme="light"] .badge-inactive{background:rgba(153,27,27,.07);border-color:rgba(153,27,27,.22);color:#991b1b}
-html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button{color:var(--text-dim)}
-html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button:hover{border-color:var(--border);color:var(--text);background:#fff}
-html[data-theme="light"] input::placeholder,html[data-theme="light"] textarea::placeholder{color:#596273;opacity:1}
-html[data-theme="light"] button:disabled{color:#596273}
-
-/* Fundo claro sem apagar as cores próprias dos controles do tema survival. */
-html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav,html[data-theme="light"] body.student-desktop .student-desktop-nav{background:linear-gradient(180deg,#11100f,#090807);border-color:#41372f}
-html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button,html[data-theme="light"] body.student-desktop .student-desktop-nav button{color:#918477}
-html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button:hover,html[data-theme="light"] body.student-desktop .student-desktop-nav button:hover{border-color:#4a3d34;color:#d7c7b6;background:#151210}
-html[data-theme="light"] .quick-nav-btn{background:#151311;border-color:#41372f;color:#c8bda9;box-shadow:none}
-html[data-theme="light"] .quick-nav-btn:hover{border-color:#a28361;color:#f0e5d7;background:linear-gradient(145deg,#1c1916,#100e0d)}
-html[data-theme="light"] .quick-nav-btn:active{border-color:var(--accent);background:linear-gradient(145deg,rgba(142,25,27,.24),#100e0d)}
-html[data-theme="light"] .btn-add-set{background:transparent;border-color:#51453a;color:#766d63}
-html[data-theme="light"] .btn-add-set:hover{border-color:var(--accent);color:var(--accent)}
-html[data-theme="light"] #screen-trainer>.content>button.btn-add-set{background:#303030!important;border-color:#4a4a4a;color:#ded8ce}
-html[data-theme="light"] #screen-trainer>.content>button.btn-add-set:hover{background:#383838!important;border-color:var(--accent);color:#fff}
-html[data-theme="light"] .v107-command-button{color:#e2d2c1}
-html[data-theme="light"] .tb-hub-tab{background:#111;border-color:rgba(255,255,255,.12);color:#c8bda9}
-html[data-theme="light"] .tb-hub-tab.active,html[data-theme="light"] .tb-hub-tab:hover{border-color:rgba(225,29,72,.72);background:#a51e20;color:#fff}
-html[data-theme="light"] .header .btn-icon,html[data-theme="light"] .btn-icon{background:#141210;border-color:#4a4037;color:#c8bda9}
-html[data-theme="light"] .btn-offline,html[data-theme="light"] .btn-ghost,html[data-theme="light"] .btn-cancel{background:transparent;border-color:#51453a;color:#4b5563}
-html[data-theme="light"] .toggle-btn,html[data-theme="light"] .chart-toggle button,html[data-theme="light"] .setting-switch button,
-html[data-theme="light"] .workout-actions-row button,html[data-theme="light"] .cardio-card-actions button,html[data-theme="light"] .cardio-timer-actions button{background:#141210;border-color:#51453a;color:#c8bda9}
-html[data-theme="light"] .chart-toggle button.active{background:rgba(165,30,32,.16);border-color:var(--accent);color:var(--accent)}
-html[data-theme="light"] .setting-switch button.active{background:rgba(134,25,27,.18);border-color:var(--accent);color:#e2d2c1}
-html[data-theme="light"] .cardio-card-actions button.primary,html[data-theme="light"] .cardio-timer-actions button.start{border-color:rgba(165,30,32,.78);background:rgba(128,20,22,.2);color:var(--accent)}
-html[data-theme="light"] button:disabled{color:#918477}
+html[data-theme="light"] #screen-auth .auth-logo{color:#27221f;text-shadow:none}
+html[data-theme="light"] #screen-auth .auth-logo .dim{color:var(--accent)}
+html[data-theme="light"] #screen-auth::before,html[data-theme="light"] #screen-auth::after{color:#665e57}
