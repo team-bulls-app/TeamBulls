@@ -8,7 +8,7 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = '10.10.9'
-BUILD = 2026082502
+BUILD = 2026101901
 REQUIRED = [
     'index.html', 'manifest.json', 'version.json', 'sw.js', 'sw_47.js',
     'update_v10_10_9.js', 'app_v10_10_9_core.js', 'styles_v10_10_9.css',
