@@ -2429,3 +2429,12 @@ html[data-theme="light"] #screen-auth::before,html[data-theme="light"] #screen-a
 html[data-theme="light"] .auth-card{box-shadow:0 12px 36px rgba(15,23,42,.12)}
 html[data-theme="light"] .auth-logo{color:var(--text);text-shadow:none}
 html[data-theme="light"] .auth-sub,html[data-theme="light"] .auth-help{color:var(--text-dim);text-shadow:none}
+html[data-theme="light"] .archive-file-kicker{color:var(--text-muted)}
+html[data-theme="light"] .archive-file-name{color:var(--text);text-shadow:none}
+html[data-theme="light"] .archive-file-meta{color:var(--text-dim)}
+html[data-theme="light"] .badge-active{background:rgba(22,101,52,.08);border-color:rgba(22,101,52,.25);color:#166534}
+html[data-theme="light"] .badge-inactive{background:rgba(153,27,27,.07);border-color:rgba(153,27,27,.22);color:#991b1b}
+html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button{color:var(--text-dim)}
+html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button:hover{border-color:var(--border);color:var(--text);background:#fff}
+html[data-theme="light"] input::placeholder,html[data-theme="light"] textarea::placeholder{color:#596273;opacity:1}
+html[data-theme="light"] button:disabled{color:#596273}
