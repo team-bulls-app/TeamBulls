@@ -51,7 +51,7 @@ assert(sw.includes(`const BUILD_REVISION=${publishedBuild};`),'Service Worker pr
 assert(sw47.includes(`const BUILD_REVISION=${publishedBuild};`),'Service Worker legado precisa reconhecer o mesmo build publicado no version.json.');
 assert(sw===sw47,'Service Workers precisam permanecer idênticos após um hotfix de sessão.');
 assert(updater.includes("fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:'no-store'"),'Verificação de versão precisa continuar ignorando cache HTTP.');
-assert(updater.includes("'./boot_v10.js?v=10.10.9'"),'Atualizador precisa renovar boot_v10.js entre os arquivos críticos do PWA.');
+assert(updater.includes("'./boot_v10.js?v=10.10.9-themefirstpaint1'"),'Atualizador precisa renovar a camada de tema e sessão do PWA entre os arquivos críticos.');
 
 assert(viewport.includes("const REVISION='10.10.25-session1';"),'Camada de estabilidade móvel não possui revisão própria.');
 assert(viewport.includes("email.setAttribute('autocomplete','username')"),'Login não devolve semântica username ao gerenciador de senhas.');
