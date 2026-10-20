@@ -1,4 +1,4 @@
-/* Team Bulls v10.10.9 — ponte de migração para instalações controladas pelo antigo sw_47.js. */
+/* Team Bulls v10.10.9 — Service Worker estável e atualização sem reinstalação. */
 'use strict';
 
 const APP_VERSION='10.10.9';
