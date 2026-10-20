@@ -12,7 +12,7 @@ const has=(text,needle,message)=>assert(text.includes(needle),message);
 const lacks=(text,needle,message)=>assert(!text.includes(needle),message);
 
 [
-  'index.html','manifest.json','version.json','sw.js','sw_47.js','config_v10_7.js',
+  'index.html','manifest.json','version.json','sw.js','sw_47.js','boot_v10.js','config_v10_7.js',
   'app_v10_10_9_core.js','styles_v10_10_9.css',
   'modules/stability_v10_10_9.js','modules/app-update-v10_10_9.js',
   'modules/diet-scroll-fix-v10_10_9.js','modules/modal-form-guard-v10_10_9.js',
@@ -254,9 +254,11 @@ has(panelPalette,'--text-dim:var(--tb-light-panel-muted);','Textos secundários 
 assert(!/rgba?\(/.test(panelPalette),'Painéis opacos passaram a usar superfícies translúcidas.');
 assert(!lightThemeCss.includes('.supplements-free-meal-card'),'Tema claro repintou o atalho de refeições livres.');
 
-const sw=read('sw.js'),bridge=read('sw_47.js');
+const sw=read('sw.js'),bridge=read('sw_47.js'),boot=read('boot_v10.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme9'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme10'",'Service Worker não criou a revisão atual do tema claro.');
+has(boot,"localStorage.getItem('team_bulls_settings_v9_4')",'Tema salvo não é lido durante o início antecipado.');
+has(boot,"document.documentElement.dataset.theme=light?'light':'dark'",'Tema inicial não é aplicado antes da primeira pintura.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
