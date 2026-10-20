@@ -190,39 +190,51 @@ const core=read('app_v10_10_9_core.js');
 has(core,'const BASE_APPLY_APP_SETTINGS=applyAppSettings;','Aplicador final de configurações precisa preservar a lógica compartilhada do tema.');
 has(core,'BASE_APPLY_APP_SETTINGS();','Trocar o tema deve atualizar os tokens visuais imediatamente.');
 has(core,"if(APP_SETTINGS.theme!=='light')",'A paleta escura deve ser aplicada somente enquanto o tema escuro estiver selecionado.');
+has(core,"root.setProperty('--accent',light?'#a51e20':'#e11d48')",'Tema claro perdeu o vermelho institucional com contraste adequado.');
+has(core,"root.setProperty('--chart-label',light?'#d0c7bc':'#5a5a5a')",'Gráficos perderam a escala legível para cada tema.');
 has(core,'state.endAt=Date.now()+state.remainingSeconds*1000','Fluxo principal não persiste endAt do cardio.');
 has(core,'function pauseCardioTimer()','Pausa do cardio ausente.');
 has(core,'function resetCardioTimer()','Reset do cardio ausente.');
 has(core,'function resolveWeekPrescription(exercise,week)','Resolução de prescrição herdada ausente.');
 has(core,'function refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week)','Refresh seguro de prescrição ausente.');
 const themeCss=read('styles_v10_10_9.css');
-const lightThemeStart=themeCss.indexOf('/* Tema claro: canvas branco, componentes e controles mantêm a paleta original. */');
-const lightThemeCss=lightThemeStart>=0?themeCss.slice(lightThemeStart):'';
-has(lightThemeCss,'html[data-theme="light"] #app,html[data-theme="light"] .screen.active{background:#fff}','Tema claro deixou de usar canvas branco.');
-has(lightThemeCss,'html[data-theme="light"] .trainer-title{color:#27221f;text-shadow:none}','Título do treinador perdeu contraste no canvas branco.');
-assert(!/\bbutton\b|\.btn-|quick-nav-btn|toggle-btn/.test(lightThemeCss),'Tema claro passou a repintar botões ou controles.');
-assert(!/--(?:surface|card|border|text|accent)\s*:/.test(lightThemeCss),'Tema claro alterou a paleta original dos componentes.');
-const opaquePanelsStart=lightThemeCss.indexOf('/* No canvas claro, os painéis de conteúdo continuam sólidos e com leitura clara. */');
-const opaquePanelsCss=opaquePanelsStart>=0?lightThemeCss.slice(opaquePanelsStart):'';
-has(opaquePanelsCss,'html[data-theme="light"] .diet-page-intro,\nhtml[data-theme="light"] .workout-card,\nhtml[data-theme="light"] .diet-folder-card{\n  background-color:#262422;\n  background-image:none;','Painéis do tema claro deixaram de usar superfície escura sólida.');
-has(opaquePanelsCss,'html[data-theme="light"] .workout-card.is-active{background-color:#301d1e;background-image:none;border-color:#a51e20}','Protocolo ativo ficou translúcido ou perdeu contraste.');
-has(opaquePanelsCss,'html[data-theme="light"] .workout-card.is-inactive{background-color:#2b2927;background-image:none;border-color:#665a50;opacity:1;filter:none}','Protocolos desativados ficaram translúcidos ou sem contraste.');
-has(opaquePanelsCss,'html[data-theme="light"] .diet-folder-card.is-inactive{background-color:#2b2927;background-image:none;opacity:1;filter:none}','Planos desativados ficaram translúcidos ou sem contraste.');
-has(opaquePanelsCss,'html[data-theme="light"] .diet-folder-name{color:#f0e8de}','Nome da dieta perdeu contraste sobre o cartão escuro.');
-has(opaquePanelsCss,'html[data-theme="light"] .workout-card-name{color:#f0e8de}','Nome do treino perdeu contraste sobre o cartão escuro.');
-has(opaquePanelsCss,'html[data-theme="light"] .global-report-guide-panel{background-color:#262422;background-image:none;border-color:#554a42}','Painel do guia de fotos ficou translúcido no tema claro.');
-has(opaquePanelsCss,'html[data-theme="light"] .global-report-guide-panel>p{color:#ded7ce}','Descrição do guia de fotos perdeu contraste.');
-has(opaquePanelsCss,'html[data-theme="light"] .quest-card-preview{color:#ded7ce}','Histórico de relatórios perdeu contraste.');
-has(opaquePanelsCss,'html[data-theme="light"] #tb-weekly-report-current .tb-weekly-current-meta{color:#ded7ce}','Texto do relatório semanal perdeu contraste.');
-has(opaquePanelsCss,'html[data-theme="light"] .diet-support-table td{background:#2b2927;color:#ded7ce;border-color:#554a42}','Tabela de dieta perdeu fundo sólido ou legibilidade.');
-has(opaquePanelsCss,'html[data-theme="light"] .food-options-table td{background:#2b2927;border-color:#554a42}','Tabela de alimentos deixou de usar células escuras sólidas.');
-has(opaquePanelsCss,'html[data-theme="light"] .food-options-table .food-table-empty{background:#252321;background-image:none;opacity:1}','Células vazias da tabela de alimentos ficaram claras ou translúcidas.');
-assert(!opaquePanelsCss.includes('.supplements-free-meal-card'),'Tema claro repintou o atalho de refeições livres.');
-assert(!/rgba?\(/.test(opaquePanelsCss),'Painéis do tema claro passaram a usar fundos com transparência.');
+const lightThemeStart=themeCss.indexOf('/* Paleta clara Team Bulls: branco no canvas, tinta escura na página, carvão nas áreas de conteúdo. */');
+const lightThemeCss=(lightThemeStart>=0?themeCss.slice(lightThemeStart):'').replace(/\r\n/g,'\n');
+has(lightThemeCss,'--tb-light-canvas:#ffffff;','Tema claro perdeu o branco do canvas.');
+has(lightThemeCss,'--tb-light-ink:#25211e;','Texto principal do canvas perdeu a cor de alto contraste.');
+has(lightThemeCss,'--tb-light-panel:#262422;','Paleta de painéis perdeu a base carvão.');
+has(lightThemeCss,'--tb-light-panel-ink:#f0e8de;','Texto dos painéis escuros perdeu a cor clara.');
+has(lightThemeCss,'--chart-label:#d0c7bc;','Rótulos de gráficos perderam contraste no tema claro.');
+const luminance=hex=>{const channels=hex.match(/[0-9a-f]{2}/gi).map(value=>parseInt(value,16)/255).map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4);return .2126*channels[0]+.7152*channels[1]+.0722*channels[2];};
+const contrast=(a,b)=>{const values=[luminance(a),luminance(b)].sort((x,y)=>y-x);return(values[0]+.05)/(values[1]+.05);};
+[
+  ['#25211e','#ffffff','texto principal sobre o canvas'],
+  ['#625a53','#ffffff','texto secundário sobre o canvas'],
+  ['#f0e8de','#262422','texto principal nos painéis'],
+  ['#d0c7bc','#262422','texto secundário nos painéis'],
+  ['#bdb1a2','#262422','metadados nos painéis'],
+  ['#a51e20','#ffffff','marca sobre o canvas'],
+  ['#ed7779','#262422','marca sobre os painéis']
+].forEach(([foreground,background,label])=>assert(contrast(foreground,background)>=4.5,`Contraste insuficiente para ${label}.`));
+has(lightThemeCss,'html[data-theme="light"] .modal-sheet,','Formulários perderam uma superfície clara legível.');
+has(lightThemeCss,'html[data-theme="light"] .modal-dialog{background:var(--tb-light-canvas-soft);','Modais perderam uma superfície clara legível.');
+const controlPaletteStart=lightThemeCss.indexOf('html[data-theme="light"] button,');
+const controlPaletteEnd=lightThemeCss.indexOf('\n}',controlPaletteStart);
+const controlPalette=controlPaletteStart>=0&&controlPaletteEnd>controlPaletteStart?lightThemeCss.slice(controlPaletteStart,controlPaletteEnd+2):'';
+has(controlPalette,'--card:#1c1c1c;','Controles perderam seus tokens visuais originais.');
+has(controlPalette,'--accent:#e11d48;','Botões perderam sua cor original da marca.');
+assert(!/(^|;)\s*(?:background|border|color)\s*:/m.test(controlPalette),'Tema claro aplicou cores diretamente aos botões.');
+const panelsStart=lightThemeCss.indexOf('html[data-theme="light"] .workout-card,');
+const panelsEnd=lightThemeCss.indexOf('\n}',panelsStart);
+const panelPalette=panelsStart>=0&&panelsEnd>panelsStart?lightThemeCss.slice(panelsStart,panelsEnd+2):'';
+has(panelPalette,'background-color:var(--tb-light-panel);','Painéis de conteúdo deixaram de usar a superfície opaca compartilhada.');
+has(panelPalette,'--text-dim:var(--tb-light-panel-muted);','Textos secundários dos painéis perderam o tom claro compartilhado.');
+assert(!/rgba?\(/.test(panelPalette),'Painéis opacos passaram a usar superfícies translúcidas.');
+assert(!lightThemeCss.includes('.supplements-free-meal-card'),'Tema claro repintou o atalho de refeições livres.');
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme7'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme8'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
