@@ -99,7 +99,7 @@ async function forceRecoveredNavigation(){
   }));
 }
 
-self.addEventListener('install',event=>{event.waitUntil((async()=>{await prepareActivationShell();await self.skipWaiting();})());});
+self.addEventListener('install',event=>{event.waitUntil((async()=>{await prepareActivationShell().catch(()=>false);await self.skipWaiting();})());});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
   const stale=keys.filter(key=>key.startsWith(CACHE_PREFIX)&&![SHELL_CACHE,RUNTIME_CACHE,AUDIO_CACHE_NAME].includes(key));
