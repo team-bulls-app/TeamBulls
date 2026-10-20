@@ -2438,3 +2438,24 @@ html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button{color:
 html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button:hover{border-color:var(--border);color:var(--text);background:#fff}
 html[data-theme="light"] input::placeholder,html[data-theme="light"] textarea::placeholder{color:#596273;opacity:1}
 html[data-theme="light"] button:disabled{color:#596273}
+
+/* Fundo claro sem apagar as cores próprias dos controles do tema survival. */
+html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav,html[data-theme="light"] body.student-desktop .student-desktop-nav{background:linear-gradient(180deg,#11100f,#090807);border-color:#41372f}
+html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button,html[data-theme="light"] body.student-desktop .student-desktop-nav button{color:#918477}
+html[data-theme="light"] body.trainer-desktop .trainer-desktop-nav button:hover,html[data-theme="light"] body.student-desktop .student-desktop-nav button:hover{border-color:#4a3d34;color:#d7c7b6;background:#151210}
+html[data-theme="light"] .quick-nav-btn{background:#151311;border-color:#41372f;color:#c8bda9;box-shadow:none}
+html[data-theme="light"] .quick-nav-btn:hover{border-color:#a28361;color:#f0e5d7;background:linear-gradient(145deg,#1c1916,#100e0d)}
+html[data-theme="light"] .quick-nav-btn:active{border-color:var(--accent);background:linear-gradient(145deg,rgba(142,25,27,.24),#100e0d)}
+html[data-theme="light"] .btn-add-set{background:transparent;border-color:#51453a;color:#766d63}
+html[data-theme="light"] .btn-add-set:hover{border-color:var(--accent);color:var(--accent)}
+html[data-theme="light"] .v107-command-button{color:#e2d2c1}
+html[data-theme="light"] .tb-hub-tab{background:#111;border-color:rgba(255,255,255,.12);color:#c8bda9}
+html[data-theme="light"] .tb-hub-tab.active,html[data-theme="light"] .tb-hub-tab:hover{border-color:rgba(225,29,72,.72);background:#a51e20;color:#fff}
+html[data-theme="light"] .header .btn-icon,html[data-theme="light"] .btn-icon{background:#141210;border-color:#4a4037;color:#c8bda9}
+html[data-theme="light"] .btn-offline,html[data-theme="light"] .btn-ghost,html[data-theme="light"] .btn-cancel{background:transparent;border-color:#51453a;color:#4b5563}
+html[data-theme="light"] .toggle-btn,html[data-theme="light"] .chart-toggle button,html[data-theme="light"] .setting-switch button,
+html[data-theme="light"] .workout-actions-row button,html[data-theme="light"] .cardio-card-actions button,html[data-theme="light"] .cardio-timer-actions button{background:#141210;border-color:#51453a;color:#c8bda9}
+html[data-theme="light"] .chart-toggle button.active{background:rgba(165,30,32,.16);border-color:var(--accent);color:var(--accent)}
+html[data-theme="light"] .setting-switch button.active{background:rgba(134,25,27,.18);border-color:var(--accent);color:#e2d2c1}
+html[data-theme="light"] .cardio-card-actions button.primary,html[data-theme="light"] .cardio-timer-actions button.start{border-color:rgba(165,30,32,.78);background:rgba(128,20,22,.2);color:var(--accent)}
+html[data-theme="light"] button:disabled{color:#918477}

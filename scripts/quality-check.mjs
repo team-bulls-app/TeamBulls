@@ -195,10 +195,16 @@ has(core,'function pauseCardioTimer()','Pausa do cardio ausente.');
 has(core,'function resetCardioTimer()','Reset do cardio ausente.');
 has(core,'function resolveWeekPrescription(exercise,week)','Resolução de prescrição herdada ausente.');
 has(core,'function refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week)','Refresh seguro de prescrição ausente.');
+const themeCss=read('styles_v10_10_9.css');
+has(themeCss,'html[data-theme="light"] .quick-nav-btn{background:#151311','Tema claro alterou a cor original dos botões de opções.');
+has(themeCss,'html[data-theme="light"] .toggle-btn,html[data-theme="light"] .chart-toggle button','Tema claro deixou os controles escuros no padrão original.');
+has(themeCss,'html[data-theme="light"] .setting-switch button.active{background:rgba(134,25,27,.18)','Botão de configuração ativo perdeu a cor de destaque original.');
+has(themeCss,'html[data-theme="light"] .tb-hub-tab.active,html[data-theme="light"] .tb-hub-tab:hover{border-color:rgba(225,29,72,.72);background:#a51e20;color:#fff}','Aba ativa do painel do treinador perdeu contraste no tema claro.');
+has(themeCss,'html[data-theme="light"] .v107-command-button{color:#e2d2c1}','Botão da central de operações perdeu contraste no tema claro.');
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme2'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme3'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
