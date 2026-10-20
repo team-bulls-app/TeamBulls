@@ -202,10 +202,21 @@ has(lightThemeCss,'html[data-theme="light"] #app,html[data-theme="light"] .scree
 has(lightThemeCss,'html[data-theme="light"] .trainer-title{color:#27221f;text-shadow:none}','Título do treinador perdeu contraste no canvas branco.');
 assert(!/\bbutton\b|\.btn-|quick-nav-btn|toggle-btn/.test(lightThemeCss),'Tema claro passou a repintar botões ou controles.');
 assert(!/--(?:surface|card|border|text|accent)\s*:/.test(lightThemeCss),'Tema claro alterou a paleta original dos componentes.');
+const opaquePanelsStart=lightThemeCss.indexOf('/* No canvas claro, os painéis de conteúdo continuam sólidos e com leitura clara. */');
+const opaquePanelsCss=opaquePanelsStart>=0?lightThemeCss.slice(opaquePanelsStart):'';
+has(opaquePanelsCss,'html[data-theme="light"] .diet-page-intro,\nhtml[data-theme="light"] .workout-card,\nhtml[data-theme="light"] .diet-folder-card{\n  background-color:#262422;\n  background-image:none;','Painéis do tema claro deixaram de usar superfície escura sólida.');
+has(opaquePanelsCss,'html[data-theme="light"] .workout-card.is-active{background-color:#301d1e;background-image:none;border-color:#a51e20}','Protocolo ativo ficou translúcido ou perdeu contraste.');
+has(opaquePanelsCss,'html[data-theme="light"] .workout-card.is-inactive{background-color:#2b2927;background-image:none;border-color:#665a50;opacity:1;filter:none}','Protocolos desativados ficaram translúcidos ou sem contraste.');
+has(opaquePanelsCss,'html[data-theme="light"] .diet-folder-card.is-inactive{background-color:#2b2927;background-image:none;opacity:1;filter:none}','Planos desativados ficaram translúcidos ou sem contraste.');
+has(opaquePanelsCss,'html[data-theme="light"] .diet-support-table td{background:#2b2927;color:#ded7ce;border-color:#554a42}','Tabela de dieta perdeu fundo sólido ou legibilidade.');
+has(opaquePanelsCss,'html[data-theme="light"] .food-options-table td{background:#2b2927;border-color:#554a42}','Tabela de alimentos deixou de usar células escuras sólidas.');
+has(opaquePanelsCss,'html[data-theme="light"] .food-options-table .food-table-empty{background:#252321;background-image:none;opacity:1}','Células vazias da tabela de alimentos ficaram claras ou translúcidas.');
+assert(!opaquePanelsCss.includes('.supplements-free-meal-card'),'Tema claro repintou o atalho de refeições livres.');
+assert(!/rgba?\(/.test(opaquePanelsCss),'Painéis do tema claro passaram a usar fundos com transparência.');
 
 const sw=read('sw.js'),bridge=read('sw_47.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme4'",'Service Worker não criou a revisão do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme5'",'Service Worker não criou a revisão do tema claro.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
