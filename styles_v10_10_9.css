@@ -2448,6 +2448,8 @@ html[data-theme="light"] .quick-nav-btn:hover{border-color:#a28361;color:#f0e5d7
 html[data-theme="light"] .quick-nav-btn:active{border-color:var(--accent);background:linear-gradient(145deg,rgba(142,25,27,.24),#100e0d)}
 html[data-theme="light"] .btn-add-set{background:transparent;border-color:#51453a;color:#766d63}
 html[data-theme="light"] .btn-add-set:hover{border-color:var(--accent);color:var(--accent)}
+html[data-theme="light"] #screen-trainer>.content>button.btn-add-set{background:#303030!important;border-color:#4a4a4a;color:#ded8ce}
+html[data-theme="light"] #screen-trainer>.content>button.btn-add-set:hover{background:#383838!important;border-color:var(--accent);color:#fff}
 html[data-theme="light"] .v107-command-button{color:#e2d2c1}
 html[data-theme="light"] .tb-hub-tab{background:#111;border-color:rgba(255,255,255,.12);color:#c8bda9}
 html[data-theme="light"] .tb-hub-tab.active,html[data-theme="light"] .tb-hub-tab:hover{border-color:rgba(225,29,72,.72);background:#a51e20;color:#fff}
