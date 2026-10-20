@@ -35,7 +35,12 @@ const OPTIONAL_SHELL=[
  * tem timeout próprio; nenhum recurso opcional pode deixar o novo worker preso.
  */
 const ACTIVATION_SHELL=[
-  './index.html','./version.json','./boot_v10.js?v=10.10.9-themefirstpaint1','./styles_v10_10_9.css?v=10.10.9&theme=light12'
+  './index.html',
+  './version.json',
+  './boot_v10.js?v=10.10.9-themefirstpaint1',
+  './styles_v10_10_9.css?v=10.10.9&theme=light12',
+  './modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3',
+  './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'
 ];
 
 const VERSIONED_PATH_PATTERN=/(?:v\d+(?:[._-]\d+)+|_v\d+(?:_\d+)+)\.(?:js|css|json|png|webp)$/i;
@@ -74,7 +79,7 @@ function fetchWithTimeout(request,timeoutMs=NETWORK_TIMEOUT_MS,init={}){const co
 async function fetchFresh(input,timeoutMs=SHELL_ITEM_TIMEOUT_MS){const request=typeof input==='string'?new Request(scopedUrl(input)):input;return fetchWithTimeout(request,timeoutMs,{cache:'reload'});}
 async function cacheOne(cache,path,timeoutMs=SHELL_ITEM_TIMEOUT_MS){try{const response=await fetchFresh(path,timeoutMs);if(!response.ok)throw new Error(`HTTP ${response.status}: ${path}`);await cache.put(scopedUrl(path),response.clone());return true;}catch(error){console.warn('[Team Bulls] Não foi possível preparar',path,error);return false;}}
 async function cachePathsWithLimit(cache,paths,limit=4,timeoutMs=SHELL_ITEM_TIMEOUT_MS){const queue=Array.from(paths||[]);if(!queue.length)return true;let next=0;const worker=async()=>{while(true){const index=next++;if(index>=queue.length)return;await cacheOne(cache,queue[index],timeoutMs);}};await Promise.all(Array.from({length:Math.min(Math.max(1,limit),queue.length)},worker));return true;}
-async function prepareActivationShell(){const cache=await caches.open(SHELL_CACHE);await cachePathsWithLimit(cache,ACTIVATION_SHELL,SHELL_FETCH_CONCURRENCY,SHELL_ITEM_TIMEOUT_MS);return true;}
+async function prepareActivationShell(){const cache=await caches.open(SHELL_CACHE);const results=await Promise.all(ACTIVATION_SHELL.map(path=>cacheOne(cache,path,SHELL_ITEM_TIMEOUT_MS)));const missing=ACTIVATION_SHELL.filter((path,index)=>!results[index]);if(missing.length)throw new Error(`Falha ao preparar o shell de ativação: ${missing.join(', ')}`);return true;}
 async function prepareShell(){const cache=await caches.open(SHELL_CACHE);await cachePathsWithLimit(cache,REQUIRED_SHELL,SHELL_FETCH_CONCURRENCY,SHELL_ITEM_TIMEOUT_MS);cachePathsWithLimit(cache,OPTIONAL_SHELL,OPTIONAL_FETCH_CONCURRENCY,SHELL_ITEM_TIMEOUT_MS).catch(()=>{});return true;}
 async function broadcast(message){const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});clients.forEach(client=>client.postMessage(message));}
 async function forceRecoveredNavigation(){
@@ -94,7 +99,7 @@ async function forceRecoveredNavigation(){
   }));
 }
 
-self.addEventListener('install',event=>{event.waitUntil((async()=>{await prepareActivationShell().catch(()=>false);await self.skipWaiting();})());});
+self.addEventListener('install',event=>{event.waitUntil((async()=>{await prepareActivationShell();await self.skipWaiting();})());});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
   const stale=keys.filter(key=>key.startsWith(CACHE_PREFIX)&&![SHELL_CACHE,RUNTIME_CACHE,AUDIO_CACHE_NAME].includes(key));
