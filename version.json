@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102011,
-  "revision": "light-theme-visual-update-fix-1",
+  "build": 2026102012,
+  "revision": "reading-navigation-stability-1",
   "publishedAt": "2026-10-20T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Adiciona tema claro com alternância nas configurações e mantém sua preferência neste dispositivo."
+  "message": "Mantém a tela aberta durante atualizações e reduz verificações de rede em segundo plano."
 }
