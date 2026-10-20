@@ -12,13 +12,13 @@ const worker=read('sw.js');
 const bridge=read('sw_47.js');
 const manifest=JSON.parse(read('manifest.json'));
 const version=JSON.parse(read('version.json'));
-const BUILD=2026102010;
+const BUILD=2026102011;
 
 assert(version.version==='10.10.9','version.json incorreto');
 assert(version.build===BUILD,'version.json não informa o build atual');
 assert(manifest.start_url==='./index.html','start_url ainda está preso a uma versão antiga');
 assert(manifest.scope==='./','scope do manifesto incorreto');
-assert(html.includes('update_v10_10_9.js?v=10.10.9'),'gerenciador de atualização não é carregado');
+assert(html.includes('update_v10_10_9.js?v=10.10.9&b=2026102011'),'gerenciador de atualização não é carregado');
 assert(html.includes('manifest.json?v=10.10.9'),'manifesto estável não é utilizado');
 assert(html.includes('modules/v107-core.js?v=10.10.9'),'módulos estáveis não possuem bust de versão');
 assert(!core.includes("serviceWorker.register('sw_47.js'"),'núcleo ainda registra o worker obsoleto');
@@ -26,6 +26,11 @@ assert(updater.includes(`const CURRENT_BUILD=${BUILD}`),'atualizador não conhec
 assert(updater.includes('navigator.serviceWorker.register(`./sw.js?v=${encodeURIComponent(CURRENT_VERSION)}&b=${CURRENT_BUILD}`'),'worker estável não é registrado com build');
 assert(updater.includes("fetch(`${VERSION_URL}?t=${Date.now()}`"),'verificação de versão não evita cache HTTP');
 assert(updater.includes('sessionStorage.setItem(UPDATE_RELOAD_KEY,releaseKey(target))'),'recarga de atualização não grava versão + build');
+assert(updater.includes("const APPLIED_RELEASE_KEY='team-bulls-applied-release'"),'release aplicada não possui memória persistente para encerrar o aviso após recarga');
+assert(updater.includes('const newer=compareRelease(info)>0&&!isReleaseApplied(info)'),'aviso volta a aparecer para a mesma revisão já aplicada');
+assert(updater.includes('if(updated&&stored===targetKey){rememberAppliedRelease(target);'),'conclusão não registra a revisão efetivamente preparada');
+assert(updater.includes("success:true,visible:true"),'notificação de sucesso não é preservada enquanto a versão atualiza');
+assert(html.includes(`update_v10_10_9.js?v=10.10.9&b=${BUILD}`),'script do atualizador não invalida cache ao mudar o build');
 assert(updater.includes('function compareRelease(info)'),'atualizador não compara versão + build');
 assert(updater.includes('function safeForAutomaticHotfix()'),'hotfix automático não possui gate de tela segura');
 assert(updater.includes("if(screen!=='screen-auth')return false"),'hotfix poderia recarregar durante uso ativo');

@@ -2465,7 +2465,13 @@ html[data-theme="light"] .archive-file-card,
 html[data-theme="light"] .protocol-review-home-banner,
 html[data-theme="light"] .protocol-review-info-grid>div,
 html[data-theme="light"] .v107-kpi-grid article,
-html[data-theme="light"] .v107-sync-grid article{
+html[data-theme="light"] .v107-sync-grid article,
+html[data-theme="light"] .day-block,
+html[data-theme="light"] .day-folder-card,
+html[data-theme="light"] .protocol-summary{
+  --bg:var(--tb-light-panel);
+  --surface:var(--tb-light-panel-raised);
+  --card:var(--tb-light-panel-raised);
   --text:var(--tb-light-panel-ink);
   --text-dim:var(--tb-light-panel-muted);
   --text-muted:var(--tb-light-panel-subtle);
@@ -2498,6 +2504,14 @@ html[data-theme="light"] .free-meal-intro-title{color:var(--tb-light-panel-ink)}
 html[data-theme="light"] .diet-page-intro span,
 html[data-theme="light"] .free-meal-intro-sub{color:var(--tb-light-panel-muted)}
 html[data-theme="light"] .workout-card::after{color:var(--tb-light-panel-subtle)}
+html[data-theme="light"] .day-folder-name,
+html[data-theme="light"] .protocol-summary-title{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .day-folder-meta,
+html[data-theme="light"] .day-block-count,
+html[data-theme="light"] .protocol-summary-meta,
+html[data-theme="light"] .archive-file-meta{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .archive-file-kicker{color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .archive-file-card::after{border-color:#8e4244;color:#f0a6a5}
 html[data-theme="light"] .workout-card .protocol-state-badge.inactive,
 html[data-theme="light"] .diet-folder-card .protocol-state-badge.inactive{border-color:#75685d;background:#1b1a19;color:#d0c7bc}
 html[data-theme="light"] .diet-folder-card .exercise-row-arrow{color:var(--tb-light-panel-subtle)}
@@ -2625,3 +2639,90 @@ html[data-theme="light"] #screen-instructions .instruction-video-btn{
   color:#e3b9b4;
 }
 html[data-theme="light"] #screen-instructions .instruction-admin-actions button:disabled{opacity:.55}
+
+/* Superfícies em cartões escuros ficam sólidas; botões preservam sua paleta própria. */
+html[data-theme="light"] :is(.workout-card,.exercise-row,.meal-card,.diet-folder-card,.weekly-plan-shell,.prescription-card,.session-block) :is(input,select,textarea){
+  color-scheme:dark;
+}
+html[data-theme="light"] .protocol-cycle-strip{
+  --text:var(--tb-light-panel-ink);
+  --text-dim:var(--tb-light-panel-muted);
+  --text-muted:var(--tb-light-panel-subtle);
+  background:#1b1a19;
+  background-image:none;
+  border-color:var(--tb-light-panel-border);
+  border-left-color:var(--tb-light-brand-on-panel);
+  color:var(--tb-light-panel-muted);
+}
+html[data-theme="light"] .protocol-cycle-strip b{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .diet-cycle-summary{
+  background:var(--tb-light-canvas-soft);
+  background-image:none;
+  border-color:var(--tb-light-line);
+  border-left-color:var(--tb-light-brand);
+  color:var(--tb-light-muted);
+}
+html[data-theme="light"] .diet-cycle-summary b{color:var(--tb-light-ink)}
+html[data-theme="light"] .diet-active-banner{
+  background:var(--tb-light-canvas-soft);
+  background-image:none;
+  border-color:var(--tb-light-line);
+  color:var(--tb-light-ink);
+}
+html[data-theme="light"] .diet-active-banner .protocol-state-badge.active{
+  background:#f5e3e2;
+  border-color:#b64a4c;
+  color:#762126;
+}
+html[data-theme="light"] .diet-active-banner .protocol-state-badge.inactive{
+  background:#ece8e4;
+  border-color:var(--tb-light-line-strong);
+  color:var(--tb-light-muted);
+}
+html[data-theme="light"] .diet-folder-card .protocol-state-badge.active{
+  background:#482526;
+  border-color:#bb5557;
+  color:#ffe7df;
+}
+html[data-theme="light"] .diet-folder-variants span{
+  background:#1b1a19;
+  border-color:var(--tb-light-panel-border-strong);
+  color:var(--tb-light-panel-muted);
+}
+html[data-theme="light"] .exercise-instructions-card,
+html[data-theme="light"] .exercise-technique-panel,
+html[data-theme="light"] .superset-card,
+html[data-theme="light"] .tb-guidance-card{
+  background:#262422;
+  background-image:none;
+  border-color:#554a42;
+  box-shadow:none;
+  color:#f0e8de;
+  opacity:1;
+}
+html[data-theme="light"] .exercise-instructions-head,
+html[data-theme="light"] .exercise-instructions-text,
+html[data-theme="light"] .exercise-technique-panel-head,
+html[data-theme="light"] .superset-title,
+html[data-theme="light"] .tb-guidance-head strong,
+html[data-theme="light"] .tb-nutrition-details summary{
+  color:#f0e8de;
+}
+html[data-theme="light"] .exercise-technique-panel-head,
+html[data-theme="light"] .exercise-technique-panel .week-technique-none,
+html[data-theme="light"] .superset-note,
+html[data-theme="light"] .tb-guidance-head small,
+html[data-theme="light"] .tb-hydration-note,
+html[data-theme="light"] .tb-nutrition-list li,
+html[data-theme="light"] .tb-guidance-card .week-technique-none{
+  color:#d0c7bc;
+}
+html[data-theme="light"] .exercise-instructions-card .exercise-instructions-head,
+html[data-theme="light"] .tb-guidance-card .tb-nutrition-details{
+  border-color:#554a42;
+}
+html[data-theme="light"] .exercise-row-techniques span,
+html[data-theme="light"] .exercise-row-techniques b{color:#f2c8c2}
+html[data-theme="light"] .superset-badge{color:#ffd27c}
+html[data-theme="light"] .tb-guidance-card .tb-hydration-value{color:#b8d9ff}
+html[data-theme="light"] .tb-guidance-card .tb-nutrition-details summary::marker{color:#ed7779}
