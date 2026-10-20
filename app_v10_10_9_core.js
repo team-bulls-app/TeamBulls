@@ -141,6 +141,7 @@ const SETTINGS_LEGACY_KEY='team_bulls_settings_v9';
 const SETTINGS_DEFAULTS={background:100,lightBackground:70,text:100,font:100,theme:'dark',clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:true,musicDock:false};
 const MUSIC_VOLUME_MIGRATION_KEY='team_bulls_music_volume_reduced_v10_5_4';
 const LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY='team_bulls_light_background_default_70_v1';
+const LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY_V2='team_bulls_light_background_default_70_v2';
 let APP_SETTINGS=loadAppSettings();
 function loadAppSettings(){
   try{
@@ -164,6 +165,13 @@ function loadAppSettings(){
     }
     if(loaded.theme==='light'&&!localStorage.getItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY)){
       localStorage.setItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY,'1');
+    }
+    if(!localStorage.getItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY_V2)){
+      if(Number(loaded.lightBackground)===100){
+        loaded.lightBackground=70;
+        localStorage.setItem(SETTINGS_KEY,JSON.stringify(loaded));
+      }
+      localStorage.setItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY_V2,'1');
     }
     return loaded;
   }catch(e){return{...SETTINGS_DEFAULTS};}
@@ -5577,7 +5585,7 @@ function setMusicPanelVisible(visible){
   APP_SETTINGS.musicDock=!!visible;saveAppSettings();applyAppSettings();
   if(visible){initLocalMusic();updateMusicUi();}
 }
-function resetAppSettings(){APP_SETTINGS={...SETTINGS_DEFAULTS};try{localStorage.removeItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY);}catch(e){}saveAppSettings();applyAppSettings();showToast('Configurações restauradas');}
+function resetAppSettings(){APP_SETTINGS={...SETTINGS_DEFAULTS};try{localStorage.removeItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY);localStorage.removeItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY_V2);}catch(e){}saveAppSettings();applyAppSettings();showToast('Configurações restauradas');}
 // Para adicionar novas músicas, inclua outro objeto nesta lista; a fila aleatória se adapta automaticamente.
 const MUSIC_TRACKS=[
   {id:'option-screen',url:'team-bulls-music-01-option-screen.mp3',title:'OPTION SCREEN — EXTENDED'},

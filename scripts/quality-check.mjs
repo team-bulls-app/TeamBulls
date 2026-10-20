@@ -189,6 +189,8 @@ lacks(prescriptionActions,'MutationObserver','Central de ações não deve obser
 const core=read('app_v10_10_9_core.js');
 has(core,"const SETTINGS_DEFAULTS={background:100,lightBackground:70,text:100,font:100,theme:'dark'",'A configuração inicial do tema escuro ou a preferência clara foi alterada.');
 has(core,"loaded.lightBackground=loaded.theme==='light'&&Number.isFinite(savedBackground)&&savedBackground!==100?savedBackground:70",'Preferências claras antigas não recebem uma migração separada do tema escuro.');
+has(core,"if(!localStorage.getItem(LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY_V2))",'Preferências claras antigas não recebem a migração do brilho padrão reduzido.');
+has(core,'if(Number(loaded.lightBackground)===100){','Uma preferência clara antiga de 100% precisa migrar para o padrão reduzido.');
 has(core,'function adjustLightSurfaceHex(hex,brightness)','Brilho do canvas claro não tem uma transformação própria.');
 has(core,"root.setProperty('--tb-light-canvas',canvas)",'Brilho do canvas claro não atualiza a superfície em tempo real.');
 has(core,'function adjustLightTextHex(base,minimum,maximum,brightness)','Brilho do texto claro não atualiza a escala tipográfica.');
@@ -240,6 +242,12 @@ has(lightThemeCss,'html[data-theme="light"] .v107-tabs{background:#171615}','Aba
 has(lightThemeCss,'html[data-theme="light"] .diet-variant-card.active,','Abas de divisões de dieta precisam de um estado ativo opaco.');
 has(lightThemeCss,'background-image:none;','Estados ativos das abas não podem manter gradientes translúcidos.');
 has(lightThemeCss,'color:var(--tb-light-panel-ink);','Rótulos das abas escuras precisam de texto legível.');
+const instructionsCssStart=lightThemeCss.indexOf('/* Instruções permanecem opacas');
+const instructionsCss=instructionsCssStart>=0?lightThemeCss.slice(instructionsCssStart):'';
+has(instructionsCss,'#screen-instructions .instruction-folder','Pastas de instruções precisam de estilo sólido no tema claro.');
+has(instructionsCss,'background-color:var(--tb-light-panel);','Instruções precisam usar uma superfície opaca independente do brilho do canvas.');
+has(instructionsCss,'#screen-instructions .instruction-item.inactive','Instruções ocultas não podem reduzir a legibilidade por opacidade.');
+assert(!/background(?:-color)?\s*:[^;]*rgba?\(/.test(instructionsCss),'A aba de instruções não pode usar fundos translúcidos no tema claro.');
 const controlPaletteStart=lightThemeCss.indexOf('html[data-theme="light"] button,');
 const controlPaletteEnd=lightThemeCss.indexOf('\n}',controlPaletteStart);
 const controlPalette=controlPaletteStart>=0&&controlPaletteEnd>controlPaletteStart?lightThemeCss.slice(controlPaletteStart,controlPaletteEnd+2):'';
@@ -256,7 +264,7 @@ assert(!lightThemeCss.includes('.supplements-free-meal-card'),'Tema claro repint
 
 const sw=read('sw.js'),bridge=read('sw_47.js'),boot=read('boot_v10.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme10'",'Service Worker não criou a revisão atual do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme11'",'Service Worker não criou a revisão atual do tema claro.');
 has(boot,"localStorage.getItem('team_bulls_settings_v9_4')",'Tema salvo não é lido durante o início antecipado.');
 has(boot,"document.documentElement.dataset.theme=light?'light':'dark'",'Tema inicial não é aplicado antes da primeira pintura.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');

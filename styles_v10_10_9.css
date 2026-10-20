@@ -2582,3 +2582,46 @@ html[data-theme="light"] .diet-variant-card:hover,
 html[data-theme="light"] .v107-tabs button:not(.active):hover{border-color:var(--tb-light-panel-border-strong);color:#ffffff}
 html[data-theme="light"] .v107-tabs{background:#171615}
 html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-light-panel-muted)}
+
+/* Instruções permanecem opacas para que o brilho do canvas não interfira na leitura. */
+html[data-theme="light"] #screen-instructions .instructions-required-banner,
+html[data-theme="light"] #screen-instructions .instruction-folder,
+html[data-theme="light"] #screen-instructions .instruction-item{
+  --text:var(--tb-light-panel-ink);
+  --text-dim:var(--tb-light-panel-muted);
+  --text-muted:var(--tb-light-panel-subtle);
+  --border:var(--tb-light-panel-border);
+  --border-l:var(--tb-light-panel-border-strong);
+  --accent:var(--tb-light-brand-on-panel);
+  --accent-dim:#472526;
+  background-color:var(--tb-light-panel);
+  background-image:none;
+  border-color:var(--tb-light-panel-border);
+  color:var(--tb-light-panel-ink);
+  opacity:1;
+  filter:none;
+}
+html[data-theme="light"] #screen-instructions .instruction-folder-head{
+  background-color:var(--tb-light-panel-raised);
+  background-image:none;
+  border-color:var(--tb-light-panel-border);
+}
+html[data-theme="light"] #screen-instructions .instructions-required-banner{border-left-color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] #screen-instructions .instructions-required-banner strong{color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] #screen-instructions .instructions-required-banner span,
+html[data-theme="light"] #screen-instructions .instruction-folder-state,
+html[data-theme="light"] #screen-instructions .instruction-item-text{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] #screen-instructions .instruction-folder-title,
+html[data-theme="light"] #screen-instructions .instruction-item-title{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] #screen-instructions .instruction-folder.inactive,
+html[data-theme="light"] #screen-instructions .instruction-item.inactive{
+  background-color:var(--tb-light-panel-raised);
+  opacity:1;
+  filter:none;
+}
+html[data-theme="light"] #screen-instructions .instruction-video-btn{
+  background:#382322;
+  border-color:#792021;
+  color:#e3b9b4;
+}
+html[data-theme="light"] #screen-instructions .instruction-admin-actions button:disabled{opacity:.55}
