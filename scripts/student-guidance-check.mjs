@@ -83,7 +83,7 @@ has(firestore,"request.resource.data.get('plans', []) is list",'mealPlans deixou
 has(firestore,"request.resource.data.get('meals', []) is list",'mealPlans deixou de validar refeições.');
 
 // PWA: módulo ativo no shell e espelho sw_47 intacto.
-has(sw,"const CACHE_REVISION='lighttheme5'",'Revisão de cache do tema claro ausente.');
+has(sw,"const CACHE_REVISION='lighttheme6'",'Revisão de cache do tema claro ausente.');
 const requiredStart=sw.indexOf('const REQUIRED_SHELL=['),requiredEnd=sw.indexOf('const OPTIONAL_SHELL=[');
 const required=requiredStart>=0&&requiredEnd>requiredStart?sw.slice(requiredStart,requiredEnd):'';
 has(required,guidanceLoader,'Shell offline não inclui student guidance.');
