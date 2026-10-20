@@ -1,3 +1,16 @@
+/* Aplica o tema salvo antes que a folha de estilos pinte a primeira tela. */
+(function applyStoredThemeBeforeFirstPaint(){
+  try{
+    const raw=localStorage.getItem('team_bulls_settings_v9_4')||localStorage.getItem('team_bulls_settings_v9');
+    const settings=raw?JSON.parse(raw):null;
+    const light=settings?.theme==='light';
+    document.documentElement.dataset.theme=light?'light':'dark';
+    const color=light?'#ffffff':'#000000';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content',color);
+    document.querySelector('meta[name="msapplication-TileColor"]')?.setAttribute('content',color);
+  }catch(error){document.documentElement.dataset.theme='dark';}
+})();
+
 /* Team Bulls v10.10.27 — autofill de login disponível já no cold start.
  *
  * Este guard roda no <head>, antes do DOMContentLoaded. O HTML legado ainda
