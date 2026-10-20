@@ -258,13 +258,17 @@ const panelsStart=lightThemeCss.indexOf('html[data-theme="light"] .workout-card,
 const panelsEnd=lightThemeCss.indexOf('\n}',panelsStart);
 const panelPalette=panelsStart>=0&&panelsEnd>panelsStart?lightThemeCss.slice(panelsStart,panelsEnd+2):'';
 has(panelPalette,'background-color:var(--tb-light-panel);','Painéis de conteúdo deixaram de usar a superfície opaca compartilhada.');
+has(panelPalette,'--bg:var(--tb-light-panel);','Campos dinâmicos perderam o fundo escuro herdado dos cartões.');
+has(panelPalette,'--card:var(--tb-light-panel-raised);','Controles dos cartões não recebem a superfície sólida do tema claro.');
 has(panelPalette,'--text-dim:var(--tb-light-panel-muted);','Textos secundários dos painéis perderam o tom claro compartilhado.');
 assert(!/rgba?\(/.test(panelPalette),'Painéis opacos passaram a usar superfícies translúcidas.');
+has(lightThemeCss,'html[data-theme="light"] .protocol-cycle-strip','Resumo semanal de treino precisa de um fundo opaco no tema claro.');
+has(lightThemeCss,'html[data-theme="light"] .tb-guidance-card','Orientações de dieta precisam de uma superfície sólida no tema claro.');
 assert(!lightThemeCss.includes('.supplements-free-meal-card'),'Tema claro repintou o atalho de refeições livres.');
 
 const sw=read('sw.js'),bridge=read('sw_47.js'),boot=read('boot_v10.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme11'",'Service Worker não criou a revisão atual do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme12'",'Service Worker não criou a revisão atual do tema claro.');
 has(boot,"localStorage.getItem('team_bulls_settings_v9_4')",'Tema salvo não é lido durante o início antecipado.');
 has(boot,"document.documentElement.dataset.theme=light?'light':'dark'",'Tema inicial não é aplicado antes da primeira pintura.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');

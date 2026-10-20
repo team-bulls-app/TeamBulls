@@ -1,8 +1,8 @@
 {
   "version": "10.10.9",
-  "build": 2026102010,
-  "revision": "light-theme-solid-instructions-1",
-  "publishedAt": "2026-10-19T00:00:00Z",
+  "build": 2026102011,
+  "revision": "light-theme-visual-update-fix-1",
+  "publishedAt": "2026-10-20T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
   "message": "Adiciona tema claro com alternância nas configurações e mantém sua preferência neste dispositivo."
