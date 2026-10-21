@@ -16,6 +16,7 @@
   let badgeRefreshUid='';
   let badgeRefreshPromise=null;
   let noticeActionBusy=false;
+  let openCenterRefreshPromise=null;
 
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const student=()=>CURRENT_USER?.role==='student'?CURRENT_USER:null;
@@ -246,15 +247,18 @@
     notifications=items.sort((a,b)=>timestamp(b.createdAt)-timestamp(a.createdAt));return notifications;
   }
 
-  function renderNotifications(){
+  function renderNotifications({preserveScroll=false}={}){
+    const scroller=document.getElementById('app'),scrollTop=scroller?.scrollTop||0;
+    const restore=()=>{if(preserveScroll&&scroller)scroller.scrollTop=scrollTop;};
     const host=document.getElementById('tb-notice-list');if(!host)return;
-    if(!notifications.length){host.innerHTML='<div class="tb-notice-empty">Nenhuma notificação no momento.</div>';return;}
+    if(!notifications.length){host.innerHTML='<div class="tb-notice-empty">Nenhuma notificação no momento.</div>';restore();return;}
     host.innerHTML=notifications.map((item,index)=>{
       const actionable=['questionnaire','weekly','retry','protocol'].includes(item.action);
       return`<article class="tb-notice-card ${item.read?'':'unread'}"${actionable?` data-notice-index="${index}" role="button" tabindex="0"`:''}><div class="tb-notice-meta">${esc(item.type)}${fmt(item.createdAt)?' · '+esc(fmt(item.createdAt)):''}</div><strong>${esc(item.title)}</strong><p>${esc(item.body)}</p><div class="tb-notice-actions">${item.action==='questionnaire'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">RESPONDER</button>`:item.action==='weekly'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ENVIAR RELATÓRIO</button>`:item.action==='retry'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">ATUALIZAR</button>`:item.action==='protocol'?`<button onclick="TeamBullsStudentHome.openNotice(${index})">VER CRONOGRAMA</button>`:!item.read&&(item.source==='notification'||item.source==='feedback')?`<button onclick="TeamBullsStudentHome.markRead(${index})">MARCAR COMO LIDA</button>`:''}</div></article>`;
     }).join('');
     host.onclick=event=>{if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(card&&host.contains(card))openNotice(Number(card.dataset.noticeIndex));};
     host.onkeydown=event=>{if(event.key!=='Enter'&&event.key!==' ')return;if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(!card||!host.contains(card))return;event.preventDefault();openNotice(Number(card.dataset.noticeIndex));};
+    restore();
   }
 
   function applyNoticeBadge(){
@@ -282,13 +286,27 @@
     await loadNotifications({includeProtocol:true});renderNotifications();
     badgeRefreshUid=studentUid();badgeRefreshAt=Date.now();applyNoticeBadge();
   }
+  async function refreshOpenNotifications(){
+    if(activeScreen()!=='screen-student-notifications')return false;
+    if(openCenterRefreshPromise)return openCenterRefreshPromise;
+    const uid=studentUid();
+    openCenterRefreshPromise=(async()=>{
+      await loadNotifications({includeProtocol:true});
+      if(studentUid()!==uid||activeScreen()!=='screen-student-notifications')return false;
+      renderNotifications({preserveScroll:true});
+      badgeRefreshUid=uid;badgeRefreshAt=Date.now();applyNoticeBadge();
+      return true;
+    })().finally(()=>{openCenterRefreshPromise=null;});
+    return openCenterRefreshPromise;
+  }
+
   async function markRead(index){
     const item=notifications[index];if(!item||item.read)return;
     try{
       if(item.source==='notification')await cloudWrite(db.collection('notifications').doc(item.id).update({readAt:firebase.firestore.FieldValue.serverTimestamp()}),'marcar notificação como lida');
       else if(item.source==='feedback')await cloudWrite(db.collection('feedback').doc(item.id).update({read:true}),'marcar mensagem como lida');
       else return;
-      item.read=true;renderNotifications();applyNoticeBadge();
+      item.read=true;renderNotifications({preserveScroll:true});applyNoticeBadge();
     }catch(error){showToast?.('Não foi possível marcar como lida.',true);}
   }
   function noticeActionButton(index){return document.querySelector(`#tb-notice-list .tb-notice-card:nth-child(${Number(index)+1}) .tb-notice-actions button`);}
@@ -402,6 +420,6 @@
   document.addEventListener('click',event=>{if(!event.target.closest?.('.tb-profile-head'))closeProfileMenu();},true);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&student())refreshStudentHeader(true).catch(()=>{});});
   window.addEventListener('team-bulls-v107-ready',()=>setTimeout(init,0));
-  window.TeamBullsStudentHome=Object.freeze({version:VERSION,init,openNotifications,toggleProfileMenu,closeProfileMenu,pickAvatar,changeNickname,logout,markRead,openNotice,moderatePhoto,moderateNickname,refresh:()=>refreshStudentHeader(true)});
+  window.TeamBullsStudentHome=Object.freeze({version:VERSION,init,openNotifications,refreshOpenNotifications,toggleProfileMenu,closeProfileMenu,pickAvatar,changeNickname,logout,markRead,openNotice,moderatePhoto,moderateNickname,refresh:()=>refreshStudentHeader(true)});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});else setTimeout(init,0);
 })();
