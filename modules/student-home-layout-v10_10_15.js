@@ -291,11 +291,11 @@
     const focusedId=document.activeElement?.closest?.('.tb-v17-feedback')?.dataset.feedbackId||'';
     const scroller=document.getElementById('app'),scrollTop=scroller?.scrollTop||0;
     const restoreReadingPosition=()=>{
-      if(scroller)scroller.scrollTop=scrollTop;
       if(focusedId){
         const target=[...host.querySelectorAll('.tb-v17-feedback-toggle')].find(button=>button.closest('.tb-v17-feedback')?.dataset.feedbackId===focusedId);
         try{target?.focus({preventScroll:true});}catch(error){target?.focus?.();}
       }
+      if(scroller)scroller.scrollTop=scrollTop;
     };
     host.replaceChildren();
     if(!items.length){const empty=document.createElement('div');empty.className='tb-v17-empty';empty.textContent=cloudReady()?'Nenhum feedback enviado pelo treinador.':'Feedbacks disponíveis quando a sessão online estiver ativa.';host.appendChild(empty);restoreReadingPosition();return;}
