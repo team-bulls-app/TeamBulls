@@ -325,7 +325,9 @@
 
   function renderLoadFailure(id,message,sequence){
     if(sequence!==refreshSequence)return;
-    const host=document.getElementById(id);if(!host||host.childElementCount)return;
+    const host=document.getElementById(id);if(!host)return;
+    const hasLoadedContent=host.querySelector(':scope > .tb-v17-feedback, :scope > .tb-v17-weight-panel');if(hasLoadedContent)return;
+    host.replaceChildren();
     const notice=document.createElement('div');notice.className='tb-v17-empty';notice.textContent=message;host.appendChild(notice);
   }
 
