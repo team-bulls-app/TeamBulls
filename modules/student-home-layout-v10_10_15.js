@@ -17,6 +17,8 @@
   let refreshSequence=0;
   let lastRefreshAt=0;
   let lastRefreshUid='';
+  let lastRenderedUid='';
+  let hasRenderedContext=false;
   let hotbarIntent='home';
   let feedbackOrderedQueryState='unknown';
   let weightOrderedQueryState='unknown';
@@ -262,7 +264,7 @@
   }
 
   async function fetchFeedbacks(uid){
-    if(!uid||!cloudReady())return[];
+    if(!uid||!cloudReady())return null;
     const base=db.collection('feedback').where('studentId','==',uid);
     try{
       if(feedbackOrderedQueryState!=='unsupported'){
@@ -278,34 +280,57 @@
       }
       const snap=await base.get();
       return snap.docs.map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>createdMillis(b.createdAt)-createdMillis(a.createdAt)||String(b.id).localeCompare(String(a.id))).slice(0,MAX_FEEDBACKS);
-    }catch(error){console.warn('[Team Bulls] Feedbacks da home indisponíveis',error);return[];}
+    }catch(error){console.warn('[Team Bulls] Feedbacks da home indisponíveis',error);return null;}
   }
 
-  function feedbackTitle(item){return String(item?.title||item?.feedbackType||'Feedback do treinador').trim()||'Feedback do treinador';}
+    function feedbackTitle(item){return String(item?.title||item?.feedbackType||'Feedback do treinador').trim()||'Feedback do treinador';}
   function renderFeedbacks(items,sequence){
     if(sequence!==refreshSequence)return;
-    const host=document.getElementById('tb-v17-feedbacks');if(!host)return;host.replaceChildren();
-    if(!items.length){const empty=document.createElement('div');empty.className='tb-v17-empty';empty.textContent=cloudReady()?'Nenhum feedback enviado pelo treinador.':'Feedbacks disponíveis quando a sessão online estiver ativa.';host.appendChild(empty);return;}
+    const host=document.getElementById('tb-v17-feedbacks');if(!host)return;
+    const openIds=new Set([...host.querySelectorAll('.tb-v17-feedback.is-open')].map(card=>card.dataset.feedbackId).filter(Boolean));
+    const focusedId=document.activeElement?.closest?.('.tb-v17-feedback')?.dataset.feedbackId||'';
+    const scroller=document.getElementById('app'),scrollTop=scroller?.scrollTop||0;
+    const restoreReadingPosition=()=>{
+      if(scroller)scroller.scrollTop=scrollTop;
+      if(focusedId){
+        const target=[...host.querySelectorAll('.tb-v17-feedback-toggle')].find(button=>button.closest('.tb-v17-feedback')?.dataset.feedbackId===focusedId);
+        try{target?.focus({preventScroll:true});}catch(error){target?.focus?.();}
+      }
+    };
+    host.replaceChildren();
+    if(!items.length){const empty=document.createElement('div');empty.className='tb-v17-empty';empty.textContent=cloudReady()?'Nenhum feedback enviado pelo treinador.':'Feedbacks disponíveis quando a sessão online estiver ativa.';host.appendChild(empty);restoreReadingPosition();return;}
     items.forEach((item,index)=>{
-      const card=document.createElement('article');card.className='tb-v17-feedback';card.dataset.unread=String(item.read!==true);
+      const id=String(item.id||''),card=document.createElement('article');card.className='tb-v17-feedback';card.dataset.feedbackId=id;card.dataset.unread=String(item.read!==true);
       const toggle=document.createElement('button');toggle.type='button';toggle.className='tb-v17-feedback-toggle';toggle.setAttribute('aria-expanded','false');
       const idx=document.createElement('span');idx.className='tb-v17-feedback-index';idx.textContent=String(index+1).padStart(2,'0');
-      const copy=document.createElement('span');copy.className='tb-v17-feedback-copy';const title=document.createElement('strong'),meta=document.createElement('small');title.textContent=feedbackTitle(item);meta.textContent=`${item.read===true?'LIDO':'NOVO'}${item.createdAt?' · '+fmtDate(item.createdAt):''} · TOQUE PARA ABRIR`;copy.append(title,meta);
+      const copy=document.createElement('span');copy.className='tb-v17-feedback-copy';const title=document.createElement('strong'),meta=document.createElement('small');title.textContent=feedbackTitle(item);copy.append(title,meta);
       const chevron=document.createElement('span');chevron.className='tb-v17-feedback-chevron';chevron.textContent='▸';
       const body=document.createElement('div');body.className='tb-v17-feedback-body';body.textContent=String(item.message||'');
       toggle.append(idx,copy,chevron);card.append(toggle,body);host.appendChild(card);
+      const initiallyOpen=openIds.has(id);
+      if(initiallyOpen){card.classList.add('is-open');toggle.setAttribute('aria-expanded','true');chevron.textContent='▾';}
+      const updateMeta=()=>{meta.textContent=(item.read===true?'LIDO':'NOVO')+(item.createdAt?' · '+fmtDate(item.createdAt):'')+' · TOQUE PARA '+(card.classList.contains('is-open')?'FECHAR':'ABRIR');};
+      updateMeta();
       toggle.addEventListener('click',async()=>{
-        const open=card.classList.toggle('is-open');toggle.setAttribute('aria-expanded',String(open));chevron.textContent=open?'▾':'▸';
+        const open=card.classList.toggle('is-open');toggle.setAttribute('aria-expanded',String(open));chevron.textContent=open?'▾':'▸';updateMeta();
         if(open&&item.read!==true&&cloudReady()&&item.id){
-          item.read=true;card.dataset.unread='false';meta.textContent=`LIDO${item.createdAt?' · '+fmtDate(item.createdAt):''}`;
-          try{await db.collection('feedback').doc(item.id).update({read:true});}catch(error){item.read=false;card.dataset.unread='true';}
+          item.read=true;card.dataset.unread='false';updateMeta();
+          try{await db.collection('feedback').doc(item.id).update({read:true});}
+          catch(error){item.read=false;card.dataset.unread='true';updateMeta();}
         }
       });
     });
+    restoreReadingPosition();
   }
 
-  async function fetchWeights(uid){
-    if(!uid||!cloudReady())return[];
+  function renderLoadFailure(id,message,sequence){
+    if(sequence!==refreshSequence)return;
+    const host=document.getElementById(id);if(!host||host.childElementCount)return;
+    const notice=document.createElement('div');notice.className='tb-v17-empty';notice.textContent=message;host.appendChild(notice);
+  }
+
+    async function fetchWeights(uid){
+    if(!uid||!cloudReady())return null;
     const base=db.collection('weeklyCheckins').where('studentId','==',uid);
     const normalize=snap=>snap.docs.map(doc=>({...doc.data(),id:doc.id})).filter(item=>Number(item.weight)>0).sort((a,b)=>String(a.submittedDate||a.dueDate||'').localeCompare(String(b.submittedDate||b.dueDate||''))||createdMillis(a.createdAt)-createdMillis(b.createdAt)).slice(-MAX_WEIGHT_POINTS);
     try{
@@ -321,10 +346,10 @@
         }
       }
       return normalize(await base.get());
-    }catch(error){console.warn('[Team Bulls] Histórico de peso indisponível',error);return[];}
+    }catch(error){console.warn('[Team Bulls] Histórico de peso indisponível',error);return null;}
   }
 
-  function renderWeight(items,sequence){
+    function renderWeight(items,sequence){
     if(sequence!==refreshSequence)return;
     const host=document.getElementById('tb-v17-weight');if(!host)return;host.replaceChildren();
     if(!items.length){const empty=document.createElement('div');empty.className='tb-v17-empty';empty.textContent=cloudReady()?'O gráfico aparece após o primeiro relatório com peso.':'Histórico de peso disponível quando a sessão online estiver ativa.';host.appendChild(empty);return;}
@@ -342,15 +367,32 @@
 
   async function refreshHome(force=false){
     if(!isStudentContext()||activeScreen()!=='screen-home')return false;
-    ensureInsights();const uid=studentUid(),now=Date.now();if(!force&&uid===lastRefreshUid&&now-lastRefreshAt<REFRESH_TTL)return true;lastRefreshUid=uid;lastRefreshAt=now;const sequence=++refreshSequence;
-    await Promise.allSettled([
+    ensureInsights();
+    const uid=studentUid();
+    if(!hasRenderedContext||uid!==lastRenderedUid){
+      hasRenderedContext=true;lastRenderedUid=uid;lastRefreshUid='';lastRefreshAt=0;
+      const resetSequence=++refreshSequence;renderFeedbacks([],resetSequence);renderWeight([],resetSequence);
+    }
+    if(!uid||!cloudReady())return true;
+    const now=Date.now();
+    if(!force&&uid===lastRefreshUid&&now-lastRefreshAt<REFRESH_TTL)return true;
+    lastRefreshUid=uid;lastRefreshAt=now;const sequence=++refreshSequence;
+    const settled=await Promise.allSettled([
       refreshProtocolDate(uid,sequence),
-      fetchFeedbacks(uid).then(items=>renderFeedbacks(items,sequence)),
-      fetchWeights(uid).then(items=>renderWeight(items,sequence))
-    ]);return true;
+      fetchFeedbacks(uid).then(items=>{
+        if(items===null){renderLoadFailure('tb-v17-feedbacks','Não foi possível carregar os feedbacks agora. O conteúdo salvo continua disponível quando houver conexão.',sequence);return false;}
+        renderFeedbacks(items,sequence);return true;
+      }),
+      fetchWeights(uid).then(items=>{
+        if(items===null){renderLoadFailure('tb-v17-weight','Não foi possível carregar o histórico de peso agora.',sequence);return false;}
+        renderWeight(items,sequence);return true;
+      })
+    ]);
+    if(settled.some(result=>result.status==='rejected'||result.value===false))lastRefreshAt=0;
+    return true;
   }
 
-  function sync(){
+    function sync(){
     ensureStyles();ensureHotbar();ensureStudentDietLabel();patchSupplyOptionsHeader();
     const active=isStudentContext();
     document.documentElement.classList.toggle('tb-student-home-v17',active);
