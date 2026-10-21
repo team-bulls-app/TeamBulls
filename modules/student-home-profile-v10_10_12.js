@@ -289,10 +289,11 @@
   async function refreshOpenNotifications(){
     if(activeScreen()!=='screen-student-notifications')return false;
     if(openCenterRefreshPromise)return openCenterRefreshPromise;
-    const uid=studentUid();
+    const uid=studentUid(),previousNotifications=notifications;
     openCenterRefreshPromise=(async()=>{
       await loadNotifications({includeProtocol:true});
       if(studentUid()!==uid||activeScreen()!=='screen-student-notifications')return false;
+      if(notifications.some(item=>item.source==='error')&&previousNotifications.length)notifications=previousNotifications;
       renderNotifications({preserveScroll:true});
       badgeRefreshUid=uid;badgeRefreshAt=Date.now();applyNoticeBadge();
       return true;
