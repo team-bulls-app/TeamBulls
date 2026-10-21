@@ -283,7 +283,7 @@
     }catch(error){console.warn('[Team Bulls] Feedbacks da home indisponíveis',error);return null;}
   }
 
-    function feedbackTitle(item){return String(item?.title||item?.feedbackType||'Feedback do treinador').trim()||'Feedback do treinador';}
+  function feedbackTitle(item){return String(item?.title||item?.feedbackType||'Feedback do treinador').trim()||'Feedback do treinador';}
   function renderFeedbacks(items,sequence){
     if(sequence!==refreshSequence)return;
     const host=document.getElementById('tb-v17-feedbacks');if(!host)return;
@@ -329,7 +329,7 @@
     const notice=document.createElement('div');notice.className='tb-v17-empty';notice.textContent=message;host.appendChild(notice);
   }
 
-    async function fetchWeights(uid){
+  async function fetchWeights(uid){
     if(!uid||!cloudReady())return null;
     const base=db.collection('weeklyCheckins').where('studentId','==',uid);
     const normalize=snap=>snap.docs.map(doc=>({...doc.data(),id:doc.id})).filter(item=>Number(item.weight)>0).sort((a,b)=>String(a.submittedDate||a.dueDate||'').localeCompare(String(b.submittedDate||b.dueDate||''))||createdMillis(a.createdAt)-createdMillis(b.createdAt)).slice(-MAX_WEIGHT_POINTS);
@@ -349,7 +349,7 @@
     }catch(error){console.warn('[Team Bulls] Histórico de peso indisponível',error);return null;}
   }
 
-    function renderWeight(items,sequence){
+  function renderWeight(items,sequence){
     if(sequence!==refreshSequence)return;
     const host=document.getElementById('tb-v17-weight');if(!host)return;host.replaceChildren();
     if(!items.length){const empty=document.createElement('div');empty.className='tb-v17-empty';empty.textContent=cloudReady()?'O gráfico aparece após o primeiro relatório com peso.':'Histórico de peso disponível quando a sessão online estiver ativa.';host.appendChild(empty);return;}
@@ -392,7 +392,7 @@
     return true;
   }
 
-    function sync(){
+  function sync(){
     ensureStyles();ensureHotbar();ensureStudentDietLabel();patchSupplyOptionsHeader();
     const active=isStudentContext();
     document.documentElement.classList.toggle('tb-student-home-v17',active);
