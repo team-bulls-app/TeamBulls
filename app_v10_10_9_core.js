@@ -3498,7 +3498,8 @@ function normalizeExerciseCatalog(data){
     id:String(group?.id||uid()),name:String(group?.name||'Grupo'),note:String(group?.note||''),
     items:(Array.isArray(group?.items)?group.items:[]).map(item=>({id:String(item?.id||uid()),name:String(item?.name||'Exercício'),videoUrl:String(item?.videoUrl||'')}))
   }));
-  return{catalogVersion:Number(source.catalogVersion)||EXERCISE_CATALOG_VERSION,groups};
+  const ids=value=>Array.isArray(value)?[...new Set(value.map(item=>String(item||'').trim().slice(0,128)).filter(Boolean))].slice(0,1000):[];
+  return{catalogVersion:Number(source.catalogVersion)||EXERCISE_CATALOG_VERSION,deletedGroupIds:ids(source.deletedGroupIds),deletedItemIds:ids(source.deletedItemIds),groups};
 }
 function cacheExerciseCatalog(){
   try{
@@ -3510,7 +3511,7 @@ function cacheExerciseCatalog(){
 function cachedExerciseCatalog(){
   try{
     const raw=JSON.parse(localStorage.getItem('team_bulls_exercise_catalog_cache')||'null');
-    if(!raw||!Array.isArray(raw.groups)||!raw.groups.length)return null;
+    if(!raw||!Array.isArray(raw.groups))return null;
     const safe=normalizeExerciseCatalog(raw);safe.groups=safe.groups.map(group=>({...group,items:(group.items||[]).map(item=>({...item,videoUrl:''}))}));
     localStorage.setItem('team_bulls_exercise_catalog_cache',JSON.stringify(safe));return safe;
   }catch(e){return null;}
@@ -3561,13 +3562,30 @@ function closeCatalogVideo(){document.getElementById('catalog-video-body').inner
 function mergeExerciseCatalogWithDefaults(stored){
   const base=normalizeExerciseCatalog(defaultExerciseOptions()),source=normalizeExerciseCatalog(stored||{});
   const result={...source,catalogVersion:EXERCISE_CATALOG_VERSION,groups:Array.isArray(source.groups)?source.groups:[]};
+  const deletedGroups=new Set(source.deletedGroupIds),deletedItems=new Set(source.deletedItemIds);
   for(const group of base.groups){
+    if(deletedGroups.has(String(group.id)))continue;
     let target=result.groups.find(g=>String(g.id||'')===String(group.id)||normalizedName(g.name)===normalizedName(group.name));
-    if(!target){result.groups.push(JSON.parse(JSON.stringify(group)));continue;}
+    if(!target){const added=JSON.parse(JSON.stringify(group));added.items=added.items.filter(item=>!deletedItems.has(String(item.id)));result.groups.push(added);continue;}
     target.items=Array.isArray(target.items)?target.items:[];
-    for(const item of group.items){const existing=target.items.find(x=>String(x.id||'')===String(item.id)||normalizedName(x.name)===normalizedName(item.name));if(!existing)target.items.push({...item});else if(!String(existing.videoUrl||'').trim()&&item.videoUrl)existing.videoUrl=item.videoUrl;}
+    for(const item of group.items){if(deletedItems.has(String(item.id)))continue;const existing=target.items.find(x=>String(x.id||'')===String(item.id)||normalizedName(x.name)===normalizedName(item.name));if(!existing)target.items.push({...item});else if(!String(existing.videoUrl||'').trim()&&item.videoUrl)existing.videoUrl=item.videoUrl;}
   }
   return normalizeExerciseCatalog(result);
+}
+function defaultExerciseGroupFor(group){
+  if(!group)return null;
+  return defaultExerciseOptions().groups.find(item=>String(item.id)===String(group.id)||normalizedName(item.name)===normalizedName(group.name))||null;
+}
+function rememberDeletedExerciseGroup(group){
+  const fallback=defaultExerciseGroupFor(group);if(!fallback)return;
+  const deleted=Array.isArray(EXERCISE_OPTIONS.deletedGroupIds)?EXERCISE_OPTIONS.deletedGroupIds:[];
+  EXERCISE_OPTIONS.deletedGroupIds=[...new Set([...deleted,String(fallback.id)])];
+}
+function rememberDeletedExerciseItem(group,item){
+  const fallbackGroup=defaultExerciseGroupFor(group);if(!fallbackGroup)return;
+  const fallbackItem=(fallbackGroup.items||[]).find(entry=>String(entry.id)===String(item?.id)||normalizedName(entry.name)===normalizedName(item?.name));if(!fallbackItem)return;
+  const deleted=Array.isArray(EXERCISE_OPTIONS.deletedItemIds)?EXERCISE_OPTIONS.deletedItemIds:[];
+  EXERCISE_OPTIONS.deletedItemIds=[...new Set([...deleted,String(fallbackItem.id)])];
 }
 async function loadExerciseOptions(force=false){
   if(MODE==='local'){EXERCISE_OPTIONS=cachedExerciseCatalog()||mergeExerciseCatalogWithDefaults(null);return EXERCISE_OPTIONS;}
@@ -3614,22 +3632,35 @@ function renderExerciseOptions(){
     <div class="options-intro-subtitle">${exerciseCount} exercícios organizados em ${EXERCISE_OPTIONS.groups.length} grupos, na ordem da lista de montagem de treino.</div>
   </div><div class="section-header"><span class="section-label">catálogo por grupo de exercício</span></div>`;
   if(canEdit) html+=`<button class="food-add-btn" onclick="openAddExerciseGroup()">+ NOVO GRUPO</button>`;
-  html+=EXERCISE_OPTIONS.groups.map(gr=>{
+  html+=EXERCISE_OPTIONS.groups.map((gr,index)=>{
     const videoAllowed=canUseCatalogVideos()||canEdit;
     const items=gr.items.map(it=>`<div class="food-item-row">
         <span class="food-item-name">${esc(it.name)}</span>
-        <div class="food-item-actions">${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:26px;height:26px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})">✏️</button>`:''}</div>
+        <div class="food-item-actions">${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Editar ${esc(it.name)}" aria-label="Editar ${esc(it.name)}">✏️</button><button class="btn-icon ghost exercise-option-delete" style="width:28px;height:28px;font-size:12px" onclick="deleteExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Excluir ${esc(it.name)}" aria-label="Excluir ${esc(it.name)}">🗑</button>`:''}</div>
       </div>`).join('');
+    const controls=canEdit?`<div class="exercise-group-actions"><button class="btn-icon ghost" onclick="event.stopPropagation();moveExerciseGroup(${jsArg(gr.id)},-1)" title="Mover ${esc(gr.name)} para cima" aria-label="Mover ${esc(gr.name)} para cima" ${index===0?'disabled':''}>↑</button><button class="btn-icon ghost" onclick="event.stopPropagation();moveExerciseGroup(${jsArg(gr.id)},1)" title="Mover ${esc(gr.name)} para baixo" aria-label="Mover ${esc(gr.name)} para baixo" ${index===EXERCISE_OPTIONS.groups.length-1?'disabled':''}>↓</button><button class="btn-icon ghost" onclick="event.stopPropagation();openEditExerciseGroup(${jsArg(gr.id)})" title="Editar grupo ${esc(gr.name)}" aria-label="Editar grupo ${esc(gr.name)}">✏️</button><button class="btn-icon ghost exercise-group-delete" onclick="event.stopPropagation();deleteExerciseGroup(${jsArg(gr.id)})" title="Excluir grupo ${esc(gr.name)}" aria-label="Excluir grupo ${esc(gr.name)}">🗑</button><button class="btn-icon ghost" onclick="event.stopPropagation();openAddExOptItem(${jsArg(gr.id)})" title="Adicionar exercício a ${esc(gr.name)}" aria-label="Adicionar exercício a ${esc(gr.name)}">+</button></div>`:'';
     return `<div class="food-cat-block">
       <div class="food-cat-title">
-        <span${canEdit?` style="cursor:pointer" onclick="openEditExerciseGroup(${jsArg(gr.id)})"`:''}>${esc(gr.name)}</span>
-        ${canEdit?`<button class="btn-icon ghost" style="width:24px;height:24px;font-size:14px" onclick="openAddExOptItem(${jsArg(gr.id)})">+</button>`:''}
+        <span class="exercise-group-name"${canEdit?` style="cursor:pointer" onclick="openEditExerciseGroup(${jsArg(gr.id)})"`:''}>${esc(gr.name)}</span>
+        ${controls}
       </div>
       ${items||'<div class="empty-hint" style="text-align:left;padding:6px 0;margin:0">Nenhuma opção</div>'}
       ${gr.note?`<div class="food-misc-note" style="margin-top:6px;font-style:italic">${esc(gr.note)}</div>`:''}
     </div>`;
   }).join('');
   wrap.innerHTML=html;
+}
+function moveExerciseGroup(groupId,direction){
+  const id=String(groupId||''),step=Number(direction);
+  if(!id||![-1,1].includes(step))return false;
+  const index=EXERCISE_OPTIONS.groups.findIndex(group=>String(group.id)===id),next=index+step;
+  if(index<0||next<0||next>=EXERCISE_OPTIONS.groups.length)return false;
+  const key='move-exercise-groups';if(!beginAction(key))return false;
+  const snapshot=JSON.stringify(EXERCISE_OPTIONS);
+  try{
+    [EXERCISE_OPTIONS.groups[index],EXERCISE_OPTIONS.groups[next]]=[EXERCISE_OPTIONS.groups[next],EXERCISE_OPTIONS.groups[index]];
+    return persistExerciseOptions().then(()=>{renderExerciseOptions();return true;}).catch(error=>{EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível reordenar os grupos: '+error.message);return false;}).finally(()=>endAction(key));
+  }catch(error){EXERCISE_OPTIONS=JSON.parse(snapshot);endAction(key);alert('Não foi possível reordenar os grupos: '+error.message);return false;}
 }
 // Grupo (ex: "Supino Reto")
 function openAddExerciseGroup(){
@@ -3670,14 +3701,25 @@ async function saveExerciseGroup(){
   }catch(e){EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível salvar: '+e.message);}
   finally{endAction('catalog-ex-group');}
 }
-function deleteExerciseGroupFromModal(){
-  showConfirm('Excluir grupo','Excluir este grupo e todas as opções dentro dele?',async function(){
-    const key='delete-exercise-group-'+EDIT_EXOPT_GROUP_ID;if(!beginAction(key))return false;
+function deleteExerciseGroup(groupId=EDIT_EXOPT_GROUP_ID){
+  const id=String(groupId||''),group=EXERCISE_OPTIONS.groups.find(item=>String(item.id)===id);if(!group)return false;
+  showConfirm('Excluir grupo',`Excluir o grupo “${group.name}” e todas as opções dentro dele?`,async function(){
+    const key='delete-exercise-group-'+id;if(!beginAction(key))return false;
     const snapshot=JSON.stringify(EXERCISE_OPTIONS);
-    try{EXERCISE_OPTIONS.groups=EXERCISE_OPTIONS.groups.filter(g=>g.id!==EDIT_EXOPT_GROUP_ID);await persistExerciseOptions();closeModal('modal-exercise-group');renderExerciseOptions();return true;}
-    catch(e){EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível excluir: '+e.message);return false;}
+    try{
+      const current=EXERCISE_OPTIONS.groups.find(item=>String(item.id)===id);if(!current)throw new Error('Grupo não encontrado.');
+      rememberDeletedExerciseGroup(current);
+      EXERCISE_OPTIONS.groups=EXERCISE_OPTIONS.groups.filter(item=>String(item.id)!==id);
+      await persistExerciseOptions();
+      if(String(EDIT_EXOPT_GROUP_ID||'')===id&&document.getElementById('modal-exercise-group')?.classList.contains('open'))closeModal('modal-exercise-group');
+      renderExerciseOptions();return true;
+    }catch(error){EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível excluir o grupo: '+error.message);return false;}
     finally{endAction(key);}
   });
+  return true;
+}
+function deleteExerciseGroupFromModal(){
+  return deleteExerciseGroup(EDIT_EXOPT_GROUP_ID);
 }
 // Item dentro de um grupo (ex: "Supino reto barra")
 function openAddExOptItem(gid){
@@ -3712,15 +3754,25 @@ async function saveExOptItem(){
   }catch(e){EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível salvar: '+e.message);}
   finally{endAction(key,'modal-exercise-option-item');}
 }
-function deleteExOptItemFromModal(){
-  const group=EXERCISE_OPTIONS.groups.find(g=>g.id===EDIT_EXOPT_GROUP_ID);if(!group)return;
-  showConfirm('Excluir opção','Remover esta opção de exercício?',async function(){
-    const key='delete-exercise-item-'+EDIT_EXOPT_ITEM_ID;if(!beginAction(key))return false;
+function deleteExerciseOptionItem(groupId,itemId){
+  const groupKey=String(groupId||''),itemKey=String(itemId||''),group=EXERCISE_OPTIONS.groups.find(item=>String(item.id)===groupKey),option=group?.items.find(item=>String(item.id)===itemKey);if(!group||!option)return false;
+  showConfirm('Excluir exercício',`Remover “${option.name}” do grupo “${group.name}”?`,async function(){
+    const key='delete-exercise-item-'+groupKey+'-'+itemKey;if(!beginAction(key))return false;
     const snapshot=JSON.stringify(EXERCISE_OPTIONS);
-    try{group.items=group.items.filter(x=>x.id!==EDIT_EXOPT_ITEM_ID);await persistExerciseOptions();closeModal('modal-exercise-option-item');renderExerciseOptions();return true;}
-    catch(e){EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível excluir: '+e.message);return false;}
+    try{
+      const currentGroup=EXERCISE_OPTIONS.groups.find(item=>String(item.id)===groupKey),current=currentGroup?.items.find(item=>String(item.id)===itemKey);if(!currentGroup||!current)throw new Error('Exercício não encontrado.');
+      rememberDeletedExerciseItem(currentGroup,current);
+      currentGroup.items=currentGroup.items.filter(item=>String(item.id)!==itemKey);
+      await persistExerciseOptions();
+      if(String(EDIT_EXOPT_GROUP_ID||'')===groupKey&&String(EDIT_EXOPT_ITEM_ID||'')===itemKey&&document.getElementById('modal-exercise-option-item')?.classList.contains('open'))closeModal('modal-exercise-option-item');
+      renderExerciseOptions();return true;
+    }catch(error){EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível excluir o exercício: '+error.message);return false;}
     finally{endAction(key);}
   });
+  return true;
+}
+function deleteExOptItemFromModal(){
+  return deleteExerciseOptionItem(EDIT_EXOPT_GROUP_ID,EDIT_EXOPT_ITEM_ID);
 }
 
 /* ══════════════════════════════════════════════════
