@@ -376,6 +376,11 @@
 
     .food-cat-block{margin-bottom:22px;}
     .food-cat-title{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+    .exercise-group-name{flex:1;min-width:0;overflow-wrap:anywhere;}
+    .exercise-group-actions{display:flex;align-items:center;gap:2px;flex:0 0 auto;}
+    .exercise-group-actions .btn-icon{width:30px;height:30px;min-width:30px;padding:0;font-size:13px;}
+    .exercise-group-actions .btn-icon:disabled{opacity:.35;cursor:not-allowed;}
+    .exercise-group-actions .exercise-group-delete,.food-item-actions .exercise-option-delete{color:var(--danger);}
     .food-item-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 2px;border-bottom:1px solid var(--border);}
     .food-item-row:last-child{border-bottom:none;}
     .food-item-name{font-size:14px;color:var(--text);}

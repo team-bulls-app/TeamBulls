@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102201,
-  "revision": "diet-choice-accordion-1",
+  "build": 2026102202,
+  "revision": "exercise-catalog-controls-1",
   "publishedAt": "2026-10-22T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Compacta as escolhas da dieta e abre a edição do alimento apenas quando necessário."
+  "message": "Permite excluir e reordenar grupos e opções do catálogo de exercícios."
 }
