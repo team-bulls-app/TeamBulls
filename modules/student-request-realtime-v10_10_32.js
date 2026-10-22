@@ -39,10 +39,12 @@
   }
   function updateBadge(){if(!applyBadge())setTimeout(applyBadge,120);}
   function refreshOpenCenter(){
-    try{if(document.querySelector('.screen.active')?.id!=='screen-student-notifications'||typeof window.TeamBullsStudentHome?.openNotifications!=='function')return;}
+    const refresh=window.TeamBullsStudentHome?.refreshOpenNotifications;
+    try{if(document.querySelector('.screen.active')?.id!=='screen-student-notifications'||typeof refresh!=='function')return;}
     catch(error){return;}
-    clearTimeout(centerRefreshTimer);centerRefreshTimer=setTimeout(()=>{try{window.TeamBullsStudentHome.openNotifications();}catch(error){}},140);
+    clearTimeout(centerRefreshTimer);centerRefreshTimer=setTimeout(()=>{Promise.resolve(window.TeamBullsStudentHome?.refreshOpenNotifications?.()).catch(()=>{});},140);
   }
+
   function changedAfterPrime(primed,previous,next){return primed&&previous!==next;}
 
   function scheduleDueBoundary(){

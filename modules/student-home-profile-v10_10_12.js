@@ -16,6 +16,7 @@
   let badgeRefreshUid='';
   let badgeRefreshPromise=null;
   let noticeActionBusy=false;
+  let openCenterRefreshPromise=null;
 
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const student=()=>CURRENT_USER?.role==='student'?CURRENT_USER:null;
@@ -255,6 +256,13 @@
     }).join('');
     host.onclick=event=>{if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(card&&host.contains(card))openNotice(Number(card.dataset.noticeIndex));};
     host.onkeydown=event=>{if(event.key!=='Enter'&&event.key!==' ')return;if(event.target.closest?.('button'))return;const card=event.target.closest?.('.tb-notice-card[data-notice-index]');if(!card||!host.contains(card))return;event.preventDefault();openNotice(Number(card.dataset.noticeIndex));};
+    
+  }
+
+  function renderNotificationsPreservingScroll(){
+    const scroller=document.getElementById('app'),scrollTop=scroller?.scrollTop||0;
+    renderNotifications();
+    if(scroller)scroller.scrollTop=scrollTop;
   }
 
   function applyNoticeBadge(){
@@ -282,13 +290,28 @@
     await loadNotifications({includeProtocol:true});renderNotifications();
     badgeRefreshUid=studentUid();badgeRefreshAt=Date.now();applyNoticeBadge();
   }
+  async function refreshOpenNotifications(){
+    if(activeScreen()!=='screen-student-notifications')return false;
+    if(openCenterRefreshPromise)return openCenterRefreshPromise;
+    const uid=studentUid(),previousNotifications=notifications;
+    openCenterRefreshPromise=(async()=>{
+      await loadNotifications({includeProtocol:true});
+      if(studentUid()!==uid||activeScreen()!=='screen-student-notifications')return false;
+      if(notifications.some(item=>item.source==='error')&&previousNotifications.length)notifications=previousNotifications;
+      renderNotificationsPreservingScroll();
+      badgeRefreshUid=uid;badgeRefreshAt=Date.now();applyNoticeBadge();
+      return true;
+    })().finally(()=>{openCenterRefreshPromise=null;});
+    return openCenterRefreshPromise;
+  }
+
   async function markRead(index){
     const item=notifications[index];if(!item||item.read)return;
     try{
       if(item.source==='notification')await cloudWrite(db.collection('notifications').doc(item.id).update({readAt:firebase.firestore.FieldValue.serverTimestamp()}),'marcar notificação como lida');
       else if(item.source==='feedback')await cloudWrite(db.collection('feedback').doc(item.id).update({read:true}),'marcar mensagem como lida');
       else return;
-      item.read=true;renderNotifications();applyNoticeBadge();
+      item.read=true;renderNotificationsPreservingScroll();applyNoticeBadge();
     }catch(error){showToast?.('Não foi possível marcar como lida.',true);}
   }
   function noticeActionButton(index){return document.querySelector(`#tb-notice-list .tb-notice-card:nth-child(${Number(index)+1}) .tb-notice-actions button`);}
@@ -402,6 +425,6 @@
   document.addEventListener('click',event=>{if(!event.target.closest?.('.tb-profile-head'))closeProfileMenu();},true);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&student())refreshStudentHeader(true).catch(()=>{});});
   window.addEventListener('team-bulls-v107-ready',()=>setTimeout(init,0));
-  window.TeamBullsStudentHome=Object.freeze({version:VERSION,init,openNotifications,toggleProfileMenu,closeProfileMenu,pickAvatar,changeNickname,logout,markRead,openNotice,moderatePhoto,moderateNickname,refresh:()=>refreshStudentHeader(true)});
+  window.TeamBullsStudentHome=Object.freeze({version:VERSION,init,openNotifications,refreshOpenNotifications,toggleProfileMenu,closeProfileMenu,pickAvatar,changeNickname,logout,markRead,openNotice,moderatePhoto,moderateNickname,refresh:()=>refreshStudentHeader(true)});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});else setTimeout(init,0);
 })();
