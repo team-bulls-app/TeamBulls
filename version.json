@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102101,
-  "revision": "feedback-reading-stability-1",
-  "publishedAt": "2026-10-21T00:00:00Z",
+  "build": 2026102201,
+  "revision": "diet-choice-accordion-1",
+  "publishedAt": "2026-10-22T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Preserva o feedback aberto e o conteúdo da aluna durante atualizações e instabilidade de conexão."
+  "message": "Compacta as escolhas da dieta e abre a edição do alimento apenas quando necessário."
 }

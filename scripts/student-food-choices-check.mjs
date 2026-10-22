@@ -151,7 +151,7 @@ export async function checkFoodChoices(){
   vm.runInNewContext(core.slice(core.indexOf('async function fetchCompletionsToday('),core.indexOf('function isMealDoneToday(')),completionContext);
   assert.deepEqual([...await completionContext.fetchCompletionsToday('student-a')],['done']);
   assert.ok(fs.readFileSync('modules/v107-operations.js','utf8').includes("filter(item=>item.recordType!=='food_choice')"));
-  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices2';
+  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices3';
   for(const file of ['config_v10_7.js','sw.js','sw_47.js','update_v10_10_9.js'])assert.ok(fs.readFileSync(file,'utf8').includes(src),file);
   assert.ok(!source.includes('setInterval('));assert.ok(!source.includes("collection('mealPlans')"));
   console.log('APROVADO — escolhas por porção: tabela real, botões, quantidades, reabertura, offline, erro, confirmação tardia, isolamento e conclusão independente.');

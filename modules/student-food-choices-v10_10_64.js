@@ -2,8 +2,8 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices2',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
-  const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set();
+  const VERSION='10.10.64-foodchoices3',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
+  const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set();
   let loaded='',loading=null,epoch=0;
   const clean=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -82,12 +82,17 @@
       const busy=inflight.has(key),pending=!!(saved&&entry.pending);
       const status=errors.get(key)||(busy?'Sincronizando…':pending?'Guardado neste aparelho. Sincronização pendente.':saved?'Escolha guardada para todos os dias.':ready?'Escolha um alimento da tabela.':'Carregando tabela e escolhas…');
       const disabled=!ready||!food||busy||(saved?.id===selected&&!pending);
+      const detailOpen=expandedRows.has(key)?' open':'';
+      const summaryName=food?food.name:ready?'Escolher alimento':'Carregando opções…';
+      const summaryAmount=food?food.quantity:number(row.count)+' '+(row.count===1?'porção':'porções');
+      const summary='<summary class="tb-food-choice-summary"><span class="tb-food-summary-copy"><small>'+escape(row.text)+'</small><strong>'+escape(summaryName)+'</strong></span><span class="tb-food-summary-value"><span>'+escape(summaryAmount)+'</span><span class="tb-food-chevron" aria-hidden="true">⌄</span></span></summary>';
+      const select='<select data-tb-food-select aria-label="Alimento para '+escape(row.text)+'" '+(!ready||(!saved&&!available.length)?'disabled':'')+'><option value="">Selecione um alimento</option>'+available.map(item=>'<option value="'+escape(item.id)+'" '+(item.id===selected?'selected':'')+'>'+escape(item.name)+'</option>').join('')+'</select>';
       if(saved){
         const notice=errors.get(key)||(busy?'Salvo no aparelho · Sincronizando…':pending?'Salvo no aparelho · Sincronização pendente.':'');
         const actions=drafts.has(key)?'<div class="tb-food-actions"><button type="button" class="tb-food-small-btn" data-tb-food-save '+(disabled?'disabled':'')+'>Guardar</button><button type="button" class="tb-food-small-btn" data-tb-food-cancel>Cancelar</button></div>':pending&&!busy?'<div class="tb-food-actions"><button type="button" class="tb-food-small-btn" data-tb-food-save '+(!ready?'disabled':'')+'>Sincronizar</button></div>':'';
-        return '<li class="tb-food-choice tb-food-choice-compact" data-tb-food-compact="1" data-tb-food-row="'+escape(key)+'"><small class="tb-food-prescription">'+escape(row.text)+'</small><div class="tb-food-summary-line"><select data-tb-food-select aria-label="Trocar alimento para '+escape(row.text)+'" '+(!ready?'disabled':'')+'><option value="">Selecione um alimento</option>'+available.map(item=>'<option value="'+escape(item.id)+'" '+(item.id===selected?'selected':'')+'>'+escape(item.name)+'</option>').join('')+'</select><span class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</span></div>'+actions+(notice?'<small role="status" data-tb-food-status>'+escape(notice)+'</small>':'')+'</li>';
+        return '<li class="tb-food-choice tb-food-choice-compact tb-food-choice-accordion" data-tb-food-compact="1" data-tb-food-row="'+escape(key)+'"><details data-tb-food-details="1"'+detailOpen+'>'+summary+'<div class="tb-food-editor"><label><span>Seu alimento</span>'+select+'</label><div class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</div>'+actions+(notice?'<small role="status" data-tb-food-status>'+escape(notice)+'</small>':'')+'</div></details></li>';
       }
-      return '<li class="tb-food-choice" data-tb-food-row="'+escape(key)+'"><strong>'+escape(row.text)+'</strong><label><span>Seu alimento</span><select data-tb-food-select aria-label="Alimento para '+escape(row.text)+'" '+(!ready||!available.length?'disabled':'')+'><option value="">Selecione um alimento</option>'+available.map(item=>'<option value="'+escape(item.id)+'" '+(item.id===selected?'selected':'')+'>'+escape(item.name)+'</option>').join('')+'</select></label><div class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</div><small>Quantidade para '+number(row.count)+' '+(row.count===1?'porção':'porções')+' da sua prescrição.</small><button type="button" class="tb-food-save" data-tb-food-save '+(disabled?'disabled':'')+'>'+ (busy?'Sincronizando…':pending&&saved?.id===selected?'Tentar sincronizar':'Guardar escolha')+'</button><small role="status" data-tb-food-status>'+escape(!available.length&&ready?'Nenhuma quantidade calculável nesta categoria. Consulte a tabela e seu treinador.':status)+'</small></li>';
+      return '<li class="tb-food-choice tb-food-choice-accordion" data-tb-food-row="'+escape(key)+'"><details data-tb-food-details="1"'+detailOpen+'>'+summary+'<div class="tb-food-editor"><label><span>Seu alimento</span>'+select+'</label><div class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</div><small>Quantidade para '+number(row.count)+' '+(row.count===1?'porção':'porções')+' da sua prescrição.</small><button type="button" class="tb-food-save" data-tb-food-save '+(disabled?'disabled':'')+'>'+ (busy?'Sincronizando…':pending&&saved?.id===selected?'Tentar sincronizar':'Guardar escolha')+'</button><small role="status" data-tb-food-status>'+escape(!available.length&&ready?'Nenhuma quantidade calculável nesta categoria. Consulte a tabela e seu treinador.':status)+'</small></div></details></li>';
     }).join('');
   }
   async function docId(ctx){
@@ -188,6 +193,28 @@
     openDietDetail=async function(...args){loaded='';const result=await open.apply(this,args);if(context())await refresh();return result;};
     const style=document.createElement('style');style.id='tb-food-choices-style';style.textContent='.meal-card-items .tb-food-choice{list-style:none;margin:10px 0;padding:12px;border:1px solid var(--border,#333);border-radius:10px;display:grid;gap:8px}.tb-food-choice label{display:grid;gap:5px}.tb-food-choice select{width:100%;min-height:44px;background:var(--bg,#161616);color:var(--text,#eee);border:1px solid var(--border,#555);border-radius:8px;padding:8px;font-size:16px}.tb-food-quantity{font-weight:700;font-size:20px;color:var(--accent,#d4af37)}.tb-food-choice small{font-size:12px;line-height:1.5}.tb-food-save{min-height:44px;border-radius:8px;background:var(--accent,#d4af37);color:#111;font-weight:700;border:0;padding:10px}.tb-food-save:disabled{opacity:.5;cursor:default}';document.head.appendChild(style);
     style.textContent+='.meal-card-items .tb-food-choice-compact{margin:6px 0;padding:8px 10px;gap:4px}.tb-food-summary-line{display:flex;align-items:center;gap:4px 10px;flex-wrap:wrap;min-width:0}.tb-food-choice-compact .tb-food-prescription{display:block;font-size:11px;color:var(--text-dim,#888)}.tb-food-choice-compact select{flex:1;width:auto;min-width:100px;max-width:100%}.tb-food-choice-compact .tb-food-quantity{font-size:15px;line-height:1.35;white-space:nowrap}.tb-food-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.tb-food-small-btn{min-height:44px;padding:6px 10px;background:transparent;border:1px solid var(--border,#555);border-radius:8px;color:var(--text,#eee);font:inherit;font-size:12px;cursor:pointer}.tb-food-small-btn:disabled{opacity:.5;cursor:default}.tb-food-small-btn:focus-visible{outline:2px solid var(--accent,#e11d48);outline-offset:2px}';
+    style.textContent+=`\n      .meal-card-items .tb-food-choice-accordion{display:block!important;margin:6px 0!important;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;gap:0!important}
+      .tb-food-choice-accordion details{overflow:hidden;border:1px solid var(--border,#38312d);border-radius:10px;background:var(--card,#191715)}
+      .tb-food-choice-accordion summary{display:flex;min-height:58px;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;list-style:none;cursor:pointer}
+      .tb-food-choice-accordion summary::marker{content:""}
+      .tb-food-choice-accordion summary::-webkit-details-marker{display:none}
+      .tb-food-choice-accordion details[open]>summary{background:var(--surface,#151311);border-bottom:1px solid var(--border,#38312d)}
+      .tb-food-summary-copy{display:grid;min-width:0;gap:3px}
+      .tb-food-summary-copy>small{overflow:hidden;color:var(--text-dim,#999);font-size:11px;line-height:1.25;text-overflow:ellipsis;white-space:nowrap}
+      .tb-food-summary-copy>strong{overflow:hidden;color:var(--text,#f1eee9);font-size:14px;line-height:1.2;text-overflow:ellipsis;white-space:nowrap}
+      .tb-food-summary-value{display:flex;max-width:46%;flex:0 1 auto;align-items:center;gap:7px;color:var(--accent,#d54a50);font-size:12px;font-weight:700;line-height:1.3;text-align:right;overflow-wrap:anywhere}
+      .tb-food-chevron{display:inline-block;flex:0 0 auto;color:var(--text-muted,#aaa);font-size:16px;transition:transform .15s ease}
+      .tb-food-choice-accordion details[open] .tb-food-chevron{transform:rotate(180deg)}
+      .tb-food-choice-accordion .tb-food-editor{display:grid;gap:8px;padding:10px 11px 12px}
+      .tb-food-choice-accordion .tb-food-editor>label{display:grid;gap:5px;color:var(--text-dim,#999);font-size:12px}
+      .tb-food-choice-accordion .tb-food-editor select{width:100%;min-height:44px;background:var(--bg,#111);color:var(--text,#f1eee9);border:1px solid var(--border,#555);border-radius:8px;padding:8px 10px;font-size:16px}
+      .tb-food-choice-accordion .tb-food-quantity{color:var(--accent,#d54a50);font-size:16px;line-height:1.3}
+      .tb-food-choice-accordion .tb-food-editor>small{color:var(--text-dim,#999);font-size:12px;line-height:1.45}
+      .tb-food-choice-accordion .tb-food-editor [role="status"]{color:var(--text-muted,#aaa)}
+      .tb-food-choice-accordion .tb-food-save{width:100%;min-height:44px}
+      .tb-food-choice-accordion .tb-food-actions{justify-content:flex-end}
+      @media(max-width:380px){.tb-food-choice-accordion summary{gap:7px;padding-inline:9px}.tb-food-summary-value{max-width:48%;font-size:11px}}
+    `;
     document.addEventListener('change',event=>{
       const select=event.target.closest?.('[data-tb-food-select]'),node=select?.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
       const row=live(ctx),key=entryKey(ctx),food=row&&foods(row).find(item=>item.id===select.value);drafts.set(key,select.value);errors.delete(key);
@@ -214,6 +241,11 @@
       const node=button.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
       event.preventDefault();save(ctx,node.querySelector('[data-tb-food-select]').value).catch(error=>{errors.set(entryKey(ctx),error.message);paint();notify(error.message,true);});
     });
+    document.addEventListener('toggle',event=>{
+      const details=event.target.closest?.('details[data-tb-food-details]');if(!details)return;
+      const node=details.closest('[data-tb-food-row]'),key=node?.dataset.tbFoodRow;if(!key)return;
+      if(details.open)expandedRows.add(key);else expandedRows.delete(key);
+    },true);
     window.addEventListener('online',()=>{if(context())refresh(true).catch(()=>{});});
     window.addEventListener('storage',event=>{if(event.key===PREFIX+context()?.studentUid)paint();});
     paint();
