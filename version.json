@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102601,
-  "revision": "student-notice-controls-diagnostics-1",
-  "publishedAt": "2026-10-26T18:52:14Z",
+  "build": 2026102602,
+  "revision": "profile-notice-controls-diagnostics-1",
+  "publishedAt": "2026-10-26T19:53:17Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Permite controlar avisos por aparelho e copiar um resumo técnico local para suporte."
+  "message": "Permite editar o nome do aluno com sincronização após falhas de conexão, melhora a atualização da foto e mantém os controles de avisos e diagnóstico local."
 }

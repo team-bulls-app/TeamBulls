@@ -2,11 +2,11 @@
 'use strict';
 (()=>{
   const CURRENT_VERSION='10.10.9';
-  const CURRENT_BUILD=2026102601;
+  const CURRENT_BUILD=2026102602;
   const CHECK_INTERVAL_MS=2*60*1000;
   const VERSION_URL='./version.json';
   const TECHNIQUE_COMPOSITION_MODULE='./modules/technique-composition-integrity-v10_10_12.js?v=10.10.12-techcombo1';
-  const STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.21-studenthome5';
+  const STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.22-studenthome6';
   const SUPPORT_DIAGNOSTICS_MODULE='./modules/support-diagnostics-v10_10_9.js?v=10.10.9-diagnostics1';
   const STUDENT_HOME_LAYOUT_MODULE='./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4';
   const STUDENT_DIET_COMPACT_MODULE='./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1';
@@ -19,7 +19,7 @@
   const CRITICAL_REFRESH_CONCURRENCY=4;
   const CRITICAL_ASSETS=[
     './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices3',SUPPORT_DIAGNOSTICS_MODULE,
-    './index.html','./manifest.json?v=10.10.9','./version.json','./viewport_v10_10_9.js?v=10.10.9','./boot_v10.js?v=10.10.9-themefirstpaint1','./config_v10_7.js?v=10.10.9','./update_v10_10_9.js?v=10.10.9&b=2026102601','./app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&theme=light12&exercise=groupcatalog1','./modules/v107-core.js?v=10.10.9','./modules/v107-invites.js?v=10.10.9','./modules/v107-operations.js?v=10.10.9&diet=foodchoices1','./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf4','./modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession2','./modules/session-integrity-v10_10_39.js?v=10.10.63-sessionintegrity2','./modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1','./modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1','./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2','./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2','./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2','./modules/release-coherence-v10_10_10.js?v=10.10.12-release6',TECHNIQUE_COMPOSITION_MODULE,STUDENT_HOME_MODULE,STUDENT_HOME_LAYOUT_MODULE,STUDENT_DIET_COMPACT_MODULE,'./modules/custom-food-calorie-bridge-v10_10_12.js?v=10.10.12-customfood2','./modules/diet-live-deficit-v10_10_13.js?v=10.10.13-deficit1','./interaction_v10_10_9.js?v=10.10.9','./styles_v10_10_9.css?v=10.10.9&theme=light12&exercise=groupcontrols1&support=diagnostics1'
+    './index.html','./manifest.json?v=10.10.9','./version.json','./viewport_v10_10_9.js?v=10.10.9','./boot_v10.js?v=10.10.9-themefirstpaint1','./config_v10_7.js?v=10.10.9','./update_v10_10_9.js?v=10.10.9&b=2026102602','./app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&theme=light12&exercise=groupcatalog1','./modules/v107-core.js?v=10.10.9','./modules/v107-invites.js?v=10.10.9','./modules/v107-operations.js?v=10.10.9&diet=foodchoices1','./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf4','./modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession2','./modules/session-integrity-v10_10_39.js?v=10.10.63-sessionintegrity2','./modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1','./modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1','./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2','./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2','./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2','./modules/release-coherence-v10_10_10.js?v=10.10.12-release6',TECHNIQUE_COMPOSITION_MODULE,STUDENT_HOME_MODULE,STUDENT_HOME_LAYOUT_MODULE,STUDENT_DIET_COMPACT_MODULE,'./modules/custom-food-calorie-bridge-v10_10_12.js?v=10.10.12-customfood2','./modules/diet-live-deficit-v10_10_13.js?v=10.10.13-deficit1','./interaction_v10_10_9.js?v=10.10.9','./styles_v10_10_9.css?v=10.10.9&theme=light12&exercise=groupcontrols1&support=diagnostics1'
   ];
   let registration=null,latestInfo=null,checking=null,applying=false,banner=null,scheduledCheckTimer=null,techniqueModulePromise=null,studentHomePromise=null,studentLayoutPromise=null;
   function numericParts(value){return String(value||'').split('.').map(part=>Number.parseInt(part,10)||0);}
