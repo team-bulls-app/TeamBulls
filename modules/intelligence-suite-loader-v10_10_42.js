@@ -3,13 +3,13 @@
 (()=>{
   if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
-  const VERSION='10.10.57-intelsuite7';
+  const VERSION='10.10.58-intelsuite8';
   const specs={
     trainer:[
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity5'],
-      ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports3'],
+      ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports4',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports4'],
       ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox6'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.66-inteldata3',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.66-inteldata3'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.56-contextguard5',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.56-contextguard5'],

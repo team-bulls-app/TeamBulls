@@ -31,10 +31,10 @@ const sw=read('sw.js');
 /* Entrega e ordem dos runtimes. */
 has(source,"const VERSION='10.10.58-canonicalinbox6'",'Central canônica está na revisão errada.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6",'Loader do treinador não entrega a Central com deduplicação semanal.');
-has(loader,"const VERSION='10.10.57-intelsuite7'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
+has(loader,"const VERSION='10.10.58-intelsuite8'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
 has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5",'Loader não entrega a guarda semanal com recuperação de data.');
-has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports3",'Loader não entrega a revisão resiliente da tela individual do aluno.');
+has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports4",'Loader não entrega a revisão resiliente da tela individual do aluno.');
 assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('weekly-report-integrity-v10_10_58.js'),'Recuperação de vínculo deve continuar antes da integridade semanal.');
 assert(loader.indexOf('weekly-report-integrity-v10_10_58.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Integridade semanal precisa ser instalada antes do histórico individual.');
 assert(loader.indexOf('trainer-student-report-history-v10_10_55.js')<loader.indexOf('trainer-canonical-inbox-v10_10_58.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
@@ -47,7 +47,7 @@ has(source,'const canonicalRows=[...ownedRows,...groups.flatMap','Questionários
 has(source,'ownerRecoveredCount','Diagnóstico de recuperação histórica não está disponível.');
 
 /* Histórico individual deve continuar independente, finito e somente leitura. */
-has(history,"const VERSION='10.10.55-studentreports3'",'Histórico individual está na revisão errada.');
+has(history,"const VERSION='10.10.55-studentreports4'",'Histórico individual está na revisão errada.');
 has(history,"const READ_TIMEOUT=6000",'Tela individual precisa de timeout próprio e finito.');
 has(history,"Promise.allSettled([refreshQuestionnaires(studentUid),refreshWeekly(studentUid)])",'Personalizados e semanais precisam carregar independentemente em paralelo.');
 has(history,"db.collection('questionnaires').where('trainerId','==',trainerUid).limit(MAX_REPORTS)",'Tela individual perdeu a leitura histórica pelo trainerId.');
@@ -58,7 +58,9 @@ has(history,'TENTAR NOVAMENTE','Tela individual sem retry explícito após falha
 has(history,"showScreen('screen-ts-quest',navigation)",'A aba Relatórios do aluno não abre imediatamente antes da consulta de rede.');
 has(history,'report?.answeredAt?{...report,createdAt:report.answeredAt}:report','Card do treinador continua exibindo a data errada da resposta.');
 has(history,'TS_QUEST_CACHE=questionnaires','Tela individual não substitui o cache antigo pelo histórico canônico atualizado.');
-has(history,"renderQuestList(TS_QUEST_CACHE,'ts-quest-list','ts-quest-empty',true)",'Tela individual não renderiza o histórico recuperado.');
+has(history,"renderQuestList(TS_QUEST_CACHE.filter(report=>report?.reportType!=='monthly'),'ts-quest-list','ts-quest-empty',true)",'Relatórios mensais devem aparecer apenas no histórico combinado, sem duplicação na lista personalizada.');
+has(history,'renderCombinedHistory(studentUid,wOk&&weeklyHistoryStudent===studentUid,qOk&&questionnaireHistoryStudent===studentUid)','Tela individual não monta o histórico semanal e mensal com as seções recuperadas.');
+has(history,'list.innerHTML=cards.join','Histórico combinado não apresenta os relatórios recuperados.');
 has(history,'fetchWeeklyCheckins(studentUid)','Correção individual não preserva a seção de relatórios semanais existente.');
 has(integrity,'fetchWeeklyCheckins=wrapped','Leitor semanal não recebe a guarda de integridade.');
 has(integrity,'function effectiveSubmittedDate(row)','Data real do semanal não é recuperada do timestamp do servidor.');
