@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__)return;
   window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__=true;
 
-  const VERSION='10.10.43-studenthome4';
+  const VERSION='10.10.44-studenthome5';
   const PROFILE_PREFIX='studentProfiles';
   const NICK_MAX=24;
   const BADGE_REFRESH_TTL=120000;
@@ -204,7 +204,7 @@
   function ensureNotificationScreen(){
     if(document.getElementById('screen-student-notifications'))return;
     const screen=document.createElement('div');screen.className='screen';screen.id='screen-student-notifications';
-    screen.innerHTML=`<div class="tb-notice-screen-head"><button class="btn-icon" type="button" onclick="goHome()">←</button><div><div class="tb-notice-meta">CENTRAL DO ALUNO</div><h1>NOTIFICAÇÕES</h1></div></div><div id="tb-device-notice-panel" class="tb-device-notice-panel" hidden><button class="btn-primary" type="button" id="tb-device-notice-enable" onclick="TeamBullsDeviceNotices.enable()">ATIVAR AVISOS NO CELULAR</button><p id="tb-device-notice-status"></p></div><div class="tb-notice-list" id="tb-notice-list"><div class="tb-notice-empty">Carregando notificações...</div></div>`;
+    screen.innerHTML=`<div class="tb-notice-screen-head"><button class="btn-icon" type="button" onclick="goHome()">←</button><div><div class="tb-notice-meta">CENTRAL DO ALUNO</div><h1>NOTIFICAÇÕES</h1></div></div><div id="tb-device-notice-panel" class="tb-device-notice-panel" hidden><div class="tb-device-notice-actions"><button class="btn-primary" type="button" id="tb-device-notice-enable" onclick="TeamBullsDeviceNotices.enable()">ATIVAR AVISOS NO CELULAR</button><button class="btn-ghost" type="button" id="tb-device-notice-disable" onclick="TeamBullsDeviceNotices.disable()" hidden>DESATIVAR AVISOS NESTE CELULAR</button></div><p id="tb-device-notice-status" role="status" aria-live="polite"></p></div><div class="tb-notice-list" id="tb-notice-list"><div class="tb-notice-empty">Carregando notificações...</div></div>`;
     document.getElementById('app')?.appendChild(screen);
     window.TeamBullsDeviceNotices?.render?.();
   }

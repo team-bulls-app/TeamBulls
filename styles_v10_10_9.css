@@ -2359,6 +2359,10 @@ html.mobile-landscape-blocked #portrait-lock-overlay{display:flex;}
 .tb-device-notice-panel{margin:14px 16px;padding:12px;border:1px solid #553338;border-radius:8px;background:#1b1113}
 .tb-device-notice-panel[hidden],.tb-device-notice-panel button[hidden]{display:none!important}
 .tb-device-notice-panel p{margin:8px 0 0;color:#c4aba9;font-size:12px;line-height:1.45}
+.tb-device-notice-actions{display:flex;flex-wrap:wrap;gap:8px}
+.tb-device-notice-actions button{flex:1 1 220px;min-height:44px}
+.tb-diagnostics-output{margin-top:10px;min-height:140px;white-space:pre;overflow-wrap:normal;font-size:12px;line-height:1.5}
+.tb-diagnostics-output[hidden]{display:none!important}
 
 /* Paleta clara Team Bulls: branco no canvas, tinta escura na página, carvão nas áreas de conteúdo. */
 html[data-theme="light"]{

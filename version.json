@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102202,
-  "revision": "exercise-catalog-controls-1",
-  "publishedAt": "2026-10-22T00:00:00Z",
+  "build": 2026102601,
+  "revision": "student-notice-controls-diagnostics-1",
+  "publishedAt": "2026-10-26T18:52:14Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Permite excluir e reordenar grupos e opções do catálogo de exercícios."
+  "message": "Permite controlar avisos por aparelho e copiar um resumo técnico local para suporte."
 }
