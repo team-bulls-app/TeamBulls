@@ -58,7 +58,9 @@ has(history,'TENTAR NOVAMENTE','Tela individual sem retry explícito após falha
 has(history,"showScreen('screen-ts-quest',navigation)",'A aba Relatórios do aluno não abre imediatamente antes da consulta de rede.');
 has(history,'report?.answeredAt?{...report,createdAt:report.answeredAt}:report','Card do treinador continua exibindo a data errada da resposta.');
 has(history,'TS_QUEST_CACHE=questionnaires','Tela individual não substitui o cache antigo pelo histórico canônico atualizado.');
-has(history,"renderQuestList(TS_QUEST_CACHE,'ts-quest-list','ts-quest-empty',true)",'Tela individual não renderiza o histórico recuperado.');
+has(history,"renderQuestList(TS_QUEST_CACHE.filter(report=>report?.reportType!=='monthly'),'ts-quest-list','ts-quest-empty',true)",'Relatórios mensais devem aparecer apenas no histórico combinado, sem duplicação na lista personalizada.');
+has(history,'renderCombinedHistory(studentUid,wOk&&weeklyHistoryStudent===studentUid,qOk&&questionnaireHistoryStudent===studentUid)','Tela individual não monta o histórico semanal e mensal com as seções recuperadas.');
+has(history,'list.innerHTML=cards.join','Histórico combinado não apresenta os relatórios recuperados.');
 has(history,'fetchWeeklyCheckins(studentUid)','Correção individual não preserva a seção de relatórios semanais existente.');
 has(integrity,'fetchWeeklyCheckins=wrapped','Leitor semanal não recebe a guarda de integridade.');
 has(integrity,'function effectiveSubmittedDate(row)','Data real do semanal não é recuperada do timestamp do servidor.');
