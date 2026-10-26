@@ -44,7 +44,7 @@ if(heicRecovery){
   assert(sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'Resgate HEIC exige worker network-first.');
 }
 
-assert(update.includes("STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3'"),'Atualizador não conhece o perfil estabilizado.');
+assert(update.includes("STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.21-studenthome5'"),'Atualizador não conhece o perfil estabilizado.');
 assert(update.includes("STUDENT_HOME_LAYOUT_MODULE='./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'"),'Atualizador não conhece a Home otimizada.');
 assert(update.includes('loadStudentHomeModules'),'Home não é preservada pelo caminho opcional pós-boot.');
 assert(update.includes('STUDENT_HOME_MODULE,STUDENT_HOME_LAYOUT_MODULE'),'Módulos da Home não estão no refresh crítico.');
@@ -59,7 +59,7 @@ assert(update.includes('if(!techniqueCompositionRelevant())return;loadTechniqueC
 assert(update.includes('if(!studentHomeRelevant())return;loadStudentHomeModules()'),'Agendamento da Home não evita trabalho redundante fora do contexto.');
 
 assert(config.includes('const studentPriorityModules=['),'Loader não possui prioridade de runtime para a Home do aluno.');
-assert(config.includes("'./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3'"),'Perfil estabilizado não é prioridade do runtime.');
+assert(config.includes("'./modules/student-home-profile-v10_10_12.js?v=10.10.21-studenthome5'"),'Perfil estabilizado não é prioridade do runtime.');
 assert(config.includes("'./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'"),'Layout otimizado não é prioridade do runtime.');
 assert(!config.includes("'./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1'"),'Ponte legada voltou a executar no loader atual.');
 assert(config.includes('deferredComplete=false,completedRole='),'Loader não registra conclusão por papel.');
@@ -92,7 +92,7 @@ assert(config.includes("screen!=='screen-loading'&&screen!=='screen-auth'"),'Fil
 assert(config.includes('await yieldUi();'),'Fila diferida não devolve o thread principal entre módulos.');
 assert(config.includes("version:'10.10.61-startup12'")&&config.includes("context:'role-aware-low-contention'"),'Loader não expõe a revisão de baixa contenção por contexto.');
 
-assert(sw.includes("./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3"),'Perfil estabilizado não está no shell PWA.');
+assert(sw.includes("./modules/student-home-profile-v10_10_12.js?v=10.10.21-studenthome5"),'Perfil estabilizado não está no shell PWA.');
 assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4"),'Home otimizada não está no shell PWA.');
 assert(sw.includes("./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability4"),'Usabilidade estabilizada não está no shell PWA.');
 assert(sw.includes("./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1"),'Ponte antiga deve permanecer disponível apenas para instalações legadas.');
@@ -142,7 +142,7 @@ for(const [collection,orderField] of [['feedback','createdAt'],['weeklyCheckins'
   assert(fields.some(field=>field.fieldPath===orderField&&field.order==='DESCENDING'),`Índice ${collection} não ordena ${orderField} desc.`);
 }
 
-assert(profile.includes("const VERSION='10.10.43-studenthome4'"),'Perfil do aluno não está na revisão de Storage lazy estabilizada.');
+assert(profile.includes("const VERSION='10.10.44-studenthome5'"),'Perfil do aluno não está na revisão de Storage lazy estabilizada.');
 assert(profile.includes('body.student-desktop .student-desktop-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a sidebar antiga.');
 assert(profile.includes('#screen-home.tb-home-v2 .quick-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a grade antiga.');
 assert(profile.includes('data-tb-profile-logout="1"'),'Perfil não cria o logout diretamente.');

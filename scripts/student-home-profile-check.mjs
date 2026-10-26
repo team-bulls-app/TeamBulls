@@ -66,7 +66,7 @@ has(storage,'trainerOwns(uid) || activeOwner(uid)','Perfil visual não está iso
 has(storage,'validOptimizedJpegUpload(800 * 1024)','Avatar não possui limite de armazenamento de 800 KB.');
 has(storage,"request.resource.contentType == 'application/json'",'Perfil JSON não valida Content-Type.');
 
-const asset='./modules/student-home-profile-v10_10_12.js?v=10.10.20-studenthome3';
+const asset='./modules/student-home-profile-v10_10_12.js?v=10.10.21-studenthome5';
 has(config,asset,'Loader não entrega o perfil/home estabilizado.');
 has(updater,asset,'Atualizador não aquece o perfil/home estabilizado.');
 has(sw,asset,'Service Worker não prepara o perfil/home estabilizado.');
