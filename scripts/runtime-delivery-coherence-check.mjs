@@ -33,13 +33,13 @@ assert(sw.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&sw.i
 assert(heic.includes("const VERSION='10.10.12-heic4'")&&heic.includes('heicworker4'),'Conversor HEIC canônico não corresponde às referências publicadas.');
 assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'")&&sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'HEIC precisa permanecer network-first.');
 
-assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.57-intelsuite7')&&usability.includes("const EXPECTED_VERSION='10.10.57-intelsuite7'"),'Bootstrap ainda espera suíte de inteligência antiga.');
-assert(intelligence.includes("const VERSION='10.10.57-intelsuite7'"),'Suíte de inteligência canônica não está na revisão esperada.');
+assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite8')&&usability.includes("const EXPECTED_VERSION='10.10.58-intelsuite8'"),'Bootstrap ainda espera suíte de inteligência antiga.');
+assert(intelligence.includes("const VERSION='10.10.58-intelsuite8'"),'Suíte de inteligência canônica não está na revisão esperada.');
 assert(intelligence.includes('student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7'),'Suíte não entrega a correção atual do envio semanal.');
 
-assert(viewport.includes('trainer-runtime-reliability-v10_10_46.js?v=10.10.52-trainer2'),'Cold start ainda pede runtime antigo do treinador.');
-assert(viewport.includes("TeamBullsTrainerRuntimeReliability?.version==='10.10.52-trainer2'"),'Cold start ainda valida revisão antiga do treinador.');
-assert(trainerRuntime.includes("const VERSION='10.10.52-trainer2'"),'Runtime canônico do treinador divergiu.');
+assert(viewport.includes('trainer-runtime-reliability-v10_10_46.js?v=10.10.53-trainer3'),'Cold start ainda pede runtime antigo do treinador.');
+assert(viewport.includes("TeamBullsTrainerRuntimeReliability?.version==='10.10.53-trainer3'"),'Cold start ainda valida revisão antiga do treinador.');
+assert(trainerRuntime.includes("const VERSION='10.10.53-trainer3'"),'Runtime canônico do treinador divergiu.');
 assert(sw.includes("'/modules/trainer-runtime-reliability-v10_10_46.js'"),'Runtime do treinador precisa ser network-first.');
 
 if(fail.length){

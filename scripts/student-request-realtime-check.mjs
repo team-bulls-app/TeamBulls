@@ -53,7 +53,7 @@ assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode dup
 // Envio canônico: relatórios com fotos não usam mais a fila de batch do Firestore Web SDK.
 // O loader físico é mutável/network-first; sua revisão pública permanece compatível
 // com o bootstrap enquanto o módulo semanal usa um cache-buster próprio novo.
-assert(loader.includes("const VERSION='10.10.57-intelsuite7'"),'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
+assert(loader.includes("const VERSION='10.10.58-intelsuite8'"),'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
 assert(loader.includes("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5"),'Aluno não carrega a guarda semanal atual depois do transporte REST.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');

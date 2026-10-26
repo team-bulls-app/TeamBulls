@@ -380,7 +380,7 @@
   window.__TEAM_BULLS_TRAINER_COLDSTART_101046__=true;
 
   const VERSION='10.10.46-coldstart1';
-  const RUNTIME_SRC='./modules/trainer-runtime-reliability-v10_10_46.js?v=10.10.52-trainer2';
+  const RUNTIME_SRC='./modules/trainer-runtime-reliability-v10_10_46.js?v=10.10.53-trainer3';
   let appCheckTask=null;
   let runtimePromise=null;
 
@@ -397,7 +397,7 @@
   }
   function loadRuntime(){
     if(!trainerContext())return Promise.resolve(false);
-    if(window.TeamBullsTrainerRuntimeReliability?.version==='10.10.52-trainer2')return Promise.resolve(true);
+    if(window.TeamBullsTrainerRuntimeReliability?.version==='10.10.53-trainer3')return Promise.resolve(true);
     if(runtimePromise)return runtimePromise;
     runtimePromise=new Promise(resolve=>{
       const expected=new URL(RUNTIME_SRC,location.href).href;

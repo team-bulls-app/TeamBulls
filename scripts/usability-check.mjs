@@ -15,7 +15,7 @@ const usability=read('modules/usability-checkup-v10_10_9.js');
 const profile=read('modules/student-home-profile-v10_10_12.js');
 const modal=read('modules/modal-stack-stability-v10_10_9.js');
 
-has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.20-usability3','Camada de usabilidade estabilizada não está carregada.');
+has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability4','Camada de usabilidade estabilizada não está carregada.');
 has(config,"setTimeout(()=>finish(false,'tempo limite')",'Loader opcional não possui limite de espera.');
 has(config,'const DEFERRED_YIELD_EVERY=2;','Loader deve devolver tempo de pintura em lotes curtos.');
 has(config,'deferredBatchCount%DEFERRED_YIELD_EVERY===0','Loader não usa a política explícita de yield entre lotes.');
