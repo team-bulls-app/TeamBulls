@@ -183,7 +183,7 @@ if('caches' in window){
     './modules/exercise-video-resilience-v10_10_45.js?v=10.10.45-video1'
   ];
   const studentPriorityModules=[
-    './modules/student-home-profile-v10_10_12.js?v=10.10.21-studenthome5',
+    './modules/student-home-profile-v10_10_12.js?v=10.10.22-studenthome6',
     './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4',
     './modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity1',
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
