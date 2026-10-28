@@ -2,7 +2,7 @@
 'use strict';
 
 const APP_VERSION='10.10.9';
-const BUILD_REVISION=2026102801;
+const BUILD_REVISION=2026102802;
 const CACHE_REVISION='lighttheme12';
 const CACHE_HOTFIX='heic-recovery1';
 const CACHE_TAG=`${APP_VERSION.replace(/\./g,'-')}-${CACHE_REVISION}-${CACHE_HOTFIX}-${BUILD_REVISION}`;
