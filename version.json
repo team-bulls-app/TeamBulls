@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102801,
-  "revision": "diet-food-choice-storage-quota-fallback-1",
+  "build": 2026102802,
+  "revision": "diet-food-choice-storage-quota-fallback-2",
   "publishedAt": "2026-10-28T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Corrige o salvamento das escolhas de alimentos quando o armazenamento local está cheio, priorizando a conta conectada."
+  "message": "Protege o salvamento alternativo na conta, alinha os testes e atualiza os caches da correção de armazenamento."
 }
