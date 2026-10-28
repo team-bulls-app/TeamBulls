@@ -268,7 +268,7 @@ assert(!lightThemeCss.includes('.supplements-free-meal-card'),'Tema claro repint
 
 const sw=read('sw.js'),bridge=read('sw_47.js'),boot=read('boot_v10.js');
 has(sw,"const APP_VERSION='10.10.9'",'Service Worker com versão divergente.');
-has(sw,"const CACHE_REVISION='lighttheme12'",'Service Worker não criou a revisão atual do tema claro.');
+has(sw,"const CACHE_REVISION='lighttheme13'",'Service Worker não criou a revisão atual do tema claro.');
 has(boot,"localStorage.getItem('team_bulls_settings_v9_4')",'Tema salvo não é lido durante o início antecipado.');
 has(boot,"document.documentElement.dataset.theme=light?'light':'dark'",'Tema inicial não é aplicado antes da primeira pintura.');
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');

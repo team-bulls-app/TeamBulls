@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102802,
-  "revision": "diet-food-choice-storage-quota-fallback-2",
-  "publishedAt": "2026-10-28T00:00:00Z",
+  "build": 2026102803,
+  "revision": "music-default-color-balance-1",
+  "publishedAt": "2026-10-28T20:03:24Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Protege o salvamento alternativo na conta, alinha os testes e atualiza os caches da correção de armazenamento."
+  "message": "Deixa a música desligada por padrão e melhora a leitura das cores da interface."
 }
