@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102602,
-  "revision": "profile-notice-controls-diagnostics-1",
-  "publishedAt": "2026-10-26T19:53:17Z",
+  "build": 2026102802,
+  "revision": "diet-food-choice-storage-quota-fallback-2",
+  "publishedAt": "2026-10-28T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Permite editar o nome do aluno com sincronização após falhas de conexão, melhora a atualização da foto e mantém os controles de avisos e diagnóstico local."
+  "message": "Protege o salvamento alternativo na conta, alinha os testes e atualiza os caches da correção de armazenamento."
 }
