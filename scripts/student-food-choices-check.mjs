@@ -102,7 +102,13 @@ export async function checkFoodChoices(){
   const failed=foodApp({writeFailure:true});await failed.ready();await failed.api.save(failed.ctx(),failed.chicken().id);assert.equal(failed.remote.size,0);
   assert.ok(failed.list.innerHTML.includes('Não foi possível sincronizar'));assert.ok(failed.list.innerHTML.includes('Sincronizar'));
   const recovered=foodApp({local:failed.local,remote:failed.remote});await recovered.ready();assert.equal(recovered.remote.size,1);
-  const full=foodApp({storageFailure:true});await full.ready();await assert.rejects(full.api.save(full.ctx(),full.chicken().id),/guardar neste aparelho/);assert.equal(full.writes.length,0);
+  const fullOffline=foodApp({storageFailure:true,offline:true});await fullOffline.ready();await assert.rejects(fullOffline.api.save(fullOffline.ctx(),fullOffline.chicken().id),/não há conexão segura/);assert.equal(fullOffline.writes.length,0);
+  const full=foodApp({storageFailure:true});await full.ready();assert.equal(await full.api.save(full.ctx(),full.chicken().id),true);assert.equal(full.remote.size,1);assert.equal(full.writes.length,1);assert.ok(full.toasts.some(item=>item.message.includes('não conseguiu manter uma cópia offline')));
+  const fullFailure=foodApp({storageFailure:true,writeFailure:true});await fullFailure.ready();await assert.rejects(fullFailure.api.save(fullFailure.ctx(),fullFailure.chicken().id),/não foi possível confirmar/);assert.equal(fullFailure.remote.size,0);
+  let releaseFull;const fullGate=new Promise(resolve=>{releaseFull=resolve;});const concurrent=foodApp({storageFailure:true,gate:fullGate});await concurrent.ready();
+  const firstSave=concurrent.api.save(concurrent.ctx(),concurrent.chicken().id);await settle();
+  assert.equal(await concurrent.api.save(concurrent.ctx(),concurrent.fish().id),false,'A second selection must not race the in-flight fallback write.');
+  releaseFull();assert.equal(await firstSave,true);assert.equal(concurrent.writes.length,1);assert.equal([...concurrent.remote.values()][0].foodId,concurrent.chicken().id);
   const olderBrowser=foodApp();await olderBrowser.ready();olderBrowser.context.crypto={subtle:webcrypto.subtle};await olderBrowser.api.save(olderBrowser.ctx(),olderBrowser.chicken().id);assert.equal(olderBrowser.remote.size,1);
 
   // A fresh device with a failed read reconciles an existing immutable date.
@@ -151,7 +157,7 @@ export async function checkFoodChoices(){
   vm.runInNewContext(core.slice(core.indexOf('async function fetchCompletionsToday('),core.indexOf('function isMealDoneToday(')),completionContext);
   assert.deepEqual([...await completionContext.fetchCompletionsToday('student-a')],['done']);
   assert.ok(fs.readFileSync('modules/v107-operations.js','utf8').includes("filter(item=>item.recordType!=='food_choice')"));
-  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices3';
+  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices5';
   for(const file of ['config_v10_7.js','sw.js','sw_47.js','update_v10_10_9.js'])assert.ok(fs.readFileSync(file,'utf8').includes(src),file);
   assert.ok(!source.includes('setInterval('));assert.ok(!source.includes("collection('mealPlans')"));
   console.log('APROVADO — escolhas por porção: tabela real, botões, quantidades, reabertura, offline, erro, confirmação tardia, isolamento e conclusão independente.');
