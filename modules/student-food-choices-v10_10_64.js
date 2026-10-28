@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices3',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
+  const VERSION='10.10.64-foodchoices4',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
   const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set();
   let loaded='',loading=null,epoch=0;
   const clean=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
@@ -139,7 +139,19 @@
     const current=recordsFor(ctx.studentUid)[key];
     // Guardar antes de iniciar a rede permite fechar o app sem perder a escolha.
     const entry={...ctx,recordType:TYPE,foodId,date:valid(current,ctx)&&/^\d{4}-\d{2}-\d{2}$/.test(current.date)?current.date:today(),mutationId:uid(),pending:true};
-    try{store(ctx.studentUid,key,entry);}catch(error){throw new Error('Não foi possível guardar neste aparelho. Libere espaço e tente novamente.');}
+    try{store(ctx.studentUid,key,entry);}catch(storageError){
+      // Se o armazenamento local estiver cheio, prioriza a gravação segura na conta.
+      // A escolha continua disponível na memória desta sessão, mesmo sem cache offline.
+      if(!canCloud(ctx.studentUid))throw new Error('O armazenamento deste aparelho está cheio e não há conexão segura para salvar na conta. Libere espaço ou conecte-se à internet e tente novamente.');
+      try{
+        const date=await commit(entry),confirmed={...entry,date,pending:false};
+        remote.set(key,confirmed);volatile.add(key);drafts.delete(key);errors.delete(key);paint();
+        notify('✓ Escolha salva na sua conta. Este aparelho não conseguiu manter uma cópia offline.');
+        return true;
+      }catch(cloudError){
+        throw new Error('O aparelho está sem espaço e não foi possível confirmar o salvamento na conta. Conecte-se à internet, libere espaço e tente novamente.');
+      }
+    }
     drafts.delete(key);errors.delete(key);paint();
     if(!canCloud(ctx.studentUid)){notify('Escolha guardada neste aparelho. Será sincronizada ao abrir a dieta com conexão.');return true;}
     const task=sync(entry);paint();
