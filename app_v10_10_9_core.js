@@ -138,7 +138,7 @@ const CFG = {
 ══════════════════════════════════════════════════ */
 const SETTINGS_KEY='team_bulls_settings_v9_4';
 const SETTINGS_LEGACY_KEY='team_bulls_settings_v9';
-const SETTINGS_DEFAULTS={background:100,lightBackground:70,text:100,font:100,theme:'dark',clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:true,musicDock:false};
+const SETTINGS_DEFAULTS={background:100,lightBackground:70,text:100,font:100,theme:'dark',clickVolume:120,clickEnabled:true,musicVolume:28,musicEnabled:false,musicDock:false};
 const MUSIC_VOLUME_MIGRATION_KEY='team_bulls_music_volume_reduced_v10_5_4';
 const LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY='team_bulls_light_background_default_70_v1';
 const LIGHT_BACKGROUND_DEFAULT_MIGRATION_KEY_V2='team_bulls_light_background_default_70_v2';
@@ -6636,11 +6636,21 @@ function adjustLightSurfaceHex(hex,brightness){
   const amount=Math.max(.35,Math.min(1.8,(Number(brightness)||70)/100));
   const linear=value=>{const channel=value/255;return channel<=.04045?channel/12.92:Math.pow((channel+.055)/1.055,2.4);};
   const encoded=value=>{const channel=Math.max(0,Math.min(1,value));return Math.round(255*(channel<=.0031308?channel*12.92:1.055*Math.pow(channel,1/2.4)-.055)).toString(16).padStart(2,'0');};
-  return'#'+themeHexChannels(hex).map(value=>{const source=linear(value),target=amount<=1?source*amount:source+(1-source)*((amount-1)/.8);return encoded(target);}).join('');
+  return'#'+themeHexChannels(hex).map(value=>{const source=linear(value),target=amount<=1?source*Math.pow(amount,.4):source+(1-source)*((amount-1)/.8);return encoded(target);}).join('');
 }
 function adjustLightTextHex(base,minimum,maximum,brightness){
   const amount=Math.max(45,Math.min(180,Number(brightness)||100));
   return amount<=100?blendThemeHex(minimum,base,(amount-45)/55):blendThemeHex(base,maximum,(amount-100)/80);
+}
+function themeContrastRatio(foreground,background){
+  const luminance=hex=>themeHexChannels(hex).reduce((total,value,index)=>{const channel=value/255,linear=channel<=.04045?channel/12.92:Math.pow((channel+.055)/1.055,2.4);return total+linear*[.2126,.7152,.0722][index];},0);
+  const first=luminance(foreground),second=luminance(background);return(Math.max(first,second)+.05)/(Math.min(first,second)+.05);
+}
+function ensureThemeTextContrast(color,background,minimum=4.5){
+  if(themeContrastRatio(color,background)>=minimum)return color;
+  let low=0,high=1,result='#ffffff';
+  for(let step=0;step<12;step++){const amount=(low+high)/2,candidate=blendThemeHex(color,'#ffffff',amount);if(themeContrastRatio(candidate,background)>=minimum){result=candidate;high=amount;}else low=amount;}
+  return result;
 }
 let FONT_SCALE_RULES_PREPARED=false;
 function prepareFontScaleRules(){
@@ -6655,8 +6665,9 @@ applyAppSettings=function(){
   BASE_APPLY_APP_SETTINGS();
   if(APP_SETTINGS.theme!=='light'){
     const text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
-    root.setProperty('--bg',adjustHex('#070706',bg));root.setProperty('--surface',adjustHex('#11100f',bg));root.setProperty('--card',adjustHex('#171513',bg));root.setProperty('--border',adjustHex('#342e29',bg));root.setProperty('--border-l',adjustHex('#51453a',bg));
-    root.setProperty('--text',adjustHex('#e8e0d3',text));root.setProperty('--text-dim',adjustHex('#aaa095',text));root.setProperty('--text-muted',adjustHex('#766d63',text));
+    const cardSurface=adjustHex('#171513',bg);
+    root.setProperty('--bg',adjustHex('#070706',bg));root.setProperty('--surface',adjustHex('#11100f',bg));root.setProperty('--card',cardSurface);root.setProperty('--border',adjustHex('#342e29',bg));root.setProperty('--border-l',adjustHex('#51453a',bg));
+    root.setProperty('--text',ensureThemeTextContrast(adjustHex('#e8e0d3',text),cardSurface));root.setProperty('--text-dim',ensureThemeTextContrast(adjustHex('#aaa095',text),cardSurface));root.setProperty('--text-muted',ensureThemeTextContrast(adjustHex('#766d63',text),cardSurface));
   }else{
     const text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
     const canvas=adjustLightSurfaceHex('#ffffff',bg),canvasSoft=adjustLightSurfaceHex('#f7f5f3',bg);

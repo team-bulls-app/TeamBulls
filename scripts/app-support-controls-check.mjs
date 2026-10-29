@@ -83,11 +83,11 @@ async function checkDiagnostics(clipboardAvailable){
   const document={getElementById:id=>elements[id]||null,querySelector:()=>({id:'screen-student-notifications'})};
   const navigator={onLine:true,serviceWorker:{controller:{}},standalone:false};
   if(clipboardAvailable)navigator.clipboard={writeText:async text=>copied.push(text)};
-  const window={TeamBullsUpdater:{version:'10.10.9',build:2026102802}};
+  const window={TeamBullsUpdater:{version:'10.10.9',build:2026102803}};
   const context={window,document,navigator,matchMedia:query=>({matches:query==='(pointer: coarse)'}),CURRENT_USER:{uid:'private-user-id',name:'Nome Particular',email:'private@example.com',role:'student'},MODE:'cloud',Date,Number,String,Promise,console};
   vm.runInNewContext(diagnosticsSource,context,{filename:'support-diagnostics-v10_10_9.js'});
   const summary=window.TeamBullsSupportDiagnostics.createSummary();
-  assert.match(summary,/Build: 2026102802/);
+  assert.match(summary,/Build: 2026102803/);
   assert.match(summary,/Tela: screen-student-notifications/);
   for(const secret of ['private-user-id','Nome Particular','private@example.com'])assert.equal(summary.includes(secret),false,'O diagnóstico não pode incluir dados pessoais.');
   assert.equal(/fetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket/.test(diagnosticsSource),false,'O módulo de diagnóstico não pode enviar dados.');
@@ -105,8 +105,8 @@ assert.match(config,/student-home-profile-v10_10_12\.js\?v=10\.10\.22-studenthom
 assert.match(updater,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics1/);
 assert.match(sw,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics1/);
 assert.equal(sw,sw47,'Os service workers publicados devem permanecer idênticos.');
-assert.equal(Number(version.build),2026102802,'O build publicado deve acompanhar os arquivos atualizados.');
-assert.match(updater,/const CURRENT_BUILD=2026102802/);
-assert.match(sw,/const BUILD_REVISION=2026102802/);
+assert.equal(Number(version.build),2026102803,'O build publicado deve acompanhar os arquivos atualizados.');
+assert.match(updater,/const CURRENT_BUILD=2026102803/);
+assert.match(sw,/const BUILD_REVISION=2026102803/);
 
 console.log('APROVADO — ativação, desativação remota, preferência offline pendente, retomada de conexão, reinscrição controlada e diagnóstico local sem dados pessoais.');
