@@ -368,6 +368,39 @@ service cloud.firestore {
       allow delete: if activeOwner(resource.data.studentUid);
     }
 
+    // Progresso do ciclo separado do plano: aluno ativo grava apenas os próprios
+    // dados; o treinador vinculado pode acompanhar; registros são imutáveis.
+    match /workoutCycleStates/{id} {
+      allow read: if trainerOwns(resource.data.studentUid) || activeOwner(resource.data.studentUid);
+      allow create: if activeOwner(request.resource.data.studentUid)
+        && request.resource.data.keys().hasOnly(['studentUid','workoutId','startDate','initialWeek','createdAt'])
+        && requiredText(request.resource.data.workoutId, 128)
+        && isoDate(request.resource.data.startDate)
+        && request.resource.data.initialWeek is int
+        && request.resource.data.initialWeek >= 1
+        && request.resource.data.initialWeek <= 8
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+    }
+
+    match /workoutCompletions/{id} {
+      allow read: if trainerOwns(resource.data.studentUid) || activeOwner(resource.data.studentUid);
+      allow create: if activeOwner(request.resource.data.studentUid)
+        && request.resource.data.keys().hasOnly([
+          'studentUid','workoutId','startDate','week','dayId','dayName','completedDate','createdAt'
+        ])
+        && requiredText(request.resource.data.workoutId, 128)
+        && isoDate(request.resource.data.startDate)
+        && request.resource.data.week is int
+        && request.resource.data.week >= 1
+        && request.resource.data.week <= 8
+        && requiredText(request.resource.data.dayId, 128)
+        && requiredText(request.resource.data.dayName, 60)
+        && isoDate(request.resource.data.completedDate)
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+    }
+
     match /reportSettings/{trainerUid} {
       allow read: if (isTrainer() && request.auth.uid == trainerUid)
         || (signedIn() && activeOwner(request.auth.uid)

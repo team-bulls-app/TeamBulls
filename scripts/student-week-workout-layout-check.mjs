@@ -23,10 +23,10 @@ const usability=fs.existsSync(usabilityPath)?read(usabilityPath):'';
 const worker=fs.existsSync(workerPath)?read(workerPath):'';
 const core=fs.existsSync(corePath)?read(corePath):'';
 const index=fs.existsSync(indexPath)?read(indexPath):'';
-const src='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout2';
+const src='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout3';
 
 assert(usability.includes(src),'Camada network-first de usabilidade não carrega a revisão corrigida do layout semanal.');
-assert(usability.includes("const EXPECTED_VERSION='10.10.40-weeklayout2'"),'Loader não valida explicitamente a revisão corrigida.');
+assert(usability.includes("const EXPECTED_VERSION='10.10.40-weeklayout3'"),'Loader não valida explicitamente a revisão corrigida.');
 assert(usability.includes("window.TeamBullsStudentWeekWorkoutLayout?.version===EXPECTED_VERSION"),'Loader aceita uma versão antiga já carregada no PWA.');
 assert(usability.includes("String(script.src||'')===expectedUrl"),'Loader pode confundir o script antigo em cache com a revisão corrigida.');
 assert(!usability.includes("?v=10.10.40-weeklayout1'"),'Loader ainda referencia a revisão antiga do layout semanal.');
@@ -34,7 +34,7 @@ assert(usability.includes('function loadWeekWorkoutLayout()'),'Loader dedicado d
 assert(usability.includes("CURRENT_USER?.role==='trainer'"),'Loader não impede carregamento desnecessário no contexto do treinador.');
 assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Arquivo ponte deixou de ser tratado como mutável/network-first pelo Service Worker.');
 
-assert(source.includes("const VERSION='10.10.40-weeklayout2'"),'Layout semanal não possui a revisão corrigida.');
+assert(source.includes("const VERSION='10.10.40-weeklayout3'"),'Layout semanal não possui a revisão corrigida.');
 assert(source.includes("document.getElementById('screen-day')"),'Layout novo não está limitado à tela DIA // pasta.');
 assert(source.includes("document.getElementById('student-day-weekly-board')"),'Layout novo não usa o quadro semanal da pasta aberta.');
 assert(source.includes("host.id='tb-student-day-week-sheet'"),'Planilha semanal da pasta não é criada dentro da tela do dia.');

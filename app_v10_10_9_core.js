@@ -414,6 +414,9 @@ let INACTIVE_UID = '';            // uid preservado para marcar alterações off
 
 function localGeneratedId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function safeDayName(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').slice(0,60)||'Treino geral';}
+const WORKOUT_MUSCLE_GROUPS=['Peito','Costas','Ombros','Bíceps','Tríceps','Antebraços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Trapézio','Adutores','Abdutores'];
+function normalizeMuscleGroups(value){const allowed=new Set(WORKOUT_MUSCLE_GROUPS.map(normalizedName));const seen=new Set();return(Array.isArray(value)?value:[]).map(item=>String(item||'').trim()).filter(item=>{const key=normalizedName(item);if(!allowed.has(key)||seen.has(key))return false;seen.add(key);return true;}).slice(0,WORKOUT_MUSCLE_GROUPS.length);}
+function safeWorkoutGuidance(value){return String(value||'').normalize('NFKC').trim().replace(/[<>]/g,'').slice(0,160);}
 function dayIdFromName(value){
   const source=normalizedName(safeDayName(value));let hash=2166136261;
   for(let i=0;i<source.length;i++){hash^=source.charCodeAt(i);hash=Math.imul(hash,16777619);}
@@ -424,7 +427,7 @@ function normalizeWorkoutDays(rawDays,exercises=[]){
   const add=(entry,index)=>{
     const name=safeDayName(typeof entry==='string'?entry:entry?.name);
     const key=normalizedName(name);if(!key||seen.has(key))return;
-    seen.add(key);result.push({id:String((entry&&typeof entry==='object'&&entry.id)||dayIdFromName(name)),name,order:Number.isFinite(Number(entry?.order))?Number(entry.order):index});
+    seen.add(key);result.push({id:String((entry&&typeof entry==='object'&&entry.id)||dayIdFromName(name)),name,order:Number.isFinite(Number(entry?.order))?Number(entry.order):index,muscleGroups:normalizeMuscleGroups(entry?.muscleGroups),frequencyGuidance:safeWorkoutGuidance(entry?.frequencyGuidance),restGuidance:safeWorkoutGuidance(entry?.restGuidance)});
   };
   (Array.isArray(rawDays)?rawDays:[]).forEach(add);
   (Array.isArray(exercises)?exercises:[]).forEach((exercise,index)=>add({name:exercise?.dayName||'Treino geral',order:result.length+index},result.length+index));
@@ -2189,7 +2192,8 @@ function renderDayFolders(workout,trainerMode=false){
   const days=getWorkoutDays(workout),canEdit=trainerMode||canSelfManagePlan(),target=trainerMode?'student':'self';
   return days.map((day,index)=>{
     const items=exercisesForDay(workout,day.name),last=dayLastDate(items),rx=dayPrescriptionCount(items);
-    const meta=`${items.length} ${items.length===1?'exercício':'exercícios'} · ${rx} semanas prescritas${last?' · Último: '+fmt(last):''}`;
+    const groups=normalizeMuscleGroups(day.muscleGroups),guidance=[day.frequencyGuidance,day.restGuidance].filter(Boolean).join(' · ');
+    const meta=`${items.length} ${items.length===1?'exercício':'exercícios'} · ${rx} semanas prescritas${groups.length?' · '+groups.join(', '):''}${guidance?' · '+guidance:''}${last?' · Último: '+fmt(last):''}`;
     const dayArg=jsArg(day.name),openCall=trainerMode?'openTsDay':'openDay';
     const reorder=canEdit?`<div class="day-order-controls"><button class="drag-handle" data-drag-handle="day" onclick="event.stopPropagation()" title="Segure e arraste para reordenar" aria-label="Arrastar dia">⋮⋮</button><button class="order-btn" ${index===0?'disabled':''} onclick="event.stopPropagation();moveDayFolder(${dayArg},-1,'${target}')" title="Mover dia para cima">↑</button><button class="order-btn" ${index===days.length-1?'disabled':''} onclick="event.stopPropagation();moveDayFolder(${dayArg},1,'${target}')" title="Mover dia para baixo">↓</button></div>`:'';
     const actions=canEdit?`<div class="day-folder-actions"><button class="btn-icon ghost" onclick="event.stopPropagation();openEditDayModal(${dayArg},'${target}')" title="Renomear pasta">✏️</button><button class="btn-icon ghost" onclick="event.stopPropagation();showConfirm('Excluir pasta do dia','A pasta será removida. Exercícios existentes serão movidos para Treino geral, sem apagar séries ou histórico.',function(){deleteDayFolder(${dayArg},'${target}');})" title="Excluir pasta">🗑</button></div>`:'';
@@ -2200,7 +2204,8 @@ function protocolSummaryHtml(workout,dayName=''){
   const days=getWorkoutDays(workout),items=dayName?exercisesForDay(workout,dayName):(workout?.exercises||[]),sessions=items.reduce((sum,e)=>sum+(e.sessions||[]).length,0);
   const title=dayName?safeDayName(dayName):workout?.name||'Treino';
   const meta=dayName?`${workout?.name||'Protocolo'} · ${items.length} exercícios · ${sessions} registros`:`${days.length} ${days.length===1?'pasta de dia':'pastas de dias'} · ${items.length} exercícios · ${sessions} registros`;
-  return`<div class="archive-file-kicker">${dayName?'PASTA DO DIA':'PASTA PRINCIPAL DO PROTOCOLO'}</div><div class="protocol-summary-title">${esc(title)}</div><div class="protocol-summary-meta">${esc(meta)}</div>`;
+  const day=dayName?days.find(item=>normalizedName(item.name)===normalizedName(dayName)):null,groups=normalizeMuscleGroups(day?.muscleGroups),guidance=[day?.frequencyGuidance,day?.restGuidance].filter(Boolean);
+  return`<div class="archive-file-kicker">${dayName?'PASTA DO DIA':'PASTA PRINCIPAL DO PROTOCOLO'}</div><div class="protocol-summary-title">${esc(title)}</div><div class="protocol-summary-meta">${esc(meta)}</div>${day&&(groups.length||guidance.length)?`<div class="protocol-summary-guidance">${groups.length?`<span>Grupos musculares: ${esc(groups.join(', '))}</span>`:''}${day.frequencyGuidance?`<span>Frequência: ${esc(day.frequencyGuidance)}</span>`:''}${day.restGuidance?`<span>Descanso: ${esc(day.restGuidance)}</span>`:''}</div>`:''}`;
 }
 function toggleWorkoutOverview(trainerMode){
   const panel=document.getElementById(trainerMode?'trainer-workout-overview':'student-workout-overview'),button=document.getElementById(trainerMode?'trainer-overview-toggle':'student-overview-toggle');if(!panel||!button)return;
@@ -4624,11 +4629,15 @@ async function saveWorkout(){
 function workoutForDayTarget(target){return target==='student'?VIEW_STUDENT_WORKOUT:getW(CUR_WORKOUT);}
 function openAddDayModal(target='self'){
   const workout=workoutForDayTarget(target);if(!workout){showToast('Abra um protocolo primeiro.',true);return;}
-  DAY_MODAL_TARGET=target;EDIT_DAY_NAME='';document.getElementById('modal-day-title').textContent='Novo dia — '+workout.name;document.getElementById('input-day-name').value='';openModal('modal-day');focusEditorField('input-day-name',180);
+  DAY_MODAL_TARGET=target;EDIT_DAY_NAME='';document.getElementById('modal-day-title').textContent='Novo dia — '+workout.name;document.getElementById('input-day-name').value='';document.getElementById('input-day-frequency').value='';document.getElementById('input-day-rest').value='';renderWorkoutMuscleChoices([]);openModal('modal-day');focusEditorField('input-day-name',180);
 }
 function openEditDayModal(dayName,target='self'){
   const workout=workoutForDayTarget(target),day=getWorkoutDays(workout).find(item=>normalizedName(item.name)===normalizedName(dayName));if(!workout||!day)return;
-  DAY_MODAL_TARGET=target;EDIT_DAY_NAME=day.name;document.getElementById('modal-day-title').textContent='Renomear dia — '+workout.name;document.getElementById('input-day-name').value=day.name;openModal('modal-day');focusEditorField('input-day-name',180);
+  DAY_MODAL_TARGET=target;EDIT_DAY_NAME=day.name;document.getElementById('modal-day-title').textContent='Editar dia — '+workout.name;document.getElementById('input-day-name').value=day.name;document.getElementById('input-day-frequency').value=day.frequencyGuidance||'';document.getElementById('input-day-rest').value=day.restGuidance||'';renderWorkoutMuscleChoices(day.muscleGroups);openModal('modal-day');focusEditorField('input-day-name',180);
+}
+function renderWorkoutMuscleChoices(selected=[]){
+  const host=document.getElementById('day-muscle-group-options');if(!host)return;const chosen=new Set(normalizeMuscleGroups(selected).map(normalizedName));
+  host.innerHTML=WORKOUT_MUSCLE_GROUPS.map(group=>`<label class="muscle-choice"><input type="checkbox" data-muscle-group="${esc(group)}" ${chosen.has(normalizedName(group))?'checked':''}><span>${esc(group)}</span></label>`).join('');
 }
 function dayListAfterRename(workout,oldName,newName){
   // O ID é a referência das divisões da dieta; renomear a pasta não pode quebrá-la.
@@ -4641,7 +4650,8 @@ async function saveDayFolder(){
   if(!document.getElementById('input-day-name').value.trim()){alert('Digite o nome do dia de treino.');return;}
   const duplicate=getWorkoutDays(workout).some(day=>normalizedName(day.name)===normalizedName(name)&&normalizedName(day.name)!==normalizedName(EDIT_DAY_NAME));if(duplicate){alert('Já existe uma pasta de dia com esse nome.');return;}
   if(!beginAction('save-day','modal-day'))return;
-  const oldName=EDIT_DAY_NAME,newDays=dayListAfterRename(workout,oldName,name);
+  const oldName=EDIT_DAY_NAME,groups=[...document.querySelectorAll('#day-muscle-group-options [data-muscle-group]:checked')].map(input=>input.dataset.muscleGroup),frequencyGuidance=safeWorkoutGuidance(document.getElementById('input-day-frequency').value),restGuidance=safeWorkoutGuidance(document.getElementById('input-day-rest').value);
+  const newDays=dayListAfterRename(workout,oldName,name).map(day=>normalizedName(day.name)===normalizedName(name)?{...day,muscleGroups:groups,frequencyGuidance,restGuidance}:day);
   try{
     if(DAY_MODAL_TARGET==='student'){
       if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT)return;
