@@ -33,7 +33,7 @@ has(session,'function parseQueueSnapshot(raw,uidValue)','Fila não interpreta sn
 has(session,'if(session?.fallback)return session;','Snapshots temporários legados não são recuperáveis.');
 has(session,'value.updatedAt>latest.updatedAt','Cópia mais nova não tem prioridade sobre espelhos antigos.');
 has(session,'if(!durable&&!indexed)return false;','sessionStorage sozinho ainda pode confirmar o salvamento.');
-has(session,'if(!await enqueue(entry))','Registro rápido não aguarda persistência confirmada.');
+has(session,'await enqueue(entry)','Registro rápido não aguarda persistência confirmada.');
 has(session,'function ensureLocalSession(entry,exerciseOverride=null,pendingSync=true)','Registro pendente não possui projeção local determinística.');
 has(session,'function restorePendingSessions({rerender=false}={})','Fila pendente não é restaurada no treino após reentrada/re-render.');
 has(session,'if(latest)ensureLocalSession(latest,getE(wid,eid)||exercise,true);','Projeção não usa a revisão pendente atual no exercício atual.');
