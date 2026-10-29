@@ -121,10 +121,11 @@
       const saved=savedAllocations(entry,ctx,row,available),draft=draftFor(key,row,saved),hasDraft=drafts.has(key);
       const busy=inflight.has(key),pending=!!(saved.length&&entry?.pending),complete=distributionComplete(row,draft,available);
       const changed=hasDraft&&!selectionsMatch(draft,saved),sameSaved=saved.length&&!changed;
+      const displayAllocations=(changed?draft:saved).map(item=>{const food=available.find(option=>option.id===item.foodId);return food?{...item,food,quantity:scale(food.amount,item.portions)}:null;}).filter(Boolean);
       const total=roundPortions(draft.reduce((sum,item)=>sum+item.portions,0));
       const status=errors.get(key)||(busy?'Sincronizando…':pending?'Guardado neste aparelho. Sincronização pendente.':saved.length?'Escolha guardada para todos os dias.':ready?'Distribua as porções entre os alimentos.':'Carregando tabela e escolhas…');
-      const summaryName=saved.length?saved.map(item=>item.food.name).join(' + '):ready?'Escolher alimento':'Carregando opções…';
-      const summaryAmount=saved.length?saved.map(item=>item.quantity).join(' + '):number(row.count)+' '+(row.count===1?'porção':'porções');
+      const summaryName=displayAllocations.length?displayAllocations.map(item=>item.food.name).join(' + '):ready?'Escolher alimento':'Carregando opções…';
+      const summaryAmount=displayAllocations.length?displayAllocations.map(item=>item.quantity).join(' + '):number(row.count)+' '+(row.count===1?'porção':'porções');
       const detailOpen=expandedRows.has(key)?' open':'';
       const summary='<summary class="tb-food-choice-summary"><span class="tb-food-summary-copy"><small>'+escape(row.text)+'</small><strong>'+escape(summaryName)+'</strong></span><span class="tb-food-summary-value"><span>'+escape(summaryAmount)+'</span><span class="tb-food-chevron" aria-hidden="true">⌄</span></span></summary>';
       const allocationMarkup=draft.map((item,index)=>{
