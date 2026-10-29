@@ -15,6 +15,54 @@
         { "fieldPath": "studentId", "order": "ASCENDING" },
         { "fieldPath": "submittedDate", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "workoutCycleStates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentUid", "order": "ASCENDING" },
+        { "fieldPath": "workoutId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "workoutCompletions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentUid", "order": "ASCENDING" },
+        { "fieldPath": "workoutId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "workoutCompletions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentUid", "order": "ASCENDING" },
+        { "fieldPath": "completedDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mealCompletions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "studentUid", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "freeMealLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

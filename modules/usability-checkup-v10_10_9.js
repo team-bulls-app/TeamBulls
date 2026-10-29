@@ -202,8 +202,8 @@
 
 /* Carrega o quadro semanal corrigido por uma camada network-first já existente. */
 (()=>{
-  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout2';
-  const EXPECTED_VERSION='10.10.40-weeklayout2';
+  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout3';
+  const EXPECTED_VERSION='10.10.40-weeklayout3';
   let loading=null;
   const studentContext=()=>{
     try{

@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102803,
-  "revision": "music-default-color-balance-1",
-  "publishedAt": "2026-10-28T20:03:24Z",
+  "build": 2026102902,
+  "revision": "explicit-workout-cycle-calendar-2",
+  "publishedAt": "2026-10-29T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Deixa a música desligada por padrão e melhora a leitura das cores da interface."
+  "message": "Adiciona conclusão explícita do treino, grupos musculares por dia e calendário com eventos de alimentação."
 }

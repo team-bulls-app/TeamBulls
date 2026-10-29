@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsSupportDiagnostics)return;
-  const VERSION='10.10.9-diagnostics1';
+  const VERSION='10.10.9-diagnostics2';
   const cleanScreen=value=>/^[a-z0-9_-]{1,60}$/i.test(String(value||''))?String(value):'indisponível';
   function createSummary(){
     const activeScreen=document.querySelector('.screen.active')?.id||'';
@@ -13,6 +13,7 @@
     const device=matchMedia('(pointer: coarse)').matches?'celular ou tablet':'computador';
     const connection=navigator.onLine===false?'sem conexão':'conectado';
     const serviceWorker=!('serviceWorker'in navigator)?'indisponível':navigator.serviceWorker.controller?'controlando o app':'ainda não controla o app';
+    const workoutProgress=window.TeamBullsWorkoutCompletion?.diagnostics?.()||{pending:0,failed:0};
     return[
       'Team Bulls — resumo técnico',
       `Versão: ${String(updater.version||'indisponível').slice(0,30)}`,
@@ -23,6 +24,8 @@
       `Instalação: ${installed?'app instalado':'navegador'}`,
       `Service Worker: ${serviceWorker}`,
       `Tela: ${cleanScreen(activeScreen)}`,
+      `Conclusões de treino pendentes: ${Number(workoutProgress.pending)||0}`,
+      `Falhas de sincronização de treino: ${Number(workoutProgress.failed)||0}`,
       `Dispositivo: ${device}`,
       `Gerado em: ${new Date().toISOString()}`
     ].join('\n');

@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_DAY_WEEK_WORKOUT_LAYOUT_101040_2__)return;
   window.__TEAM_BULLS_STUDENT_DAY_WEEK_WORKOUT_LAYOUT_101040_2__=true;
 
-  const VERSION='10.10.40-weeklayout2';
+  const VERSION='10.10.40-weeklayout3';
   const selectedWeeks=new Map();
 
   const currentUser=()=>{try{return typeof CURRENT_USER!=='undefined'?CURRENT_USER:null;}catch(error){return null;}};
@@ -49,6 +49,7 @@
   }
 
   function cycleWeek(workout){
+    try{if(studentContext()&&typeof window.TeamBullsWorkoutCompletion?.currentWeek==='function')return clampWeek(window.TeamBullsWorkoutCompletion.currentWeek(workout));}catch(error){}
     try{if(validIsoDate(workout?.startDate)&&typeof v104CycleWeek==='function'&&typeof today==='function')return clampWeek(v104CycleWeek(workout.startDate,today()));}catch(error){}
     try{return clampWeek(LAST_SESSION_WEEK);}catch(error){return 1;}
   }
