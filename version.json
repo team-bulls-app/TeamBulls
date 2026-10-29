@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102903,
-  "revision": "daily-diet-summary-contrast-1",
+  "build": 2026102904,
+  "revision": "student-access-food-allocation-1",
   "publishedAt": "2026-10-29T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Corrige a contagem das refeições do dia e o contraste dos cartões de dieta."
+  "message": "Melhora a retomada do acesso e permite distribuir as porções entre vários alimentos."
 }

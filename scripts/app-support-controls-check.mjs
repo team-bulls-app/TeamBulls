@@ -83,11 +83,11 @@ async function checkDiagnostics(clipboardAvailable){
   const document={getElementById:id=>elements[id]||null,querySelector:()=>({id:'screen-student-notifications'})};
   const navigator={onLine:true,serviceWorker:{controller:{}},standalone:false};
   if(clipboardAvailable)navigator.clipboard={writeText:async text=>copied.push(text)};
-  const window={TeamBullsUpdater:{version:'10.10.9',build:2026102903}};
+  const window={TeamBullsUpdater:{version:'10.10.9',build:2026102904}};
   const context={window,document,navigator,matchMedia:query=>({matches:query==='(pointer: coarse)'}),CURRENT_USER:{uid:'private-user-id',name:'Nome Particular',email:'private@example.com',role:'student'},MODE:'cloud',Date,Number,String,Promise,console};
   vm.runInNewContext(diagnosticsSource,context,{filename:'support-diagnostics-v10_10_9.js'});
   const summary=window.TeamBullsSupportDiagnostics.createSummary();
-  assert.match(summary,/Build: 2026102903/);
+  assert.match(summary,/Build: 2026102904/);
   assert.match(summary,/Tela: screen-student-notifications/);
   for(const secret of ['private-user-id','Nome Particular','private@example.com'])assert.equal(summary.includes(secret),false,'O diagnóstico não pode incluir dados pessoais.');
   assert.equal(/fetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket/.test(diagnosticsSource),false,'O módulo de diagnóstico não pode enviar dados.');
@@ -101,13 +101,13 @@ await checkDiagnostics(false);
 
 assert.match(profile,/id="tb-device-notice-disable"/,'A Central do aluno deve oferecer controle por aparelho.');
 assert.match(index,/id="tb-copy-diagnostics"/,'Configurações devem expor o resumo técnico local.');
-assert.match(config,/student-home-profile-v10_10_12\.js\?v=10\.10\.22-studenthome6/);
+assert.match(config,/student-home-profile-v10_10_12\.js\?v=10\.10\.22-studenthome7/);
 assert.match(updater,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics2/);
 assert.match(sw,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics2/);
 assert.equal(sw,sw47,'Os service workers publicados devem permanecer idênticos.');
-assert.equal(Number(version.build),2026102903,'O build publicado deve acompanhar os arquivos atualizados.');
-assert.match(updater,/const CURRENT_BUILD=2026102903/);
-assert.match(sw,/const BUILD_REVISION=2026102903/);
+assert.equal(Number(version.build),2026102904,'O build publicado deve acompanhar os arquivos atualizados.');
+assert.match(updater,/const CURRENT_BUILD=2026102904/);
+assert.match(sw,/const BUILD_REVISION=2026102904/);
 assert.match(index,/student-training-calendar-v10_10_70\.js\?v=10\.10\.70-explicit-cycle-calendar2/);
 assert.match(index,/styles_v10_10_9\.css\?v=10\.10.9&theme=light14/);
 
