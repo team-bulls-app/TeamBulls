@@ -187,7 +187,7 @@ if('caches' in window){
     './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4',
     './modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity1',
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
-    './modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf4',
+    './modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf5',
     './modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession2',
     './modules/week-selection-fix-v10_10_9.js?v=10.10.9-weekselection1',
     './modules/session-integrity-v10_10_39.js?v=10.10.63-sessionintegrity2',
@@ -197,7 +197,7 @@ if('caches' in window){
     './modules/student-workout-library-v10_10_24.js?v=10.10.24-workoutlibrary1',
     './modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1',
     './modules/student-diet-layout-v10_10_24.js?v=10.10.24-dietlayout1',
-    './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices6',
+    './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices7',
     './modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay1'
   ];
   const modules=[

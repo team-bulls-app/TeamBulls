@@ -2,9 +2,57 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices6',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
-  const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set();
+  const VERSION='10.10.64-foodchoices7',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_',DIAGNOSTICS_PREFIX='team_bulls_food_choices_diag_v1_';
+  const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set(),diagnosticCache=new Map();
   let loaded='',loading=null,epoch=0;
+  const FOOD_SYNC_ERROR_CATEGORIES=new Set(['network','permission','storage','conflict','other']);
+  const emptyFoodDiagnostics=()=>({version:1,failures:Object.create(null)});
+  function foodDiagnosticId(value){
+    const text=String(value||'');let first=2166136261,second=2246822519;
+    for(let i=0;i<text.length;i++){const code=text.charCodeAt(i);first=Math.imul(first^code,16777619);second=Math.imul(second^code,3266489917);}
+    return(first>>>0).toString(16).padStart(8,'0')+(second>>>0).toString(16).padStart(8,'0');
+  }
+  function readFoodDiagnostics(uidValue){
+    const uid=String(uidValue||'');if(!uid)return emptyFoodDiagnostics();
+    if(diagnosticCache.has(uid))return diagnosticCache.get(uid);
+    let state=emptyFoodDiagnostics();
+    try{
+      const parsed=JSON.parse(localStorage.getItem(DIAGNOSTICS_PREFIX+encodeURIComponent(uid))||'null');
+      if(parsed?.version===1&&parsed.failures&&typeof parsed.failures==='object'&&!Array.isArray(parsed.failures)){
+        const failures=Object.create(null);
+        Object.entries(parsed.failures).slice(-400).forEach(([key,item])=>{
+          if(/^[a-f0-9]{16}$/i.test(key)&&FOOD_SYNC_ERROR_CATEGORIES.has(item?.category)&&Number.isFinite(Number(item?.at)))failures[key]={category:item.category,at:Math.max(0,Math.min(8640000000000000,Math.trunc(Number(item.at))))};
+        });
+        state={version:1,failures};
+      }
+    }catch(error){}
+    diagnosticCache.set(uid,state);return state;
+  }
+  function writeFoodDiagnostics(uidValue,state){
+    const uid=String(uidValue||'');if(!uid)return;
+    diagnosticCache.set(uid,state);
+    try{localStorage.setItem(DIAGNOSTICS_PREFIX+encodeURIComponent(uid),JSON.stringify(state));}catch(error){}
+  }
+  function foodSyncErrorCategory(error){
+    const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
+    if(code.includes('permission-denied')||code.includes('unauthenticated'))return'permission';
+    if(code.includes('quota')||code.includes('storage')||message.includes('armazenamento'))return'storage';
+    if(code.includes('conflict'))return'conflict';
+    if(code.includes('timeout')||code.includes('unavailable')||code.includes('network')||code.includes('deadline-exceeded')||message.includes('offline'))return'network';
+    return'other';
+  }
+  function markFoodFailure(uidValue,key,error){
+    const uid=String(uidValue||''),identity=String(key||'');if(!uid||!identity||identity.length>1200)return;
+    const state=readFoodDiagnostics(uid);state.failures[foodDiagnosticId(identity)]={category:foodSyncErrorCategory(error),at:Date.now()};
+    const ids=Object.keys(state.failures);if(ids.length>400){ids.sort((a,b)=>Number(state.failures[a]?.at||0)-Number(state.failures[b]?.at||0));ids.slice(0,ids.length-400).forEach(id=>delete state.failures[id]);}
+    writeFoodDiagnostics(uid,state);
+  }
+  function clearFoodFailure(uidValue,key){
+    const uid=String(uidValue||''),identity=String(key||'');if(!uid||!identity||identity.length>1200)return;
+    const state=readFoodDiagnostics(uid),id=foodDiagnosticId(identity);
+    if(!Object.prototype.hasOwnProperty.call(state.failures,id))return;
+    delete state.failures[id];writeFoodDiagnostics(uid,state);
+  }
   const clean=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const number=value=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:3}).format(value);
@@ -178,10 +226,10 @@
     const syncEntry={...entry,foodId:selected[0].foodId,selections:selected.map(item=>({foodId:item.foodId,portions:item.portions}))};
     const promise=commit(syncEntry).then(date=>{
       const confirmed={...syncEntry,date,pending:false};remote.set(key,confirmed);
-      try{store(syncEntry.studentUid,key,confirmed,syncEntry.mutationId);errors.delete(key);}catch(error){errors.set(key,'Salvo na conta. Não foi possível atualizar o cache deste aparelho.');}
+      try{const applied=store(syncEntry.studentUid,key,confirmed,syncEntry.mutationId);if(applied){errors.delete(key);clearFoodFailure(syncEntry.studentUid,key);}else return true;}catch(error){errors.set(key,'Salvo na conta. Não foi possível atualizar o cache deste aparelho.');markFoodFailure(syncEntry.studentUid,key,error);}
       return true;
     },error=>{
-      if(context()?.studentUid===entry.studentUid)errors.set(key,'Escolha guardada neste aparelho. Não foi possível sincronizar. Tente novamente.');
+      const current=read(entry.studentUid)[key];if(current?.mutationId===entry.mutationId){markFoodFailure(entry.studentUid,key,error);if(context()?.studentUid===entry.studentUid)errors.set(key,'Escolha guardada neste aparelho. Não foi possível sincronizar. Tente novamente.');}
       console.warn('[Team Bulls] Escolha de alimento pendente.',error?.code||error?.message);return false;
     }).finally(()=>{
       if(inflight.get(key)===promise)inflight.delete(key);
@@ -200,14 +248,15 @@
     const entry={...ctx,recordType:TYPE,foodId:selections[0].foodId,selections,date:valid(current,ctx)&&/^\d{4}-\d{2}-\d{2}$/.test(current.date)?current.date:today(),mutationId:uid(),pending:true};
     try{store(ctx.studentUid,key,entry);}catch(storageError){
       // Sem espaço local: serializa a tentativa remota para impedir gravações concorrentes.
-      if(!canCloud(ctx.studentUid))throw new Error('O armazenamento deste aparelho está cheio e não há conexão segura para salvar na conta. Libere espaço ou conecte-se à internet e tente novamente.');
+      if(!canCloud(ctx.studentUid)){markFoodFailure(ctx.studentUid,key,new Error('local storage unavailable'));errors.set(key,'Não foi possível salvar neste aparelho enquanto estiver offline.');throw new Error('O armazenamento deste aparelho está cheio e não há conexão segura para salvar na conta. Libere espaço ou conecte-se à internet e tente novamente.');}
       const task=(async()=>{
         try{
           const date=await commit(entry),confirmed={...entry,date,pending:false};
-          remote.set(key,confirmed);volatile.add(key);drafts.delete(key);errors.delete(key);
+          remote.set(key,confirmed);volatile.add(key);drafts.delete(key);errors.delete(key);clearFoodFailure(ctx.studentUid,key);
           notify('✓ Escolha salva na sua conta. Este aparelho não conseguiu manter uma cópia offline.');
           return true;
         }catch(cloudError){
+          markFoodFailure(ctx.studentUid,key,cloudError);errors.set(key,'Não foi possível confirmar o salvamento na conta. Tente novamente.');
           throw new Error('O aparelho está sem espaço e não foi possível confirmar o salvamento na conta. Conecte-se à internet, libere espaço e tente novamente.');
         }finally{
           if(inflight.get(key)===task)inflight.delete(key);
@@ -217,7 +266,7 @@
       inflight.set(key,task);paint();
       return await task;
     }
-    drafts.delete(key);errors.delete(key);paint();
+    drafts.delete(key);errors.delete(key);clearFoodFailure(ctx.studentUid,key);paint();
     if(!canCloud(ctx.studentUid)){notify('Escolha guardada neste aparelho. Será sincronizada ao abrir a dieta com conexão.');return true;}
     const task=sync(entry);paint();
     // Um timeout libera o botão sem abandonar o write original nem repeti-lo.
@@ -243,6 +292,7 @@
             if(local?.pending||local?.mutationId!==baseline[recordKey]?.mutationId)continue;
             const cached={recordType:TYPE,studentUid:entry.studentUid,dietId:entry.dietId,variantId:entry.variantId,mealId:entry.mealId,lineKey:entry.lineKey,foodId:entry.foodId||allocations[0].foodId,selections:allocations.map(item=>({foodId:item.foodId,portions:item.portions})),date:entry.date,mutationId:entry.mutationId,pending:false};remote.set(recordKey,cached);
             try{store(own.studentUid,recordKey,cached);}catch(error){console.warn('[Team Bulls] Cache de escolhas indisponível.');}
+            clearFoodFailure(own.studentUid,recordKey);
           }
         }catch(error){console.warn('[Team Bulls] Usando escolhas guardadas no aparelho.',error?.code||error?.message);}
       }
@@ -257,6 +307,18 @@
     // Somente eventos explícitos (abrir, reconectar ou botão) iniciam tentativas.
     await Promise.all(entries.map(entry=>sync(entry)));
     return true;
+  }
+  function diagnostics(){
+    const uid=String(CURRENT_USER?.role==='student'?CURRENT_USER?.uid||'':'');
+    if(!uid)return{available:false,pending:0,failed:0};
+    const records=Object.entries(read(uid)).filter(([,entry])=>entry?.studentUid===uid&&entry.recordType===TYPE);
+    const pending=records.filter(([,entry])=>entry.pending===true).length;
+    const state=readFoodDiagnostics(uid),failedIds=new Set(Object.keys(state.failures));
+    for(const key of [...errors.keys(),...volatile]){
+      try{const parsed=JSON.parse(key);if(Array.isArray(parsed)&&parsed[0]===uid)failedIds.add(foodDiagnosticId(key));}catch(error){}
+    }
+    const latest=Object.values(state.failures).sort((a,b)=>Number(b?.at||0)-Number(a?.at||0))[0]||{};
+    return{available:true,pending,failed:failedIds.size,lastError:FOOD_SYNC_ERROR_CATEGORIES.has(latest.category)?latest.category:'',lastErrorAt:Math.max(0,Math.min(8640000000000000,Number(latest.at)||0))};
   }
   function rowContext(node){
     const own=context();if(!own)return null;
@@ -402,7 +464,7 @@
     window.addEventListener('storage',event=>{if(event.key===PREFIX+context()?.studentUid)paint();});
     paint();
   }
-  window.TeamBullsStudentFoodChoices=Object.freeze({version:VERSION,parse,rows,scale,foods,items,save,refresh,flush});
+  window.TeamBullsStudentFoodChoices=Object.freeze({version:VERSION,parse,rows,scale,foods,items,save,refresh,flush,diagnostics});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
   window.addEventListener('team-bulls-runtime-ready',install);
 })();

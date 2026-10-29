@@ -4256,7 +4256,11 @@ async function viewQuestionnaire(qid,fromTrainer){
    SESSIONS RENDER
 ══════════════════════════════════════════════════ */
 function sessionSyncBadge(session){
-  return session?.pendingSync?'<span class="session-week-badge" style="color:var(--warn)">Aguardando sincronização</span>':'';
+  const pending=session?.pendingSync===true,failure=pending?window.TeamBullsSessionPerformance?.failureFor?.(session.id):'';
+  const label=pending?(failure?'Falha na sincronização':'Aguardando sincronização'):'Salvo';
+  const color=pending?(failure?'var(--danger,#ff6b6b)':'var(--warn)'):'var(--ok,#43d17a)';
+  const title=failure?'Registro preservado no aparelho. Tente sincronizar novamente pela Central de Sincronização.':pending?'Registro preservado no aparelho e aguardando sincronização.':'Registro salvo.';
+  return '<span class="session-week-badge" style="color:'+color+'" aria-label="'+label+'" title="'+title+'">'+label+'</span>';
 }
 function buildSessions(e,elId,readonly,homeWid,ws){
   const el=document.getElementById(elId);
