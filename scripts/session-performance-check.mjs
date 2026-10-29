@@ -18,7 +18,7 @@ const core=read('app_v10_10_9_core.js');
 const sw=read('sw.js');
 const sw47=read('sw_47.js');
 
-has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf4','Revisão resiliente de registro de séries não está carregada.');
+has(config,'./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf5','Revisão resiliente de registro de séries não está carregada.');
 assert(config.indexOf('session-save-performance-v10_10_9.js')<config.indexOf('pending-session-mutations-v10_10_34.js'),'Registro rápido deve carregar antes da camada de mutações pendentes no runtime prioritário do aluno.');
 lacks(config,'attempts++>=80','Polling agressivo voltou ao startup.');
 has(config,"const installAndWarm=()=>{const ok=patch();if(ok)setTimeout(()=>warmFirebase(),0);return ok;}",'Warmup/resiliência de autenticação não está definido.');
@@ -26,7 +26,7 @@ has(config,'installAndWarm();','Resiliência não é instalada imediatamente dur
 has(config,"document.addEventListener('DOMContentLoaded',installAndWarm,{once:true})",'Resiliência não é reaplicada no DOMContentLoaded.');
 assert(config.indexOf('installAndWarm();')<config.indexOf("document.addEventListener('DOMContentLoaded',installAndWarm,{once:true})"),'Warmup precisa iniciar antes de depender do DOMContentLoaded.');
 
-has(session,"const VERSION='10.10.63-sessionperf4'",'Módulo de sessões não está na revisão resiliente esperada.');
+has(session,"const VERSION='10.10.63-sessionperf5'",'Módulo de sessões não está na revisão resiliente esperada.');
 has(session,"const QUEUE_PREFIX='team_bulls_pending_sessions_v1_'",'Fila persistente de séries ausente.');
 has(session,'const SESSION_SNAPSHOT_VERSION=3','Fila de sessão não possui snapshots duráveis ordenados.');
 has(session,'function parseQueueSnapshot(raw,uidValue)','Fila não interpreta snapshots legados e novos de forma compatível.');
