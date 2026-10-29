@@ -4,12 +4,13 @@
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.63-sessionperf4';
+  const VERSION='10.10.63-sessionperf5';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
+  const SYNC_DIAGNOSTIC_PREFIX='team_bulls_session_sync_diag_v1_';
   const SESSION_SNAPSHOT_VERSION=3;
   const MAX_PENDING=160;
   const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
-  const pendingArchiveByUser=new Map(),pendingArchiveScheduled=new Set();
+  const pendingArchiveByUser=new Map(),pendingArchiveScheduled=new Set(),syncDiagnosticCache=new Map();
   const indexedSnapshots=new Map(),queueReady=new Map(),queueMutations=new Map(),remoteWrites=new Map();
   let snapshotClock=0;
   let flushing=null;
@@ -17,6 +18,72 @@
   let retryTimer=null;
 
   function safeUid(value){return String(value||'').replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,160);}
+  const SYNC_ERROR_CATEGORIES=new Set(['network','permission','storage','conflict','other']);
+  const emptySyncDiagnostic=()=>({version:1,failures:Object.create(null),lastAttemptAt:0,lastDurationMs:0,lastSuccessAt:0,localSaveFailures:0,lastLocalSaveError:'',lastLocalSaveErrorAt:0,lastLocalSaveSuccessAt:0});
+  function readSyncDiagnostic(uidValue){
+    const uid=String(uidValue||'');if(!uid)return emptySyncDiagnostic();
+    if(syncDiagnosticCache.has(uid))return syncDiagnosticCache.get(uid);
+    let state=emptySyncDiagnostic();
+    try{
+      const parsed=JSON.parse(storageGet(SYNC_DIAGNOSTIC_PREFIX+encodeURIComponent(uid))||'null');
+      if(parsed?.version===1&&parsed.failures&&typeof parsed.failures==='object'&&!Array.isArray(parsed.failures)){
+        const failures=Object.create(null);
+        Object.entries(parsed.failures).slice(-MAX_PENDING).forEach(([id,item])=>{
+          if(typeof id==='string'&&id.length>0&&id.length<=200&&id!=='__proto__'&&id!=='constructor'&&id!=='prototype'&&SYNC_ERROR_CATEGORIES.has(item?.category)&&Number.isFinite(Number(item?.at)))failures[id]={category:item.category,at:Math.max(0,Math.trunc(Number(item.at)))};
+        });
+        state={version:1,failures,lastAttemptAt:Math.max(0,Math.min(8640000000000000,Math.trunc(Number(parsed.lastAttemptAt)||0))),lastDurationMs:Math.max(0,Math.min(600000,Math.trunc(Number(parsed.lastDurationMs)||0))),lastSuccessAt:Math.max(0,Math.min(8640000000000000,Math.trunc(Number(parsed.lastSuccessAt)||0))),localSaveFailures:Math.max(0,Math.min(10000,Math.trunc(Number(parsed.localSaveFailures)||0))),lastLocalSaveError:SYNC_ERROR_CATEGORIES.has(parsed.lastLocalSaveError)?parsed.lastLocalSaveError:'',lastLocalSaveErrorAt:Math.max(0,Math.min(8640000000000000,Math.trunc(Number(parsed.lastLocalSaveErrorAt)||0))),lastLocalSaveSuccessAt:Math.max(0,Math.min(8640000000000000,Math.trunc(Number(parsed.lastLocalSaveSuccessAt)||0)))};
+      }
+    }catch(error){}
+    syncDiagnosticCache.set(uid,state);return state;
+  }
+  function writeSyncDiagnostic(uidValue,state){
+    const uid=String(uidValue||'');if(!uid)return;
+    syncDiagnosticCache.set(uid,state);
+    try{storageSet(SYNC_DIAGNOSTIC_PREFIX+encodeURIComponent(uid),JSON.stringify(state));}catch(error){}
+  }
+  function syncErrorCategory(error){
+    const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
+    if(code.includes('permission-denied')||code.includes('unauthenticated'))return'permission';
+    if(code.includes('quota')||code.includes('storage')||message.includes('armazenamento'))return'storage';
+    if(code.includes('conflict')||code.includes('session-conflict'))return'conflict';
+    if(code.includes('timeout')||code.includes('unavailable')||code.includes('network')||code.includes('deadline-exceeded')||message.includes('offline'))return'network';
+    return'other';
+  }
+  function markSyncFailure(uidValue,id,error){
+    const uid=String(uidValue||''),key=String(id||'');if(!uid||!key||key.length>200||key==='__proto__'||key==='constructor'||key==='prototype')return;
+    const state=readSyncDiagnostic(uid);state.failures[key]={category:syncErrorCategory(error),at:Date.now()};writeSyncDiagnostic(uid,state);
+  }
+  function clearSyncFailure(uidValue,id){
+    const uid=String(uidValue||''),key=String(id||'');if(!uid||!key)return;
+    const state=readSyncDiagnostic(uid);if(!Object.prototype.hasOwnProperty.call(state.failures,key))return;
+    delete state.failures[key];writeSyncDiagnostic(uid,state);
+  }
+  function recordSyncAttempt(uidValue,startedAt,durationMs,synced,pending){
+    const uid=String(uidValue||'');if(!uid)return;
+    const state=readSyncDiagnostic(uid);state.lastAttemptAt=Math.max(0,Math.trunc(Number(startedAt)||Date.now()));state.lastDurationMs=Math.max(0,Math.min(600000,Math.trunc(Number(durationMs)||0)));
+    if(Number(synced)>0)state.lastSuccessAt=Date.now();
+    if(Number(pending)===0)state.failures=Object.create(null);
+    writeSyncDiagnostic(uid,state);
+  }
+  function recordLocalSaveFailure(uidValue,error){
+    const uid=String(uidValue||'');if(!uid)return;
+    const state=readSyncDiagnostic(uid);state.localSaveFailures=Math.min(10000,Math.max(0,Number(state.localSaveFailures)||0)+1);state.lastLocalSaveError=syncErrorCategory(error);state.lastLocalSaveErrorAt=Date.now();writeSyncDiagnostic(uid,state);
+  }
+  function recordLocalSaveSuccess(uidValue){
+    const uid=String(uidValue||'');if(!uid)return;
+    const state=readSyncDiagnostic(uid);state.lastLocalSaveSuccessAt=Date.now();writeSyncDiagnostic(uid,state);
+  }
+  function syncFailureFor(id,uidValue=String(CURRENT_USER?.uid||'')){
+    if(!registeredStudent()||String(uidValue)!==String(CURRENT_USER?.uid||''))return'';
+    const key=String(id||'');if(!key)return'';
+    return readSyncDiagnostic(uidValue).failures[key]?.category||'';
+  }
+  function syncDiagnostics(uidValue=String(CURRENT_USER?.uid||'')){
+    if(!registeredStudent()||String(uidValue)!==String(CURRENT_USER?.uid||''))return{available:false,pending:0,failed:0,lastError:'',lastErrorAt:0,lastAttemptAt:0,lastDurationMs:0,lastSuccessAt:0,localSaveFailures:0,lastLocalSaveError:'',lastLocalSaveErrorAt:0,lastLocalSaveSuccessAt:0};
+    const queue=readQueue(uidValue),state=readSyncDiagnostic(uidValue),ids=new Set(queue.map(item=>String(item.id||''))),failures=Object.entries(state.failures).filter(([id])=>ids.has(id));
+    failures.sort((a,b)=>Number(b[1]?.at||0)-Number(a[1]?.at||0));
+    return{available:true,pending:queue.length,failed:failures.length,lastError:failures[0]?.[1]?.category||'',lastErrorAt:Math.max(0,Math.min(8640000000000000,Number(failures[0]?.[1]?.at)||0)),lastAttemptAt:state.lastAttemptAt,lastDurationMs:state.lastDurationMs,lastSuccessAt:state.lastSuccessAt,localSaveFailures:state.localSaveFailures,lastLocalSaveError:state.lastLocalSaveError,lastLocalSaveErrorAt:state.lastLocalSaveErrorAt,lastLocalSaveSuccessAt:state.lastLocalSaveSuccessAt};
+  }
   function queueKey(uidValue){return QUEUE_PREFIX+safeUid(uidValue);}
   function indexedQueueKey(uidValue){return 'pending-sessions:'+String(uidValue);}
   function registeredStudent(){
@@ -117,21 +184,26 @@
   }
   async function enqueue(entry){
     const normalized=normalizeQueuedEntry(entry),uidValue=String(normalized?.userId||'');if(!uidValue||!normalized?.id)return false;
-    return mutateQueue(uidValue,queue=>{
+    const result=await mutateQueue(uidValue,queue=>{
       const index=queue.findIndex(item=>item.id===normalized.id);
       if(index<0&&queue.length>=MAX_PENDING)throw new Error('Há muitos registros aguardando sincronização. Conecte o app antes de adicionar mais; os campos foram mantidos.');
       if(index>=0)queue[index]=normalized;else queue.push(normalized);
       return{items:queue,result:true};
     });
+    if(result)clearSyncFailure(uidValue,normalized.id);
+    return result;
   }
-  function removeQueued(uidValue,id,revision=null){
-    return mutateQueue(uidValue,queue=>{
+  async function removeQueued(uidValue,id,revision=null){
+    const result=await mutateQueue(uidValue,queue=>{
       const current=queue.find(item=>String(item.id)===String(id));
       if(!current)return{items:queue,result:true,changed:false};
       if(revision!==null&&current.revision!==revision)return{items:queue,result:false,changed:false};
       return{items:queue.filter(item=>String(item.id)!==String(id)),result:true};
     });
+    if(result)clearSyncFailure(uidValue,id);
+    return result;
   }
+
   function queuedEntry(id,uidValue=String(CURRENT_USER?.uid||'')){
     if(!uidValue||!id)return null;
     return readQueue(uidValue).find(item=>String(item.id)===String(id))||null;
@@ -147,6 +219,7 @@
       queue[index]=next;return{items:queue,result:next};
     });
     if(!next)return null;
+    clearSyncFailure(uidValue,id);
     ensureLocalSession(next,null,true);
     scheduleFlush(120);return next;
   }
@@ -187,6 +260,7 @@
       variantId:entry.variantId||'',variantName:entry.variantName||'',pendingSync:!!pendingSync,createdAt:stableCreatedAt(entry)
     };
   }
+
   function durablePendingQueueContains(userId,entry){
     try{
       const raw=storageGet(queueKey(userId));
@@ -326,26 +400,32 @@
       await ensureQueueReady(uidValue);
       const queue=readQueue(uidValue);
       if(!queue.length)return true;
-      let synced=0;
+      const startedAt=Date.now();let synced=0;
       for(const entry of queue){
         if(!networkReady()||CURRENT_USER?.uid!==uidValue)break;
-        try{if(await syncEntry(entry))synced++;}
-        catch(error){
+        try{
+          if(await syncEntry(entry)){synced++;clearSyncFailure(uidValue,entry.id);}
+        }catch(error){
+          markSyncFailure(uidValue,entry.id,error);
           console.warn('[Team Bulls] Registro preservado, aguardando sincronização',entry.id,error?.code||error?.message);
+          if(CURRENT_USER?.uid===uidValue&&CUR_WORKOUT===entry.workoutId&&CUR_EX===entry.exerciseId){try{renderExercise();}catch(renderError){}}
           // Erros próprios de um documento não bloqueiam todos os demais.
           // Falta de rede/autenticação encerra esta passagem, sem retry cego.
           const code=String(error?.code||'');
           if(!networkReady()||code.includes('timeout')||code.includes('unavailable')||code.includes('unauthenticated')||code.includes('deadline-exceeded'))break;
         }
       }
+      const pending=readQueue(uidValue).length;
+      recordSyncAttempt(uidValue,startedAt,Date.now()-startedAt,synced,pending);
       if(synced){
         try{runWhenIdle(()=>saveCloudBackup(),3500);}catch(error){}
         if(!silent)showToast(`✓ ${synced} registro${synced===1?'':'s'} sincronizado${synced===1?'':'s'}`);
       }
-      return readQueue(uidValue).length===0;
+      return pending===0;
     })().finally(()=>{flushing=null;if(flushAgain){flushAgain=false;scheduleFlush(80);}});
     return flushing;
   }
+
   function scheduleFlush(delay=180){
     clearTimeout(retryTimer);
     retryTimer=setTimeout(()=>{if(flushing){flushAgain=true;return;}flushPending({silent:true}).catch(()=>{});},Math.max(0,delay));
@@ -394,7 +474,9 @@
           id:sessionId,userId:ownerUid,workoutId:wid,exerciseId:eid,exerciseName:exercise.name,date,week,note,sets,
           performedTechniqueMode,...variant,queuedAt:stamp,createdAtMs:stamp,revision:0
         };
-        if(!await enqueue(entry))throw new Error('Não foi possível guardar o registro neste aparelho. Os campos foram mantidos.');
+        let queued=false;try{queued=await enqueue(entry);}catch(queueError){recordLocalSaveFailure(ownerUid,queueError);throw queueError;}
+        if(!queued){const queueError=new Error('Não foi possível guardar o registro neste aparelho. Os campos foram mantidos.');recordLocalSaveFailure(ownerUid,queueError);throw queueError;}
+        recordLocalSaveSuccess(ownerUid);
         if(CURRENT_USER?.uid!==ownerUid||!registeredStudent())return true;
         SESSION_CREATE_ID=null;
         try{closeModal('modal-session');}catch(error){}
@@ -434,6 +516,8 @@
     window.TeamBullsSessionPerformance=Object.freeze({
       version:VERSION,
       pending:pendingCount,
+      diagnostics:syncDiagnostics,
+      failureFor:syncFailureFor,
       ready:ensureQueueReady,
       sessions:(uidValue=String(CURRENT_USER?.uid||''))=>uidValue===CURRENT_USER?.uid&&registeredStudent()?readQueue(uidValue).map(entry=>sessionDataFromEntry(entry,true)):[],
       hasPending:pendingSession,
