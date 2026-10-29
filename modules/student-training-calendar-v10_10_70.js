@@ -287,6 +287,18 @@
     if(!host){host=document.createElement('section');host.id='home-daily-summary';host.className='home-daily-summary';host.setAttribute('aria-live','polite');stats.insertAdjacentElement('afterend',host);}
     return host;
   }
+  function mealsScheduledForDate(dietDocument,date){
+    const plans=Array.isArray(dietDocument?.plans)?dietDocument.plans:[];
+    const plan=plans.find(item=>item?.isActive===true)||plans[0];if(!plan)return[];
+    const variants=Array.isArray(plan.variants)?plan.variants:[];if(!variants.length)return Array.isArray(plan.meals)?plan.meals:[];
+    const match=String(date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const weekday=match?new Date(Number(match[1]),Number(match[2])-1,Number(match[3])).getDay():new Date().getDay();
+    const scheduled=variants.find(variant=>[...(variant.weekdays||[]),...(variant.restWeekdays||[])].includes(weekday));
+    if(scheduled)return Array.isArray(scheduled.meals)?scheduled.meals:[];
+    const hasFixedDays=variants.some(variant=>(variant.weekdays||[]).length||(variant.restWeekdays||[]).length);
+    if(hasFixedDays)return[];
+    return Array.isArray(variants[0]?.meals)?variants[0].meals:[];
+  }
   async function refreshHomeSummary(){
     if(currentUser()?.role==='trainer'||document.getElementById('screen-home')?.classList.contains('active')===false)return;
     const host=renderHomeSummaryShell();if(!host)return;const seq=++homeLoadSeq,uid=ownerUid(),date=typeof today==='function'?today():new Date().toISOString().slice(0,10),workouts=(()=>{try{return getWorkouts()||[];}catch(error){return[];}})();
@@ -296,15 +308,18 @@
     let meals=[],completed=new Set(),loadError=false;
     try{
       if(mode()==='local'){
-        meals=LOCAL_DB?.mealPlan?.meals||[];for(const meal of meals)if((meal.doneDates||[]).includes(date))completed.add(String(meal.id));
+        const dietDocument=await loadDietDocument();meals=mealsScheduledForDate(dietDocument,date);
+        for(const meal of meals)if((meal.doneDates||[]).includes(date))completed.add(String(meal.id));
       }else if(currentUser()?.role==='student'&&currentUser()?.uid===uid){
-        const [plan,marked]=await Promise.all([loadMealPlan(uid),fetchCompletionsToday(uid)]);meals=Array.isArray(plan)?plan:[];completed=marked;
+        const [dietDocument,marked]=await Promise.all([loadDietDocument(uid),fetchCompletionsToday(uid)]);
+        meals=mealsScheduledForDate(dietDocument,date);completed=new Set([...marked].map(String));
       }
-    }catch(error){loadError=true;meals=LOCAL_DB?.mealPlan?.meals||[];}
+    }catch(error){loadError=true;meals=mealsScheduledForDate(LOCAL_DB?.mealPlan,date);}
     if(seq!==homeLoadSeq||ownerUid()!==uid)return;
     const count=host.querySelector('.home-daily-summary-item:nth-child(2) strong'),label=host.querySelector('.home-daily-summary-item:nth-child(2) span');
-    if(count)count.textContent=meals.length?`${completed.size}/${meals.length}`:String(completed.size);
-    if(label)label.textContent=meals.length?'Refeições concluídas':'Refeições registradas';
+    const completedCount=meals.reduce((sum,meal)=>sum+(completed.has(String(meal.id))?1:0),0);
+    if(count)count.textContent=`${completedCount}/${meals.length}`;
+    if(label)label.textContent='Refeições concluídas';
     const foot=host.querySelector('.home-daily-summary-foot');if(foot&&loadError)foot.textContent+=' · dados alimentares locais';
   }
   const baseRenderHome=typeof renderHome==='function'?renderHome:null;
