@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__)return;
   window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__=true;
 
-  const VERSION='10.10.45-studenthome6';
+  const VERSION='10.10.45-studenthome7';
   const PROFILE_PREFIX='studentProfiles';
   const NICK_MAX=24;
   const BADGE_REFRESH_TTL=120000;
@@ -475,15 +475,36 @@
     if(!num||!Number.isFinite(count)||count<0)return;
     const next=String(Math.trunc(count));
     if(num.textContent!==next)num.textContent=next;
+    num.removeAttribute?.('title');
+    num.removeAttribute?.('aria-label');
   }
-
+  function setStatUnavailable(cell){
+    const num=cell?.querySelector('.num');if(!num)return;
+    num.textContent='—';
+    num.title='Sem conexão: aguardando validar os dados salvos.';
+    num.setAttribute?.('aria-label','Quantidade indisponível até validar os dados.');
+  }
   async function refreshStats(){
     const user=student(),uid=uidOf(user),stats=document.getElementById('home-stats');if(!user||!uid||!stats)return;
-    const cells=ensureStatsShell(stats),workouts=Array.isArray(CLOUD_WORKOUTS)?CLOUD_WORKOUTS:[];
-    setStatCount(cells[0],workouts.length);
+    const cells=ensureStatsShell(stats),workouts=MODE==='local'&&Array.isArray(LOCAL_DB?.workouts)?LOCAL_DB.workouts:Array.isArray(CLOUD_WORKOUTS)?CLOUD_WORKOUTS:[];
+    const workoutMirror=storageGet('teamms_cloud_mirror_'+uid)==='1';
+    const localInitialized=storageGet('teamms_local_initialized_'+uid)==='1';
+    const cachedDiet=Array.isArray(LOCAL_DB?.mealPlan?.plans)?LOCAL_DB.mealPlan.plans:Array.isArray(DIET_DOCUMENT?.plans)?DIET_DOCUMENT.plans:null;
+    const hasCachedWorkoutCount=workouts.length>0||workoutMirror||(MODE==='local'&&localInitialized);
+    const hasCachedDietCount=!!cachedDiet&&(cachedDiet.length>0||localInitialized);
+    const offline=ACCESS_MODE==='offline-registered'||ACCESS_MODE==='local-inactive'||navigator.onLine===false;
+    if(offline){
+      if(hasCachedWorkoutCount)setStatCount(cells[0],workouts.length);else setStatUnavailable(cells[0]);
+      if(hasCachedDietCount)setStatCount(cells[1],cachedDiet.length);else setStatUnavailable(cells[1]);
+      return;
+    }
+    if(hasCachedWorkoutCount)setStatCount(cells[0],workouts.length);else setStatUnavailable(cells[0]);
     if(Array.isArray(DIET_DOCUMENT?.plans))setStatCount(cells[1],DIET_DOCUMENT.plans.length);
+    else if(hasCachedDietCount)setStatCount(cells[1],cachedDiet.length);
+    else setStatUnavailable(cells[1]);
     if(MODE==='cloud'&&db){
-      try{const doc=await cloudGet(db.collection('mealPlans').doc(uid),'contar protocolos de dieta');if(doc.exists)setStatCount(cells[1],Array.isArray(doc.data()?.plans)?doc.data().plans.length:0);}catch(error){}
+      try{const doc=await cloudGet(db.collection('mealPlans').doc(uid),'contar protocolos de dieta');if(doc.exists)setStatCount(cells[1],Array.isArray(doc.data()?.plans)?doc.data().plans.length:0);else setStatCount(cells[1],0);}
+      catch(error){if(!hasCachedDietCount)setStatUnavailable(cells[1]);}
     }
   }
 

@@ -1582,7 +1582,7 @@ function startAuthListener(){
   if(!auth){bootToAuth('O serviço de autenticação não foi carregado. Tente corrigir a atualização.');return;}
   if(AUTH_UNSUBSCRIBE&&AUTH_LISTENER_SERVICE===auth){
     // Retomar o app reutiliza a assinatura; somente uma validação pendente/falha é retomada.
-    if(auth.currentUser&&!AUTH_PROCESSING_UID&&(!AUTH_HANDLED||ACCESS_MODE==='offline-registered'))handleAuthStateUser(auth.currentUser);
+    if(auth.currentUser&&!AUTH_PROCESSING_UID&&(!AUTH_HANDLED||['offline-registered','local-inactive'].includes(ACCESS_MODE)))handleAuthStateUser(auth.currentUser);
     return;
   }
   if(AUTH_UNSUBSCRIBE){AUTH_UNSUBSCRIBE();AUTH_UNSUBSCRIBE=null;}
@@ -5885,7 +5885,17 @@ document.addEventListener('visibilitychange',()=>{
   if(document.hidden){MUSIC_WAS_PLAYING=!audio.paused;clearMusicTransitionTimer();if(MUSIC_WAS_PLAYING)musicPause(false,false);}
   else if(MUSIC_WAS_PLAYING&&APP_SETTINGS.musicEnabled&&!MUSIC_USER_PAUSED){MUSIC_WAS_PLAYING=false;musicPlay();}
 });
-window.addEventListener('online',()=>{if(ACCESS_MODE==='offline-registered')showToast('Internet disponível. Entre novamente para sincronizar.');});
+window.addEventListener('online',()=>{
+  if(!['offline-registered','local-inactive'].includes(ACCESS_MODE))return;
+  const cachedUid=CURRENT_USER?.uid||INACTIVE_UID;
+  const sameFirebaseSession=!!auth?.currentUser?.uid&&auth.currentUser.uid===cachedUid;
+  if(sameFirebaseSession){showToast('Internet disponível. Validando sua conta para retomar a sincronização.');startAuthListener();return;}
+  showToast('Internet disponível. Entre novamente para sincronizar.');
+});
+document.addEventListener('visibilitychange',()=>{
+  const offlineAccess=['offline-registered','local-inactive'].includes(ACCESS_MODE),cachedUid=CURRENT_USER?.uid||INACTIVE_UID;
+  if(document.visibilityState==='visible'&&offlineAccess&&navigator.onLine!==false&&auth?.currentUser?.uid===cachedUid)startAuthListener();
+});
 
 /* ══════════════════════════════════════════════════
    TEAM BULLS v10.2 — INSTRUÇÕES GERAIS E TÉCNICAS

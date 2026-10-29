@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices5',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
+  const VERSION='10.10.64-foodchoices6',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_';
   const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set();
   let loaded='',loading=null,epoch=0;
   const clean=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/\s+/g,' ');
@@ -58,7 +58,48 @@
     return true;
   }
   function valid(entry,ctx){
-    return !!entry&&['studentUid','dietId','variantId','mealId','lineKey'].every(field=>typeof ctx[field]==='string'&&ctx[field].length>0&&entry[field]===ctx[field])&&entry.recordType===TYPE&&typeof entry.foodId==='string'&&entry.foodId.length>0&&entry.foodId.length<=200;
+    const identity=!!entry&&['studentUid','dietId','variantId','mealId','lineKey'].every(field=>typeof ctx[field]==='string'&&ctx[field].length>0&&entry[field]===ctx[field])&&entry.recordType===TYPE;
+    if(!identity)return false;
+    const legacy=typeof entry.foodId==='string'&&entry.foodId.length>0&&entry.foodId.length<=200;
+    const allocations=Array.isArray(entry.selections)&&entry.selections.length>0&&entry.selections.length<=8&&entry.selections.every(item=>item&&typeof item.foodId==='string'&&item.foodId.length>0&&item.foodId.length<=200&&Number.isFinite(Number(item.portions))&&Number(item.portions)>0&&Number(item.portions)<=100);
+    return legacy||allocations;
+  }
+  const roundPortions=value=>Math.round((Number(value)||0)*1000)/1000;
+  function normalizedAllocations(row,items,available,{allowBlank=false,requireTotal=true}={}){
+    if(!Array.isArray(items)||!items.length||items.length>8)return null;
+    const seen=new Set(),result=[];let total=0;
+    for(const item of items){
+      const foodId=String(item?.foodId||''),portions=roundPortions(item?.portions);
+      if(!Number.isFinite(portions)||portions<=0||portions>row.count)return null;
+      if(!foodId){if(!allowBlank)return null;}
+      else{
+        if(seen.has(foodId)||!available.some(food=>food.id===foodId))return null;
+        seen.add(foodId);
+      }
+      result.push({foodId,portions});total+=portions;
+    }
+    if(total>row.count+0.001)return null;
+    if(requireTotal&&(result.some(item=>!item.foodId)||roundPortions(total)!==roundPortions(row.count)))return null;
+    return result;
+  }
+  function savedAllocations(entry,ctx,row,available=foods(row)){
+    if(!valid(entry,ctx))return[];
+    let raw=Array.isArray(entry.selections)?entry.selections:null;
+    if(raw?.length===1&&entry.foodId&&raw[0]?.foodId!==entry.foodId)raw=[{foodId:entry.foodId,portions:row.count}];
+    if(!raw&&entry.foodId)raw=[{foodId:entry.foodId,portions:row.count}];
+    const normalized=normalizedAllocations(row,raw,available);
+    if(!normalized)return[];
+    return normalized.map(item=>{const food=available.find(option=>option.id===item.foodId);return{...item,food,quantity:scale(food.amount,item.portions)};});
+  }
+  function selectionsMatch(left,right){
+    return Array.isArray(left)&&Array.isArray(right)&&left.length===right.length&&left.every((item,index)=>item.foodId===right[index].foodId&&roundPortions(item.portions)===roundPortions(right[index].portions));
+  }
+  function draftFor(key,row,saved){
+    const source=drafts.has(key)?drafts.get(key):saved.length?saved:[{foodId:'',portions:row.count}];
+    return source.map(item=>({foodId:String(item.foodId||''),portions:roundPortions(item.portions)}));
+  }
+  function distributionComplete(row,allocations,available){
+    return !!normalizedAllocations(row,allocations,available);
   }
   function recordsFor(uid){const records=read(uid);for(const [key,entry] of remote){if(entry.studentUid===uid&&(!records[key]||(volatile.has(key)&&!records[key].pending)))records[key]=entry;}return records;}
   function live(ctx){
@@ -76,23 +117,36 @@
     const records=recordsFor(own.studentUid),ready=loaded===scopeKey(own);
     return rows(meal).map(row=>{
       if(!row.lineKey)return '<li>'+escape(row.text)+'</li>';
-      const ctx={...own,mealId:String(meal.id),lineKey:row.lineKey},key=entryKey(ctx),entry=records[key];
-      const available=foods(row),saved=valid(entry,ctx)?available.find(food=>food.id===entry.foodId):null;
-      const selected=drafts.has(key)?drafts.get(key):(saved?.id||''),food=available.find(item=>item.id===selected);
-      const busy=inflight.has(key),pending=!!(saved&&entry.pending);
-      const status=errors.get(key)||(busy?'Sincronizando…':pending?'Guardado neste aparelho. Sincronização pendente.':saved?'Escolha guardada para todos os dias.':ready?'Escolha um alimento da tabela.':'Carregando tabela e escolhas…');
-      const disabled=!ready||!food||busy||(saved?.id===selected&&!pending);
+      const ctx={...own,mealId:String(meal.id),lineKey:row.lineKey},key=entryKey(ctx),entry=records[key],available=foods(row);
+      const saved=savedAllocations(entry,ctx,row,available),draft=draftFor(key,row,saved),hasDraft=drafts.has(key);
+      const busy=inflight.has(key),pending=!!(saved.length&&entry?.pending),complete=distributionComplete(row,draft,available);
+      const changed=hasDraft&&!selectionsMatch(draft,saved),sameSaved=saved.length&&!changed;
+      const displayAllocations=(changed?draft:saved).map(item=>{const food=available.find(option=>option.id===item.foodId);return food?{...item,food,quantity:scale(food.amount,item.portions)}:null;}).filter(Boolean);
+      const total=roundPortions(draft.reduce((sum,item)=>sum+item.portions,0));
+      const status=errors.get(key)||(busy?'Sincronizando…':pending?'Guardado neste aparelho. Sincronização pendente.':saved.length?'Escolha guardada para todos os dias.':ready?'Distribua as porções entre os alimentos.':'Carregando tabela e escolhas…');
+      const summaryName=displayAllocations.length?displayAllocations.map(item=>item.food.name).join(' + '):ready?'Escolher alimento':'Carregando opções…';
+      const summaryAmount=displayAllocations.length?displayAllocations.map(item=>item.quantity).join(' + '):number(row.count)+' '+(row.count===1?'porção':'porções');
       const detailOpen=expandedRows.has(key)?' open':'';
-      const summaryName=food?food.name:ready?'Escolher alimento':'Carregando opções…';
-      const summaryAmount=food?food.quantity:number(row.count)+' '+(row.count===1?'porção':'porções');
       const summary='<summary class="tb-food-choice-summary"><span class="tb-food-summary-copy"><small>'+escape(row.text)+'</small><strong>'+escape(summaryName)+'</strong></span><span class="tb-food-summary-value"><span>'+escape(summaryAmount)+'</span><span class="tb-food-chevron" aria-hidden="true">⌄</span></span></summary>';
-      const select='<select data-tb-food-select aria-label="Alimento para '+escape(row.text)+'" '+(!ready||(!saved&&!available.length)?'disabled':'')+'><option value="">Selecione um alimento</option>'+available.map(item=>'<option value="'+escape(item.id)+'" '+(item.id===selected?'selected':'')+'>'+escape(item.name)+'</option>').join('')+'</select>';
-      if(saved){
+      const allocationMarkup=draft.map((item,index)=>{
+        const selectedElsewhere=new Set(draft.filter((other,otherIndex)=>otherIndex!==index&&other.foodId).map(other=>other.foodId));
+        const options='<option value="">Selecione um alimento</option>'+available.map(food=>'<option value="'+escape(food.id)+'" '+(food.id===item.foodId?'selected ':'')+(selectedElsewhere.has(food.id)?'disabled':'')+'>'+escape(food.name)+'</option>').join('');
+        const food=available.find(option=>option.id===item.foodId);
+        const quantity=food?scale(food.amount,item.portions):'—';
+        return '<div class="tb-food-allocation" data-tb-food-allocation="'+index+'"><label><span>Alimento '+(index+1)+'</span><select data-tb-food-select aria-label="Alimento '+(index+1)+' para '+escape(row.text)+'" '+(!ready||busy?'disabled':'')+'>'+options+'</select></label><label class="tb-food-portion-label"><span>Porções</span><input data-tb-food-portions type="number" min="0.001" max="'+escape(String(row.count))+'" step="0.001" inputmode="decimal" value="'+escape(String(item.portions))+'" '+(!ready||busy?'disabled':'')+'></label><strong class="tb-food-quantity" data-tb-food-quantity>'+escape(quantity)+'</strong>'+(draft.length>1?'<button type="button" class="tb-food-small-btn tb-food-remove" data-tb-food-remove="'+index+'" aria-label="Remover alimento '+(index+1)+'">Remover</button>':'')+'</div>';
+      }).join('');
+      const addButton='<button type="button" class="tb-food-small-btn tb-food-add" data-tb-food-add '+(!ready||busy||draft.length>=8?'disabled':'')+'>+ Adicionar alimento</button>';
+      const showSave=!saved.length||changed||pending;
+      const saveText=busy?'Sincronizando…':pending&&sameSaved?'Sincronizar':saved.length?'Guardar':'Guardar escolha';
+      const saveButton=showSave?'<button type="button" class="'+(saved.length?'tb-food-small-btn':'tb-food-save')+'" data-tb-food-save '+(!ready||busy||!complete||(!changed&&saved.length&&!pending)?'disabled':'')+'>'+saveText+'</button>':'';
+      const cancelButton=saved.length&&changed?'<button type="button" class="tb-food-small-btn" data-tb-food-cancel>Cancelar</button>':'';
+      const actions='<div class="tb-food-actions">'+addButton+saveButton+cancelButton+'</div>';
+      const distribution='<small class="tb-food-distribution" data-tb-food-distribution>'+escape(complete?'Distribuição completa: '+number(row.count)+' porções.':'Distribua '+number(row.count)+' porções. Total atual: '+number(total)+' porções.')+'</small>';
+      if(saved.length){
         const notice=errors.get(key)||(busy?'Salvo no aparelho · Sincronizando…':pending?'Salvo no aparelho · Sincronização pendente.':'');
-        const actions=drafts.has(key)?'<div class="tb-food-actions"><button type="button" class="tb-food-small-btn" data-tb-food-save '+(disabled?'disabled':'')+'>Guardar</button><button type="button" class="tb-food-small-btn" data-tb-food-cancel>Cancelar</button></div>':pending&&!busy?'<div class="tb-food-actions"><button type="button" class="tb-food-small-btn" data-tb-food-save '+(!ready?'disabled':'')+'>Sincronizar</button></div>':'';
-        return '<li class="tb-food-choice tb-food-choice-compact tb-food-choice-accordion" data-tb-food-compact="1" data-tb-food-row="'+escape(key)+'"><details data-tb-food-details="1"'+detailOpen+'>'+summary+'<div class="tb-food-editor"><label><span>Seu alimento</span>'+select+'</label><div class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</div>'+actions+(notice?'<small role="status" data-tb-food-status>'+escape(notice)+'</small>':'')+'</div></details></li>';
+        return '<li class="tb-food-choice tb-food-choice-compact tb-food-choice-accordion" data-tb-food-compact="1" data-tb-food-row="'+escape(key)+'"><details data-tb-food-details="1"'+detailOpen+'>'+summary+'<div class="tb-food-editor">'+allocationMarkup+distribution+actions+(notice?'<small role="status" data-tb-food-status>'+escape(notice)+'</small>':'')+'</div></details></li>';
       }
-      return '<li class="tb-food-choice tb-food-choice-accordion" data-tb-food-row="'+escape(key)+'"><details data-tb-food-details="1"'+detailOpen+'>'+summary+'<div class="tb-food-editor"><label><span>Seu alimento</span>'+select+'</label><div class="tb-food-quantity" data-tb-food-quantity>'+escape(food?food.quantity:'—')+'</div><small>Quantidade para '+number(row.count)+' '+(row.count===1?'porção':'porções')+' da sua prescrição.</small><button type="button" class="tb-food-save" data-tb-food-save '+(disabled?'disabled':'')+'>'+ (busy?'Sincronizando…':pending&&saved?.id===selected?'Tentar sincronizar':'Guardar escolha')+'</button><small role="status" data-tb-food-status>'+escape(!available.length&&ready?'Nenhuma quantidade calculável nesta categoria. Consulte a tabela e seu treinador.':status)+'</small></div></details></li>';
+      return '<li class="tb-food-choice tb-food-choice-accordion" data-tb-food-row="'+escape(key)+'"><details data-tb-food-details="1"'+detailOpen+'>'+summary+'<div class="tb-food-editor">'+allocationMarkup+distribution+actions+'<small role="status" data-tb-food-status>'+escape(!available.length&&ready?'Nenhuma quantidade calculável nesta categoria. Consulte a tabela e seu treinador.':status)+'</small></div></details></li>';
     }).join('');
   }
   async function docId(ctx){
@@ -104,25 +158,27 @@
     await window.TeamBullsForegroundWriteResilience?.awaitReady?.();
     if(!canCloud(entry.studentUid))throw new Error('Sua conta mudou. Reabra a dieta.');
     const ref=db.collection('mealCompletions').doc(id);
-    const payload={recordType:TYPE,studentUid:entry.studentUid,mealId:entry.mealId,date:entry.date,dietId:entry.dietId,variantId:entry.variantId,lineKey:entry.lineKey,foodId:entry.foodId,mutationId:entry.mutationId,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const payload={recordType:TYPE,studentUid:entry.studentUid,mealId:entry.mealId,date:entry.date,dietId:entry.dietId,variantId:entry.variantId,lineKey:entry.lineKey,foodId:entry.foodId,selections:entry.selections.map(item=>({foodId:item.foodId,portions:item.portions})),mutationId:entry.mutationId,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     try{await ref.set(payload,{merge:true});return entry.date;}
     catch(error){
-      // Rules 28 preserva date/mealId. Uma escolha criada noutro dia exige
+      // As regras preservam date/mealId. Uma escolha criada noutro dia exige
       // reconciliar o registro existente, jamais sobrescrever esses campos.
       if(!String(error?.code||'').includes('permission-denied')||!canCloud(entry.studentUid))throw error;
       const snapshot=await ref.get({source:'server'}),existing=snapshot.exists?snapshot.data():null;
       if(!valid(existing,entry)||!canCloud(entry.studentUid))throw error;
-      await ref.update({foodId:entry.foodId,mutationId:entry.mutationId,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+      await ref.update({foodId:entry.foodId,selections:payload.selections,mutationId:entry.mutationId,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
       return existing.date;
     }
   }
   function sync(entry){
     const key=entryKey(entry);if(inflight.has(key))return inflight.get(key);
     if(!canCloud(entry.studentUid)||!live(entry))return Promise.resolve(false);
-    const row=live(entry);if(!foods(row).some(food=>food.id===entry.foodId))return Promise.resolve(false);
-    const promise=commit(entry).then(date=>{
-      const confirmed={...entry,date,pending:false};remote.set(key,confirmed);
-      try{store(entry.studentUid,key,confirmed,entry.mutationId);errors.delete(key);}catch(error){errors.set(key,'Salvo na conta. Não foi possível atualizar o cache deste aparelho.');}
+    const row=live(entry),selected=savedAllocations(entry,entry,row,foods(row));if(!selected.length)return Promise.resolve(false);
+    // Migra escolhas antigas (somente foodId) para o formato de distribuição antes de sincronizar.
+    const syncEntry={...entry,foodId:selected[0].foodId,selections:selected.map(item=>({foodId:item.foodId,portions:item.portions}))};
+    const promise=commit(syncEntry).then(date=>{
+      const confirmed={...syncEntry,date,pending:false};remote.set(key,confirmed);
+      try{store(syncEntry.studentUid,key,confirmed,syncEntry.mutationId);errors.delete(key);}catch(error){errors.set(key,'Salvo na conta. Não foi possível atualizar o cache deste aparelho.');}
       return true;
     },error=>{
       if(context()?.studentUid===entry.studentUid)errors.set(key,'Escolha guardada neste aparelho. Não foi possível sincronizar. Tente novamente.');
@@ -133,12 +189,15 @@
     });
     inflight.set(key,promise);paint();return promise;
   }
-  async function save(ctx,foodId){
-    const row=live(ctx),key=entryKey(ctx);if(!row||!foods(row).some(food=>food.id===foodId))throw new Error('Escolha um alimento válido desta categoria.');
+  async function save(ctx,selectionInput){
+    const row=live(ctx),key=entryKey(ctx);if(!row)throw new Error('Esta porção não está mais disponível. Reabra a dieta.');
+    const available=foods(row),raw=typeof selectionInput==='string'?[{foodId:selectionInput,portions:row.count}]:selectionInput;
+    const selections=normalizedAllocations(row,raw,available);
+    if(!selections)throw new Error('Escolha alimentos válidos desta categoria e distribua exatamente '+number(row.count)+' porções entre eles.');
     if(inflight.has(key)){notify('Esta escolha ainda está sincronizando.');return false;}
     const current=recordsFor(ctx.studentUid)[key];
     // Guardar antes de iniciar a rede permite fechar o app sem perder a escolha.
-    const entry={...ctx,recordType:TYPE,foodId,date:valid(current,ctx)&&/^\d{4}-\d{2}-\d{2}$/.test(current.date)?current.date:today(),mutationId:uid(),pending:true};
+    const entry={...ctx,recordType:TYPE,foodId:selections[0].foodId,selections,date:valid(current,ctx)&&/^\d{4}-\d{2}-\d{2}$/.test(current.date)?current.date:today(),mutationId:uid(),pending:true};
     try{store(ctx.studentUid,key,entry);}catch(storageError){
       // Sem espaço local: serializa a tentativa remota para impedir gravações concorrentes.
       if(!canCloud(ctx.studentUid))throw new Error('O armazenamento deste aparelho está cheio e não há conexão segura para salvar na conta. Libere espaço ou conecte-se à internet e tente novamente.');
@@ -178,10 +237,11 @@
           const baseline=read(own.studentUid);
           const snapshot=await cloudGet({get:()=>query.get({source:'server'})},'escolhas de alimentos');
           for(const doc of snapshot.docs){
-            const entry=doc.data();if(!valid(entry,entry)||entry.studentUid!==own.studentUid||entry.dietId!==own.dietId||!live(entry))continue;
+            const entry=doc.data(),row=live(entry);if(!valid(entry,entry)||entry.studentUid!==own.studentUid||entry.dietId!==own.dietId||!row)continue;
+            const allocations=savedAllocations(entry,entry,row,foods(row));if(!allocations.length)continue;
             const recordKey=entryKey(entry),local=read(own.studentUid)[recordKey];
             if(local?.pending||local?.mutationId!==baseline[recordKey]?.mutationId)continue;
-            const cached={recordType:TYPE,studentUid:entry.studentUid,dietId:entry.dietId,variantId:entry.variantId,mealId:entry.mealId,lineKey:entry.lineKey,foodId:entry.foodId,date:entry.date,mutationId:entry.mutationId,pending:false};remote.set(recordKey,cached);
+            const cached={recordType:TYPE,studentUid:entry.studentUid,dietId:entry.dietId,variantId:entry.variantId,mealId:entry.mealId,lineKey:entry.lineKey,foodId:entry.foodId||allocations[0].foodId,selections:allocations.map(item=>({foodId:item.foodId,portions:item.portions})),date:entry.date,mutationId:entry.mutationId,pending:false};remote.set(recordKey,cached);
             try{store(own.studentUid,recordKey,cached);}catch(error){console.warn('[Team Bulls] Cache de escolhas indisponível.');}
           }
         }catch(error){console.warn('[Team Bulls] Usando escolhas guardadas no aparelho.',error?.code||error?.message);}
@@ -233,31 +293,105 @@
       .tb-food-choice-accordion .tb-food-actions{justify-content:flex-end}
       @media(max-width:380px){.tb-food-choice-accordion summary{gap:7px;padding-inline:9px}.tb-food-summary-value{max-width:48%;font-size:11px}}
     `;
+    style.textContent+='.tb-food-allocation{display:grid;grid-template-columns:minmax(0,1fr) minmax(78px,.36fr);align-items:end;gap:8px;padding:8px;border:1px solid var(--border,#38312d);border-radius:8px;background:var(--surface,#151311)}.tb-food-allocation label{display:grid;min-width:0;gap:5px;color:var(--text-dim,#999);font-size:11px}.tb-food-allocation select,.tb-food-allocation input{width:100%;min-width:0;min-height:42px;background:var(--bg,#111);color:var(--text,#f1eee9);border:1px solid var(--border,#555);border-radius:7px;padding:7px 8px;font:inherit;font-size:15px}.tb-food-allocation .tb-food-quantity{grid-column:1;font-size:15px}.tb-food-allocation .tb-food-remove{grid-column:2;justify-self:end}.tb-food-distribution{color:var(--text-dim,#999)}.tb-food-add{margin-right:auto}.tb-food-add:disabled{opacity:.5;cursor:default}@media(max-width:380px){.tb-food-allocation{grid-template-columns:minmax(0,1fr) 82px;gap:6px;padding:7px}.tb-food-allocation select,.tb-food-allocation input{font-size:14px}}';
+    const selectionForDraft=(ctx,row)=>{
+      const key=entryKey(ctx),available=foods(row),entry=recordsFor(ctx.studentUid)[key],saved=savedAllocations(entry,ctx,row,available);
+      return{key,available,entry,saved,values:draftFor(key,row,saved)};
+    };
+    const updateDraftUi=(node,ctx,row)=>{
+      const state=selectionForDraft(ctx,row),complete=distributionComplete(row,state.values,state.available),same=state.saved.length&&selectionsMatch(state.values,state.saved);
+      const total=roundPortions(state.values.reduce((sum,item)=>sum+item.portions,0)),allocations=Array.from(node.querySelectorAll?.('[data-tb-food-allocation]')||[]);
+      if(allocations.length){
+        allocations.forEach((allocation,index)=>{
+          const item=state.values[index],food=item&&state.available.find(option=>option.id===item.foodId),quantity=allocation.querySelector('[data-tb-food-quantity]');
+          if(quantity)quantity.textContent=food?scale(food.amount,item.portions):'—';
+        });
+      }else{
+        const first=state.values[0],food=first&&state.available.find(option=>option.id===first.foodId),quantity=node.querySelector('[data-tb-food-quantity]');
+        if(quantity)quantity.textContent=food?scale(food.amount,first.portions):'—';
+      }
+      const distribution=node.querySelector('[data-tb-food-distribution]');
+      if(distribution)distribution.textContent=complete?'Distribuição completa: '+number(row.count)+' porções.':'Distribua '+number(row.count)+' porções. Total atual: '+number(total)+' porções.';
+      const button=node.querySelector('[data-tb-food-save]'),busy=inflight.has(state.key),pending=!!(state.saved.length&&state.entry?.pending),ready=loaded===scopeKey(ctx);
+      if(button){button.disabled=!complete||busy||!ready||(!state.saved.length?false:!!same&&!pending);button.textContent=busy?'Sincronizando…':pending&&same?'Sincronizar':state.saved.length?'Guardar':'Guardar escolha';}
+      const status=node.querySelector('[data-tb-food-status]');
+      if(status&&!busy&&!pending&&!errors.has(state.key))status.textContent=complete?'Toque em Guardar para salvar a distribuição para todos os dias.':'Distribua exatamente '+number(row.count)+' porções entre os alimentos.';
+    };
+    const controlIndex=control=>{
+      const allocation=control.closest?.('[data-tb-food-allocation]');
+      const value=allocation?.dataset?.tbFoodAllocation??control.dataset?.tbFoodAllocation??0;
+      const index=Number(value);return Number.isInteger(index)&&index>=0?index:0;
+    };
+    const addAllocation=(ctx,node)=>{
+      const row=live(ctx);if(!row)return;
+      const state=selectionForDraft(ctx,row),values=state.values.map(item=>({...item}));
+      if(values.length>=8)return;
+      const total=roundPortions(values.reduce((sum,item)=>sum+item.portions,0)),remaining=roundPortions(row.count-total);
+      if(remaining>0.001)values.push({foodId:'',portions:remaining});
+      else{
+        let index=0;for(let i=1;i<values.length;i++)if(values[i].portions>values[index].portions)index=i;
+        const first=roundPortions(values[index].portions/2),second=roundPortions(values[index].portions-first);
+        if(first<0.001||second<0.001){notify('Essa porção é pequena demais para ser dividida em outro alimento.',true);return;}
+        values[index].portions=first;values.push({foodId:'',portions:second});
+      }
+      drafts.set(state.key,values);errors.delete(state.key);paint();
+      const fresh=Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===node.dataset.tbFoodRow);
+      const selects=Array.from(fresh?.querySelectorAll?.('[data-tb-food-select]')||[]);selects[selects.length-1]?.focus();
+    };
+    const removeAllocation=(ctx,node,index)=>{
+      const row=live(ctx);if(!row)return;
+      const state=selectionForDraft(ctx,row),values=state.values.map(item=>({...item}));
+      if(values.length<=1||index<0||index>=values.length)return;
+      const [removed]=values.splice(index,1);values[0].portions=roundPortions(values[0].portions+removed.portions);
+      drafts.set(state.key,values);errors.delete(state.key);paint();
+      const fresh=Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===node.dataset.tbFoodRow);
+      fresh?.querySelector('[data-tb-food-select]')?.focus();
+    };
     document.addEventListener('change',event=>{
-      const select=event.target.closest?.('[data-tb-food-select]'),node=select?.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
-      const row=live(ctx),key=entryKey(ctx),food=row&&foods(row).find(item=>item.id===select.value);drafts.set(key,select.value);errors.delete(key);
+      const control=event.target.closest?.('[data-tb-food-select]'),node=control?.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
+      const row=live(ctx);if(!row)return;
+      const state=selectionForDraft(ctx,row),values=state.values.map(item=>({...item})),index=controlIndex(control);
+      if(index>=values.length)return;
+      values[index].foodId=String(control.value||'');drafts.set(state.key,values);errors.delete(state.key);updateDraftUi(node,ctx,row);
       if(node.dataset.tbFoodCompact==='1'){
         paint();
-        Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===key)?.querySelector('[data-tb-food-select]')?.focus();return;
+        const fresh=Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===state.key);
+        const selects=Array.from(fresh?.querySelectorAll?.('[data-tb-food-select]')||[]);selects[index]?.focus();
       }
-      node.querySelector('[data-tb-food-quantity]').textContent=food?.quantity||'—';
-      const entry=read(ctx.studentUid)[key],button=node.querySelector('[data-tb-food-save]');button.disabled=!food||inflight.has(key)||(entry?.foodId===select.value&&!entry.pending);button.textContent=entry?.pending&&entry.foodId===select.value?'Tentar sincronizar':'Guardar escolha';
-      node.querySelector('[data-tb-food-status]').textContent=food?'Toque em Guardar escolha para usar este alimento todos os dias.':'Escolha um alimento da tabela.';
+    });
+    document.addEventListener('input',event=>{
+      const input=event.target.closest?.('[data-tb-food-portions]'),node=input?.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
+      const row=live(ctx);if(!row)return;
+      const state=selectionForDraft(ctx,row),values=state.values.map(item=>({...item})),index=controlIndex(input);
+      if(index>=values.length)return;
+      values[index].portions=roundPortions(input.value);drafts.set(state.key,values);errors.delete(state.key);updateDraftUi(node,ctx,row);
     });
     document.addEventListener('click',event=>{
-      const action=event.target.closest?.('[data-tb-food-cancel]');
-      if(action){
-        if(action.disabled)return;
-        const node=action.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
-        const key=entryKey(ctx);event.preventDefault();
-        drafts.delete(key);errors.delete(key);
-        paint();
-        const row=Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===key);
-        row?.querySelector('[data-tb-food-select]')?.focus();return;
+      const add=event.target.closest?.('[data-tb-food-add]');
+      if(add){
+        if(add.disabled)return;
+        const node=add.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
+        event.preventDefault();addAllocation(ctx,node);return;
+      }
+      const remove=event.target.closest?.('[data-tb-food-remove]');
+      if(remove){
+        if(remove.disabled)return;
+        const node=remove.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
+        event.preventDefault();removeAllocation(ctx,node,Number(remove.dataset.tbFoodRemove));return;
+      }
+      const cancel=event.target.closest?.('[data-tb-food-cancel]');
+      if(cancel){
+        if(cancel.disabled)return;
+        const node=cancel.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
+        const key=entryKey(ctx);event.preventDefault();drafts.delete(key);errors.delete(key);paint();
+        const fresh=Array.from(document.querySelectorAll?.('[data-tb-food-row]')||[]).find(item=>item.dataset.tbFoodRow===key);
+        fresh?.querySelector('[data-tb-food-select]')?.focus();return;
       }
       const button=event.target.closest?.('[data-tb-food-save]');if(!button||button.disabled)return;
       const node=button.closest('[data-tb-food-row]'),ctx=node&&rowContext(node);if(!ctx)return;
-      event.preventDefault();save(ctx,node.querySelector('[data-tb-food-select]').value).catch(error=>{errors.set(entryKey(ctx),error.message);paint();notify(error.message,true);});
+      const row=live(ctx);if(!row)return;
+      const state=selectionForDraft(ctx,row),values=drafts.has(state.key)?state.values:state.saved.map(item=>({foodId:item.foodId,portions:item.portions}));
+      event.preventDefault();save(ctx,values).catch(error=>{errors.set(state.key,error.message);paint();notify(error.message,true);});
     });
     document.addEventListener('toggle',event=>{
       const details=event.target.closest?.('details[data-tb-food-details]');if(!details)return;
