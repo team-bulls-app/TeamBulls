@@ -2747,3 +2747,53 @@ html[data-theme="light"] .exercise-row-techniques b{color:#f2c8c2}
 html[data-theme="light"] .superset-badge{color:#ffd27c}
 html[data-theme="light"] .tb-guidance-card .tb-hydration-value{color:#b8d9ff}
 html[data-theme="light"] .tb-guidance-card .tb-nutrition-details summary::marker{color:#ed7779}
+
+/* Team Bulls v10.10.9 — contraste dos cartões de dieta e do resumo diário no tema claro. */
+html[data-theme="light"] .options-intro,
+html[data-theme="light"] .diet-free-meal-policy,
+html[data-theme="light"] .home-daily-summary{
+  --text:var(--tb-light-panel-ink);
+  --text-dim:var(--tb-light-panel-muted);
+  --text-muted:var(--tb-light-panel-subtle);
+  --border:var(--tb-light-panel-border);
+  --border-l:var(--tb-light-panel-border-strong);
+  --accent:var(--tb-light-brand-on-panel);
+  --accent-dim:#472526;
+  background:var(--tb-light-panel);
+  background-image:none;
+  border-color:var(--tb-light-panel-border);
+  color:var(--tb-light-panel-ink);
+}
+html[data-theme="light"] .options-intro-title,
+html[data-theme="light"] .diet-free-meal-policy-main strong,
+html[data-theme="light"] .home-daily-summary-head strong,
+html[data-theme="light"] .home-daily-summary-item strong{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .options-intro-subtitle,
+html[data-theme="light"] .diet-free-meal-policy-main small,
+html[data-theme="light"] .home-daily-summary-head span,
+html[data-theme="light"] .home-daily-summary-item span,
+html[data-theme="light"] .home-daily-summary-foot{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .diet-free-meal-policy-main span{color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .home-daily-summary-item{background:var(--tb-light-panel-raised);border:1px solid var(--tb-light-panel-border)}
+html[data-theme="light"] .global-report-guide-panel{background:var(--tb-light-panel);background-image:none;border-color:var(--tb-light-panel-border);color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .global-report-guide-head>div>span{color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .global-report-guide-panel .report-guide-card span{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .global-report-guide-panel .report-guide-card small{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .global-report-guide-panel .plan-help{background:var(--tb-light-panel-raised);border-color:var(--tb-light-panel-border);color:var(--tb-light-panel-muted)}
+html[data-theme="light"] #screen-meals .readonly-banner{background:#fff3d7;border-color:#c79431;color:#56390b}
+html[data-theme="light"] .supplements-free-meal-card{
+  --text:#f0e8de;
+  --text-dim:#d0c7bc;
+  --text-muted:#c5b9ab;
+  background:linear-gradient(110deg,#482526,#262422 58%,#1b1a19);
+  border-color:#75685d;
+  border-left-color:#ed7779;
+  color:#f0e8de;
+}
+html[data-theme="light"] .supplements-free-meal-card strong{color:#f0e8de}
+html[data-theme="light"] .supplements-free-meal-card small{color:#d0c7bc}
+html[data-theme="light"] .supplements-free-meal-card>b{color:#f1c9ae}
+html[data-theme="light"] .supplements-free-meal-card svg{stroke:#f0e8de}
+html[data-theme="light"] .supplements-free-meal-card:hover{background:linear-gradient(110deg,#5a292b,#2b2927 58%,#1b1a19);border-color:#a28361}
+html[data-theme="light"] .tb-guidance-card .tb-guidance-head small{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .tb-guidance-card .tb-hydration-note{color:var(--tb-light-panel-muted)}
