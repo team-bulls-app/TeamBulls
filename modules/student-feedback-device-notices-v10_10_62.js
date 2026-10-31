@@ -48,7 +48,7 @@
     if(!uid||optedOut(uid)||!available()||Notification.permission!=='granted'||!vapidKey||!db)return false;
     if(registerPromise)return registerPromise;
     registerPromise=(async()=>{
-      const loaded=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js',()=>typeof firebase?.messaging==='function');
+      const loaded=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-messaging-compat.js',()=>typeof firebase?.messaging==='function');
       if(!loaded||!await firebase.messaging.isSupported())throw new Error('Este celular não oferece notificações em segundo plano.');
       const registration=await pushRegistration(),messaging=firebase.messaging(),token=await messaging.getToken({vapidKey,serviceWorkerRegistration:registration});
       if(!token||student()!==uid)throw new Error('Não foi possível confirmar o aparelho do aluno.');
@@ -91,7 +91,7 @@
       let messaging=null;
       if(Notification.permission==='granted'&&publicKey()){
         try{
-          const loaded=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js',()=>typeof firebase?.messaging==='function');
+          const loaded=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-messaging-compat.js',()=>typeof firebase?.messaging==='function');
           if(loaded&&await firebase.messaging.isSupported()){
             messaging=firebase.messaging();
             const registration=await pushRegistration(),token=await messaging.getToken({vapidKey:publicKey(),serviceWorkerRegistration:registration});

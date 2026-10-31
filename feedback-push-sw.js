@@ -1,7 +1,7 @@
 /* Worker isolado: recebe apenas avisos de feedback; não altera o cache do app. */
 'use strict';
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/13.1.0/firebase-messaging-compat.js');
 firebase.initializeApp({apiKey:'AIzaSyAdaKNItJ66v0Po_VpQue9huFf_psLmV54',authDomain:'teamms-app.firebaseapp.com',projectId:'teamms-app',messagingSenderId:'57870273303',appId:'1:57870273303:web:1de3016167b9a69dfd4552'});
 const labels={weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',extra:'Feedback extra'};
 firebase.messaging().onBackgroundMessage(payload=>{

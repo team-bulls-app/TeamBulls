@@ -4691,13 +4691,14 @@ async function saveDayFolder(){
   const dayId=String(editingDay?.id||(oldName?dayIdFromName(oldName):dayIdFromName(name)));
   const duplicate=getWorkoutDays(workout).some(day=>normalizedName(day.name)===normalizedName(name)&&String(day.id)!==dayId);if(duplicate){alert('Já existe uma pasta de dia com esse nome.');return;}
   if(!beginAction('save-day','modal-day'))return;
+  let saveSucceeded=false;
   try{
     if(DAY_MODAL_TARGET==='student'){
       if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT)throw new Error('Abra novamente o cadastro do aluno antes de salvar.');
       const studentUid=String(VIEW_STUDENT.uid||''),workoutId=String(workout.id||'');
       if(!studentUid||!workoutId)throw new Error('Aluno ou protocolo não identificado.');
       const workoutRef=db.collection('workouts').doc(workoutId);
-      const renameExerciseRefs=oldName&&normalizedName(oldName)!==normalizedName(name)
+      const renameExerciseRefs=oldName&&String(oldName)!==String(name)
         ?[...new Set(exercisesForDay(workout,oldName).map(exercise=>String(exercise.id||'')).filter(Boolean))].map(id=>db.collection('exercises').doc(id))
         :[];
       const persist=()=>db.runTransaction(async transaction=>{
@@ -4708,24 +4709,30 @@ async function saveDayFolder(){
         const rawDays=Array.isArray(workoutData.days)?workoutData.days:[];
         const currentDays=normalizeWorkoutDays(rawDays,workout.exercises||[]);
         const selected=currentDays.find(day=>String(day.id)===dayId)||currentDays.find(day=>normalizedName(day.name)===normalizedName(oldName));
-        const alreadySaved=currentDays.find(day=>String(day.id)===dayId&&normalizedName(day.name)===normalizedName(name)&&JSON.stringify(normalizeMuscleGroups(day.muscleGroups))===JSON.stringify(groups)&&safeWorkoutGuidance(day.frequencyGuidance)===frequencyGuidance&&safeWorkoutGuidance(day.restGuidance)===restGuidance);
-        if(oldName&&!selected){
-          if(alreadySaved){
-            // A previous transaction may have committed while its response timed
-            // out. Reconcile the same exercise refs before reporting success so
-            // the trainer's in-memory protocol matches the server snapshot.
-            const exerciseSnapshots=await Promise.all(renameExerciseRefs.map(ref=>transaction.get(ref)));
-            const renamedExerciseIds=exerciseSnapshots.filter(snapshot=>{
-              if(!snapshot.exists)return false;
-              const data=snapshot.data()||{};
-              return String(data.userId||'')===studentUid&&String(data.workoutId||'')===workoutId&&normalizedName(data.dayName||'Treino geral')===normalizedName(name);
-            }).map(snapshot=>snapshot.id);
-            return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds,alreadySaved:true};
-          }
-          throw new Error('Este dia mudou em outra sessão. Atualize o protocolo e tente novamente.');
-        }
+        const alreadySaved=currentDays.find(day=>String(day.id)===dayId&&String(day.name||'')===name&&JSON.stringify(normalizeMuscleGroups(day.muscleGroups))===JSON.stringify(groups)&&safeWorkoutGuidance(day.frequencyGuidance)===frequencyGuidance&&safeWorkoutGuidance(day.restGuidance)===restGuidance);
         const conflicting=currentDays.find(day=>normalizedName(day.name)===normalizedName(name)&&String(day.id)!==dayId);
         if(conflicting)throw new Error('Já existe uma pasta de dia com esse nome.');
+        if(oldName&&alreadySaved){
+          // A previous transaction may have committed while its response timed
+          // out. Keep the stable day ID and reconcile exercises under the same
+          // owner/protocol before reporting success to the in-memory view.
+          const exerciseSnapshots=await Promise.all(renameExerciseRefs.map(ref=>transaction.get(ref)));
+          const renamedExerciseIds=[];
+          exerciseSnapshots.forEach(snapshot=>{
+            if(!snapshot.exists)return;
+            const data=snapshot.data()||{};
+            if(String(data.userId||'')!==studentUid||String(data.workoutId||'')!==workoutId)return;
+            const currentDayName=normalizedName(data.dayName||'Treino geral');
+            if(currentDayName===normalizedName(oldName)){
+              transaction.update(snapshot.ref,{dayName:name});
+              renamedExerciseIds.push(snapshot.id);
+            }else if(currentDayName===normalizedName(name))renamedExerciseIds.push(snapshot.id);
+          });
+          return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds,alreadySaved:true};
+        }
+        if(oldName&&!selected){
+          throw new Error('Este dia mudou em outra sessão. Atualize o protocolo e tente novamente.');
+        }
         if(!oldName&&alreadySaved)return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds:[],alreadySaved:true};
         let nextDays=oldName
           ?currentDays.map(day=>String(day.id)===String(selected.id)?{...day,name,muscleGroups:groups,frequencyGuidance,restGuidance}:day)
@@ -4764,19 +4771,21 @@ async function saveDayFolder(){
       const renamed=new Set(result.renamedExerciseIds||[]);
       if(renamed.size)for(const exercise of workout.exercises||[])if(renamed.has(String(exercise.id)))exercise.dayName=name;
       if(renamed.size)workout.exercises=sortWorkoutExercises(workout);
+      saveSucceeded=true;
       VIEW_STUDENT_DAY=name;closeModal('modal-day');renderTsWorkout(workout);showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
     }else{
       if(!canSelfManagePlan())throw new Error('Este plano é administrado pelo treinador.');
       const newDays=dayListAfterRename(workout,oldName,name).map(day=>normalizedName(day.name)===normalizedName(name)?{...day,muscleGroups:groups,frequencyGuidance,restGuidance}:day);
       const snapshot=JSON.stringify(LOCAL_DB);workout.days=newDays;if(oldName)for(const exercise of exercisesForDay(workout,oldName))exercise.dayName=name;
       if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(snapshot));throw new Error('Falha ao gravar no aparelho.');}
+      saveSucceeded=true;
       CUR_DAY=name;closeModal('modal-day');renderWorkout();showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
     }
   }catch(error){
     console.error('[Team Bulls] Falha ao salvar o dia de treino.',error);
     const detail=cloudWriteError(error,'salvar o dia de treino');
     alert('Erro ao salvar o dia: '+detail);
-  }finally{EDIT_DAY_NAME='';endAction('save-day','modal-day');}
+  }finally{if(saveSucceeded)EDIT_DAY_NAME='';endAction('save-day','modal-day');}
 }
 async function deleteDayFolder(dayName,target='self'){
   const workout=workoutForDayTarget(target);if(!workout)return;
