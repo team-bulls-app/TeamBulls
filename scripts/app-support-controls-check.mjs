@@ -9,6 +9,7 @@ const diagnosticsSource=read('modules/support-diagnostics-v10_10_9.js');
 const profile=read('modules/student-home-profile-v10_10_12.js');
 const index=read('index.html'),config=read('config_v10_7.js'),updater=read('update_v10_10_9.js');
 const sw=read('sw.js'),sw47=read('sw_47.js'),version=JSON.parse(read('version.json'));
+const CURRENT_BUILD=Number(version.build);
 
 function makeNoticeHarness({online=true,failDelete=false}={}){
   const local=new Map(),listeners=new Map(),records=new Map(),writes=[],deletes=[],shown=[];
@@ -83,11 +84,11 @@ async function checkDiagnostics(clipboardAvailable){
   const document={getElementById:id=>elements[id]||null,querySelector:()=>({id:'screen-student-notifications'})};
   const navigator={onLine:true,serviceWorker:{controller:{}},standalone:false};
   if(clipboardAvailable)navigator.clipboard={writeText:async text=>copied.push(text)};
-  const window={TeamBullsUpdater:{version:'10.10.9',build:2026103101}};
+  const window={TeamBullsUpdater:{version:'10.10.9',build:CURRENT_BUILD}};
   const context={window,document,navigator,matchMedia:query=>({matches:query==='(pointer: coarse)'}),CURRENT_USER:{uid:'private-user-id',name:'Nome Particular',email:'private@example.com',role:'student'},MODE:'cloud',Date,Number,String,Promise,console};
   vm.runInNewContext(diagnosticsSource,context,{filename:'support-diagnostics-v10_10_9.js'});
   const summary=window.TeamBullsSupportDiagnostics.createSummary();
-  assert.match(summary,/Build: 2026103101/);
+  assert.match(summary,new RegExp(`Build: ${CURRENT_BUILD}`));
   assert.match(summary,/Tela: screen-student-notifications/);
   for(const secret of ['private-user-id','Nome Particular','private@example.com'])assert.equal(summary.includes(secret),false,'O diagnóstico não pode incluir dados pessoais.');
   assert.equal(/fetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket/.test(diagnosticsSource),false,'O módulo de diagnóstico não pode enviar dados.');
@@ -105,9 +106,9 @@ assert.match(config,/student-home-profile-v10_10_12\.js\?v=10\.10\.22-studenthom
 assert.match(updater,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics3/);
 assert.match(sw,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics3/);
 assert.equal(sw,sw47,'Os service workers publicados devem permanecer idênticos.');
-assert.equal(Number(version.build),2026103101,'O build publicado deve acompanhar os arquivos atualizados.');
-assert.match(updater,/const CURRENT_BUILD=2026103101/);
-assert.match(sw,/const BUILD_REVISION=2026103101/);
+assert.ok(CURRENT_BUILD>0,'O build publicado deve acompanhar os arquivos atualizados.');
+assert.match(updater,new RegExp(`const CURRENT_BUILD=${CURRENT_BUILD}`));
+assert.match(sw,new RegExp(`const BUILD_REVISION=${CURRENT_BUILD}`));
 assert.match(index,/student-training-calendar-v10_10_70\.js\?v=10\.10\.70-explicit-cycle-calendar2/);
 assert.match(index,/styles_v10_10_9\.css\?v=10\.10.9&theme=light14/);
 

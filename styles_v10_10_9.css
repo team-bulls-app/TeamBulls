@@ -2632,27 +2632,14 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
   }
   #screen-auth::before,#screen-auth::after{content:none}
   #screen-auth .auth-logo{
-    display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;
-    margin:0;text-align:left;font-size:21px;line-height:1;letter-spacing:1px;
+    display:block;width:100%;max-width:100%;
+    margin:0 0 20px;text-align:center;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
+    font-size:clamp(42px,11vw,48px);font-weight:900;line-height:.95;letter-spacing:-2px;
     color:#f2eadf;text-shadow:0 2px 16px #000;
   }
-  #screen-auth .auth-logo::before{
-    content:'TB';display:flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:42px;
-    border-radius:10px;background:#a51e20;color:#fff;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
-    font-size:14px;font-weight:800;letter-spacing:0;text-shadow:none;box-shadow:0 5px 18px rgba(0,0,0,.35);
-  }
-  #screen-auth .auth-logo .dim{color:#f2eadf}
-  #screen-auth .auth-sub{
-    margin:30px 8px 7px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;
-    line-height:1.4;letter-spacing:1.5px;color:#e29a87;text-shadow:0 2px 12px #000;
-  }
-  #screen-auth .auth-intro{display:block;margin:0 8px 22px;max-width:440px}
-  #screen-auth .auth-intro h1{
-    margin:0;color:#f7f1e9;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
-    font-size:clamp(27px,7vw,32px);font-weight:800;line-height:.99;letter-spacing:.1px;
-    text-shadow:0 3px 18px rgba(0,0,0,.72);
-  }
-  #screen-auth .auth-intro p{margin:8px 0 0;color:#d5c9bb;font-size:12px;line-height:1.45;text-shadow:0 2px 12px #000}
+  #screen-auth .auth-logo::before{content:none}
+  #screen-auth .auth-logo .dim{color:#9f2224}
+  #screen-auth .auth-sub{display:none}
   #screen-auth .auth-card{
     width:100%;max-width:480px;margin:0 auto;padding:18px;border:1px solid rgba(117,99,84,.72);
     border-top:3px solid #a51e20;border-radius:19px;background:rgba(15,14,13,.95);
@@ -2713,8 +2700,7 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
     background-size:cover,cover,cover!important;background-position:center,center,center top!important;background-repeat:no-repeat!important;
   }
   html[data-theme="light"] #screen-auth .auth-logo{color:#f2eadf;text-shadow:0 2px 16px #000}
-  html[data-theme="light"] #screen-auth .auth-logo .dim{color:#f2eadf}
-  html[data-theme="light"] #screen-auth .auth-sub{color:#e29a87}
+  html[data-theme="light"] #screen-auth .auth-logo .dim{color:#9f2224}
   html[data-theme="light"] #screen-auth .auth-card::before{color:#d69a86}
   html[data-theme="light"] #screen-auth .auth-link-btn{color:#e2ab98}
   html[data-theme="light"] #screen-auth .auth-divider::before,
@@ -2724,9 +2710,7 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
 }
 @media(max-width:899px) and (max-height:740px){
   #screen-auth.active{padding-top:calc(14px + env(safe-area-inset-top,0px))!important;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))!important}
-  #screen-auth .auth-sub{margin-top:18px}
-  #screen-auth .auth-intro{margin-bottom:15px}
-  #screen-auth .auth-intro h1{font-size:clamp(24px,6vw,28px)}
+  #screen-auth .auth-logo{margin-bottom:16px;font-size:42px}
   #screen-auth .auth-card{padding:15px}
   #screen-auth .auth-card-intro{margin-bottom:11px}
 }
