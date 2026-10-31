@@ -200,10 +200,11 @@
   }
   async function refreshCanonicalRequest(uid){
     if(!uid||typeof computeCheckinRequest!=='function')throw new Error('Não foi possível validar o período atual do relatório.');
-    const [scheduleDoc,historySnap]=await Promise.all([
-      strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal'),
-      strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal')
-    ]);
+    // Leituras sequenciais evitam duas operações compat do Firestore concorrendo
+    // durante o preflight em aparelhos móveis/conexões instáveis. Ambas continuam
+    // exigindo fonte server; nenhuma resposta do cache pode autorizar o envio.
+    const scheduleDoc=await strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal');
+    const historySnap=await strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal');
     if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw new Error('A sessão do aluno mudou durante a confirmação.');
     if(!scheduleDoc?.exists)throw new Error('A programação semanal não está mais disponível.');
     const schedule={...scheduleDoc.data(),studentId:uid};
