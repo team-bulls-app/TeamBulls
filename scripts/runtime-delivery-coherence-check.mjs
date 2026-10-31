@@ -15,8 +15,10 @@ const usability=read('modules/usability-checkup-v10_10_9.js');
 const intelligence=read('modules/intelligence-suite-loader-v10_10_42.js');
 const trainerRuntime=read('modules/trainer-runtime-reliability-v10_10_46.js');
 const heic=read('modules/heic-report-conversion-v10_10_12.js');
+const core=read('app_v10_10_9_core.js');
+const index=read('index.html');
 
-for(const file of ['config_v10_7.js','update_v10_10_9.js','sw.js','sw_47.js','viewport_v10_10_9.js','modules/usability-checkup-v10_10_9.js','modules/intelligence-suite-loader-v10_10_42.js','modules/trainer-runtime-reliability-v10_10_46.js','modules/heic-report-conversion-v10_10_12.js']){
+for(const file of ['config_v10_7.js','update_v10_10_9.js','sw.js','sw_47.js','viewport_v10_10_9.js','modules/usability-checkup-v10_10_9.js','modules/intelligence-suite-loader-v10_10_42.js','modules/trainer-runtime-reliability-v10_10_46.js','modules/heic-report-conversion-v10_10_12.js','app_v10_10_9_core.js']){
   const syntax=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});
   assert(syntax.status===0,`${file} possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
 }
@@ -36,6 +38,12 @@ assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'")&&sw.include
 assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite9')&&usability.includes("const EXPECTED_VERSION='10.10.58-intelsuite9'"),'Bootstrap ainda espera suíte de inteligência antiga.');
 assert(intelligence.includes("const VERSION='10.10.58-intelsuite9'"),'Suíte de inteligência canônica não está na revisão esperada.');
 assert(intelligence.includes('student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7'),'Suíte não entrega a correção atual do envio semanal.');
+const trainerSpec=intelligence.slice(intelligence.indexOf('trainer:['),intelligence.indexOf('],\n    student:['));
+assert(trainerSpec.includes('foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1'),'A retomada do Firestore precisa ser carregada também no fluxo do treinador.');
+assert(core.includes('firebasejs/13.1.0/firebase-firestore-compat.js')&&!core.includes('firebasejs/10.7.1/'),'O runtime ainda usa uma versão antiga/inconsistente do Firebase.');
+assert(config.includes('firebasejs/13.1.0/firebase-app-check-compat.js')&&!config.includes('firebasejs/10.7.1/'),'App Check ainda usa uma versão antiga do Firebase.');
+assert(core.includes('db.runTransaction')&&core.includes('function daySaveRetryable'),'A gravação do dia deve usar transação e retry limitado.');
+assert(index.includes('firebase=13.1.0&daysave=transaction1'),'O cache do navegador ainda pode servir o runtime antigo da gravação.');
 
 assert(viewport.includes('trainer-runtime-reliability-v10_10_46.js?v=10.10.53-trainer3'),'Cold start ainda pede runtime antigo do treinador.');
 assert(viewport.includes("TeamBullsTrainerRuntimeReliability?.version==='10.10.53-trainer3'"),'Cold start ainda valida revisão antiga do treinador.');
