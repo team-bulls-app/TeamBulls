@@ -2618,6 +2618,119 @@ html[data-theme="light"] .v107-tabs button:not(.active):hover{border-color:var(-
 html[data-theme="light"] .v107-tabs{background:#171615}
 html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-light-panel-muted)}
 
+/* Login mobile: portal de consultoria com fundo imersivo e formulário legível. */
+.auth-intro,.auth-card-intro{display:none}
+@media(max-width:899px){
+  #screen-auth.active{
+    display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;
+    min-height:var(--app-height,100svh);height:auto;overflow-x:hidden;overflow-y:auto;
+    overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;
+    padding:calc(22px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))!important;
+    background-color:#070706;
+    background-image:linear-gradient(180deg,rgba(4,4,4,.34) 0%,rgba(4,4,4,.34) 28%,rgba(4,4,4,.82) 51%,#070706 73%),linear-gradient(90deg,rgba(4,4,4,.46),rgba(4,4,4,.04) 48%,rgba(4,4,4,.42)),url('team-bulls-consultoria-bg-v1.jpg');
+    background-size:cover,cover,cover;background-position:center,center,center top;background-repeat:no-repeat;background-attachment:scroll;
+  }
+  #screen-auth::before,#screen-auth::after{content:none}
+  #screen-auth .auth-logo{
+    display:flex;align-items:center;gap:10px;width:max-content;max-width:100%;
+    margin:0;text-align:left;font-size:21px;line-height:1;letter-spacing:1px;
+    color:#f2eadf;text-shadow:0 2px 16px #000;
+  }
+  #screen-auth .auth-logo::before{
+    content:'TB';display:flex;align-items:center;justify-content:center;flex:0 0 42px;width:42px;height:42px;
+    border-radius:10px;background:#a51e20;color:#fff;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
+    font-size:14px;font-weight:800;letter-spacing:0;text-shadow:none;box-shadow:0 5px 18px rgba(0,0,0,.35);
+  }
+  #screen-auth .auth-logo .dim{color:#f2eadf}
+  #screen-auth .auth-sub{
+    margin:30px 8px 7px;text-align:left;font-family:'DM Mono',monospace;font-size:9px;
+    line-height:1.4;letter-spacing:1.5px;color:#e29a87;text-shadow:0 2px 12px #000;
+  }
+  #screen-auth .auth-intro{display:block;margin:0 8px 22px;max-width:440px}
+  #screen-auth .auth-intro h1{
+    margin:0;color:#f7f1e9;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
+    font-size:clamp(27px,7vw,32px);font-weight:800;line-height:.99;letter-spacing:.1px;
+    text-shadow:0 3px 18px rgba(0,0,0,.72);
+  }
+  #screen-auth .auth-intro p{margin:8px 0 0;color:#d5c9bb;font-size:12px;line-height:1.45;text-shadow:0 2px 12px #000}
+  #screen-auth .auth-card{
+    width:100%;max-width:480px;margin:0 auto;padding:18px;border:1px solid rgba(117,99,84,.72);
+    border-top:3px solid #a51e20;border-radius:19px;background:rgba(15,14,13,.95);
+    box-shadow:0 20px 54px rgba(0,0,0,.58);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  }
+  #screen-auth .auth-card::before{
+    content:'ÁREA DO ALUNO  //  TEAM BULLS';display:block;margin-bottom:8px;
+    color:#d69a86;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1.1px;
+  }
+  #screen-auth .auth-card-intro{display:block;margin:0 0 15px}
+  #screen-auth .auth-card-intro h2{
+    margin:0;color:#f5efe6;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
+    font-size:22px;font-weight:800;line-height:1.1;letter-spacing:.2px;
+  }
+  #screen-auth .auth-card-intro p{margin:5px 0 0;color:#bcb2a7;font-size:11px;line-height:1.45}
+  #screen-auth .auth-tabs{
+    display:flex;gap:4px;margin:0 0 14px;padding:4px;border:1px solid #453c35;
+    border-radius:10px;background:#211f1d;
+  }
+  #screen-auth .auth-tab{
+    min-height:38px;padding:8px 6px;border:1px solid transparent;border-radius:7px;
+    background:transparent;color:#c3b9ae;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
+    font-size:13px;letter-spacing:.5px;
+  }
+  #screen-auth .auth-tab.active{
+    border-color:#bd4143;background:#a51e20;color:#fff;
+    box-shadow:0 3px 10px rgba(90,10,12,.28);
+  }
+  #screen-auth .auth-panel .form-group{margin-bottom:11px}
+  #screen-auth .form-label{margin-bottom:5px;color:#d3c8bc;font-size:9px;letter-spacing:.8px}
+  #screen-auth .form-input{
+    min-height:44px;padding:11px 12px;border:1px solid #51463d;border-radius:8px;
+    background:#191816;color:#f0e8de;font-size:14px;
+  }
+  #screen-auth .form-input:focus{border-color:#a51e20;box-shadow:0 0 0 2px rgba(165,30,32,.22)}
+  #screen-auth .btn-primary{
+    min-height:48px;margin-top:5px;border:1px solid #c64749;border-radius:9px;
+    background:linear-gradient(180deg,#b32629,#8e191c);box-shadow:inset 0 1px rgba(255,255,255,.1);
+    font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:13px;letter-spacing:.7px;
+  }
+  #screen-auth #btn-login{width:100%}
+  #screen-auth .auth-link-btn{
+    margin:1px 0 7px auto;padding:5px 2px;color:#e2ab98;font-family:'Barlow',sans-serif;
+    font-size:10px;letter-spacing:0;text-decoration:none;text-transform:none;
+  }
+  #screen-auth .auth-divider{gap:9px;margin:8px 0}
+  #screen-auth .auth-divider span{color:#91877c;font-size:10px}
+  #screen-auth .auth-divider::before,#screen-auth .auth-divider::after{background:#453c35}
+  #screen-auth .btn-offline{
+    min-height:43px;padding:9px 10px;border:1px solid #51463d;border-radius:9px;
+    background:#1c1a18;color:#d5cabd;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.8px;
+  }
+  #screen-auth .auth-help{color:#c1b7ab;font-size:12px}
+  #screen-auth .auth-error{border-radius:8px}
+  html[data-theme="light"] #screen-auth.active{
+    background-color:#070706!important;
+    background-image:linear-gradient(180deg,rgba(4,4,4,.34) 0%,rgba(4,4,4,.34) 28%,rgba(4,4,4,.82) 51%,#070706 73%),linear-gradient(90deg,rgba(4,4,4,.46),rgba(4,4,4,.04) 48%,rgba(4,4,4,.42)),url('team-bulls-consultoria-bg-v1.jpg')!important;
+    background-size:cover,cover,cover!important;background-position:center,center,center top!important;background-repeat:no-repeat!important;
+  }
+  html[data-theme="light"] #screen-auth .auth-logo{color:#f2eadf;text-shadow:0 2px 16px #000}
+  html[data-theme="light"] #screen-auth .auth-logo .dim{color:#f2eadf}
+  html[data-theme="light"] #screen-auth .auth-sub{color:#e29a87}
+  html[data-theme="light"] #screen-auth .auth-card::before{color:#d69a86}
+  html[data-theme="light"] #screen-auth .auth-link-btn{color:#e2ab98}
+  html[data-theme="light"] #screen-auth .auth-divider::before,
+  html[data-theme="light"] #screen-auth .auth-divider::after{background:#453c35}
+  html[data-theme="light"] #screen-auth .auth-divider span{color:#91877c}
+  html[data-theme="light"] #screen-auth .btn-offline{background:#1c1a18;border-color:#51463d;color:#d5cabd}
+}
+@media(max-width:899px) and (max-height:740px){
+  #screen-auth.active{padding-top:calc(14px + env(safe-area-inset-top,0px))!important;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px))!important}
+  #screen-auth .auth-sub{margin-top:18px}
+  #screen-auth .auth-intro{margin-bottom:15px}
+  #screen-auth .auth-intro h1{font-size:clamp(24px,6vw,28px)}
+  #screen-auth .auth-card{padding:15px}
+  #screen-auth .auth-card-intro{margin-bottom:11px}
+}
+
 /* Instruções permanecem opacas para que o brilho do canvas não interfira na leitura. */
 html[data-theme="light"] #screen-instructions .instructions-required-banner,
 html[data-theme="light"] #screen-instructions .instruction-folder,
