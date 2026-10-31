@@ -51,4 +51,3 @@ assert.equal(Number(bridge.match(/const BUILD_REVISION=(\d+)/)?.[1]), Number(ver
 assert.equal(Number(updater.match(/const CURRENT_BUILD=(\d+)/)?.[1]), Number(version.build));
 
 console.log('APROVADO: layout mobile da consultoria, fluxos de login e entrega/cache dos assets estão coerentes.');
-
