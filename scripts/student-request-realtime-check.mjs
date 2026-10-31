@@ -9,6 +9,8 @@ const realtime=read('modules/student-request-realtime-v10_10_32.js');
 const submitPath='modules/student-report-submit-reconciliation-v10_10_57.js';
 const submitState=read(submitPath);
 const loader=read('modules/intelligence-suite-loader-v10_10_42.js');
+const bootstrap=read('modules/usability-checkup-v10_10_9.js');
+const weeklyIntegrity=read('modules/weekly-report-integrity-v10_10_58.js');
 const rules=read('firebase/firestore_28_compacto.rules');
 
 for(const modulePath of ['modules/student-request-realtime-v10_10_32.js',submitPath]){
@@ -50,12 +52,19 @@ assert(realtime.includes('firebase.auth().onAuthStateChanged'),'Troca/encerramen
 assert(realtime.includes('confirmLogout.__tbStudentRealtimeStop'),'Logout explícito não possui proteção de desmontagem.');
 assert(realtime.includes('if(activeUid===uid&&unsubs.length)'),'Runtime pode duplicar listeners para o mesmo aluno.');
 
-// Envio canônico: relatórios com fotos não usam mais a fila de batch do Firestore Web SDK.
-// O loader físico é mutável/network-first; sua revisão pública permanece compatível
-// com o bootstrap enquanto o módulo semanal usa um cache-buster próprio novo.
-assert(loader.includes("const VERSION='10.10.58-intelsuite8'"),'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
+// O bootstrap, o URL mutável do loader, o módulo semanal e sua verificação de
+// prontidão precisam apontar para as mesmas revisões publicadas.
+const bootstrapStart=bootstrap.indexOf("const SRC='./modules/intelligence-suite-loader-v10_10_42.js?");
+const bootstrapSection=bootstrapStart>=0?bootstrap.slice(bootstrapStart,bootstrap.indexOf('})();',bootstrapStart)):'';
+const bootstrapSrc=bootstrapSection.match(/const SRC='([^']+)'/)?.[1]||'';
+const bootstrapVersion=bootstrapSection.match(/const EXPECTED_VERSION='([^']+)'/)?.[1]||'';
+const bootstrapUrlVersion=bootstrapSrc?new URL(bootstrapSrc,'https://team-bulls.test/').searchParams.get('v'):'';
+const loaderVersion=loader.match(/const VERSION='([^']+)'/)?.[1]||'';
+const weeklyVersion=weeklyIntegrity.match(/const VERSION='([^']+)'/)?.[1]||'';
+assert(!!bootstrapVersion&&bootstrapVersion===bootstrapUrlVersion&&bootstrapVersion===loaderVersion,'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
 assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
-assert(loader.includes("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5"),'Aluno não carrega a guarda semanal atual depois do transporte REST.');
+const studentWeeklySpec=[...loader.matchAll(/\[['"]\.\/modules\/weekly-report-integrity-v10_10_58\.js\?v=([^'"]+)['"],\s*\(\)=>window\.TeamBullsWeeklyReportIntegrity\?\.version===['"]([^'"]+)['"]\]/g)].at(-1);
+assert(!!studentWeeklySpec&&studentWeeklySpec[1]===weeklyVersion&&studentWeeklySpec[2]===weeklyVersion,'Aluno não carrega e valida a guarda semanal atual depois do transporte REST.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
 assert(loader.indexOf('student-report-submit-reconciliation-v10_10_57.js')<loader.lastIndexOf('weekly-report-integrity-v10_10_58.js'),'Guarda semanal precisa envolver o submit REST canônico, não antecedê-lo.');
 assert(submitState.includes("const VERSION='10.10.57-submitstate7'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');

@@ -41,6 +41,7 @@ has(integrity,"if(String(row?.requestKind||'scheduled')==='manual')return row",'
 has(integrity,"reference.get({source:'server'})",'Preflight semanal não força confirmação no servidor.');
 has(integrity,'const READ_RETRIES=2','Confirmação semanal não possui retentativa limitada para falhas transitórias do Firestore.');
 has(integrity,'retryableServerRead(error)','Retentativa semanal não filtra erros permanentes e transitórios.');
+has(integrity,'resilience.awaitReady({force:true})','Retentativa não revalida/reabre a conexão Firestore após falha transitória.');
 has(integrity,"db.collection('checkinSchedules').doc(uid)",'Preflight não confirma a agenda semanal atual.');
 has(integrity,"db.collection('weeklyCheckins').where('studentId','==',uid)",'Preflight não confirma o histórico semanal do próprio aluno.');
 has(integrity,'const requestHistory=historyForRequestCalculation(history)','Preflight não usa identidade recuperada somente para cálculo.');

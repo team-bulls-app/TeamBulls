@@ -4710,7 +4710,18 @@ async function saveDayFolder(){
         const selected=currentDays.find(day=>String(day.id)===dayId)||currentDays.find(day=>normalizedName(day.name)===normalizedName(oldName));
         const alreadySaved=currentDays.find(day=>String(day.id)===dayId&&normalizedName(day.name)===normalizedName(name)&&JSON.stringify(normalizeMuscleGroups(day.muscleGroups))===JSON.stringify(groups)&&safeWorkoutGuidance(day.frequencyGuidance)===frequencyGuidance&&safeWorkoutGuidance(day.restGuidance)===restGuidance);
         if(oldName&&!selected){
-          if(alreadySaved)return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds:[],alreadySaved:true};
+          if(alreadySaved){
+            // A previous transaction may have committed while its response timed
+            // out. Reconcile the same exercise refs before reporting success so
+            // the trainer's in-memory protocol matches the server snapshot.
+            const exerciseSnapshots=await Promise.all(renameExerciseRefs.map(ref=>transaction.get(ref)));
+            const renamedExerciseIds=exerciseSnapshots.filter(snapshot=>{
+              if(!snapshot.exists)return false;
+              const data=snapshot.data()||{};
+              return String(data.userId||'')===studentUid&&String(data.workoutId||'')===workoutId&&normalizedName(data.dayName||'Treino geral')===normalizedName(name);
+            }).map(snapshot=>snapshot.id);
+            return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds,alreadySaved:true};
+          }
           throw new Error('Este dia mudou em outra sessão. Atualize o protocolo e tente novamente.');
         }
         const conflicting=currentDays.find(day=>normalizedName(day.name)===normalizedName(name)&&String(day.id)!==dayId);

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
+import vm from 'node:vm';
 
 const fail=[];
 const read=file=>fs.readFileSync(file,'utf8');
@@ -44,6 +45,28 @@ assert(core.includes('firebasejs/13.1.0/firebase-firestore-compat.js')&&!core.in
 assert(config.includes('firebasejs/13.1.0/firebase-app-check-compat.js')&&!config.includes('firebasejs/10.7.1/'),'App Check ainda usa uma versão antiga do Firebase.');
 assert(core.includes('db.runTransaction')&&core.includes('function daySaveRetryable'),'A gravação do dia deve usar transação e retry limitado.');
 assert(index.includes('firebase=13.1.0&daysave=transaction1'),'O cache do navegador ainda pode servir o runtime antigo da gravação.');
+const daySaveStart=core.indexOf('async function saveDayFolder()');
+const alreadySavedStart=core.indexOf('if(oldName&&!selected){',daySaveStart);
+const alreadySavedEnd=core.indexOf('        const conflicting=',alreadySavedStart);
+assert(daySaveStart>=0&&alreadySavedStart>daySaveStart&&alreadySavedEnd>alreadySavedStart,'Retry da edição de dia precisa reconhecer uma transação já confirmada.');
+if(daySaveStart>=0&&alreadySavedStart>daySaveStart&&alreadySavedEnd>alreadySavedStart){
+  const retryBranch=core.slice(alreadySavedStart,alreadySavedEnd);
+  const exercises=new Map([
+    ['exercise-ok',{userId:'student-a',workoutId:'workout-a',dayName:'Peito B'}],
+    ['exercise-other-user',{userId:'student-b',workoutId:'workout-a',dayName:'Peito B'}],
+    ['exercise-other-workout',{userId:'student-a',workoutId:'workout-b',dayName:'Peito B'}],
+    ['exercise-old-name',{userId:'student-a',workoutId:'workout-a',dayName:'Peito A'}]
+  ]);
+  const retryContext={
+    oldName:'Peito A',selected:null,alreadySaved:{id:'day-a'},currentDays:[{id:'day-a',name:'Peito B'}],rawDays:[{id:'day-a',name:'Peito B'}],
+    preserveRawWorkoutDayFields:(raw,days)=>days,normalizedName:value=>String(value||'').trim().toLowerCase(),
+    renameExerciseRefs:[...exercises.keys()].map(id=>({id})),studentUid:'student-a',workoutId:'workout-a',name:'Peito B',
+    transaction:{get:async ref=>({id:ref.id,exists:exercises.has(ref.id),data:()=>exercises.get(ref.id)})}
+  };
+  vm.createContext(retryContext);
+  const retryResult=await new vm.Script('(async()=>{'+retryBranch+'\n})()').runInContext(retryContext);
+  assert(retryResult?.alreadySaved===true&&retryResult.renamedExerciseIds.join(',')==='exercise-ok','Retry após commit incerto precisa reconciliar só os exercícios já renomeados do aluno/protocolo corretos.');
+}
 
 assert(viewport.includes('trainer-runtime-reliability-v10_10_46.js?v=10.10.53-trainer3'),'Cold start ainda pede runtime antigo do treinador.');
 assert(viewport.includes("TeamBullsTrainerRuntimeReliability?.version==='10.10.53-trainer3'"),'Cold start ainda valida revisão antiga do treinador.');

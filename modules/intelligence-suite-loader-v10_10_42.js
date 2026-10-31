@@ -1,9 +1,13 @@
 /* Team Bulls v10.10.57 — carregador isolado da suíte de inteligência, progresso e relatórios. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__)return;
-  window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=true;
   const VERSION='10.10.58-intelsuite9';
+  const registeredVersion=String(window.TeamBullsIntelligenceSuiteLoader?.version||'');
+  const revision=value=>Number(/-intelsuite(\d+)$/.exec(String(value||''))?.[1]||0);
+  if(registeredVersion===VERSION||revision(registeredVersion)>revision(VERSION))return;
+  // A prior boolean guard from an older loader must not suppress a cache-busted
+  // replacement. Keep the marker truthy for older scripts and versioned for new ones.
+  window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=VERSION;
   const specs={
     trainer:[
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],

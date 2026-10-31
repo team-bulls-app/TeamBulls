@@ -184,7 +184,7 @@
 
   async function strictServerGet(reference,label){
     if(!reference?.get)throw new Error('Consulta semanal indisponível.');
-    let lastError;
+    const uid=String(CURRENT_USER?.uid||'');let lastError,connectionRechecked=false;
     for(let attempt=0;attempt<=READ_RETRIES;attempt++){
       try{
         // Sempre exige resposta do servidor: cache local nunca autoriza o envio.
@@ -192,7 +192,14 @@
       }catch(error){
         lastError=error;
         if(attempt>=READ_RETRIES||!retryableServerRead(error))throw error;
-        if(CURRENT_USER?.uid!==auth?.currentUser?.uid)throw error;
+        if(!uid||CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw error;
+        if(!connectionRechecked){
+          connectionRechecked=true;
+          const resilience=window.TeamBullsForegroundWriteResilience;
+          if(resilience?.awaitReady)await timeout(resilience.awaitReady({force:true}),READ_TIMEOUT,'reativar conexão do Firestore');
+          else if(typeof db?.enableNetwork==='function')await timeout(db.enableNetwork(),READ_TIMEOUT,'reativar conexão do Firestore');
+          if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw error;
+        }
         await delay(350*(attempt+1));
       }
     }
