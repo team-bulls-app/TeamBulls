@@ -110,7 +110,7 @@ function isNetworkLikeError(error){
     ||code==='team-bulls/timeout'
     ||/(^|\/)(network-request-failed|unavailable|deadline-exceeded|cancelled)$/.test(code)
     ||/network|offline|failed to fetch|timed out|timeout|internal assertion|unexpected state/.test(message);
-}
+}
 function bootToAuth(message){
   AUTH_HANDLED=false;
   showScreen('screen-auth');
@@ -605,6 +605,7 @@ function cloudWriteError(error,action){
   }
   return (code?code+' — ':'')+message;
 }
+
 
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const DEFAULT_EXERCISE_INSTRUCTIONS='1- Controle bem a fase excêntrica';
@@ -4683,6 +4684,7 @@ async function recheckFirestoreForDaySave(){
   await withTimeout(db.collection('users').doc(uid).get({source:'server'}),8000,'confirmar conexão com o servidor');
   return true;
 }
+
 async function saveDayFolder(){
   const workout=workoutForDayTarget(DAY_MODAL_TARGET),name=safeDayName(document.getElementById('input-day-name').value);if(!workout)return;
   if(!document.getElementById('input-day-name').value.trim()){alert('Digite o nome do dia de treino.');return;}
@@ -4765,7 +4767,7 @@ async function saveDayFolder(){
     const detail=cloudWriteError(error,'salvar o dia de treino');
     alert('Erro ao salvar o dia: '+detail);
   }finally{EDIT_DAY_NAME='';endAction('save-day','modal-day');}
-}
+}
 async function deleteDayFolder(dayName,target='self'){
   const workout=workoutForDayTarget(target);if(!workout)return;
   const items=exercisesForDay(workout,dayName),fallback='Treino geral';
