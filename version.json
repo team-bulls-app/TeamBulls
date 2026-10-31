@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026102905,
-  "revision": "sync-diagnostics-1",
-  "publishedAt": "2026-10-29T00:00:00Z",
+  "build": 2026103101,
+  "revision": "firestore-connection-recovery-1",
+  "publishedAt": "2026-10-31T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Melhora o diagnóstico local de falhas de sincronização."
+  "message": "Reforça a recuperação de conexão e o salvamento de treinos."
 }
