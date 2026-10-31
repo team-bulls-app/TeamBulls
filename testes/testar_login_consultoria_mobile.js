@@ -1,0 +1,48 @@
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const html = read('index.html');
+const css = read('styles_v10_10_9.css');
+const worker = read('sw.js');
+const bridge = read('sw_47.js');
+const updater = read('update_v10_10_9.js');
+const version = JSON.parse(read('version.json'));
+const imagePath = path.join(root, 'team-bulls-consultoria-bg-v1.jpg');
+const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=consultancy1';
+const mobileStyles = css.slice(css.indexOf('/* Login mobile: portal de consultoria'));
+
+assert.match(html, /id="screen-auth"[\s\S]*?class="auth-intro"/);
+assert.match(html, /Evolução com<br\/>acompanhamento\./);
+assert.match(html, /Acesse sua consultoria/);
+assert.match(html, /id="tab-login" onclick="authTab\('login'\)"/);
+assert.match(html, /id="tab-register" onclick="authTab\('register'\)"/);
+assert.match(html, /id="panel-login" onsubmit="event\.preventDefault\(\);doLogin\(\)"/);
+assert.match(html, /id="panel-register" onsubmit="event\.preventDefault\(\);doRegister\(\)"/);
+assert.match(html, /id="login-email"[\s\S]*?id="login-pass"/);
+assert.match(html, /id="btn-login" onclick="doLogin\(\)"/);
+assert.match(html, /id="btn-forgot-password" onclick="openPasswordReset\(\)"/);
+
+assert.match(mobileStyles, /@media\(max-width:899px\)/);
+assert.match(mobileStyles, /overflow-y:auto/);
+assert.match(mobileStyles, /safe-area-inset-(top|bottom)/);
+assert.match(mobileStyles, /url\('team-bulls-consultoria-bg-v1\.jpg'\)/);
+assert.match(mobileStyles, /@media\(max-width:899px\) and \(max-height:740px\)/);
+assert.match(mobileStyles, /html\[data-theme="light"\] #screen-auth\.active/);
+assert.ok(fs.statSync(imagePath).size > 30_000, 'O fundo mobile deve existir como imagem distribuível.');
+
+assert.ok(html.includes(cssUrl), 'O HTML precisa solicitar a revisão nova do CSS mobile.');
+assert.ok(worker.includes(`'./${cssUrl}'`), 'O Service Worker principal precisa armazenar o CSS solicitado pelo HTML.');
+assert.equal(bridge, worker, 'Os Service Workers principal e legado precisam entregar os mesmos assets.');
+assert.ok(worker.includes("'./team-bulls-consultoria-bg-v1.jpg'"), 'O fundo deve entrar no cache de shell do Service Worker.');
+assert.ok(updater.includes(`'./${cssUrl}'`), 'A atualização manual precisa renovar o mesmo CSS mobile.');
+assert.ok(updater.includes("'./team-bulls-consultoria-bg-v1.jpg'"), 'A atualização manual precisa renovar a imagem do fundo.');
+assert.equal(Number(worker.match(/const BUILD_REVISION=(\d+)/)?.[1]), Number(version.build));
+assert.equal(Number(bridge.match(/const BUILD_REVISION=(\d+)/)?.[1]), Number(version.build));
+assert.equal(Number(updater.match(/const CURRENT_BUILD=(\d+)/)?.[1]), Number(version.build));
+
+console.log('APROVADO: layout mobile da consultoria, fluxos de login e entrega/cache dos assets estão coerentes.');
