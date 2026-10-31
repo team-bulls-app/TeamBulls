@@ -22,6 +22,7 @@ const recovery=read(recoveryPath);
 const history=read(historyPath);
 const integrity=read(integrityPath);
 const loader=read(loaderPath);
+const bootstrap=read('modules/usability-checkup-v10_10_9.js');
 const firebaseConfig=read('firebase.json');
 const firestoreRules=read('firebase/firestore_28_compacto.rules');
 const storageRules=read('firebase/storage_6.rules');
@@ -31,13 +32,40 @@ const sw=read('sw.js');
 /* Entrega e ordem dos runtimes. */
 has(source,"const VERSION='10.10.58-canonicalinbox6'",'Central canônica está na revisão errada.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6",'Loader do treinador não entrega a Central com deduplicação semanal.');
-has(loader,"const VERSION='10.10.58-intelsuite8'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
+const bootstrapStart=bootstrap.indexOf("const SRC='./modules/intelligence-suite-loader-v10_10_42.js?");
+const bootstrapSection=bootstrapStart>=0?bootstrap.slice(bootstrapStart,bootstrap.indexOf('})();',bootstrapStart)):'';
+const bootstrapSrc=bootstrapSection.match(/const SRC='([^']+)'/)?.[1]||'';
+const bootstrapVersion=bootstrapSection.match(/const EXPECTED_VERSION='([^']+)'/)?.[1]||'';
+const bootstrapUrlVersion=bootstrapSrc?new URL(bootstrapSrc,'https://team-bulls.test/').searchParams.get('v'):'';
+const loaderVersion=loader.match(/const VERSION='([^']+)'/)?.[1]||'';
+const integrityVersion=integrity.match(/const VERSION='([^']+)'/)?.[1]||'';
+assert(!!bootstrapVersion&&bootstrapVersion===bootstrapUrlVersion&&bootstrapVersion===loaderVersion,'Bootstrap, URL mutável e API registrada do loader precisam usar a mesma revisão.');
 has(loader,"trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1",'Loader perdeu a recuperação conservadora de vínculo.');
-has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5",'Loader não entrega a guarda semanal com recuperação de data.');
+const weeklySpecs=[...loader.matchAll(/\[['"]\.\/modules\/weekly-report-integrity-v10_10_58\.js\?v=([^'"]+)['"],\s*\(\)=>window\.TeamBullsWeeklyReportIntegrity\?\.version===['"]([^'"]+)['"]\]/g)];
+assert(weeklySpecs.length===2&&weeklySpecs.every(([,cacheVersion,readyVersion])=>cacheVersion===integrityVersion&&readyVersion===integrityVersion),'Loader precisa entregar e validar a guarda semanal atual para aluno e treinador.');
 has(loader,"trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports4",'Loader não entrega a revisão resiliente da tela individual do aluno.');
 assert(loader.indexOf('trainer-report-link-recovery-v10_10_51.js')<loader.indexOf('weekly-report-integrity-v10_10_58.js'),'Recuperação de vínculo deve continuar antes da integridade semanal.');
 assert(loader.indexOf('weekly-report-integrity-v10_10_58.js')<loader.indexOf('trainer-student-report-history-v10_10_55.js'),'Integridade semanal precisa ser instalada antes do histórico individual.');
 assert(loader.indexOf('trainer-student-report-history-v10_10_55.js')<loader.indexOf('trainer-canonical-inbox-v10_10_58.js'),'Histórico individual precisa ser instalado antes da Central canônica.');
+
+/* A atualização cache-bustada precisa substituir um loader antigo já registrado. */
+const upgradeListeners=[];
+const legacyWindow={
+  __TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__:true,
+  TeamBullsIntelligenceSuiteLoader:{version:'10.10.58-intelsuite8',load:async()=>false},
+  addEventListener:type=>upgradeListeners.push(type),dispatchEvent(){}
+};
+const runLoader=target=>vm.runInNewContext(loader,{window:target,document:{},MODE:'local',CURRENT_USER:{role:'student'},console:{warn(){}},location:{href:'https://team-bulls.test/index.html'}},{filename:loaderPath});
+runLoader(legacyWindow);
+assert(legacyWindow.TeamBullsIntelligenceSuiteLoader?.version===loaderVersion,'Loader atual não substitui o registro antigo que deixou a guarda semanal indisponível.');
+assert(legacyWindow.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__===loaderVersion,'Registro mutável precisa identificar a revisão instalada.');
+const listenerCount=upgradeListeners.length;
+runLoader(legacyWindow);
+assert(upgradeListeners.length===listenerCount,'Reavaliar o mesmo loader não pode duplicar listeners de runtime.');
+const newerVersion='10.10.58-intelsuite10';
+const newerWindow={__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__:newerVersion,TeamBullsIntelligenceSuiteLoader:{version:newerVersion},addEventListener(){},dispatchEvent(){}};
+runLoader(newerWindow);
+assert(newerWindow.TeamBullsIntelligenceSuiteLoader.version===newerVersion,'Um loader atrasado não pode substituir uma revisão mais nova já registrada.');
 
 /* Propriedade histórica e leitura canônica. */
 has(source,"db.collection('questionnaires').where('trainerId','==',uid).limit(MAX_ITEMS)",'Central não consulta questionários diretamente pelo trainerId imutável.');
@@ -128,6 +156,13 @@ has(source,'async refreshInbox(){const result=await hub.refreshInbox.apply(hub,a
 assert(JSON.parse(firebaseConfig)?.firestore?.rules==='firebase/firestore_28_compacto.rules','Correção alterou o caminho da Rule Firestore ativa.');
 assert(JSON.parse(firebaseConfig)?.storage?.rules==='firebase/storage_6.rules','Correção alterou o caminho da Rule Storage ativa.');
 has(sw,"'/modules/intelligence-suite-loader-v10_10_42.js'",'Loader da Central não permanece network-first/mutável no PWA.');
+const mutableStart=sw.indexOf('const MUTABLE_PATHS=new Set([');
+const mutableEnd=sw.indexOf(']);',mutableStart);
+const fetchStart=sw.indexOf("self.addEventListener('fetch'");
+const fetchHandler=fetchStart>=0?sw.slice(fetchStart):'';
+const mutableDispatch=fetchHandler.indexOf('if(MUTABLE_PATHS.has(relativePath))');
+const versionedFallback=fetchHandler.indexOf('if(VERSIONED_PATH_PATTERN.test(fileName)||url.searchParams.has');
+assert(mutableStart>=0&&mutableEnd>mutableStart&&sw.slice(mutableStart,mutableEnd).includes("'/modules/intelligence-suite-loader-v10_10_42.js'")&&mutableDispatch>=0&&versionedFallback>mutableDispatch,'Loader mutável precisa usar network-first antes do fallback cache-first por ?v=.');
 
 if(failures.length){
   console.error('FALHA — propriedade histórica / histórico individual de relatórios do treinador\n- '+failures.join('\n- '));

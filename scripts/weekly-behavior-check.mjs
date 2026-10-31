@@ -90,6 +90,39 @@ serverSchedule={nextDueDate:'2026-09-14'};
 assert.equal(await context.openWeeklyCheckinModal(),true);
 context.CURRENT_USER={uid:'student-b',role:'student'};context.auth.currentUser.uid='student-b';
 assert.equal(await context.submitWeeklyCheckin(),false,'another student cannot submit the open form');
+// A transient preflight failure must revalidate Firestore before retrying, and
+// a failed revalidation must never send the report or discard the open form.
+context.CURRENT_USER={uid:'student-a',role:'student'};context.auth.currentUser.uid='student-a';
+context.setTimeout=(callback,ms=0)=>{if(Number(ms)<2000)queueMicrotask(callback);return 0;};
+let scheduleReadFailures=0,forcedRechecks=0,rejectForcedRecheck=false;
+const serverReadOptions=[];const serverScheduleForRetry={nextDueDate:'2026-09-14',intervalDays:7};
+context.db={collection:name=>({
+  doc:()=>({get:async options=>{
+    serverReadOptions.push({name,options});
+    if(name==='checkinSchedules'&&scheduleReadFailures>0){scheduleReadFailures--;throw Object.assign(new Error('temporary network failure'),{code:'unavailable'});}
+    return{exists:true,data:()=>serverScheduleForRetry};
+  }}),
+  where:()=>({get:async options=>{serverReadOptions.push({name,options});return{docs:[]};}})
+})};
+context.window.TeamBullsForegroundWriteResilience={awaitReady:async options=>{
+  assert.equal(options.force,true,'recovery must actively probe instead of trusting cached readiness');
+  forcedRechecks++;
+  if(rejectForcedRecheck)throw new Error('server probe unavailable');
+  return true;
+}};
+assert.equal(await context.openWeeklyCheckinModal(),true);
+scheduleReadFailures=1;serverReadOptions.length=0;
+assert.equal(await context.submitWeeklyCheckin(),true,'transient report preflight failure should recover once and reuse the same request');
+assert.equal(forcedRechecks,1);
+assert.equal(submits,2);
+assert.ok(serverReadOptions.length>=3&&serverReadOptions.every(item=>item.options?.source==='server'),'all retried preflight reads must still be server-authoritative');
+assert.equal(await context.openWeeklyCheckinModal(),true);
+scheduleReadFailures=1;rejectForcedRecheck=true;const submitsBeforeFailedProbe=submits;
+assert.equal(await context.submitWeeklyCheckin(),false,'a failed connection recheck must keep the report unsent');
+assert.equal(submits,submitsBeforeFailedProbe);
+rejectForcedRecheck=false;
+assert.equal(await context.submitWeeklyCheckin(),true,'the same open request can be retried after connectivity returns');
+assert.equal(submits,submitsBeforeFailedProbe+1);
 // Exercise the canonical submit: denied create must not confirm an old document;
 // uncertain delivery only succeeds if all seven persisted writes match.
 const submitContext={...context,window:{addEventListener(){}},CURRENT_USER:{uid:'student-a',role:'student'},auth:{currentUser:{uid:'student-a'}},navigator:{onLine:true},File:class File{},beginAction:()=>true,endAction(){},weeklyCheckinDocId:()=> 'weekly-id',today:()=> '2026-09-20',buildWeeklyCheckinQuestions:()=>({questions:['Como foi?'],sectionAt:{}}),CHECKIN_POSES:photos,loadWeeklyCheckinState:async()=>{},renderCalendar(){},showToast(){},alert(){},CFG:{projectId:'test'},setTimeout:fn=>{queueMicrotask(fn);return 0;},clearTimeout(){},document:{getElementById:()=>({value:'82.5'}),querySelectorAll:()=>[{value:'Bem'}]}};

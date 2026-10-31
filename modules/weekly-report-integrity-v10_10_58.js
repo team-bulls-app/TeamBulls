@@ -1,11 +1,22 @@
 /* Team Bulls v10.10.58 — integridade do ciclo semanal sem reescrever histórico. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010585__)return;
-  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010585__=true;
+  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010586__)return;
+  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010586__=true;
 
-  const VERSION='10.10.58-weeklyintegrity5';
+  const VERSION='10.10.58-weeklyintegrity6';
   const READ_TIMEOUT=10000;
+  const READ_RETRIES=2;
+  const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const retryableServerRead=error=>{
+    const code=String(error?.code||'').toLowerCase();
+    const message=String(error?.message||error||'').toLowerCase();
+    if(['permission-denied','unauthenticated','not-found','invalid-argument','failed-precondition'].some(value=>code.includes(value)))return false;
+    return navigator.onLine!==false&&(
+      ['unavailable','deadline-exceeded','internal','aborted','unknown','weekly-integrity-timeout'].some(value=>code.includes(value))||
+      /network|offline|timeout|timed out|internal assertion|unexpected state|temporarily unavailable/.test(message)
+    );
+  };
   let fetchInstalled=false;
   let formRequest=null,submissionRequest=null,opening=false;
   let submitInstalled=false;
@@ -173,14 +184,34 @@
 
   async function strictServerGet(reference,label){
     if(!reference?.get)throw new Error('Consulta semanal indisponível.');
-    return timeout(reference.get({source:'server'}),READ_TIMEOUT,label);
+    const uid=String(CURRENT_USER?.uid||'');let lastError,connectionRechecked=false;
+    for(let attempt=0;attempt<=READ_RETRIES;attempt++){
+      try{
+        // Sempre exige resposta do servidor: cache local nunca autoriza o envio.
+        return await timeout(reference.get({source:'server'}),READ_TIMEOUT,label);
+      }catch(error){
+        lastError=error;
+        if(attempt>=READ_RETRIES||!retryableServerRead(error))throw error;
+        if(!uid||CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw error;
+        if(!connectionRechecked){
+          connectionRechecked=true;
+          const resilience=window.TeamBullsForegroundWriteResilience;
+          if(resilience?.awaitReady)await timeout(resilience.awaitReady({force:true}),READ_TIMEOUT,'reativar conexão do Firestore');
+          else if(typeof db?.enableNetwork==='function')await timeout(db.enableNetwork(),READ_TIMEOUT,'reativar conexão do Firestore');
+          if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw error;
+        }
+        await delay(350*(attempt+1));
+      }
+    }
+    throw lastError||new Error('Não foi possível confirmar o estado semanal no servidor.');
   }
   async function refreshCanonicalRequest(uid){
     if(!uid||typeof computeCheckinRequest!=='function')throw new Error('Não foi possível validar o período atual do relatório.');
-    const [scheduleDoc,historySnap]=await Promise.all([
-      strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal'),
-      strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal')
-    ]);
+    // Leituras sequenciais evitam duas operações compat do Firestore concorrendo
+    // durante o preflight em aparelhos móveis/conexões instáveis. Ambas continuam
+    // exigindo fonte server; nenhuma resposta do cache pode autorizar o envio.
+    const scheduleDoc=await strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal');
+    const historySnap=await strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal');
     if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw new Error('A sessão do aluno mudou durante a confirmação.');
     if(!scheduleDoc?.exists)throw new Error('A programação semanal não está mais disponível.');
     const schedule={...scheduleDoc.data(),studentId:uid};

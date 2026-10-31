@@ -7,7 +7,7 @@ const BOOT_TIMEOUT_MS=3200;
 const PROFILE_READ_TIMEOUT_MS=2500;
 const CLOUD_READ_TIMEOUT_MS=8000;
 const SESSION_READ_TIMEOUT_MS=15000;
-const CLOUD_WRITE_TIMEOUT_MS=10000;
+const CLOUD_WRITE_TIMEOUT_MS=20000;
 let BOOT_STARTED=false;
 let BOOT_SETTLED=false;
 let BOOT_WATCHDOG=null;
@@ -104,7 +104,13 @@ function withTimeout(task,ms,label='operação'){
 }
 function cloudGet(reference,label='consulta'){return withTimeout(reference.get(),CLOUD_READ_TIMEOUT_MS,label);}
 function cloudWrite(task,label='gravação'){return withTimeout(task,CLOUD_WRITE_TIMEOUT_MS,label);}
-function isNetworkLikeError(error){return !navigator.onLine||error?.code==='team-bulls/timeout'||error?.code==='auth/network-request-failed'||error?.code==='unavailable'||error?.code==='deadline-exceeded';}
+function isNetworkLikeError(error){
+  const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
+  return (typeof navigator!=='undefined'&&navigator.onLine===false)
+    ||code==='team-bulls/timeout'
+    ||/(^|\/)(network-request-failed|unavailable|deadline-exceeded|cancelled)$/.test(code)
+    ||/network|offline|failed to fetch|timed out|timeout|internal assertion|unexpected state/.test(message);
+}
 function bootToAuth(message){
   AUTH_HANDLED=false;
   showScreen('screen-auth');
@@ -589,10 +595,13 @@ function cloudWriteError(error,action){
   const code=String(error?.code||'');
   const message=String(error?.message||'Falha desconhecida');
   if(code.includes('permission-denied')||/missing or insufficient permissions/i.test(message)){
-    return 'Permissão recusada pelo Firebase ao '+action+'. Publique também o arquivo firestore_26_compacto.rules no Firebase Console; atualizar apenas o HTML não altera as permissões do servidor.';
+    return 'Permissão recusada pelo Firebase ao '+action+'. Verifique a regra de acesso e a conta ativa.';
   }
-  if(code.includes('unavailable')||/network|offline|failed to fetch/i.test(message)){
-    return 'O servidor está indisponível no momento. Verifique a conexão e tente novamente.';
+  if(/internal assertion|unexpected state/i.test(message)){
+    return 'O Firestore encontrou uma falha interna durante a gravação. A conexão foi revalidada; tente novamente. Se persistir, atualize a tela e avise o treinador.';
+  }
+  if(isNetworkLikeError(error)||code.includes('unavailable')){
+    return 'Não foi possível confirmar a conexão com o servidor. Verifique a internet e tente novamente.';
   }
   return (code?code+' — ':'')+message;
 }
@@ -1095,11 +1104,11 @@ function loadSdkOnce(src,globalReady){
 }
 async function ensureFirebaseCore(){
   if(typeof firebase!=='undefined'&&typeof firebase.auth==='function'&&typeof firebase.firestore==='function')return true;
-  const appOk=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js',()=>typeof firebase!=='undefined'&&typeof firebase.initializeApp==='function');
+  const appOk=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js',()=>typeof firebase!=='undefined'&&typeof firebase.initializeApp==='function');
   if(!appOk)return false;
   const [authOk,firestoreOk]=await Promise.all([
-    loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js',()=>typeof firebase.auth==='function'),
-    loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js',()=>typeof firebase.firestore==='function')
+    loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-auth-compat.js',()=>typeof firebase.auth==='function'),
+    loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-firestore-compat.js',()=>typeof firebase.firestore==='function')
   ]);
   return authOk&&firestoreOk;
 }
@@ -1111,13 +1120,13 @@ async function ensureFirebaseReady(){
 async function ensureStorageService(){
   if(storageService)return storageService;
   if(typeof firebase==='undefined')return null;
-  const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js',()=>typeof firebase.storage==='function');
+  const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-storage-compat.js',()=>typeof firebase.storage==='function');
   if(!ok)return null;
   try{storageService=firebase.storage();return storageService;}catch(error){console.warn('Storage indisponível',error);return null;}
 }
 async function initOptionalAppCheck(){
   const key=String(CFG.appCheckSiteKey||'').trim();if(!key||typeof firebase==='undefined')return false;
-  const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');
+  const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');
   if(!ok)return false;
   try{firebase.appCheck().activate(key,true);return true;}catch(error){console.warn('App Check não iniciado',error);return false;}
 }
@@ -4649,27 +4658,125 @@ function dayListAfterRename(workout,oldName,newName){
   if(!oldName)days.push({id:dayIdFromName(newName),name:newName,order:days.length});
   return normalizeWorkoutDays(days,[]);
 }
+function preserveRawWorkoutDayFields(rawDays,normalizedDays){
+  const byId=new Map(),byName=new Map();
+  (Array.isArray(rawDays)?rawDays:[]).forEach(entry=>{
+    if(!entry||typeof entry!=='object'||Array.isArray(entry))return;
+    const id=String(entry.id||''),key=normalizedName(entry.name);
+    if(id)byId.set(id,entry);
+    if(key&&!byName.has(key))byName.set(key,entry);
+  });
+  return normalizedDays.map(day=>({...((byId.get(String(day.id||''))||byName.get(normalizedName(day.name)))||{}),...day}));
+}
+function daySaveRetryable(error){
+  const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
+  if(code.includes('permission-denied')||code==='team-bulls/timeout'||code==='team-bulls/write-pending-timeout')return false;
+  return isNetworkLikeError(error)||/internal assertion|unexpected state|async queue/.test(message);
+}
+async function recheckFirestoreForDaySave(){
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)throw new Error('Sem conexão com a internet. O dia não foi enviado.');
+  const resilience=window.TeamBullsForegroundWriteResilience;
+  if(resilience?.awaitReady){await resilience.awaitReady({force:true});return true;}
+  if(typeof db.enableNetwork==='function')await withTimeout(db.enableNetwork(),5000,'reativar conexão do Firestore');
+  const uid=String(auth?.currentUser?.uid||CURRENT_USER?.uid||'');
+  if(!uid)throw new Error('Sessão não identificada. Entre novamente antes de salvar.');
+  await withTimeout(db.collection('users').doc(uid).get({source:'server'}),8000,'confirmar conexão com o servidor');
+  return true;
+}
+
 async function saveDayFolder(){
   const workout=workoutForDayTarget(DAY_MODAL_TARGET),name=safeDayName(document.getElementById('input-day-name').value);if(!workout)return;
   if(!document.getElementById('input-day-name').value.trim()){alert('Digite o nome do dia de treino.');return;}
-  const duplicate=getWorkoutDays(workout).some(day=>normalizedName(day.name)===normalizedName(name)&&normalizedName(day.name)!==normalizedName(EDIT_DAY_NAME));if(duplicate){alert('Já existe uma pasta de dia com esse nome.');return;}
+  const oldName=EDIT_DAY_NAME,editingDay=getWorkoutDays(workout).find(day=>normalizedName(day.name)===normalizedName(oldName)),groups=[...document.querySelectorAll('#day-muscle-group-options [data-muscle-group]:checked')].map(input=>input.dataset.muscleGroup),frequencyGuidance=safeWorkoutGuidance(document.getElementById('input-day-frequency').value),restGuidance=safeWorkoutGuidance(document.getElementById('input-day-rest').value);
+  const dayId=String(editingDay?.id||(oldName?dayIdFromName(oldName):dayIdFromName(name)));
+  const duplicate=getWorkoutDays(workout).some(day=>normalizedName(day.name)===normalizedName(name)&&String(day.id)!==dayId);if(duplicate){alert('Já existe uma pasta de dia com esse nome.');return;}
   if(!beginAction('save-day','modal-day'))return;
-  const oldName=EDIT_DAY_NAME,groups=[...document.querySelectorAll('#day-muscle-group-options [data-muscle-group]:checked')].map(input=>input.dataset.muscleGroup),frequencyGuidance=safeWorkoutGuidance(document.getElementById('input-day-frequency').value),restGuidance=safeWorkoutGuidance(document.getElementById('input-day-rest').value);
-  const newDays=dayListAfterRename(workout,oldName,name).map(day=>normalizedName(day.name)===normalizedName(name)?{...day,muscleGroups:groups,frequencyGuidance,restGuidance}:day);
   try{
     if(DAY_MODAL_TARGET==='student'){
-      if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT)return;
-      const batch=db.batch();batch.update(db.collection('workouts').doc(workout.id),{days:newDays});
-      if(oldName)for(const exercise of exercisesForDay(workout,oldName))batch.update(db.collection('exercises').doc(exercise.id),{dayName:name});
-      await cloudWrite(batch.commit(),'salvar alterações');workout.days=newDays;if(oldName)for(const exercise of exercisesForDay(workout,oldName))exercise.dayName=name;VIEW_STUDENT_DAY=name;
-      closeModal('modal-day');renderTsWorkout(workout);showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
+      if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT)throw new Error('Abra novamente o cadastro do aluno antes de salvar.');
+      const studentUid=String(VIEW_STUDENT.uid||''),workoutId=String(workout.id||'');
+      if(!studentUid||!workoutId)throw new Error('Aluno ou protocolo não identificado.');
+      const workoutRef=db.collection('workouts').doc(workoutId);
+      const renameExerciseRefs=oldName&&normalizedName(oldName)!==normalizedName(name)
+        ?[...new Set(exercisesForDay(workout,oldName).map(exercise=>String(exercise.id||'')).filter(Boolean))].map(id=>db.collection('exercises').doc(id))
+        :[];
+      const persist=()=>db.runTransaction(async transaction=>{
+        const workoutSnapshot=await transaction.get(workoutRef);
+        if(!workoutSnapshot.exists)throw new Error('Este protocolo não existe mais. Atualize a tela e tente novamente.');
+        const workoutData=workoutSnapshot.data()||{};
+        if(String(workoutData.userId||'')!==studentUid)throw new Error('O protocolo não pertence ao aluno selecionado. Atualize a tela antes de continuar.');
+        const rawDays=Array.isArray(workoutData.days)?workoutData.days:[];
+        const currentDays=normalizeWorkoutDays(rawDays,workout.exercises||[]);
+        const selected=currentDays.find(day=>String(day.id)===dayId)||currentDays.find(day=>normalizedName(day.name)===normalizedName(oldName));
+        const alreadySaved=currentDays.find(day=>String(day.id)===dayId&&normalizedName(day.name)===normalizedName(name)&&JSON.stringify(normalizeMuscleGroups(day.muscleGroups))===JSON.stringify(groups)&&safeWorkoutGuidance(day.frequencyGuidance)===frequencyGuidance&&safeWorkoutGuidance(day.restGuidance)===restGuidance);
+        if(oldName&&!selected){
+          if(alreadySaved){
+            // A previous transaction may have committed while its response timed
+            // out. Reconcile the same exercise refs before reporting success so
+            // the trainer's in-memory protocol matches the server snapshot.
+            const exerciseSnapshots=await Promise.all(renameExerciseRefs.map(ref=>transaction.get(ref)));
+            const renamedExerciseIds=exerciseSnapshots.filter(snapshot=>{
+              if(!snapshot.exists)return false;
+              const data=snapshot.data()||{};
+              return String(data.userId||'')===studentUid&&String(data.workoutId||'')===workoutId&&normalizedName(data.dayName||'Treino geral')===normalizedName(name);
+            }).map(snapshot=>snapshot.id);
+            return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds,alreadySaved:true};
+          }
+          throw new Error('Este dia mudou em outra sessão. Atualize o protocolo e tente novamente.');
+        }
+        const conflicting=currentDays.find(day=>normalizedName(day.name)===normalizedName(name)&&String(day.id)!==dayId);
+        if(conflicting)throw new Error('Já existe uma pasta de dia com esse nome.');
+        if(!oldName&&alreadySaved)return{days:preserveRawWorkoutDayFields(rawDays,currentDays),renamedExerciseIds:[],alreadySaved:true};
+        let nextDays=oldName
+          ?currentDays.map(day=>String(day.id)===String(selected.id)?{...day,name,muscleGroups:groups,frequencyGuidance,restGuidance}:day)
+          :[...currentDays,{id:dayId,name,order:currentDays.length,muscleGroups:groups,frequencyGuidance,restGuidance}];
+        nextDays=preserveRawWorkoutDayFields(rawDays,normalizeWorkoutDays(nextDays,[]));
+        const renamedExerciseIds=[];
+        if(renameExerciseRefs.length){
+          if(renameExerciseRefs.length>499)throw new Error('Este treino ultrapassa o limite de alterações que o Firebase aceita em uma única gravação. Nenhum exercício foi alterado.');
+          const exerciseSnapshots=await Promise.all(renameExerciseRefs.map(ref=>transaction.get(ref)));
+          const exercisesToRename=exerciseSnapshots.filter(snapshot=>{
+            if(!snapshot.exists)return false;
+            const data=snapshot.data()||{};
+            return String(data.userId||'')===studentUid&&String(data.workoutId||'')===workoutId&&normalizedName(data.dayName||'Treino geral')===normalizedName(oldName);
+          });
+          exercisesToRename.forEach(snapshot=>renamedExerciseIds.push(snapshot.id));
+          transaction.update(workoutRef,{days:nextDays});
+          exercisesToRename.forEach(snapshot=>transaction.update(snapshot.ref,{dayName:name}));
+        }else transaction.update(workoutRef,{days:nextDays});
+        return{days:nextDays,renamedExerciseIds,alreadySaved:false};
+      });
+      const resilience=window.TeamBullsForegroundWriteResilience;
+      if(resilience?.awaitReady)await resilience.awaitReady();
+      let result;
+      for(let attempt=0;attempt<2;attempt++){
+        try{result=await cloudWrite(persist(),'salvar alterações');break;}
+        catch(error){
+          if(attempt===0&&daySaveRetryable(error)){
+            await recheckFirestoreForDaySave();
+            continue;
+          }
+          throw error;
+        }
+      }
+      if(!result)throw new Error('Não foi possível confirmar a gravação. Atualize o protocolo antes de tentar novamente.');
+      workout.days=result.days;
+      const renamed=new Set(result.renamedExerciseIds||[]);
+      if(renamed.size)for(const exercise of workout.exercises||[])if(renamed.has(String(exercise.id)))exercise.dayName=name;
+      if(renamed.size)workout.exercises=sortWorkoutExercises(workout);
+      VIEW_STUDENT_DAY=name;closeModal('modal-day');renderTsWorkout(workout);showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
     }else{
       if(!canSelfManagePlan())throw new Error('Este plano é administrado pelo treinador.');
+      const newDays=dayListAfterRename(workout,oldName,name).map(day=>normalizedName(day.name)===normalizedName(name)?{...day,muscleGroups:groups,frequencyGuidance,restGuidance}:day);
       const snapshot=JSON.stringify(LOCAL_DB);workout.days=newDays;if(oldName)for(const exercise of exercisesForDay(workout,oldName))exercise.dayName=name;
       if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(snapshot));throw new Error('Falha ao gravar no aparelho.');}
       CUR_DAY=name;closeModal('modal-day');renderWorkout();showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
     }
-  }catch(error){alert('Erro ao salvar o dia: '+error.message);}finally{EDIT_DAY_NAME='';endAction('save-day','modal-day');}
+  }catch(error){
+    console.error('[Team Bulls] Falha ao salvar o dia de treino.',error);
+    const detail=cloudWriteError(error,'salvar o dia de treino');
+    alert('Erro ao salvar o dia: '+detail);
+  }finally{EDIT_DAY_NAME='';endAction('save-day','modal-day');}
 }
 async function deleteDayFolder(dayName,target='self'){
   const workout=workoutForDayTarget(target);if(!workout)return;

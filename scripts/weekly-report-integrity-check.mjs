@@ -26,7 +26,7 @@ const submit=read(submitPath);
 const history=read(historyPath);
 const core=read(corePath);
 
-has(integrity,"const VERSION='10.10.58-weeklyintegrity5'",'Guarda semanal está na revisão errada.');
+has(integrity,"const VERSION='10.10.58-weeklyintegrity6'",'Guarda semanal está na revisão errada.');
 has(integrity,'function effectiveSubmittedDate(row)','Recuperação da data real de envio não está explícita.');
 has(integrity,'localStampDate(row?.createdAt)||isoDate(row?.submittedDate)||isoDate(row?.dueDate)','Data exibida não prioriza o timestamp de criação confirmado pelo servidor.');
 has(integrity,'_weeklyDateRecovered:true','Histórico não sinaliza recuperação de submittedDate legado.');
@@ -39,6 +39,9 @@ has(integrity,'function historyForRequestCalculation(rows)','Cálculo do próxim
 has(integrity,"requestKey:'scheduled:'+due",'Relatório programado legado com dueDate não avança o ciclo semanal.');
 has(integrity,"if(String(row?.requestKind||'scheduled')==='manual')return row",'Pedido extra/manual está sendo inferido indevidamente como programado.');
 has(integrity,"reference.get({source:'server'})",'Preflight semanal não força confirmação no servidor.');
+has(integrity,'const READ_RETRIES=2','Confirmação semanal não possui retentativa limitada para falhas transitórias do Firestore.');
+has(integrity,'retryableServerRead(error)','Retentativa semanal não filtra erros permanentes e transitórios.');
+has(integrity,'resilience.awaitReady({force:true})','Retentativa não revalida/reabre a conexão Firestore após falha transitória.');
 has(integrity,"db.collection('checkinSchedules').doc(uid)",'Preflight não confirma a agenda semanal atual.');
 has(integrity,"db.collection('weeklyCheckins').where('studentId','==',uid)",'Preflight não confirma o histórico semanal do próprio aluno.');
 has(integrity,'const requestHistory=historyForRequestCalculation(history)','Preflight não usa identidade recuperada somente para cálculo.');
@@ -64,16 +67,16 @@ has(central,"if(!key){selected.push(row);continue;}",'Central está inferindo du
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).set",'Central não pode regravar semanal para reparar duplicata visual.');
 lacks(central,"db.collection('weeklyCheckins').doc(row.sourceId).delete",'Central não pode apagar semanal histórico.');
 
-has(loader,"const VERSION='10.10.58-intelsuite8'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
-has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5",'Suíte não entrega a guarda semanal com recuperação de data.');
+has(loader,"const VERSION='10.10.58-intelsuite9'",'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
+has(loader,"weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity6",'Suíte não entrega a guarda semanal com recuperação de data.');
 has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6",'Suíte não entrega a Central semanal deduplicada.');
-const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5");
+const trainerIntegrity=loader.indexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity6");
 const trainerHistory=loader.indexOf('trainer-student-report-history-v10_10_55.js');
 const trainerCentral=loader.indexOf('trainer-canonical-inbox-v10_10_58.js');
 assert(trainerIntegrity>=0&&trainerHistory>trainerIntegrity,'Treinador precisa instalar recuperação/deduplicação antes de carregar o histórico individual.');
 assert(trainerCentral>trainerHistory,'Central do treinador deve carregar depois do histórico individual.');
 const studentSubmit=loader.indexOf('student-report-submit-reconciliation-v10_10_57.js');
-const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity5");
+const studentIntegrity=loader.lastIndexOf("weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity6");
 assert(studentSubmit>=0&&studentIntegrity>studentSubmit,'Aluno precisa instalar a guarda depois do submit REST canônico.');
 
 has(history,'fetchWeeklyCheckins(studentUid)','Histórico do treinador deixou de passar pelo leitor semanal corrigido.');
