@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
-import vm from 'node:vm';
 
 const fail=[];
 const read=file=>fs.readFileSync(file,'utf8');
@@ -16,10 +15,13 @@ const usability=read('modules/usability-checkup-v10_10_9.js');
 const intelligence=read('modules/intelligence-suite-loader-v10_10_42.js');
 const trainerRuntime=read('modules/trainer-runtime-reliability-v10_10_46.js');
 const heic=read('modules/heic-report-conversion-v10_10_12.js');
+const messaging=read('modules/student-feedback-device-notices-v10_10_62.js');
+const v107Core=read('modules/v107-core.js');
+const messagingWorker=read('feedback-push-sw.js');
 const core=read('app_v10_10_9_core.js');
 const index=read('index.html');
 
-for(const file of ['config_v10_7.js','update_v10_10_9.js','sw.js','sw_47.js','viewport_v10_10_9.js','modules/usability-checkup-v10_10_9.js','modules/intelligence-suite-loader-v10_10_42.js','modules/trainer-runtime-reliability-v10_10_46.js','modules/heic-report-conversion-v10_10_12.js','app_v10_10_9_core.js']){
+for(const file of ['config_v10_7.js','update_v10_10_9.js','sw.js','sw_47.js','viewport_v10_10_9.js','modules/usability-checkup-v10_10_9.js','modules/intelligence-suite-loader-v10_10_42.js','modules/trainer-runtime-reliability-v10_10_46.js','modules/heic-report-conversion-v10_10_12.js','modules/student-feedback-device-notices-v10_10_62.js','modules/v107-core.js','feedback-push-sw.js','app_v10_10_9_core.js']){
   const syntax=spawnSync(process.execPath,['--check',file],{encoding:'utf8'});
   assert(syntax.status===0,`${file} possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
 }
@@ -43,30 +45,15 @@ const trainerSpec=intelligence.slice(intelligence.indexOf('trainer:['),intellige
 assert(trainerSpec.includes('foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1'),'A retomada do Firestore precisa ser carregada também no fluxo do treinador.');
 assert(core.includes('firebasejs/13.1.0/firebase-firestore-compat.js')&&!core.includes('firebasejs/10.7.1/'),'O runtime ainda usa uma versão antiga/inconsistente do Firebase.');
 assert(config.includes('firebasejs/13.1.0/firebase-app-check-compat.js')&&!config.includes('firebasejs/10.7.1/'),'App Check ainda usa uma versão antiga do Firebase.');
+for(const [name,source] of [['avisos do aluno',messaging],['App Check legado',v107Core],['service worker de push',messagingWorker]]){
+  assert(source.includes('firebasejs/13.1.0/')&&!source.includes('firebasejs/10.7.1/'),`${name} ainda pode carregar Firebase 10.7.1 junto com o runtime 13.1.0.`);
+}
 assert(core.includes('db.runTransaction')&&core.includes('function daySaveRetryable'),'A gravação do dia deve usar transação e retry limitado.');
 assert(index.includes('firebase=13.1.0&daysave=transaction1'),'O cache do navegador ainda pode servir o runtime antigo da gravação.');
 const daySaveStart=core.indexOf('async function saveDayFolder()');
-const alreadySavedStart=core.indexOf('if(oldName&&!selected){',daySaveStart);
-const alreadySavedEnd=core.indexOf('        const conflicting=',alreadySavedStart);
-assert(daySaveStart>=0&&alreadySavedStart>daySaveStart&&alreadySavedEnd>alreadySavedStart,'Retry da edição de dia precisa reconhecer uma transação já confirmada.');
-if(daySaveStart>=0&&alreadySavedStart>daySaveStart&&alreadySavedEnd>alreadySavedStart){
-  const retryBranch=core.slice(alreadySavedStart,alreadySavedEnd);
-  const exercises=new Map([
-    ['exercise-ok',{userId:'student-a',workoutId:'workout-a',dayName:'Peito B'}],
-    ['exercise-other-user',{userId:'student-b',workoutId:'workout-a',dayName:'Peito B'}],
-    ['exercise-other-workout',{userId:'student-a',workoutId:'workout-b',dayName:'Peito B'}],
-    ['exercise-old-name',{userId:'student-a',workoutId:'workout-a',dayName:'Peito A'}]
-  ]);
-  const retryContext={
-    oldName:'Peito A',selected:null,alreadySaved:{id:'day-a'},currentDays:[{id:'day-a',name:'Peito B'}],rawDays:[{id:'day-a',name:'Peito B'}],
-    preserveRawWorkoutDayFields:(raw,days)=>days,normalizedName:value=>String(value||'').trim().toLowerCase(),
-    renameExerciseRefs:[...exercises.keys()].map(id=>({id})),studentUid:'student-a',workoutId:'workout-a',name:'Peito B',
-    transaction:{get:async ref=>({id:ref.id,exists:exercises.has(ref.id),data:()=>exercises.get(ref.id)})}
-  };
-  vm.createContext(retryContext);
-  const retryResult=await new vm.Script('(async()=>{'+retryBranch+'\n})()').runInContext(retryContext);
-  assert(retryResult?.alreadySaved===true&&retryResult.renamedExerciseIds.join(',')==='exercise-ok','Retry após commit incerto precisa reconciliar só os exercícios já renomeados do aluno/protocolo corretos.');
-}
+const alreadySavedStart=core.indexOf('if(oldName&&alreadySaved){',daySaveStart);
+const missingDayStart=core.indexOf('if(oldName&&!selected){',daySaveStart);
+assert(daySaveStart>=0&&alreadySavedStart>daySaveStart&&missingDayStart>alreadySavedStart,'Reconciliação de rename confirmado deve reconhecer o ID estável antes de rejeitar o dia como ausente.');
 
 assert(viewport.includes('trainer-runtime-reliability-v10_10_46.js?v=10.10.53-trainer3'),'Cold start ainda pede runtime antigo do treinador.');
 assert(viewport.includes("TeamBullsTrainerRuntimeReliability?.version==='10.10.53-trainer3'"),'Cold start ainda valida revisão antiga do treinador.');

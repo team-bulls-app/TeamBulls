@@ -351,7 +351,7 @@
     const key=String(CFG.appCheckSiteKey||'').trim();
     if(!key){TB.state.appCheck='chave não configurada';return false;}
     if(typeof firebase==='undefined'){TB.state.appCheck='Firebase indisponível';return false;}
-    const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');
+    const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');
     if(!ok){TB.state.appCheck='SDK indisponível';return false;}
     try{
       const appCheck=firebase.appCheck();

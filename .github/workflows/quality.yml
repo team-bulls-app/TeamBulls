@@ -93,6 +93,7 @@ jobs:
           node scripts/weekly-report-access-check.mjs
           node scripts/startup-cache-recovery-check.mjs
           node scripts/runtime-delivery-coherence-check.mjs
+          node scripts/day-save-transaction-check.mjs
           node scripts/mobile-touch-freeze-check.mjs
           node scripts/runtime-stabilization-check.mjs
           node scripts/desktop-runtime-hygiene-check.mjs
