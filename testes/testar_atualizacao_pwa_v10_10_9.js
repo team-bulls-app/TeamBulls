@@ -40,7 +40,7 @@ assert(worker.includes("const APP_VERSION='10.10.9'"),'versão do Service Worker
 assert(worker.includes(`const BUILD_REVISION=${BUILD}`),'Service Worker não anuncia build');
 assert(worker.includes("request.mode==='navigate'"),'navegação não é interceptada');
 assert(worker.includes('event.respondWith(navigationNetworkFirst(request,event))'),'navegação precisa priorizar o HTML atualizado com timeout limitado.');
-const navigationTimeout=Number(worker.match(/const NAVIGATION_REFRESH_TIMEOUT_MS=(\\d+)/)?.[1]||0);
+const navigationTimeout=Number(worker.match(/const NAVIGATION_REFRESH_TIMEOUT_MS=(\d+)/)?.[1]||0);
 assert(navigationTimeout>0&&navigationTimeout<=5000,'Atualização de HTML não pode bloquear a abertura indefinidamente.');
 assert(worker.includes('if(cached)return secureResponse(cached.clone(),{html:true})'),'navegação offline precisa recuperar o HTML em cache.');
 assert(!worker.includes('navigationCacheFirst(request,event)'),'estratégia antiga não deve substituir atualização de HTML com fallback offline.');
@@ -54,3 +54,4 @@ assert(worker.includes("key!==AUDIO_CACHE_NAME"),'limpeza de cache pode apagar �
 assert(worker.includes("type:'TEAM_BULLS_SW_ACTIVATED',version:APP_VERSION,build:BUILD_REVISION"),'worker não comunica o build ativado');
 assert(bridge===worker,'Service Workers principal e legado precisam permanecer idênticos.');
 console.log('APROVADO: atualização build-aware, navegação com timeout/fallback offline, assets versionados em cache-first e Service Workers coerentes.');
+
