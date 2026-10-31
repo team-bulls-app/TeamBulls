@@ -54,4 +54,3 @@ assert(worker.includes("key!==AUDIO_CACHE_NAME"),'limpeza de cache pode apagar �
 assert(worker.includes("type:'TEAM_BULLS_SW_ACTIVATED',version:APP_VERSION,build:BUILD_REVISION"),'worker não comunica o build ativado');
 assert(bridge===worker,'Service Workers principal e legado precisam permanecer idênticos.');
 console.log('APROVADO: atualização build-aware, navegação com timeout/fallback offline, assets versionados em cache-first e Service Workers coerentes.');
-
