@@ -1439,7 +1439,7 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation;}
 
 /* Fundo exclusivo do login desktop. A arte mantém os minotauros à esquerda
    e a área escura do formulário à direita, nos dois temas. */
-@media (min-width:900px){
+@media (min-width:900px) and (hover:hover) and (pointer:fine){
   body.auth-desktop #screen-auth,
   body:has(#screen-auth.active) #screen-auth,
   html[data-theme="light"] body.auth-desktop #screen-auth{
