@@ -8,14 +8,14 @@ const to=core.indexOf('async function deleteDayFolder(',from);
 assert(from>=0&&to>from,'Implementação real do salvamento de dias não foi encontrada.');
 const saveSource=core.slice(from,to);
 
-function makeHarness({newName='Peito B',failBeforeFirst=false,loseFirstCommitResponse=false}={}){
+function makeHarness({newName='Peito B',failBeforeFirst=false,loseFirstCommitResponse=false,fatalBeforeFirst=false}={}){
   const workout={id:'workout-a',userId:'student-a',days:[{id:'day-a',name:'Peito A',muscleGroups:['Peitoral'],frequencyGuidance:'2x por semana',restGuidance:'48h',legacyField:'keep-me'}],exercises:[
     {id:'exercise-a',userId:'student-a',workoutId:'workout-a',dayName:'Peito A'},
     {id:'exercise-other-user',userId:'student-b',workoutId:'workout-a',dayName:'Peito A'},
     {id:'exercise-other-workout',userId:'student-a',workoutId:'workout-b',dayName:'Peito A'}
   ]};
   const persisted={workout:{...workout,days:workout.days.map(day=>({...day}))},exercises:new Map(workout.exercises.map(exercise=>[exercise.id,{...exercise}]))};
-  const alerts=[],toasts=[];let transactionCount=0,modalOpen=true;
+  const alerts=[],toasts=[];let transactionCount=0,modalOpen=true,readinessCalls=0;
   const fields={
     'input-day-name':{value:newName},
     'input-day-frequency':{value:'2x por semana'},
@@ -32,6 +32,7 @@ function makeHarness({newName='Peito B',failBeforeFirst=false,loseFirstCommitRes
     runTransaction:async callback=>{
       transactionCount++;
       if(failBeforeFirst&&transactionCount===1)throw Object.assign(new Error('denied'),{code:'permission-denied'});
+      if(fatalBeforeFirst&&transactionCount===1)throw Object.assign(new Error('FIRESTORE (13.1.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: b815) CONTEXT: ca9'),{code:'internal'});
       const writes=[];
       const transaction={
         get:async ref=>{
@@ -59,15 +60,15 @@ function makeHarness({newName='Peito B',failBeforeFirst=false,loseFirstCommitRes
     exercisesForDay:(value,dayName)=>value.exercises.filter(exercise=>String(exercise.dayName||'Treino geral').toLowerCase()===String(dayName||'').toLowerCase()),
     sortWorkoutExercises:value=>value.exercises,VIEW_STUDENT:{uid:'student-a'},VIEW_STUDENT_DAY:'Peito A',
     CURRENT_USER:{uid:'trainer-a',role:'trainer'},DAY_MODAL_TARGET:'student',EDIT_DAY_NAME:'Peito A',
-    db,auth:{currentUser:{uid:'trainer-a'}},navigator:{onLine:true},window:{TeamBullsForegroundWriteResilience:{awaitReady:async()=>true}},
+    db,auth:{currentUser:{uid:'trainer-a'}},navigator:{onLine:true},window:{TeamBullsForegroundWriteResilience:{awaitReady:async()=>{readinessCalls++;return true;}}},
     beginAction:()=>true,endAction(){},cloudWrite:promise=>promise,cloudWriteError:error=>String(error?.message||error),
-    isNetworkLikeError:error=>error?.code==='unavailable',alert:message=>alerts.push(message),console:{error(){}},
+    isNetworkLikeError:error=>error?.code==='unavailable',isFirestoreClientInternalFailure:error=>/b815|ca9|INTERNAL ASSERTION FAILED/i.test(String(error?.message||'')),alert:message=>alerts.push(message),console:{error(){}},
     closeModal:()=>{modalOpen=false;},renderTsWorkout(){},showToast:message=>toasts.push(message),
     preserveRawWorkoutDayFields:undefined,LOCAL_DB:{},localSave:()=>true,canSelfManagePlan:()=>true,renderWorkout(){}
   };
   vm.createContext(context);
   vm.runInContext(saveSource+'\nthis.runSaveDayFolder=saveDayFolder;',context,{filename:'app_v10_10_9_core.js'});
-  return{context,workout,persisted,alerts,toasts,transactionCount:()=>transactionCount,modalOpen:()=>modalOpen};
+  return{context,workout,persisted,alerts,toasts,transactionCount:()=>transactionCount,readinessCalls:()=>readinessCalls,modalOpen:()=>modalOpen};
 }
 
 const retryAfterFailure=makeHarness({failBeforeFirst:true});
@@ -100,5 +101,12 @@ assert.equal(uncertainCommit.workout.exercises[0].dayName,'Peito B','ID estável
 assert.equal(uncertainCommit.workout.exercises[1].dayName,'Peito A','Reconciliação não altera exercícios de outro aluno.');
 assert.equal(uncertainCommit.workout.exercises[2].dayName,'Peito A','Reconciliação não altera exercícios de outro protocolo.');
 assert.equal(uncertainCommit.context.EDIT_DAY_NAME,'');
+
+const fatalClient=makeHarness({fatalBeforeFirst:true});
+await fatalClient.context.runSaveDayFolder();
+assert.equal(fatalClient.transactionCount(),1,'AsyncQueue fatal não deve provocar transação/retry adicional no cliente inutilizável.');
+assert.equal(fatalClient.readinessCalls(),1,'Falha fatal não deve forçar nova sondagem de conexão depois do erro.');
+assert.equal(fatalClient.workout.days[0].name,'Peito A','Falha fatal não deve simular sucesso no estado local.');
+assert.equal(fatalClient.modalOpen(),true,'Falha fatal mantém o formulário aberto até conferência/reinício.');
 
 console.log('APROVADO — edição preservada após falha, retry sem pasta duplicada e reconciliação transacional de commit incerto com isolamento de aluno/protocolo.');

@@ -1,19 +1,20 @@
 /* Team Bulls v10.10.50 — retomada segura do Firestore após background no mobile/PWA. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_101050__)return;
-  window.__TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_101050__=true;
+  if(window.__TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_1010502__)return;
+  window.__TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_1010502__=true;
 
-  const VERSION='10.10.50-foregroundwrite1';
+  const VERSION='10.10.50-foregroundwrite2';
   const BACKGROUND_TRIGGER_MS=1200;
   const RESUME_WINDOW_MS=15000;
   const READY_CACHE_MS=6000;
+  const RESUME_SETTLE_MS=180;
   const PROBE_TIMEOUT_MS=5000;
   const WRITE_TIMEOUT_MS=10000;
   let hiddenAt=document.hidden?Date.now():0;
   let resumedAt=0;
   let readyAt=0;
-  let probePromise=null;
+  let settlePromise=null;
   let baseToggleMealDone=null;
   let mealPatched=false;
   const pendingWrites=new Map();
@@ -31,36 +32,29 @@
   const notify=(message,isError=false)=>{try{if(typeof showToast==='function'){showToast(message,!!isError);return;}console[isError?'warn':'info']('[Team Bulls]',message);}catch(error){}};
   const emit=(state,detail={})=>{try{window.dispatchEvent(new CustomEvent('team-bulls-cloud-resume-state',{detail:{state,version:VERSION,...detail}}));}catch(error){}};
 
-  function needsProbe(){
+  function needsResumeSettle(){
     if(!cloudMode())return false;
     if(!resumedAt)return false;
     if(Date.now()-resumedAt>RESUME_WINDOW_MS)return false;
     return readyAt<resumedAt||Date.now()-readyAt>READY_CACHE_MS;
   }
 
-  async function probe(force=false){
-    if(!cloudMode())return true;
-    if(!online())throw makeError('team-bulls/offline','Sem conexão com a internet.');
-    const uid=currentUid();if(!uid)throw makeError('team-bulls/no-user','Sessão online ainda não foi restaurada.');
-    if(!force&&readyAt>=resumedAt&&Date.now()-readyAt<READY_CACHE_MS)return true;
-    if(probePromise)return probePromise;
-    emit('reconnecting');
-    probePromise=(async()=>{
-      try{
-        if(typeof db.enableNetwork==='function')await timeout(db.enableNetwork(),2200,'reativar conexão','team-bulls/network-enable-timeout');
-      }catch(error){console.warn('[Team Bulls] enableNetwork não confirmou a retomada; validando por leitura de servidor.',error?.code||error?.message||error);}
-      const ref=db.collection('users').doc(uid);
-      await timeout(ref.get({source:'server'}),PROBE_TIMEOUT_MS,'confirmar conexão com o servidor','team-bulls/resume-probe-timeout');
-      readyAt=Date.now();emit('ready',{uid});return true;
-    })().catch(error=>{emit('unavailable',{code:String(error?.code||'')});throw error;}).finally(()=>{probePromise=null;});
-    return probePromise;
-  }
-
   async function awaitReady(options={}){
     if(!cloudMode())return true;
     if(!online())throw makeError('team-bulls/offline','Sem conexão com a internet.');
-    if(options.force===true||needsProbe())return probe(options.force===true);
-    return true;
+    if(options.force!==true&&!needsResumeSettle())return true;
+    if(settlePromise)return settlePromise;
+    const uid=currentUid();if(!uid)throw makeError('team-bulls/no-user','Sessão online ainda não foi restaurada.');
+    emit('reconnecting');
+    // Firestore already reconnects its own streams. Toggling enableNetwork() and
+    // opening a throwaway get() here races that recovery against live listeners.
+    // Let the browser/app foreground transition settle, then start the real read
+    // or write exactly once and let its result confirm server reachability.
+    settlePromise=delay(RESUME_SETTLE_MS).then(()=>{
+      if(!online())throw makeError('team-bulls/offline','Sem conexão com a internet.');
+      readyAt=Date.now();emit('ready',{uid,source:'foreground-transition'});return true;
+    }).finally(()=>{settlePromise=null;});
+    return settlePromise;
   }
 
   async function write(key,factory,options={}){
@@ -89,7 +83,7 @@
   }
   async function reconcileMeal(ref,mid,uid,date){
     try{
-      await probe(true);
+      await awaitReady({force:true});
       const snap=await timeout(ref.get({source:'server'}),PROBE_TIMEOUT_MS,'confirmar refeição','team-bulls/meal-reconcile-timeout');
       applyMealState(mid,!!snap.exists,uid,date);return !!snap.exists;
     }catch(error){console.warn('[Team Bulls] Estado da refeição será atualizado na próxima sincronização.',error?.code||error?.message||error);return null;}
@@ -142,7 +136,6 @@
     const now=Date.now();const elapsed=hiddenAt?now-hiddenAt:0;hiddenAt=0;
     if(elapsed<BACKGROUND_TRIGGER_MS&&source!=='online')return;
     resumedAt=now;readyAt=0;emit('resume',{backgroundMs:elapsed,source});
-    probe(false).catch(()=>{});
   }
   function install(){
     installMealPatch();
@@ -154,11 +147,10 @@
 
   window.TeamBullsForegroundWriteResilience=Object.freeze({
     version:VERSION,
-    probe,
     awaitReady,
     write,
     isPending:key=>pendingWrites.has(String(key||'')),
-    state:()=>({hiddenAt,resumedAt,readyAt,probing:!!probePromise,pendingWrites:pendingWrites.size,mealPatched})
+    state:()=>({hiddenAt,resumedAt,readyAt,settling:!!settlePromise,pendingWrites:pendingWrites.size,mealPatched})
   });
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();

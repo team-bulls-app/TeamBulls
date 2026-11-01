@@ -1,10 +1,10 @@
 /* Team Bulls v10.10.58 — integridade do ciclo semanal sem reescrever histórico. */
 'use strict';
 (()=>{
-  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010586__)return;
-  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010586__=true;
+  if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010587__)return;
+  window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010587__=true;
 
-  const VERSION='10.10.58-weeklyintegrity6';
+  const VERSION='10.10.58-weeklyintegrity7';
   const READ_TIMEOUT=10000;
   const READ_RETRIES=2;
   const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -170,11 +170,11 @@
   function installFetchGuard(){
     try{
       if(typeof fetchWeeklyCheckins!=='function')return false;
-      if(fetchWeeklyCheckins.__tbWeeklyIntegrity1010584){fetchInstalled=true;return true;}
+      if(fetchWeeklyCheckins.__tbWeeklyIntegrity1010587){fetchInstalled=true;return true;}
       const base=unwrapFetchGuard(fetchWeeklyCheckins);
       const wrapped=async function(){return dedupeWeeklyCheckins(await base.apply(this,arguments));};
       wrapped.__tbWeeklyIntegrity101058=true;
-      wrapped.__tbWeeklyIntegrity1010584=true;
+      wrapped.__tbWeeklyIntegrity1010587=true;
       wrapped.__tbBase=base;
       fetchWeeklyCheckins=wrapped;
       fetchInstalled=true;
@@ -191,13 +191,17 @@
         return await timeout(reference.get({source:'server'}),READ_TIMEOUT,label);
       }catch(error){
         lastError=error;
+        // ca9/b815 means Firestore's shared AsyncQueue is already failed. A
+        // second read or enableNetwork() cannot revive that client and only
+        // allocates more work; let the caller surface the fatal state once.
+        if(typeof isFirestoreClientInternalFailure==='function'&&isFirestoreClientInternalFailure(error))throw error;
         if(attempt>=READ_RETRIES||!retryableServerRead(error))throw error;
         if(!uid||CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw error;
         if(!connectionRechecked){
           connectionRechecked=true;
           const resilience=window.TeamBullsForegroundWriteResilience;
-          if(resilience?.awaitReady)await timeout(resilience.awaitReady({force:true}),READ_TIMEOUT,'reativar conexão do Firestore');
-          else if(typeof db?.enableNetwork==='function')await timeout(db.enableNetwork(),READ_TIMEOUT,'reativar conexão do Firestore');
+          if(resilience?.awaitReady)await timeout(resilience.awaitReady({force:true}),READ_TIMEOUT,'aguardar a retomada do aplicativo');
+          else await delay(180);
           if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw error;
         }
         await delay(350*(attempt+1));
@@ -230,7 +234,7 @@
     let current=fn;
     for(let index=0;index<8;index++){
       if(current?.__tbActivityBridge101047&&current.__tbBase){current=current.__tbBase;continue;}
-      if(current?.__tbWeeklyIntegrity101058&&!current?.__tbWeeklyIntegrity1010584&&current.__tbBase){current=current.__tbBase;continue;}
+      if(current?.__tbWeeklyIntegrity101058&&!current?.__tbWeeklyIntegrity1010587&&current.__tbBase){current=current.__tbBase;continue;}
       break;
     }
     return current;
@@ -239,8 +243,8 @@
     try{
       if(!student()||typeof submitWeeklyCheckin!=='function')return false;
       let current=submitWeeklyCheckin;
-      if(current?.__tbActivityBridge101047&&current.__tbBase?.__tbWeeklyIntegrity1010584){submitInstalled=true;return true;}
-      if(current?.__tbWeeklyIntegrity1010584){submitInstalled=true;return true;}
+      if(current?.__tbActivityBridge101047&&current.__tbBase?.__tbWeeklyIntegrity1010587){submitInstalled=true;return true;}
+      if(current?.__tbWeeklyIntegrity1010587){submitInstalled=true;return true;}
       const base=unwrapSubmit(current);
       // Só envolvemos o submit canônico corrigido. Assim um runtime antigo não
       // recebe um selo falso de compatibilidade nem volta a escrever pelo fluxo legado.
@@ -271,7 +275,7 @@
         }finally{submissionRequest=null;wrapped.busy=false;}
       };
       wrapped.__tbWeeklyIntegrity101058=true;
-      wrapped.__tbWeeklyIntegrity1010584=true;
+      wrapped.__tbWeeklyIntegrity1010587=true;
       // O reconciliador reconhece este wrapper como continuação do submit REST,
       // evitando que seus timers o substituam pelo caminho sem o preflight fresco.
       wrapped.__tbRestCanonical101057=true;

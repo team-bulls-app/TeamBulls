@@ -233,6 +233,7 @@
   function modalEntityKey(modalId){
     const candidates=[
       typeof EDIT_W!=='undefined'?EDIT_W:'',typeof EDIT_EX!=='undefined'?EDIT_EX:'',
+      typeof EDIT_EXERCISE_ID!=='undefined'?EDIT_EXERCISE_ID:'',
       typeof EDIT_DIET_PLAN_ID!=='undefined'?EDIT_DIET_PLAN_ID:'',typeof EDIT_DIET_VARIANT_ID!=='undefined'?EDIT_DIET_VARIANT_ID:'',
       typeof EDIT_MEAL!=='undefined'?EDIT_MEAL:'',typeof CUR_WORKOUT!=='undefined'?CUR_WORKOUT:'',
       typeof VIEW_STUDENT_WORKOUT!=='undefined'?VIEW_STUDENT_WORKOUT?.id:'',typeof EDIT_DAY_NAME!=='undefined'?EDIT_DAY_NAME:''
@@ -257,26 +258,64 @@
       values[id]=value;
       if(typeof value==='boolean'||String(value||'').trim()||String(baseline[id]||'').trim())meaningful=true;
     });
-    if(!meaningful||!Object.keys(values).length){storageRemove(PREFIX+draftKey(modal.id));return false;}
-    localWrite(draftKey(modal.id),{updatedAt:Date.now(),values});
+    const key=draftKey(modal.id),previous=localRead(key,null);
+    if(!meaningful||!Object.keys(values).length){if(previous?.recoveryRequired!==true)storageRemove(PREFIX+key);return false;}
+    localWrite(key,{updatedAt:Date.now(),values,recoveryRequired:previous?.recoveryRequired===true});
     TB.state.lastDraftAt=Date.now();window.dispatchEvent(new CustomEvent('team-bulls-v107-state'));return true;
   }
   function restoreModalDraft(modal){
-    if(!modal||DRAFT_DISABLED_MODAL_IDS.has(modal.id))return false;
-    const draft=localRead(draftKey(modal.id),null);
-    if(!draft||Date.now()-Number(draft.updatedAt)>MAX_FORM_DRAFT_AGE){if(draft)storageRemove(PREFIX+draftKey(modal.id));return false;}
+    if(!modal||!modal.classList.contains('open')||DRAFT_DISABLED_MODAL_IDS.has(modal.id))return false;
+    const key=draftKey(modal.id),draft=localRead(key,null);
+    if(!draft||Date.now()-Number(draft.updatedAt)>MAX_FORM_DRAFT_AGE){if(draft)storageRemove(PREFIX+key);return false;}
+    const recovery=draft.recoveryRequired===true;
+    if(recovery&&modal.dataset.tbRecoveryDraftRestored==='1')return false;
+    const entries=Object.entries(draft.values||{}).filter(([id])=>{
+      const field=document.getElementById(id);return !!field&&modal.contains(field)&&field.dataset.sensitive!=='true';
+    }).sort(([left],[right])=>{
+      const leftSelect=document.getElementById(left)?.tagName==='SELECT',rightSelect=document.getElementById(right)?.tagName==='SELECT';
+      return Number(rightSelect)-Number(leftSelect);
+    });
+    const differs=entries.some(([id,value])=>{
+      const field=document.getElementById(id),current=field.type==='checkbox'?!!field.checked:String(field.value||'');
+      return String(current)!==String(value);
+    });
+    const recoveryAccepted=modal.dataset.tbRecoveryDraftAccepted==='1';
+    if(recovery&&differs&&!recoveryAccepted){
+      const accepted=typeof window.confirm==='function'&&window.confirm('Há alterações deste exercício que não foram confirmadas pelo servidor. Deseja recuperar o rascunho salvo neste aparelho?');
+      if(!accepted){storageRemove(PREFIX+key);return false;}
+      modal.dataset.tbRecoveryDraftAccepted='1';
+    }else if(recovery&&!differs&&!recoveryAccepted){storageRemove(PREFIX+key);return false;}
     let restored=0,longText=false;
-    Object.entries(draft.values||{}).forEach(([id,value])=>{
-      const field=document.getElementById(id);if(!field||!modal.contains(field)||field.dataset.sensitive==='true')return;
+    const unavailable=[];
+    entries.forEach(([id,value])=>{
+      const field=document.getElementById(id);
+      if(recovery&&field.tagName==='SELECT'&&![...field.options].some(option=>String(option.value)===String(value))){unavailable.push([id,value]);return;}
       const isEmpty=field.type==='checkbox'?!field.checked:String(field.value||'').trim()==='';
-      if(!isEmpty)return;
+      if(!recovery&&!isEmpty)return;
       if(field.type==='checkbox')field.checked=!!value;else field.value=String(value||'');
-      field.dispatchEvent(new Event('input',{bubbles:true}));restored++;
+      field.dispatchEvent(new Event(field.tagName==='SELECT'?'change':'input',{bubbles:true}));restored++;
       if(String(value||'').trim().length>=40)longText=true;
     });
-    if(restored>1||longText)showToast('Rascunho recuperado.');
+    if(recovery&&unavailable.length){
+      console.info('[Team Bulls] Alguns campos do rascunho aguardam o catálogo de exercícios.');
+      const attempts=Number(modal.dataset.tbRecoveryRetryCount)||0;
+      if(attempts<20){modal.dataset.tbRecoveryRetryCount=String(attempts+1);setTimeout(()=>restoreModalDraft(modal),120);}
+      else showToast('Revise a seleção do catálogo; alguns campos não puderam ser recuperados.');
+    }else if(recovery){modal.dataset.tbRecoveryDraftRestored='1';delete modal.dataset.tbRecoveryDraftAccepted;delete modal.dataset.tbRecoveryRetryCount;}
+    if(restored&&(recovery||restored>1||longText))showToast(recovery?'Rascunho recuperado neste aparelho.':'Rascunho recuperado.');
     return !!restored;
   }
+  TB.preserveModalDraft=function(modalId){
+    const modal=document.getElementById(modalId);if(!modal?.classList.contains('open')||DRAFT_DISABLED_MODAL_IDS.has(modalId))return false;
+    const current=modalDraftValues(modal),baseline=modalDraftBaselines.get(modal)||{},values={};let meaningful=false;
+    Object.entries(current).forEach(([id,value])=>{
+      if(String(value)===String(baseline[id]??''))return;
+      values[id]=value;
+      if(typeof value==='boolean'||String(value||'').trim()||String(baseline[id]||'').trim())meaningful=true;
+    });
+    if(!meaningful||!Object.keys(values).length)return false;
+    return localWrite(draftKey(modal.id),{updatedAt:Date.now(),values,recoveryRequired:true});
+  };
   TB.clearOpenDraft=function(modalId){if(modalId)storageRemove(PREFIX+draftKey(modalId));};
   try{
     for(let index=localStorage.length-1;index>=0;index--){const key=localStorage.key(index)||'';if(key.startsWith(PREFIX)&&key.includes('_form_modal-day_'))localStorage.removeItem(key);}

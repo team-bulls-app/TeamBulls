@@ -102,8 +102,23 @@ function withTimeout(task,ms,label='operação'){
     Promise.resolve(task).then(value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value);},error=>{if(settled)return;settled=true;clearTimeout(timer);reject(error);});
   });
 }
-function cloudGet(reference,label='consulta'){return withTimeout(reference.get(),CLOUD_READ_TIMEOUT_MS,label);}
-function cloudWrite(task,label='gravação'){return withTimeout(task,CLOUD_WRITE_TIMEOUT_MS,label);}
+function isFirestoreClientInternalFailure(error){
+  const message=[error?.message,error?.cause?.message].filter(Boolean).join(' ');
+  return /FIRESTORE(?: \([^)]*\))? INTERNAL ASSERTION FAILED|(?:^|\b)(?:b815|ca9)(?:\b|:)|AsyncQueue/i.test(message);
+}
+function preserveActiveModalAfterFirestoreFailure(error){
+  if(!isFirestoreClientInternalFailure(error))return false;
+  try{
+    const modal=document.querySelector('.modal-backdrop.open');
+    return !!(modal?.id&&window.TeamBulls107?.preserveModalDraft?.(modal.id));
+  }catch(ignored){return false;}
+}
+function cloudGet(reference,label='consulta'){
+  return withTimeout(reference.get(),CLOUD_READ_TIMEOUT_MS,label).catch(error=>{preserveActiveModalAfterFirestoreFailure(error);throw error;});
+}
+function cloudWrite(task,label='gravação'){
+  return withTimeout(task,CLOUD_WRITE_TIMEOUT_MS,label).catch(error=>{preserveActiveModalAfterFirestoreFailure(error);throw error;});
+}
 function isNetworkLikeError(error){
   const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
   return (typeof navigator!=='undefined'&&navigator.onLine===false)
@@ -1443,8 +1458,12 @@ async function confirmLogout(){
 let AUTH_HANDLED=false;
 let AUTH_UNSUBSCRIBE=null;
 let AUTH_EXPECTED_LOCAL_SIGNOUT=false;
-let PROFILE_UNSUBSCRIBE=null;
-function stopProfileGuard(){if(PROFILE_UNSUBSCRIBE){try{PROFILE_UNSUBSCRIBE();}catch(error){}PROFILE_UNSUBSCRIBE=null;}}
+let PROFILE_GUARD_STATE=null;
+function stopProfileGuard(){
+  const state=PROFILE_GUARD_STATE;PROFILE_GUARD_STATE=null;
+  if(state?.missingTimer)clearTimeout(state.missingTimer);
+  if(state?.unsubscribe){try{state.unsubscribe();}catch(error){}}
+}
 async function enterInactiveLocalMode(profile,{preserveCloud=false}={}){
   const uid=String(profile?.uid||'');if(!uid)return false;
   if(preserveCloud&&CURRENT_USER?.uid===uid&&CLOUD_WORKOUTS.length)replaceLocalForUser(uid,CLOUD_WORKOUTS);
@@ -1460,41 +1479,75 @@ async function enterInactiveLocalMode(profile,{preserveCloud=false}={}){
   renderHome();showScreen('screen-home');showToast('Acesso online pausado pelo treinador. O último plano continua disponível localmente.',true);
   return true;
 }
-function startProfileGuard(userId){
+async function applyProfileGuardSnapshot(state,snapshot){
+  if(PROFILE_GUARD_STATE!==state||!state.active)return;
+  if(!snapshot.exists){await withTimeout(auth?.signOut?.()||Promise.resolve(),3000,'encerramento de perfil removido').catch(()=>{});return;}
+  const next=sanitizeCachedProfile({...snapshot.data(),uid:state.uid},state.uid);if(!next)return;
+  cacheUserProfile(next);
+  if(CURRENT_USER?.role==='trainer'&&next.role!=='trainer'){
+    stopProfileGuard();await withTimeout(auth.signOut(),3000,'encerramento de acesso do treinador').catch(()=>{});return;
+  }
+  if(CURRENT_USER?.role==='student'){
+    CURRENT_USER={...CURRENT_USER,name:next.name,email:next.email,status:next.status};updateOfflineCredentialProfile(CURRENT_USER);
+    if(next.status==='inactive'&&ACCESS_MODE==='cloud-active')await enterInactiveLocalMode(next,{preserveCloud:true});
+  }
+}
+function trustedProfileSnapshot(snapshot){return snapshot?.metadata?.fromCache!==true||navigator.onLine===false;}
+function ensureProfileGuard(userId){
+  const uid=String(userId||'');if(!db||!uid)throw new Error('Não foi possível iniciar a leitura do perfil autenticado.');
+  if(PROFILE_GUARD_STATE?.uid===uid&&!PROFILE_GUARD_STATE.error)return PROFILE_GUARD_STATE;
   stopProfileGuard();
-  if(!db||!userId)return;
+  let resolveFirst,rejectFirst;
+  const state={uid,active:false,unsubscribe:null,snapshot:null,error:false,missingTimer:0,firstSettled:false,
+    firstSnapshot:new Promise((resolve,reject)=>{resolveFirst=resolve;rejectFirst=reject;})};
+  PROFILE_GUARD_STATE=state;
+  const settleFirst=(snapshot,error)=>{
+    if(state.firstSettled)return;state.firstSettled=true;
+    if(state.missingTimer){clearTimeout(state.missingTimer);state.missingTimer=0;}
+    if(error)rejectFirst(error);else resolveFirst(snapshot);
+  };
+  const receive=async snapshot=>{
+    if(PROFILE_GUARD_STATE!==state)return;
+    state.snapshot=snapshot;
+    if(trustedProfileSnapshot(snapshot)){
+      if(!state.firstSettled){
+        if(snapshot.exists)settleFirst(snapshot);
+        else if(!state.missingTimer)state.missingTimer=setTimeout(()=>{
+          if(PROFILE_GUARD_STATE===state&&state.snapshot&&!state.snapshot.exists&&trustedProfileSnapshot(state.snapshot))settleFirst(state.snapshot);
+        },300);
+      }
+      if(state.active)await applyProfileGuardSnapshot(state,snapshot);
+    }
+  };
+  const fail=error=>{
+    if(PROFILE_GUARD_STATE!==state)return;
+    state.error=true;state.unsubscribe=null; // Firestore terminates an errored listener itself.
+    if(!state.firstSettled)settleFirst(null,error);
+    console.warn('Profile guard:',error?.code||error?.message);
+  };
   try{
-    PROFILE_UNSUBSCRIBE=db.collection('users').doc(userId).onSnapshot(async snapshot=>{
-      if(!snapshot.exists){await withTimeout(auth?.signOut?.()||Promise.resolve(),3000,'encerramento de perfil removido').catch(()=>{});return;}
-      const next=sanitizeCachedProfile({...snapshot.data(),uid:userId},userId);if(!next)return;
-      cacheUserProfile(next);
-      if(CURRENT_USER?.role==='trainer'&&next.role!=='trainer'){
-        stopProfileGuard();await withTimeout(auth.signOut(),3000,'encerramento de acesso do treinador').catch(()=>{});return;
-      }
-      if(CURRENT_USER?.role==='student'){
-        CURRENT_USER={...CURRENT_USER,name:next.name,email:next.email,status:next.status};updateOfflineCredentialProfile(CURRENT_USER);
-        if(next.status==='inactive'&&ACCESS_MODE==='cloud-active')await enterInactiveLocalMode(next,{preserveCloud:true});
-      }
-    },error=>console.warn('Profile guard:',error?.code||error?.message));
-  }catch(error){console.warn('Profile guard init:',error);}
+    // Use one kept-open listener for the initial profile read and the guard.
+    // A transient get() here creates and tears down a watch target on cold start;
+    // late target responses can poison the Firestore AsyncQueue (ca9 → b815).
+    state.unsubscribe=db.collection('users').doc(uid).onSnapshot({includeMetadataChanges:true},receive,fail);
+  }catch(error){state.error=true;settleFirst(null,error);}
+  return state;
+}
+function startProfileGuard(userId){
+  try{
+    const state=ensureProfileGuard(userId);state.active=true;
+    if(state.snapshot&&trustedProfileSnapshot(state.snapshot))applyProfileGuardSnapshot(state,state.snapshot).catch(error=>console.warn('Profile guard:',error?.code||error?.message));
+    return state.firstSnapshot;
+  }catch(error){console.warn('Profile guard init:',error);return Promise.reject(error);}
 }
 
-// createUserWithEmailAndPassword dispara o listener antes de o documento do
-// perfil terminar de ser gravado. Um retry curto evita deslogar uma conta nova
-// por confundir essa janela de poucos milissegundos com "perfil inexistente".
+// O primeiro acesso e a guarda usam o mesmo listener permanente. O pequeno
+// atraso para perfil ausente mantém a janela do cadastro, sem criar um get()
+// descartável nem cancelar o alvo de escuta logo após o cold start.
 async function getUserProfileWithRetry(userId){
-  let lastError=null;
-  const attempts=navigator.onLine?2:1;
-  for(let attempt=0;attempt<attempts;attempt++){
-    try{
-      const snap=await withTimeout(db.collection('users').doc(userId).get(),PROFILE_READ_TIMEOUT_MS,'leitura do perfil');
-      if(snap.exists)return snap;
-      if(attempt===attempts-1)return null;
-    }catch(error){lastError=error;if(!navigator.onLine||!isNetworkLikeError(error))break;}
-    if(attempt<attempts-1)await new Promise(resolve=>setTimeout(resolve,250));
-  }
-  if(lastError)throw lastError;
-  return null;
+  const state=ensureProfileGuard(userId);
+  const snap=await withTimeout(state.firstSnapshot,PROFILE_READ_TIMEOUT_MS,'leitura do perfil');
+  return snap?.exists?snap:null;
 }
 
 let AUTH_CALLBACK_SEEN=false;
@@ -1537,7 +1590,7 @@ async function handleAuthStateUser(user){
       return;
     }
     CURRENT_USER={...snap.data(),uid:user.uid};
-    if(!['trainer','student'].includes(CURRENT_USER.role))throw new Error('Perfil sem função válida.');
+    if(!['trainer','student'].includes(CURRENT_USER.role)){stopProfileGuard();throw new Error('Perfil sem função válida.');}
     CURRENT_USER.status=CURRENT_USER.status==='inactive'?'inactive':'active';
     cacheUserProfile(CURRENT_USER);updateOfflineCredentialProfile(CURRENT_USER);
     configureAuthPersistence(CURRENT_USER.role);
@@ -1557,6 +1610,7 @@ async function handleAuthStateUser(user){
 
     if(CURRENT_USER.status==='inactive'){
       await enterInactiveLocalMode(CURRENT_USER,{preserveCloud:false});
+      startProfileGuard(user.uid);
       return;
     }
 
@@ -4670,6 +4724,7 @@ function preserveRawWorkoutDayFields(rawDays,normalizedDays){
 }
 function daySaveRetryable(error){
   const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
+  if(isFirestoreClientInternalFailure(error))return false;
   if(code.includes('permission-denied')||code==='team-bulls/timeout'||code==='team-bulls/write-pending-timeout')return false;
   return isNetworkLikeError(error)||/internal assertion|unexpected state|async queue/.test(message);
 }
@@ -4677,10 +4732,10 @@ async function recheckFirestoreForDaySave(){
   if(typeof navigator!=='undefined'&&navigator.onLine===false)throw new Error('Sem conexão com a internet. O dia não foi enviado.');
   const resilience=window.TeamBullsForegroundWriteResilience;
   if(resilience?.awaitReady){await resilience.awaitReady({force:true});return true;}
-  if(typeof db.enableNetwork==='function')await withTimeout(db.enableNetwork(),5000,'reativar conexão do Firestore');
-  const uid=String(auth?.currentUser?.uid||CURRENT_USER?.uid||'');
-  if(!uid)throw new Error('Sessão não identificada. Entre novamente antes de salvar.');
-  await withTimeout(db.collection('users').doc(uid).get({source:'server'}),8000,'confirmar conexão com o servidor');
+  // Do not reopen Firestore networking or issue a separate probe read here.
+  // The bounded transaction retry below is the real connectivity check.
+  await new Promise(resolve=>setTimeout(resolve,180));
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)throw new Error('Sem conexão com a internet. O dia não foi enviado.');
   return true;
 }
 
@@ -5014,7 +5069,12 @@ async function saveExercise(){
       syncExerciseDestinationBeforeClose('self',w,dayName);closeModal('modal-exercise');EXERCISE_MODAL_CONTEXT=null;renderDay();
     }
   }catch(e){
-    alert(e?.code==='permission-denied'?'Não foi possível salvar porque as regras do Firebase estão desatualizadas ou esta conta não está reconhecida como treinador. Publique o arquivo firestore_26_compacto.rules em Firebase Console → Firestore Database → Regras e entre novamente.':'Erro ao salvar exercício: '+(e.code?e.code+' — ':'')+e.message);
+    if(isFirestoreClientInternalFailure(e)){
+      const preserved=window.TeamBulls107?.preserveModalDraft?.('modal-exercise')===true;
+      const message='O Firestore parou de responder. O resultado do salvamento é incerto; não tente salvar de novo antes de conferir o exercício. '+(preserved?'As alterações deste formulário foram preservadas neste aparelho. ':'')+'Reiniciar o app agora para restabelecer a conexão?';
+      if(window.confirm?.(message))window.location?.reload?.();
+      else showToast(preserved?'Rascunho preservado. Reinicie o app e confira o exercício antes de salvar novamente.':'Reinicie o app e confira o exercício antes de salvar novamente.',true);
+    }else alert(e?.code==='permission-denied'?'Não foi possível salvar porque as regras do Firebase estão desatualizadas ou esta conta não está reconhecida como treinador. Publique o arquivo firestore_26_compacto.rules em Firebase Console → Firestore Database → Regras e entre novamente.':'Erro ao salvar exercício: '+(e.code?e.code+' — ':'')+e.message);
     console.error(e);
   }finally{
     endAction('save-exercise','modal-exercise');
