@@ -51,6 +51,7 @@ class FakeEvent {
 const saved = ['Murilo@example.com', 'student.two@example.com'];
 const values = new Map([
   ['team_bulls_known_accounts_v1', JSON.stringify(saved)],
+  ['team_bulls_device_accounts_v1', JSON.stringify([{email:'device.only@example.com',uid:'device-only'}])],
   ['team_bulls_offline_credentials', JSON.stringify({
     one: { email: 'murilo@example.com', password: 'must-never-render' },
     two: { email: 'student.three@example.com', password: 'also-private' }
@@ -83,7 +84,10 @@ loginError.className = 'auth-error show';
 loginError.textContent = 'A restauração da sessão demorou. Você já pode entrar novamente; seus dados continuam preservados.';
 document.elements.set(loginError.id, loginError);
 
-vm.runInNewContext(boot.slice(start, end), { window, document, localStorage, Event: FakeEvent, MutationObserver: FakeMutationObserver });
+let selectedAccount='';
+vm.runInNewContext(boot.slice(start, end), { window, document, localStorage, Event: FakeEvent, MutationObserver: FakeMutationObserver,
+  loginWithSavedDeviceAccount:email=>{selectedAccount=email;}
+});
 
 assert.equal(typeof window.TeamBullsKnownAccounts?.render, 'function', 'O seletor precisa existir antes da restauração Firebase.');
 assert.ok(mutationObserver, 'O boot precisa observar a montagem do formulário sem esperar os módulos opcionais.');
@@ -109,17 +113,21 @@ assert.equal(loginError.textContent, 'A restauração da sessão demorou. Você 
 assert.equal(host.children[0].textContent, 'Contas neste aparelho');
 const buttons = host.children[1].children;
 assert.deepEqual(buttons.map(button => button.textContent), [
+  'device.only@example.com',
   'murilo@example.com',
   'student.two@example.com',
   'student.three@example.com'
 ]);
 assert.ok(buttons.every(button => !button.textContent.includes('private')), 'Nenhuma senha pode ser exibida no seletor.');
-assert.equal(buttons[0].className, 'tb-known-account active');
+assert.equal(buttons[1].className, 'tb-known-account active');
 
-buttons[2].click();
+pass.value='senha-de-outra-conta';
+buttons[3].click();
 assert.equal(email.value, 'student.three@example.com', 'Tocar em uma conta precisa preencher o e-mail.');
-assert.equal(pass.focusCount, 1, 'Depois de escolher uma conta, o foco vai para a senha.');
-assert.equal(document.getElementById('tb-known-accounts').children[1].children[2].className, 'tb-known-account active');
+assert.equal(pass.focusCount, 0, 'Escolher uma conta não pode abrir o gerenciador de senhas.');
+assert.equal(pass.value, '', 'Trocar a conta precisa limpar qualquer senha anterior.');
+assert.equal(selectedAccount, 'student.three@example.com', 'O seletor deve tentar o acesso salvo para a conta escolhida.');
+assert.equal(document.getElementById('tb-known-accounts').children[1].children[3].className, 'tb-known-account active');
 
 for (let i = 0; i < 10; i += 1) window.TeamBullsKnownAccounts.remember('new' + i + '@example.com');
 const persisted = JSON.parse(values.get('team_bulls_known_accounts_v1'));

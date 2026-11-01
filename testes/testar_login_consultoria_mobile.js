@@ -13,9 +13,12 @@ const bridge = read('sw_47.js');
 const updater = read('update_v10_10_9.js');
 const version = JSON.parse(read('version.json'));
 const imagePath = path.join(root, 'team-bulls-consultoria-bg-v1.jpg');
-const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2';
-const bootUrl = 'boot_v10.js?v=10.10.9-themefirstpaint2&login=quickpick1';
+const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1';
+const bootUrl = 'boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1';
 const mobileStyles = css.slice(css.indexOf('/* Login mobile: portal de consultoria'));
+const desktopArtStyles = css.slice(css.indexOf('/* Fundo exclusivo do login desktop.'));
+assert.match(desktopArtStyles,/^\/\* Fundo exclusivo[\s\S]*?@media \(min-width:900px\) and \(hover:hover\) and \(pointer:fine\)/,'A arte desktop deve excluir celulares e tablets de toque, inclusive em paisagem.');
+assert.ok(html.includes('media="(min-width: 900px) and (hover: hover) and (pointer: fine)" rel="preload" type="image/webp"'),'O preload da arte desktop também deve excluir telas de toque.');
 
 assert.match(html, /class="auth-logo">TEAM <span class="dim">BULLS<\/span><\/div>/);
 assert.doesNotMatch(html, /class="auth-intro"|Evolução com|Treinos e planos organizados/);

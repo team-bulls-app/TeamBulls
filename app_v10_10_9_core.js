@@ -1319,10 +1319,38 @@ async function offlineRegisteredLogin(email,password){
   }catch(e){console.error(e);showAuthError('login-error','Não foi possível validar o acesso offline neste aparelho.');return false;}
 }
 
+async function loginWithSavedDeviceAccount(email){
+  const btn=document.getElementById('btn-login');
+  if(!btn||btn.disabled)return;
+  clearAuthError('login-error');
+  if(!window.TeamBullsDeviceAccess?.has(email)){
+    showAuthError('login-error','Informe a senha uma vez para salvar o acesso neste aparelho.');return;
+  }
+  btn.disabled=true;btn.textContent='ENTRANDO...';
+  window.TeamBullsKnownAccounts?.render();
+  const selected=String(email).trim().toLowerCase();
+  const canActivate=()=>document.getElementById('screen-auth')?.classList.contains('active')&&document.getElementById('panel-login')?.classList.contains('active')&&document.getElementById('login-email')?.value.trim().toLowerCase()===selected;
+  try{
+    if(!auth&&!(await ensureFirebaseReady()))throw Object.assign(new Error('auth unavailable'),{code:'auth/network-request-failed'});
+    startAuthListener();
+    AUTH_HANDLED=false;startBootWatchdog();
+    await window.TeamBullsDeviceAccess.restore(email,{canActivate});
+    clearTransientAuthSecrets();
+  }catch(error){
+    if(error?.code==='team-bulls/device-cancelled')return;
+    if(error?.code==='team-bulls/device-attestation-unavailable'){
+      showAuthError('login-error','A conexão segura ainda está carregando. Aguarde alguns segundos e tente novamente.');return;
+    }
+    const network=['auth/network-request-failed','team-bulls/device-timeout'].includes(error?.code);
+    showAuthError('login-error',network?'Não foi possível conectar para usar o acesso salvo. Verifique a conexão e tente novamente.':'O acesso salvo expirou. Informe sua senha para renová-lo neste aparelho.');
+  }finally{btn.disabled=false;btn.textContent='ACESSAR MINHA CONSULTORIA';window.TeamBullsKnownAccounts?.render();}
+}
+
 async function doLogin(){
   clearAuthError('login-error');
   const email=document.getElementById('login-email').value.trim();
   const pass=document.getElementById('login-pass').value;
+  if(email&&!pass&&window.TeamBullsDeviceAccess?.has(email))return loginWithSavedDeviceAccount(email);
   if(!email||!pass){showAuthError('login-error','Preencha e-mail e senha.');return;}
   const btn=document.getElementById('btn-login');
   if(btn.disabled)return;
@@ -1594,6 +1622,8 @@ async function handleAuthStateUser(user){
     CURRENT_USER.status=CURRENT_USER.status==='inactive'?'inactive':'active';
     cacheUserProfile(CURRENT_USER);updateOfflineCredentialProfile(CURRENT_USER);
     configureAuthPersistence(CURRENT_USER.role);
+    // Só lembrar a identidade depois da validação canônica do perfil remoto.
+    window.TeamBullsDeviceAccess?.remember(user);
 
     if(CURRENT_USER.role==='trainer'){
       MODE='cloud';ACCESS_MODE='trainer';INACTIVE_NAME='';INACTIVE_UID='';

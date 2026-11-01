@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110107,
-  "revision": "mobile-scale-exercise-delete-flexible-payments-1",
+  "build": 2026110109,
+  "revision": "device-local-access-1",
   "publishedAt": "2026-11-01T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Retomada do Firestore sem sondagens extras, com drafts seguros e isolados por exercício."
+  "message": "Acesso salvo neste aparelho e novo fundo de login no desktop."
 }

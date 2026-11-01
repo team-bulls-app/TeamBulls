@@ -11,12 +11,9 @@
   }catch(error){document.documentElement.dataset.theme='dark';}
 })();
 
-/* Team Bulls v10.10.27 — autofill de login disponível já no cold start.
- *
- * Este guard roda no <head>, antes do DOMContentLoaded. O HTML legado ainda
- * nasce com marcadores que alguns gerenciadores de senha interpretam como
- * "não preencher". Assim que o parser cria o formulário de login, corrigimos
- * somente a semântica de autofill. Nenhuma senha é lida ou persistida aqui.
+/* O acesso lembrado pertence ao aparelho. Nenhuma camada deve reativar
+ * automaticamente o gerenciador de senhas da conta Google no formulário.
+ * O navegador ainda decide sua própria interface ao editar uma senha manualmente.
  */
 (function(){
   if(window.__TEAM_BULLS_EARLY_AUTH_AUTOFILL_101027__)return;
@@ -27,18 +24,15 @@
     const email=document.getElementById('login-email');
     const password=document.getElementById('login-pass');
     if(form){
-      form.setAttribute('autocomplete','on');
-      form.removeAttribute('data-form-type');
+      form.setAttribute('autocomplete','off');
     }
     if(email){
-      email.setAttribute('autocomplete','username');
-      email.setAttribute('name','username');
-      ['data-1p-ignore','data-lpignore','data-form-type','aria-autocomplete'].forEach(attribute=>email.removeAttribute(attribute));
+      email.setAttribute('autocomplete','off');
+      email.setAttribute('name','tb_access_identity');
     }
     if(password){
-      password.setAttribute('autocomplete','current-password');
-      password.setAttribute('name','password');
-      ['data-1p-ignore','data-lpignore','data-form-type','aria-autocomplete'].forEach(attribute=>password.removeAttribute(attribute));
+      password.setAttribute('autocomplete','off');
+      password.setAttribute('name','tb_access_secret');
     }
     return !!(form&&email&&password);
   }
@@ -542,6 +536,113 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
   });
 })();
 
+// BEGIN DEVICE ACCESS BOOTSTRAP
+/* Uma sessão Firebase LOCAL por conta, sem guardar a senha ou vincular Google.
+ * Apenas metadados email/uid ficam na lista; o SDK guarda e renova a sessão.
+ * O Auth principal e a validação remota do perfil continuam controlando o app.
+ */
+(()=>{
+  if(window.TeamBullsDeviceAccess)return;
+  const KEY='team_bulls_device_accounts_v1',MAX=8;
+  const normalize=value=>String(value||'').normalize('NFKC').trim().toLowerCase();
+  const failure=code=>Object.assign(new Error(code),{code});
+  const expired=new Set(['auth/user-token-expired','auth/invalid-user-token','auth/user-disabled','auth/user-not-found','team-bulls/device-account-mismatch']);
+  const attestedApps=new WeakSet();
+  let pending=Promise.resolve();
+  const serial=task=>{const result=pending.then(task);pending=result.catch(()=>{});return result;};
+  const records=()=>{
+    try{const value=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(value)?value.filter(item=>typeof item?.email==='string'&&typeof item?.uid==='string'&&item.uid).slice(0,MAX):[];}
+    catch(error){return [];}
+  };
+  function mainAuth(){try{return typeof auth!=='undefined'?auth:null;}catch(error){return null;}}
+  function notify(){window.TeamBullsKnownAccounts?.render?.();}
+  function write(value){localStorage.setItem(KEY,JSON.stringify(value));notify();}
+  function bounded(task,ms=6000){
+    let timer;
+    return Promise.race([Promise.resolve(task),new Promise((_,reject)=>{timer=setTimeout(()=>reject(failure('team-bulls/device-timeout')),ms);})]).finally(()=>clearTimeout(timer));
+  }
+  async function accountAuth(uid,attest=true){
+    const source=mainAuth();if(!source)throw failure('team-bulls/device-unavailable');
+    const name='tb-device-v1-'+uid;
+    const app=firebase.apps.find(item=>item.name===name)||firebase.initializeApp(source.app.options,name);
+    const key=typeof CFG!=='undefined'?String(CFG.appCheckSiteKey||'').trim():'';
+    if(attest&&key&&!attestedApps.has(app)){
+      // Auth também envia App Check. A instância que lembra a conta precisa da
+      // mesma atestação do app principal antes de restaurar/renovar seus tokens.
+      if(typeof firebase.appCheck!=='function'&&typeof initOptionalAppCheck==='function')await bounded(initOptionalAppCheck());
+      if(typeof firebase.appCheck!=='function'||typeof app.appCheck!=='function')throw failure('team-bulls/device-attestation-unavailable');
+      const Provider=firebase.appCheck.ReCaptchaEnterpriseProvider||firebase.appCheck.ReCaptchaV3Provider;
+      if(!Provider)throw failure('team-bulls/device-attestation-unavailable');
+      app.appCheck().activate(new Provider(key),false);
+      attestedApps.add(app);
+    }
+    return app.auth(); // Não cria Firestore nem listeners de dados para estas instâncias.
+  }
+  async function ready(service){
+    await bounded(service.setPersistence(firebase.auth.Auth.Persistence.LOCAL));
+    // currentUser pode estar vazio antes de o IndexedDB terminar a restauração.
+    let unsubscribe;
+    try{return await bounded(new Promise((resolve,reject)=>{unsubscribe=service.onAuthStateChanged(resolve,reject);}));}
+    finally{unsubscribe?.();}
+  }
+  async function clearSession(record){
+    const service=await accountAuth(record.uid,false);
+    await bounded(service.signOut());
+    await service.app.delete();
+  }
+  async function forgetRecord(email){
+    const list=records(),record=list.find(item=>normalize(item.email)===email);
+    if(!record)return false;
+    // Não anunciar remoção se o SDK não conseguiu apagar a sessão persistida.
+    await clearSession(record);
+    const current=mainAuth();
+    if(current?.currentUser?.uid===record.uid)await bounded(current.signOut());
+    write(list.filter(item=>normalize(item.email)!==email));
+    return true;
+  }
+  function remember(user){return serial(async()=>{
+    if(!user?.uid||!user.email||mainAuth()?.currentUser?.uid!==user.uid)return false;
+    const email=normalize(user.email),list=records();
+    try{
+      // Libera a sessão excedente antes de persistir uma nona conta.
+      const remaining=list.filter(item=>normalize(item.email)!==email&&item.uid!==user.uid);
+      for(const old of list.filter(item=>normalize(item.email)===email&&item.uid!==user.uid))await clearSession(old);
+      for(const old of remaining.slice(MAX-1))await clearSession(old);
+      const service=await accountAuth(user.uid);
+      await ready(service);
+      await bounded(service.updateCurrentUser(user));
+      write([{email,uid:user.uid},...remaining.slice(0,MAX-1)]);
+      return true;
+    }catch(error){console.warn('[Team Bulls] Não foi possível lembrar o acesso neste aparelho:',error?.code||'device-storage');return false;}
+  });}
+  function restore(value,{canActivate=()=>true}={}){return serial(async()=>{
+    const email=normalize(value),record=records().find(item=>normalize(item.email)===email);
+    if(!record)throw failure('team-bulls/device-missing');
+    if(navigator.onLine===false)throw failure('auth/network-request-failed');
+    const target=mainAuth();
+    try{
+      const service=await accountAuth(record.uid),user=await ready(service);
+      if(!user||user.uid!==record.uid||normalize(user.email)!==email)throw failure('team-bulls/device-account-mismatch');
+      // Renova no servidor: senha alterada, sessão revogada e conta desativada
+      // exigem um novo login. Nenhum perfil é liberado só pelos metadados locais.
+      await bounded(user.getIdToken(true));
+      if(mainAuth()!==target||!canActivate())throw failure('team-bulls/device-cancelled');
+      await bounded(target.setPersistence(firebase.auth.Auth.Persistence.LOCAL));
+      if(!canActivate())throw failure('team-bulls/device-cancelled');
+      await target.updateCurrentUser(user);
+      return true;
+    }catch(error){
+      if(expired.has(error?.code))await forgetRecord(email).catch(()=>{});
+      throw error;
+    }
+  });}
+  window.TeamBullsDeviceAccess=Object.freeze({remember,restore,
+    has:value=>records().some(item=>normalize(item.email)===normalize(value)),
+    forget:value=>serial(()=>forgetRecord(normalize(value)))
+  });
+})();
+// END DEVICE ACCESS BOOTSTRAP
+
 // BEGIN LOGIN ACCOUNT PICKER BOOTSTRAP
 /* Login account picker: keep known student emails available during session fail-open. */
 (()=>{
@@ -554,6 +655,8 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
   const readJson=(key,fallback)=>{try{const value=localStorage.getItem(key);return value?JSON.parse(value):fallback;}catch(error){return fallback;}};
   const known=()=>{
     const emails=new Set();
+    const deviceAccounts=readJson('team_bulls_device_accounts_v1',[]);
+    if(Array.isArray(deviceAccounts))deviceAccounts.forEach(record=>{const email=normalize(record?.email);if(email)emails.add(email);});
     const saved=readJson(KEY,[]);
     if(Array.isArray(saved))saved.forEach(value=>{const email=normalize(value);if(email)emails.add(email);});
     const credentials=readJson(CREDENTIALS_KEY,{});
@@ -576,14 +679,28 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
     host.replaceChildren();
     const title=document.createElement('span');title.className='tb-known-accounts-title';title.textContent='Contas neste aparelho';
     const list=document.createElement('div');list.className='tb-known-accounts-list';
-    const hint=document.createElement('span');hint.className='tb-password-manager-hint';hint.textContent='A senha pode ser preenchida pelo gerenciador seguro do Android/iPhone/navegador.';
+    const hint=document.createElement('span');hint.className='tb-password-manager-hint';hint.textContent='Toque no e-mail para usar o acesso salvo neste aparelho. No primeiro acesso, informe a senha.';
     const current=normalize(emailInput.value);
     accounts.forEach(email=>{
       const button=document.createElement('button');button.type='button';button.className='tb-known-account'+(email===current?' active':'');button.textContent=email;button.title='Usar '+email;
+      button.disabled=!!document.getElementById('btn-login')?.disabled;
       button.addEventListener('click',()=>{
-        emailInput.value=email;emailInput.dispatchEvent(new Event('input',{bubbles:true}));render();document.getElementById('login-pass')?.focus();
+        emailInput.value=email;
+        const password=document.getElementById('login-pass');if(password)password.value='';
+        emailInput.dispatchEvent(new Event('input',{bubbles:true}));render();
+        if(typeof loginWithSavedDeviceAccount==='function')loginWithSavedDeviceAccount(email);
       });
-      list.appendChild(button);
+      if(window.TeamBullsDeviceAccess?.has(email)){
+        const row=document.createElement('div');row.className='tb-known-account-row';
+        const remove=document.createElement('button');remove.type='button';remove.className='tb-forget-device-access';remove.textContent='Esquecer acesso';remove.setAttribute('aria-label','Esquecer acesso salvo de '+email);
+        remove.disabled=button.disabled;
+        remove.addEventListener('click',async()=>{
+          remove.disabled=true;
+          try{await window.TeamBullsDeviceAccess.forget(email);render();}
+          catch(error){if(typeof showAuthError==='function')showAuthError('login-error','Não foi possível remover o acesso deste aparelho. Tente novamente.');remove.disabled=false;}
+        });
+        row.append(button,remove);list.appendChild(row);
+      }else list.appendChild(button);
     });
     host.append(title,list,hint);
     if(installedInput!==emailInput){installedInput=emailInput;emailInput.addEventListener('input',render,{passive:true});}
@@ -598,7 +715,7 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
   }
   window.TeamBullsKnownAccounts=Object.freeze({version:'10.10.9-quickpick1',render,remember,list:known});
   window.addEventListener('pageshow',render,{passive:true});
-  window.addEventListener('storage',event=>{if(!event.key||event.key===KEY||event.key===CREDENTIALS_KEY)render();},{passive:true});
+  window.addEventListener('storage',event=>{if(!event.key||event.key===KEY||event.key===CREDENTIALS_KEY||event.key==='team_bulls_device_accounts_v1')render();},{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render();},{passive:true});
   if(!render()&&document.readyState==='loading'&&typeof MutationObserver==='function'){
     const observer=new MutationObserver(()=>{if(render())observer.disconnect();});

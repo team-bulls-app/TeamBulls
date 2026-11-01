@@ -32,14 +32,14 @@ assert(updater.includes(`const CURRENT_BUILD=${build};`),'Atualizador divergiu d
 assert(sw.includes(`const BUILD_REVISION=${build};`)&&sw47.includes(`const BUILD_REVISION=${build};`),'Service Workers divergem do build publicado.');
 assert(sw===sw47,'sw.js e sw_47.js divergiram.');
 
-const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2';
+const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1';
 const recoveredModalRef='modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4';
 const foregroundRecoveryRef='modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2';
 assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length>=2,'HTML precisa pré-carregar e executar a revisão nova do runtime Firestore.');
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='mobile-scale-exercise-delete-flexible-payments-1','A revisão publicada não identifica a correção de retomada/recovery do Firestore.');
+assert(version.revision==='device-local-access-1','A revisão publicada não identifica a entrega do acesso local atual.');
 
 assert(config.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4'),'Loader ainda pede conversor HEIC antigo.');
 assert(updater.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&updater.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4'),'Atualizador ainda aquece revisão HEIC antiga.');
