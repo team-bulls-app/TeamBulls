@@ -2618,11 +2618,19 @@ html[data-theme="light"] .v107-tabs button:not(.active):hover{border-color:var(-
 html[data-theme="light"] .v107-tabs{background:#171615}
 html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-light-panel-muted)}
 
+/* Login account chips stay available before deferred application modules load. */
+.tb-known-accounts{margin:-2px 0 13px;padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025)}
+.tb-known-accounts-title{display:block;margin-bottom:7px;color:#777;font:700 9px/1.2 'DM Mono',monospace;letter-spacing:.07em;text-transform:uppercase}
+.tb-known-accounts-list{display:flex;flex-wrap:wrap;gap:6px}
+.tb-known-account{max-width:100%;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:#181818;color:#ddd;padding:7px 10px;font:600 10px/1 'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.tb-known-account.active{border-color:rgba(198,61,61,.65);background:#261515;color:#fff}
+.tb-password-manager-hint{display:block;margin-top:7px;color:#777;font:500 9px/1.35 'DM Mono',monospace}
+
 /* Login mobile: portal de consultoria com fundo imersivo e formulário legível. */
 .auth-intro,.auth-card-intro{display:none}
 @media(max-width:899px){
   #screen-auth.active{
-    display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:0;
+    display:flex;flex-direction:column;align-items:stretch;justify-content:center;gap:0;
     min-height:var(--app-height,100svh);height:auto;overflow-x:hidden;overflow-y:auto;
     overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;
     padding:calc(22px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))!important;

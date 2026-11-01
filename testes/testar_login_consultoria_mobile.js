@@ -13,7 +13,8 @@ const bridge = read('sw_47.js');
 const updater = read('update_v10_10_9.js');
 const version = JSON.parse(read('version.json'));
 const imagePath = path.join(root, 'team-bulls-consultoria-bg-v1.jpg');
-const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=compacttitle1';
+const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1';
+const bootUrl = 'boot_v10.js?v=10.10.9-themefirstpaint2&login=quickpick1';
 const mobileStyles = css.slice(css.indexOf('/* Login mobile: portal de consultoria'));
 
 assert.match(html, /class="auth-logo">TEAM <span class="dim">BULLS<\/span><\/div>/);
@@ -50,4 +51,10 @@ assert.equal(Number(worker.match(/const BUILD_REVISION=(\d+)/)?.[1]), Number(ver
 assert.equal(Number(bridge.match(/const BUILD_REVISION=(\d+)/)?.[1]), Number(version.build));
 assert.equal(Number(updater.match(/const CURRENT_BUILD=(\d+)/)?.[1]), Number(version.build));
 
-console.log('APROVADO: layout mobile da consultoria, fluxos de login e entrega/cache dos assets estão coerentes.');
+const knownAccountsCss = css.slice(css.indexOf('.tb-known-accounts{'), css.indexOf('/* Login mobile: portal de consultoria'));
+assert.ok(knownAccountsCss.includes('.tb-known-account.active{'), 'Os atalhos de conta precisam estar estilizados no CSS crítico.');
+assert.match(mobileStyles, /justify-content:center/, 'O formulário curto deve ficar centralizado quando houver espaço vertical.');
+assert.ok(html.includes(bootUrl), 'O HTML precisa solicitar o bootstrap atualizado antes do app.');
+assert.ok(worker.includes("'./" + bootUrl + "'"), 'O Service Worker precisa armazenar a mesma revisão do bootstrap.');
+assert.ok(updater.includes("'./" + bootUrl + "'"), 'A atualização manual precisa renovar a mesma revisão do bootstrap.');
+console.log('APROVADO: layout mobile, contas rápidas no bootstrap e entrega/cache dos assets estão coerentes.');
