@@ -655,6 +655,8 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
   const readJson=(key,fallback)=>{try{const value=localStorage.getItem(key);return value?JSON.parse(value):fallback;}catch(error){return fallback;}};
   const known=()=>{
     const emails=new Set();
+    const deviceAccounts=readJson('team_bulls_device_accounts_v1',[]);
+    if(Array.isArray(deviceAccounts))deviceAccounts.forEach(record=>{const email=normalize(record?.email);if(email)emails.add(email);});
     const saved=readJson(KEY,[]);
     if(Array.isArray(saved))saved.forEach(value=>{const email=normalize(value);if(email)emails.add(email);});
     const credentials=readJson(CREDENTIALS_KEY,{});
@@ -713,7 +715,7 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
   }
   window.TeamBullsKnownAccounts=Object.freeze({version:'10.10.9-quickpick1',render,remember,list:known});
   window.addEventListener('pageshow',render,{passive:true});
-  window.addEventListener('storage',event=>{if(!event.key||event.key===KEY||event.key===CREDENTIALS_KEY)render();},{passive:true});
+  window.addEventListener('storage',event=>{if(!event.key||event.key===KEY||event.key===CREDENTIALS_KEY||event.key==='team_bulls_device_accounts_v1')render();},{passive:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render();},{passive:true});
   if(!render()&&document.readyState==='loading'&&typeof MutationObserver==='function'){
     const observer=new MutationObserver(()=>{if(render())observer.disconnect();});
