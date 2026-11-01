@@ -1040,7 +1040,7 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation;}
 @media(min-width:900px){
   body.auth-desktop{overflow:auto;background:#050505}
   body.auth-desktop #app,
-  body:has(#screen-auth.active) #app{max-width:1240px;width:min(1240px,100%);margin:0 auto;border-left:1px solid rgba(93,77,65,.22);border-right:1px solid rgba(93,77,65,.22)}
+  body:has(#screen-auth.active) #app{max-width:none;width:100%;margin:0 auto;border:0}
   body.auth-desktop #screen-auth.active,
   body:has(#screen-auth.active) #screen-auth.active{
     display:grid;
@@ -1437,26 +1437,24 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation;}
   body.student-desktop #exercise-list{grid-template-columns:1fr;}
 }
 
-/* ═══════════════════════════════════════════════
-   TEAM BULLS v10.5.6 — FUNDO DO MENU INICIAL NO DESKTOP
-   A camada "contain" preserva toda a arte; a camada "cover"
-   preenche monitores com proporções diferentes sem deixar faixas vazias.
-   O mobile continua usando o fundo anterior.
-═══════════════════════════════════════════════ */
+/* Fundo exclusivo do login desktop. A arte mantém os minotauros à esquerda
+   e a área escura do formulário à direita, nos dois temas. */
 @media (min-width:900px){
   body.auth-desktop #screen-auth,
-  body:has(#screen-auth.active) #screen-auth{
-    background-color:#020202;
+  body:has(#screen-auth.active) #screen-auth,
+  html[data-theme="light"] body.auth-desktop #screen-auth{
+    background-color:#050202;
     background-image:
-      linear-gradient(90deg,rgba(0,0,0,.70) 0%,rgba(0,0,0,.30) 42%,rgba(0,0,0,.40) 67%,rgba(0,0,0,.74) 100%),
-      linear-gradient(180deg,rgba(0,0,0,.12) 0%,rgba(0,0,0,.20) 58%,rgba(0,0,0,.72) 100%),
-      url('team-bulls-desktop-menu-v10-5-6.webp'),
-      url('team-bulls-desktop-menu-v10-5-6.webp');
-    background-size:cover,cover,contain,cover;
-    background-position:center,center,center,center;
-    background-repeat:no-repeat,no-repeat,no-repeat,no-repeat;
+      linear-gradient(90deg,rgba(0,0,0,.06) 0%,rgba(0,0,0,.05) 40%,rgba(0,0,0,.32) 60%,rgba(0,0,0,.6) 100%),
+      url('team-bulls-desktop-login-minotaurs-v1.webp');
+    background-size:cover,cover;
+    background-position:center,left center;
+    background-repeat:no-repeat;
     background-attachment:scroll;
   }
+  html[data-theme="light"] body.auth-desktop #screen-auth .auth-logo{color:#f2eadf;text-shadow:0 3px 22px #000}
+  html[data-theme="light"] body.auth-desktop #screen-auth .auth-logo .dim{color:#ad272b}
+  html[data-theme="light"] body.auth-desktop #screen-auth .auth-sub{color:#dac9b8;text-shadow:0 2px 12px #000}
 }
 
 /* ── v10.5.7: correção de sobreposição no agendamento do check-in ── */

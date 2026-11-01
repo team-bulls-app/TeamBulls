@@ -39,7 +39,7 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='mobile-scale-exercise-delete-flexible-payments-1','A revisão publicada não identifica a correção de retomada/recovery do Firestore.');
+assert(version.revision==='desktop-login-minotaurs-1','A revisão publicada não identifica o fundo desktop atual.');
 
 assert(config.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4'),'Loader ainda pede conversor HEIC antigo.');
 assert(updater.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&updater.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4'),'Atualizador ainda aquece revisão HEIC antiga.');
