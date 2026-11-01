@@ -2622,6 +2622,9 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
 .tb-known-accounts-list{display:flex;flex-wrap:wrap;gap:6px}
 .tb-known-account{max-width:100%;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:#181818;color:#ddd;padding:7px 10px;font:600 10px/1 'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .tb-known-account.active{border-color:rgba(198,61,61,.65);background:#261515;color:#fff}
+.tb-known-account-row{display:flex;align-items:center;gap:6px;max-width:100%;min-width:0}
+.tb-known-account-row .tb-known-account{min-width:0;flex:1}
+.tb-forget-device-access{border:0;background:transparent;color:inherit;font-size:10px;min-height:32px;text-decoration:underline;cursor:pointer}
 .tb-password-manager-hint{display:block;margin-top:7px;color:#777;font:500 9px/1.35 'DM Mono',monospace}
 
 /* Login mobile: portal de consultoria com fundo imersivo e formulário legível. */

@@ -161,10 +161,9 @@
     const form=document.getElementById('panel-login');
     const email=document.getElementById('login-email');
     const password=document.getElementById('login-pass');
-    if(form){form.setAttribute('autocomplete','on');form.removeAttribute('data-form-type');}
+    if(form)form.setAttribute('autocomplete','off');
     if(email){
-      email.setAttribute('autocomplete','username');email.setAttribute('name','username');
-      ['data-1p-ignore','data-lpignore','data-form-type','aria-autocomplete'].forEach(attr=>email.removeAttribute(attr));
+      email.setAttribute('autocomplete','off');email.setAttribute('name','tb_access_identity');
       if(!email.value.trim())email.value=String(safeGet(LAST_EMAIL_KEY)||profileEmail()||'');
       if(email.dataset.tbCredentialMemory!=='1'){
         email.dataset.tbCredentialMemory='1';
@@ -173,8 +172,7 @@
       }
     }
     if(password){
-      password.setAttribute('autocomplete','current-password');password.setAttribute('name','password');
-      ['data-1p-ignore','data-lpignore','data-form-type','aria-autocomplete'].forEach(attr=>password.removeAttribute(attr));
+      password.setAttribute('autocomplete','off');password.setAttribute('name','tb_access_secret');
     }
     return !!(form&&email&&password);
   }

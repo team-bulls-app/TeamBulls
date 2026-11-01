@@ -23,6 +23,7 @@ jobs:
           node scripts/quality-check.mjs
           node testes/testar_login_consultoria_mobile.js
           node testes/testar_login_contas_retomada.js
+          node scripts/device-access-check.mjs
           node scripts/app-support-controls-check.mjs
           node scripts/feedback-notice-cancellation-check.mjs
           node scripts/cloudflare-feedback-push-check.mjs

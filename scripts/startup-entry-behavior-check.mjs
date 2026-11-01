@@ -170,10 +170,11 @@ await test('Falha de perfil libera tela de acesso mesmo com usuário Firebase re
 });
 
 function authFixture(){
-  const pending=new Map(),screens=[],calls={subscribe:0,unsubscribe:0,profiles:0,trainer:0,profileGuard:0,inactive:0,stopProfileGuard:0};
+  const pending=new Map(),screens=[],calls={subscribe:0,unsubscribe:0,profiles:0,trainer:0,profileGuard:0,inactive:0,stopProfileGuard:0,deviceSaves:[]};
   let callback,onError;
   const auth={currentUser:null,onAuthStateChanged(next,error){calls.subscribe++;callback=next;onError=error;return()=>calls.unsubscribe++;}};
   const context=vm.createContext({auth,console:quiet,queueMicrotask,AUTH_UNSUBSCRIBE:null,AUTH_HANDLED:false,AUTH_EXPECTED_LOCAL_SIGNOUT:false,
+    window:{TeamBullsDeviceAccess:{remember(user){calls.deviceSaves.push(user.uid);return Promise.resolve(true);}}},
     CURRENT_USER:null,ACCESS_MODE:'cloud-active',document:{body:{classList:{add(){},remove(){}}}},stopProfileGuard(){calls.stopProfileGuard++;},startProfileGuard(){calls.profileGuard++;},
     enterInactiveLocalMode:async()=>{calls.inactive++;context.ACCESS_MODE='local-inactive';return true;},renderHome(){},MODE:'cloud',
     storageGet:()=>'',storageSet(){},selectLocalOwner(){},setLoadingMessage(){},restoreCachedStudentAccess:()=>false,getUserProfileWithRetry:uid=>{calls.profiles++;return new Promise((resolve,reject)=>pending.set(uid,{resolve,reject}));},
@@ -185,9 +186,11 @@ await test('Retomar app reutiliza listener; falha real permite nova assinatura',
   const f=authFixture();f.auth.currentUser={uid:'trainer-a'};f.start();await flush();
   for(let i=0;i<20;i++)f.start();await flush();
   assert.equal(f.calls.subscribe,1);assert.equal(f.calls.profiles,1);
+  assert.deepEqual(f.calls.deviceSaves,[],'O aparelho não pode lembrar acesso antes da validação do perfil.');
   f.pending.get('trainer-a').resolve({data:()=>({role:'trainer',status:'active'})});await flush();
   for(let i=0;i<20;i++)f.start();await flush();
   assert.equal(f.calls.trainer,1);assert.equal(f.calls.subscribe,1);
+  assert.deepEqual(f.calls.deviceSaves,['trainer-a']);
   f.error(new Error('listener encerrado'));f.start();await flush();assert.equal(f.calls.subscribe,2);
 });
 await test('Conta inativa mantém a guarda de perfil sem abrir outra assinatura',async()=>{
@@ -201,6 +204,7 @@ await test('Perfil sem função válida encerra a guarda que começou a leitura 
   f.pending.get('unknown-a').resolve({data:()=>({role:'unknown',status:'active'})});await login;await flush();
   assert.equal(f.calls.stopProfileGuard,1,'Um perfil inválido não pode deixar uma assinatura de Firestore ociosa.');
   assert.equal(f.calls.profileGuard,0);
+  assert.deepEqual(f.calls.deviceSaves,[],'Perfil sem função válida não pode salvar acesso.');
 });
 await test('Perfil atrasado não reabre conta anterior após saída ou troca de usuário',async()=>{
   const f=authFixture();f.start();const old=f.emit({uid:'trainer-a'});await flush();
@@ -209,5 +213,6 @@ await test('Perfil atrasado não reabre conta anterior após saída ou troca de 
   assert.equal(f.context.CURRENT_USER,null);assert.equal(f.calls.trainer,0);
   f.pending.get('trainer-b').resolve({data:()=>({role:'trainer'})});await current;await flush();
   assert.equal(f.context.CURRENT_USER.uid,'trainer-b');assert.equal(f.calls.trainer,1);
+  assert.deepEqual(f.calls.deviceSaves,['trainer-b'],'Perfil atrasado de outra conta não pode salvar acesso.');
 });
 if(failures.length)process.exitCode=1;

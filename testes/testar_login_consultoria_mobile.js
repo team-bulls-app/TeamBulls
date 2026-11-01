@@ -13,8 +13,8 @@ const bridge = read('sw_47.js');
 const updater = read('update_v10_10_9.js');
 const version = JSON.parse(read('version.json'));
 const imagePath = path.join(root, 'team-bulls-consultoria-bg-v1.jpg');
-const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1';
-const bootUrl = 'boot_v10.js?v=10.10.9-themefirstpaint2&login=quickpick1';
+const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1';
+const bootUrl = 'boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1';
 const mobileStyles = css.slice(css.indexOf('/* Login mobile: portal de consultoria'));
 
 assert.match(html, /class="auth-logo">TEAM <span class="dim">BULLS<\/span><\/div>/);

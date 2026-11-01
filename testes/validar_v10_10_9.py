@@ -73,7 +73,7 @@ def main():
         'content="10.10.9" name="team-bulls-version"',
         'manifest.json?v=10.10.9', 'update_v10_10_9.js?v=10.10.9',
         'app_v10_10_9_core.js?v=10.10.9', 'styles_v10_10_9.css?v=10.10.9',
-        'interaction_v10_10_9.js?v=10.10.9', 'viewport_v10_10_9.js?v=10.10.9',
+        'interaction_v10_10_9.js?v=10.10.9', 'viewport_v10_10_9.js?v=10.10.9&device=local-access1',
         'modules/v107-core.js?v=10.10.9', 'VERIFICAR ATUALIZAÇÃO',
         'id="student-global-report-guide-panel"', 'id="btn-delete-edited-session"',
         'data-v107-tab="overview" data-v107-trainer-only',
