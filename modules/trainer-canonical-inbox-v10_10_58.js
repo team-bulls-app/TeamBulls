@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_1010585__)return;
   window.__TEAM_BULLS_TRAINER_CANONICAL_INBOX_1010585__=true;
 
-  const VERSION='10.10.58-canonicalinbox6';
+  const VERSION='10.10.58-canonicalinbox7';
   const MAX_ITEMS=500;
   const CONCURRENCY=6;
   const REPAIR_CONCURRENCY=4;
@@ -177,10 +177,21 @@
     })().catch(error=>{console.error('[Team Bulls] Central canônica não pôde ser atualizada.',error);render();return items;}).finally(()=>{loading=null;});return loading;
   }
   async function markAllRead(){
-    if(!trainer())return;await refresh(false);const pending=items.filter(row=>row.read!==true);if(!pending.length){if(typeof showToast==='function')showToast('Nenhum relatório novo para marcar.');return;}
-    await mapWithLimit(pending,REPAIR_CONCURRENCY,row=>ensureIndex(row));
-    try{for(let offset=0;offset<pending.length;offset+=300){const batch=db.batch();pending.slice(offset,offset+300).forEach(row=>batch.set(eventCollection(trainerUid()).doc(row.id),{read:true,readAt:nowStamp()},{merge:true}));await timeout(batch.commit(),9000,'marcar Central como lida');}pending.forEach(row=>row.read=true);render();if(typeof showToast==='function')showToast('✓ Central marcada como lida');}
-    catch(error){if(typeof showToast==='function')showToast('Não foi possível marcar tudo como lido.',true);}
+    if(!trainer())return;await refresh(false);const uid=trainerUid(),pending=items.filter(row=>row.read!==true);if(!pending.length){if(typeof showToast==='function')showToast('Nenhum relatório novo para marcar.');return;}
+    // Fontes canônicas podem conter itens cujo índice secundário não pôde ser
+    // criado. Não os inclua em um batch de atualização: um documento ausente
+    // faria o batch inteiro falhar pelas regras de criação.
+    const indexed=await mapWithLimit(pending,REPAIR_CONCURRENCY,row=>ensureIndex(row));
+    if(!trainer()||trainerUid()!==uid)return;
+    const writable=pending.filter((row,index)=>indexed[index]===true);
+    const results=await mapWithLimit(writable,REPAIR_CONCURRENCY,async row=>{
+      try{await timeout(eventCollection(uid).doc(row.id).set({read:true,readAt:nowStamp()},{merge:true}),7000,'marcar relatório como lido');return true;}
+      catch(error){console.warn('[Team Bulls] Não foi possível marcar este relatório como lido:',row.id,error?.code||error?.message||error);return false;}
+    });
+    if(!trainer()||trainerUid()!==uid)return;
+    let marked=0;writable.forEach((row,index)=>{row.read=results[index]===true;if(row.read)marked++;});render();
+    const failed=pending.length-marked;
+    if(typeof showToast==='function')showToast(failed?`Marquei ${marked} relatório(s); ${failed} não puderam ser atualizados. Tente novamente.`:'✓ Central marcada como lida',failed>0);
   }
   function hookFilters(){if(filterHooked)return;const screen=document.getElementById('screen-trainer-inbox');if(!screen)return;filterHooked=true;screen.addEventListener('click',event=>{if(event.target?.closest?.('[data-inbox-filter]'))requestAnimationFrame(()=>render());});}
   function hookHub(){

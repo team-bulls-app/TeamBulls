@@ -29,7 +29,7 @@ const rules=fs.existsSync(rulesPath)?read(rulesPath):'';
 has(layout,"['diet','DIETA','DIETA'",'Layout base deixou de fornecer o destino oficial da dieta/suprimentos.');
 has(layout,"if(typeof openMeals==='function')openMeals()",'Destino oficial de suprimentos não usa mais openMeals().');
 
-has(student,"const VERSION='10.10.22-studentpay1'",'Patch da hotbar não possui revisão própria.');
+has(student,"const VERSION='10.10.22-studentpay2'",'Patch da hotbar não possui revisão própria.');
 has(student,"const COLLECTION='studentBilling'",'Tela de pagamentos do aluno não usa a projeção segura.');
 has(student,"nav.querySelector('[data-hotbar=\"supplements\"]')?.remove()",'Aba duplicada de suplementos não é removida.');
 has(student,"diet.setAttribute('aria-label','SUPRIMENTOS')",'Aba Dieta não é renomeada para Suprimentos.');
@@ -42,18 +42,18 @@ lacks(student,'receiptPath','Tela do aluno expõe caminho de comprovante privado
 lacks(student,'receiptName','Tela do aluno expõe nome de comprovante privado.');
 lacks(student,'.note','Tela do aluno expõe observação privada do treinador.');
 
-has(projection,"const VERSION='10.10.22-billingprojection1'",'Projeção financeira não possui revisão própria.');
+has(projection,"const VERSION='10.10.22-billingprojection2'",'Projeção financeira não possui revisão própria.');
 has(projection,"db.collection('trainerBilling').doc(uid).collection('payments')",'Projeção não parte da coleção privada oficial.');
 has(projection,"const TARGET_COLLECTION='studentBilling'",'Projeção não escreve no domínio seguro do aluno.');
-has(projection,"schemaVersion:1,studentId:row.studentId,trainerId:uid,paymentId:row.paymentId,planType:row.planType,amountCents:row.amountCents,validFrom:row.validFrom,nextDueDate:row.nextDueDate,updatedAt:stamp()",'Payload da projeção não está fechado aos campos mínimos esperados.');
+has(projection,"schemaVersion:1,studentId:row.studentId,trainerId:uid,paymentId:row.paymentId,planType:row.planType,durationMonths:row.durationMonths,amountCents:row.amountCents,validFrom:row.validFrom,nextDueDate:row.nextDueDate,updatedAt:stamp()",'Payload da projeção não está fechado aos campos mínimos esperados.');
 lacks(projection,'receiptPath','Projeção copia caminho de comprovante privado.');
 lacks(projection,'receiptName','Projeção copia nome do comprovante privado.');
 lacks(projection,'note:', 'Projeção copia observação privada do treinador.');
 has(projection,"CURRENT_USER?.role==='trainer'",'Projeção não possui gate explícito de treinador.');
 has(projection,"MODE!=='undefined'&&MODE==='cloud'",'Projeção não está limitada ao modo cloud.');
 
-has(config,"'./modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay1'",'Loader prioritário do aluno não entrega a nova hotbar/pagamentos.');
-has(config,"MODULE_ROOT+'trainer-billing-student-projection-v10_10_22.js?v=10.10.22-billingprojection1'",'Projeção financeira não está protegida pelo gate de treinador.');
+has(config,"'./modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay2'",'Loader prioritário do aluno não entrega a nova hotbar/pagamentos.');
+has(config,"MODULE_ROOT+'trainer-billing-student-projection-v10_10_22.js?v=10.10.22-billingprojection2'",'Projeção financeira não está protegida pelo gate de treinador.');
 assert(config.indexOf('student-hotbar-payments-v10_10_22.js')>config.indexOf('student-home-layout-v10_10_15.js'),'Patch da hotbar precisa carregar depois do layout canônico.');
 assert(config.indexOf('trainer-billing-student-projection-v10_10_22.js')>config.indexOf('trainer-inbox-payments-v10_10_12.js'),'Projeção precisa carregar depois do módulo financeiro oficial do treinador.');
 
@@ -62,9 +62,9 @@ has(rules,'allow read: if isTrainer() && request.auth.uid == trainerUid;','Leitu
 has(rules,'match /studentBilling/{studentUid}','Regras não possuem projeção financeira do aluno.');
 has(rules,'activeOwner(studentUid)','Aluno não está limitado ao próprio documento ativo.');
 has(rules,'allow create, update: if trainerOwns(studentUid)','Somente o treinador vinculado deve escrever a projeção.');
-has(rules,"'schemaVersion','studentId','trainerId','paymentId','planType'",'Schema seguro da projeção não está fechado.');
+has(rules,"'schemaVersion','studentId','trainerId','paymentId','planType','durationMonths'",'Schema seguro da projeção não está fechado.');
 has(rules,"'amountCents','validFrom','nextDueDate','updatedAt'",'Campos financeiros mínimos da projeção estão incompletos.');
-has(rules,"request.resource.data.planType in ['quarterly','semiannual']",'Projeção aceita plano financeiro desconhecido.');
+has(rules,"request.resource.data.planType in ['quarterly','semiannual','annual','custom']",'Projeção aceita plano financeiro desconhecido.');
 has(rules,'allow delete: if false;','Projeção financeira pode ser apagada pelo cliente.');
 has(rules,'match /{document=**} { allow read, write: if false; }','Firestore perdeu o deny-all final.');
 

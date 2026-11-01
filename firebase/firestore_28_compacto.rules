@@ -134,6 +134,14 @@ service cloud.firestore {
       return value is string && (value == ''
         || value.matches('^paymentReceipts/' + trainerUid + '/' + studentUid + '/[A-Za-z0-9_-]{1,190}\\.(jpg|jpeg|png|webp|heic|heif)$'));
     }
+    function paymentDurationValid(data) {
+      let type = data.get('planType', '');
+      let months = data.get('durationMonths', null);
+      return (type == 'quarterly' && (months == null || (months is int && months == 3)))
+        || (type == 'semiannual' && (months == null || (months is int && months == 6)))
+        || (type == 'annual' && (months == null || (months is int && months == 12)))
+        || (type == 'custom' && months is int && months >= 1 && months <= 60);
+    }
 
     match /users/{uid} {
       allow read: if signedIn() && (
@@ -780,12 +788,13 @@ service cloud.firestore {
         allow read: if isTrainer() && request.auth.uid == trainerUid;
         allow create: if isTrainer() && request.auth.uid == trainerUid
           && request.resource.data.keys().hasOnly([
-            'trainerId','studentId','planType','amountCents','validFrom','nextDueDate',
+            'trainerId','studentId','planType','durationMonths','amountCents','validFrom','nextDueDate',
             'receiptPath','receiptName','note','createdAt','updatedAt'
           ])
           && request.resource.data.trainerId == trainerUid
           && trainerOwns(request.resource.data.studentId)
-          && request.resource.data.planType in ['quarterly','semiannual']
+          && request.resource.data.planType in ['quarterly','semiannual','annual','custom']
+          && paymentDurationValid(request.resource.data)
           && request.resource.data.amountCents is int
           && request.resource.data.amountCents >= 0
           && request.resource.data.amountCents <= 100000000
@@ -800,11 +809,12 @@ service cloud.firestore {
           && resource.data.trainerId == trainerUid
           && trainerOwns(resource.data.studentId)
           && request.resource.data.keys().hasOnly([
-            'trainerId','studentId','planType','amountCents','validFrom','nextDueDate',
+            'trainerId','studentId','planType','durationMonths','amountCents','validFrom','nextDueDate',
             'receiptPath','receiptName','note','createdAt','updatedAt'
           ])
           && immutable('trainerId') && immutable('studentId') && immutable('createdAt')
-          && request.resource.data.planType in ['quarterly','semiannual']
+          && request.resource.data.planType in ['quarterly','semiannual','annual','custom']
+          && paymentDurationValid(request.resource.data)
           && request.resource.data.amountCents is int
           && request.resource.data.amountCents >= 0
           && request.resource.data.amountCents <= 100000000
@@ -829,14 +839,15 @@ service cloud.firestore {
         && resource.data.trainerId == userData(studentUid).trainerId;
       allow create, update: if trainerOwns(studentUid)
         && request.resource.data.keys().hasOnly([
-          'schemaVersion','studentId','trainerId','paymentId','planType',
+          'schemaVersion','studentId','trainerId','paymentId','planType','durationMonths',
           'amountCents','validFrom','nextDueDate','updatedAt'
         ])
         && request.resource.data.schemaVersion == 1
         && request.resource.data.studentId == studentUid
         && request.resource.data.trainerId == request.auth.uid
         && requiredText(request.resource.data.paymentId, 190)
-        && request.resource.data.planType in ['quarterly','semiannual']
+        && request.resource.data.planType in ['quarterly','semiannual','annual','custom']
+        && paymentDurationValid(request.resource.data)
         && request.resource.data.amountCents is int
         && request.resource.data.amountCents >= 0
         && request.resource.data.amountCents <= 100000000

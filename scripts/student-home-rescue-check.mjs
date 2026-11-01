@@ -64,7 +64,7 @@ assert(config.includes("'./modules/student-home-layout-v10_10_15.js?v=10.10.21-h
 assert(!config.includes("'./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1'"),'Ponte legada voltou a executar no loader atual.');
 assert(config.includes('deferredComplete=false,completedRole='),'Loader não registra conclusão por papel.');
 assert(config.includes('const trainerOnlyModules=new Set(['),'Loader não separa módulos exclusivos do treinador.');
-for(const trainerModule of ['trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1','trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2'])assert(config.includes(trainerModule),`Módulo de treinador ausente do gate conservador: ${trainerModule}`);
+for(const trainerModule of ['trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1','trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3'])assert(config.includes(trainerModule),`Módulo de treinador ausente do gate conservador: ${trainerModule}`);
 assert(config.includes('const studentExcludedModules=new Set(['),'Loader não possui o gate específico de aluno cloud.');
 const cloudStudentExcluded=[
   'ger-bulk-v10_10_9.js?v=10.10.9-ger1',

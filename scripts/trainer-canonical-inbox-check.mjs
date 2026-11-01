@@ -30,8 +30,8 @@ const legacyRepair=read('modules/legacy-student-link-repair-v10_10_10.js');
 const sw=read('sw.js');
 
 /* Entrega e ordem dos runtimes. */
-has(source,"const VERSION='10.10.58-canonicalinbox6'",'Central canônica está na revisão errada.');
-has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6",'Loader do treinador não entrega a Central com deduplicação semanal.');
+has(source,"const VERSION='10.10.58-canonicalinbox7'",'Central canônica está na revisão errada.');
+has(loader,"trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox7",'Loader do treinador não entrega a Central com deduplicação semanal.');
 const bootstrapStart=bootstrap.indexOf("const SRC='./modules/intelligence-suite-loader-v10_10_42.js?");
 const bootstrapSection=bootstrapStart>=0?bootstrap.slice(bootstrapStart,bootstrap.indexOf('})();',bootstrapStart)):'';
 const bootstrapSrc=bootstrapSection.match(/const SRC='([^']+)'/)?.[1]||'';

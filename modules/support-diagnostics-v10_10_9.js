@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsSupportDiagnostics)return;
-  const VERSION='10.10.9-diagnostics3';
+  const VERSION='10.10.9-diagnostics4';
   const cleanScreen=value=>/^[a-z0-9_-]{1,60}$/i.test(String(value||''))?String(value):'indisponível';
   const count=value=>Number.isFinite(Number(value))?Math.max(0,Math.min(10000,Math.trunc(Number(value)))):0;
   const time=value=>Number.isFinite(Number(value))?Math.max(0,Math.min(8640000000000000,Math.trunc(Number(value)))):0;
@@ -45,6 +45,7 @@
     const device=matchMedia('(pointer: coarse)').matches?'celular ou tablet':'computador';
     const connection=navigator.onLine===false?'sem conexão':'conectado';
     const serviceWorker=!('serviceWorker'in navigator)?'indisponível':navigator.serviceWorker.controller?'controlando o app':'ainda não controla o app';
+    let firebaseSdk='não carregado';try{if(typeof firebase!=='undefined')firebaseSdk=String(firebase.SDK_VERSION||'versão desconhecida').slice(0,30);}catch(error){}
     const stats=syncStats(),session=stats.sessions,runtime=stats.runtime;
     const lastSessionAttempt=session?.lastAttemptAt?new Date(session.lastAttemptAt).toISOString():'não registrada';
     return[
@@ -54,6 +55,7 @@
       `Rede do aparelho: ${connection}`,
       `Perfil: ${role}`,
       `Modo de dados: ${mode}`,
+      `Firebase SDK: ${firebaseSdk}`,
       `Instalação: ${installed?'app instalado':'navegador'}`,
       `Service Worker: ${serviceWorker}`,
       `Tela: ${cleanScreen(activeScreen)}`,

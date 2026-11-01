@@ -4530,23 +4530,42 @@ async function deleteTsWorkout(wid){
 }
 async function deleteTsExercise(eid){
   if(!VIEW_STUDENT||!VIEW_STUDENT_WORKOUT)return;
-  const student={...VIEW_STUDENT},wid=VIEW_STUDENT_WORKOUT.id,currentDay=VIEW_STUDENT_DAY,removed=VIEW_STUDENT_WORKOUT.exercises.find(exercise=>exercise.id===eid);
+  const student=VIEW_STUDENT,studentUid=String(student.uid),workout=VIEW_STUDENT_WORKOUT,wid=String(workout.id),removed=workout.exercises.find(exercise=>String(exercise.id)===String(eid));
   if(!beginAction('delete-ts-exercise-'+eid))return;
   try{
-    // Não apaga as sessões — ficam preservadas em HISTORY_BY_NAME (mesma lógica acima).
-    const batch=db.batch();batch.delete(db.collection('exercises').doc(eid));
-    VIEW_STUDENT_WORKOUT.exercises.filter(exercise=>String(exercise.supersetExerciseId||'')===String(eid)).forEach(exercise=>batch.update(db.collection('exercises').doc(exercise.id),{supersetExerciseId:'',techniqueIds:normalizeExerciseTechniqueIds(exercise.techniqueIds).filter(id=>id!=='ss')}));
-    if(removed){exercisesForDay(VIEW_STUDENT_WORKOUT,removed.dayName).filter(exercise=>exercise.id!==eid).forEach((exercise,index)=>batch.update(db.collection('exercises').doc(exercise.id),{order:index}));}
-    await cloudWrite(batch.commit(),'salvar alterações');
-    if(VIEW_STUDENT?.uid!==student.uid)return;
-    await renderTrainerStudent(student);
-    const w=VIEW_STUDENT.workouts.find(x=>x.id===wid);
-    if(!w){goTrainerStudent();return;}
-    VIEW_STUDENT_WORKOUT=w;
-    const day=getWorkoutDays(w).find(item=>normalizedName(item.name)===normalizedName(currentDay));
-    if(day){VIEW_STUDENT_DAY=day.name;renderTsDay();}else{VIEW_STUDENT_DAY='';renderTsWorkout(w);showScreen('screen-ts-workout');}
+    try{
+      // Não apaga as sessões — ficam preservadas em HISTORY_BY_NAME (mesma lógica acima).
+      const batch=db.batch();batch.delete(db.collection('exercises').doc(eid));
+      workout.exercises.filter(exercise=>String(exercise.supersetExerciseId||'')===String(eid)).forEach(exercise=>batch.update(db.collection('exercises').doc(exercise.id),{supersetExerciseId:'',techniqueIds:normalizeExerciseTechniqueIds(exercise.techniqueIds).filter(id=>id!=='ss')}));
+      if(removed){exercisesForDay(workout,removed.dayName).filter(exercise=>String(exercise.id)!==String(eid)).forEach((exercise,index)=>batch.update(db.collection('exercises').doc(exercise.id),{order:index}));}
+      await cloudWrite(batch.commit(),'salvar alterações');
+    }catch(e){
+      alert('Erro ao excluir exercício: '+e.message);
+      return;
+    }
+    // O salvamento pode terminar depois que o treinador saiu da tela do aluno.
+    // Reconcilia o objeto capturado (ou o contexto atualizado do mesmo aluno)
+    // sem acessar VIEW_STUDENT.workouts quando a navegação já o limpou.
+    const activeStudent=VIEW_STUDENT?.uid===studentUid?VIEW_STUDENT:student,workouts=Array.isArray(activeStudent.workouts)?activeStudent.workouts:[];
+    const activeWorkout=workouts.find(item=>String(item.id)===wid)||workout;
+    activeWorkout.exercises=(activeWorkout.exercises||[]).filter(exercise=>String(exercise.id)!==String(eid));
+    activeWorkout.exercises.forEach(exercise=>{
+      if(String(exercise.supersetExerciseId||'')===String(eid)){
+        exercise.supersetExerciseId='';
+        exercise.techniqueIds=normalizeExerciseTechniqueIds(exercise.techniqueIds).filter(id=>id!=='ss');
+      }
+    });
+    if(removed)exercisesForDay(activeWorkout,removed.dayName).forEach((exercise,index)=>{exercise.order=index;});
+    activeStudent.workouts=workouts.some(item=>String(item.id)===wid)?workouts.map(item=>String(item.id)===wid?activeWorkout:item):[...workouts,activeWorkout];
+    if(VIEW_STUDENT?.uid!==studentUid||String(VIEW_STUDENT_WORKOUT?.id||'')!==wid)return;
+    VIEW_STUDENT.workouts=activeStudent.workouts;
+    VIEW_STUDENT_WORKOUT=activeWorkout;
+    if(String(VIEW_STUDENT_EXERCISE?.id||'')===String(eid))VIEW_STUDENT_EXERCISE=null;
+    const day=getWorkoutDays(activeWorkout).find(item=>normalizedName(item.name)===normalizedName(VIEW_STUDENT_DAY));
+    if(day){VIEW_STUDENT_DAY=day.name;renderTsDay();}else{VIEW_STUDENT_DAY='';renderTsWorkout(activeWorkout);showScreen('screen-ts-workout');}
   }catch(e){
-    alert('Erro ao excluir exercício: '+e.message);
+    console.error('Exercício excluído, mas a tela não pôde ser atualizada:',e);
+    showToast('Exercício excluído. Volte ao treino para atualizar a lista.',true);
   }finally{endAction('delete-ts-exercise-'+eid);}
 }
 

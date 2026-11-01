@@ -39,7 +39,7 @@ has(config,'startBootWatchdog.__tbMobileSessionRestore','Watchdog móvel não es
 has(config,'const loadedModules=new Set(),failedModules=new Set()','Loader não rastreia módulos temporariamente falhos.');
 has(config,'const healFailedModules=async()=>','Loader não possui autorreparo.');
 has(config,"window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();})",'Ao recuperar conexão, o loader deve retentar módulos falhos e reavaliar o contexto atual.');
-has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2','Loader não entrega a Central/Pagamentos atual.');
+has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3','Loader não entrega a Central/Pagamentos atual.');
 has(config,'photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2','Loader não entrega a correção móvel de fotos.');
 has(config,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Loader não entrega o fallback HEIC/HEIF atual.');
 assert(config.indexOf('heic-report-conversion-v10_10_12.js')>config.indexOf('photo-quality-download-v10_10_9.js'),'Conversor HEIC precisa carregar após a camada de qualidade de fotos.');
@@ -51,7 +51,7 @@ has(updater,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Atualizador 
 has(updater,'heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','Atualizador não prepara o worker HEIC same-origin atual.');
 for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2",`${name} regrediu a integridade do cadastro.`);
-  has(text,"./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2",`${name} não prepara a Central/Pagamentos.`);
+  has(text,"./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3",`${name} não prepara a Central/Pagamentos.`);
   has(text,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2",`${name} não prepara a correção móvel de fotos.`);
   has(text,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4",`${name} não prepara o módulo HEIC atual.`);
   has(text,"./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4",`${name} não prepara o worker HEIC same-origin atual.`);

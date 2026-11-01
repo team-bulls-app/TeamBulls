@@ -15,11 +15,11 @@
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity7',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity7'],
       ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports4',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports4'],
-      ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox6'],
+      ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox7',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox7'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.66-inteldata3',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.66-inteldata3'],
       ['./modules/trainer-canonical-context-guard-v10_10_42.js?v=10.10.56-contextguard5',()=>window.TeamBullsTrainerCanonicalContextGuard?.version==='10.10.56-contextguard5'],
       ['./modules/trainer-command-center-v10_10_42.js?v=10.10.66-command3',()=>window.TeamBullsTrainerCommandCenter?.version==='10.10.66-command3'],
-      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.66-studentinsights3',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.66-studentinsights3']
+      ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.66-studentinsights4',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.66-studentinsights4']
     ],
     student:[
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],

@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_HOTBAR_PAYMENTS_101022__)return;
   window.__TEAM_BULLS_STUDENT_HOTBAR_PAYMENTS_101022__=true;
 
-  const VERSION='10.10.22-studentpay1';
+  const VERSION='10.10.22-studentpay2';
   const COLLECTION='studentBilling';
   let cachedRecord=null;
   let loading=null;
@@ -27,7 +27,7 @@
   const todayIso=()=>{try{return typeof today==='function'?today():new Date().toISOString().slice(0,10);}catch(error){return new Date().toISOString().slice(0,10);}};
   const formatDate=value=>{const raw=iso(value);if(!raw)return'—';const [year,month,day]=raw.split('-');return`${day}/${month}/${year}`;};
   const formatMoney=cents=>(Math.max(0,Number(cents)||0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-  const planLabel=value=>value==='semiannual'?'SEMESTRAL':'TRIMESTRAL';
+  const planLabel=(value,months=0)=>value==='custom'?`AJUSTÁVEL · ${Number(months)||1}M`:value==='annual'?'ANUAL':value==='semiannual'?'SEMESTRAL':'TRIMESTRAL';
   const dateUtc=value=>{const raw=iso(value);if(!raw)return null;const [year,month,day]=raw.split('-').map(Number);return new Date(Date.UTC(year,month-1,day));};
   const dayDiff=(left,right)=>{const a=dateUtc(left),b=dateUtc(right);return a&&b?Math.round((b-a)/86400000):null;};
   function paymentStatus(record){
@@ -103,7 +103,7 @@
   function renderRecord(record){
     const host=document.getElementById('tb-student-payment-body');if(!host)return;
     const state=paymentStatus(record);
-    host.innerHTML=`<section class="tb-student-payment-card"><div class="tb-student-payment-status"><div><small>ÚLTIMO PAGAMENTO REGISTRADO</small><strong>${h(formatMoney(record.amountCents))}</strong></div><span class="tb-student-payment-pill ${h(state.kind)}">${h(state.label)}</span></div><div class="tb-student-payment-grid"><div class="tb-student-payment-metric"><span>PLANO</span><strong>${h(planLabel(record.planType))}</strong></div><div class="tb-student-payment-metric"><span>PRÓXIMO PAGAMENTO</span><strong>${h(formatDate(record.nextDueDate))}</strong></div><div class="tb-student-payment-metric"><span>VIGÊNCIA INICIADA</span><strong>${h(formatDate(record.validFrom))}</strong></div><div class="tb-student-payment-metric"><span>SITUAÇÃO</span><strong>${h(state.label)}</strong></div></div><div class="tb-student-payment-private">Esta é uma visualização somente leitura dos seus próprios dados. Observações administrativas e arquivos internos do treinador não são exibidos.</div></section>`;
+    host.innerHTML=`<section class="tb-student-payment-card"><div class="tb-student-payment-status"><div><small>ÚLTIMO PAGAMENTO REGISTRADO</small><strong>${h(formatMoney(record.amountCents))}</strong></div><span class="tb-student-payment-pill ${h(state.kind)}">${h(state.label)}</span></div><div class="tb-student-payment-grid"><div class="tb-student-payment-metric"><span>PLANO</span><strong>${h(planLabel(record.planType,record.durationMonths))}</strong></div><div class="tb-student-payment-metric"><span>PRÓXIMO PAGAMENTO</span><strong>${h(formatDate(record.nextDueDate))}</strong></div><div class="tb-student-payment-metric"><span>VIGÊNCIA INICIADA</span><strong>${h(formatDate(record.validFrom))}</strong></div><div class="tb-student-payment-metric"><span>SITUAÇÃO</span><strong>${h(state.label)}</strong></div></div><div class="tb-student-payment-private">Esta é uma visualização somente leitura dos seus próprios dados. Observações administrativas e arquivos internos do treinador não são exibidos.</div></section>`;
   }
 
   async function readRecord(force=false){
