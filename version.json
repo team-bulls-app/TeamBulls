@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110101,
-  "revision": "login-session-quickpick-1",
+  "build": 2026110106,
+  "revision": "firestore-recovery-lifecycle-4",
   "publishedAt": "2026-11-01T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Mantém contas salvas visíveis durante a retomada da sessão."
+  "message": "Retomada do Firestore sem sondagens extras, com drafts seguros e isolados por exercício."
 }

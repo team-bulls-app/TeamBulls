@@ -11,9 +11,9 @@
   const specs={
     trainer:[
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
-      ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
+      ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite2'],
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
-      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity6',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity6'],
+      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity7',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity7'],
       ['./modules/trainer-student-report-history-v10_10_55.js?v=10.10.55-studentreports4',()=>window.TeamBullsTrainerStudentReportHistory?.version==='10.10.55-studentreports4'],
       ['./modules/trainer-canonical-inbox-v10_10_58.js?v=10.10.58-canonicalinbox6',()=>window.TeamBullsCanonicalTrainerInbox?.version==='10.10.58-canonicalinbox6'],
       ['./modules/trainer-intelligence-data-v10_10_42.js?v=10.10.66-inteldata3',()=>window.TeamBullsTrainerIntelligenceData?.version==='10.10.66-inteldata3'],
@@ -23,10 +23,10 @@
     ],
     student:[
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
-      ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite1'],
+      ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite2'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge2'],
       ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate7'],
-      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity6',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity6'],
+      ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity7',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity7'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.66-studentprogress3',()=>window.TeamBullsStudentProgressHub?.version==='10.10.66-studentprogress3']
     ]
   };

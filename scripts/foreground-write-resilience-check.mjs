@@ -11,11 +11,13 @@ const source=fs.readFileSync(modulePath,'utf8');
 const loader=fs.readFileSync(loaderPath,'utf8');
 new vm.Script(source,{filename:modulePath});
 
-has(source,"const VERSION='10.10.50-foregroundwrite1'",'Runtime de foreground está na revisão errada.');
-has(loader,'foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite1','Loader cloud do aluno não entrega a proteção de foreground.');
+has(source,"const VERSION='10.10.50-foregroundwrite2'",'Runtime de foreground está na revisão errada.');
+has(loader,'foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2','Loader cloud do aluno não entrega a proteção de foreground.');
 has(source,"document.addEventListener('visibilitychange'",'Runtime não detecta retorno do background.');
-has(source,"ref.get({source:'server'})",'Retomada não confirma conectividade real com o servidor.');
-has(source,"if(typeof db.enableNetwork==='function')",'Retomada não reabilita explicitamente a rede Firestore quando necessário.');
+has(source,"ref.get({source:'server'})",'Reconciliação de refeição não confirma o estado final com o servidor.');
+lacks(source,'db.enableNetwork(','Retomada não deve forçar uma transição de rede contra listeners ativos.');
+lacks(source,"const ref=db.collection('users').doc(uid)",'Retomada não deve abrir uma leitura descartável só para sondar a conexão.');
+has(source,"window.addEventListener('online'",'Runtime precisa registrar a retomada do navegador sem sondagem Firestore.');
 has(source,"Promise.resolve().then(factory)",'Write ainda pode ser criado antes do gate de retomada.');
 has(source,"if(error?.code==='team-bulls/write-pending-timeout')return{status:'pending'",'Timeout de write não preserva a operação original como pendente.');
 has(source,"const existing=pendingWrites.get(id)",'Operação pendente não é deduplicada por chave lógica.');
@@ -26,28 +28,27 @@ has(source,"desiredDone?ref.set({studentUid:uid,mealId:mid,date}):ref.delete()",
 has(source,"const actual=await reconcileMeal(ref,mid,uid,date)",'Resultado incerto da refeição não é reconciliado com o servidor.');
 has(source,"if(pendingWrites.has(writeKey))",'Duplo toque durante write incerto não está protegido.');
 
-/* Execução simulada: a factory não pode iniciar enquanto o probe de servidor está pendente. */
-let resolveProbe;
-const probePromise=new Promise(resolve=>{resolveProbe=resolve;});
+/* Execução simulada: após retorno online, a factory aguarda a transição local,
+   sem enableNetwork() nem leitura de sondagem no Firestore. */
 let writeStarts=0;
-const listeners={};
+const listeners={},dbCalls={enableNetwork:0,userReads:0};
 const doc={
   hidden:false,
   readyState:'complete',
   addEventListener(type,handler){listeners[type]=handler;}
 };
 const win={
-  addEventListener(){},
+  addEventListener(type,handler){listeners['window:'+type]=handler;},
   dispatchEvent(){},
-  __TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_101050__:false
+  __TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_1010502__:false
 };
-const userRef={get:()=>probePromise};
+const userRef={get:()=>{dbCalls.userReads++;return Promise.resolve({exists:true});}};
 const context={
   window:win,document:doc,navigator:{onLine:true},console,
   CustomEvent:class{constructor(type,init){this.type=type;this.detail=init?.detail;}},
   setTimeout,clearTimeout,Promise,Map,Set,Date,Error,TypeError,
   MODE:'cloud',CURRENT_USER:{uid:'student-1',role:'student'},auth:{currentUser:{uid:'student-1'}},
-  db:{enableNetwork:()=>Promise.resolve(),collection:name=>({doc:id=>name==='users'?userRef:{set:()=>Promise.resolve(),delete:()=>Promise.resolve(),get:()=>Promise.resolve({exists:false})}})},
+  db:{enableNetwork:()=>{dbCalls.enableNetwork++;return Promise.resolve();},collection:name=>({doc:id=>name==='users'?userRef:{set:()=>Promise.resolve(),delete:()=>Promise.resolve(),get:()=>Promise.resolve({exists:false})}})},
   MEAL_CTX:{targetUid:'student-1',canToggleDone:true},MEAL_PLAN_CACHE:{meals:[]},MEAL_COMPLETIONS_TODAY:new Set(),
   beginAction:()=>true,endAction:()=>{},toggleMealDone:async()=>{},today:()=> '2026-09-15',renderMealsList:()=>{},showToast:()=>{}
 };
@@ -55,13 +56,14 @@ win.window=win;
 Object.assign(win,{TeamBullsForegroundWriteResilience:null});
 vm.runInNewContext(source,context,{filename:modulePath});
 const api=context.window.TeamBullsForegroundWriteResilience;
-assert(api?.version==='10.10.50-foregroundwrite1','Runtime não expõe API versionada.');
+assert(api?.version==='10.10.50-foregroundwrite2','Runtime não expõe API versionada.');
+listeners['window:online']();
 const gated=api.write('simulated',()=>{writeStarts++;return Promise.resolve('ok');},{forceProbe:true,timeoutMs:500});
 await Promise.resolve();await Promise.resolve();
-assert(writeStarts===0,'Factory de write iniciou antes do probe de servidor terminar.');
-resolveProbe({exists:true});
+assert(writeStarts===0,'Factory de write iniciou antes da transição foreground terminar.');
 const committed=await gated;
-assert(writeStarts===1&&committed?.status==='committed','Write não iniciou exatamente uma vez depois do probe.');
+assert(writeStarts===1&&committed?.status==='committed','Write não iniciou exatamente uma vez depois do gate.');
+assert(dbCalls.enableNetwork===0&&dbCalls.userReads===0,'Retomada abriu operações Firestore redundantes antes da gravação real.');
 
 /* Timeout não deve criar retry automático. */
 let resolveSlow;
@@ -74,4 +76,4 @@ resolveSlow(true);await slowPromise;await Promise.resolve();
 assert(slowStarts===1,'Conclusão tardia disparou write duplicado.');
 
 if(failures.length){console.error('FALHA — retomada segura de foreground\n- '+failures.join('\n- '));process.exit(1);}
-console.log('APROVADO — retorno do background aquece/valida Firestore; writes seguros iniciam somente após o gate, timeout não gera retry cego e refeição reconcilia operação incerta sem alert bloqueante.');
+console.log('APROVADO — retorno do background aguarda a transição do app sem alternar a rede nem sondar o Firestore; writes iniciam uma vez, timeout não gera retry cego e refeição reconcilia operação incerta com o servidor.');

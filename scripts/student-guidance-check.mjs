@@ -75,7 +75,8 @@ has(config,'ReCaptchaEnterpriseProvider','App Check Enterprise não está config
 has(config,"if(typeof ensureFirebaseReady==='function'&&!ensureFirebaseReady.__tbRetry)",'Retry único de inicialização ausente.');
 has(config,"if(typeof cloudGet==='function'&&!cloudGet.__tbRetry)",'Retry único de leitura ausente.');
 lacks(config,"if(typeof cloudWrite==='function'&&!cloudWrite.__tbRetry)",'Escritas não podem receber retry automático.');
-has(core,"function cloudWrite(task,label='gravação'){return withTimeout(task,CLOUD_WRITE_TIMEOUT_MS,label);}",'Contrato de escrita do núcleo mudou inesperadamente.');
+has(core,"function cloudWrite(task,label='gravação'){",'Contrato de escrita do núcleo mudou inesperadamente.');
+has(core,'return withTimeout(task,CLOUD_WRITE_TIMEOUT_MS,label).catch(error=>{preserveActiveModalAfterFirestoreFailure(error);throw error;});','A gravação deve preservar o rascunho em falha fatal e relançar o erro sem retry.');
 
 // Regras: hydrationMl continua dentro do documento de mealPlans, sem exigir regra nova.
 has(firestore,'match /mealPlans/{uid}','Regra de mealPlans ausente.');

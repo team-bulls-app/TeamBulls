@@ -106,19 +106,40 @@ await test('Falha inesperada ao preparar conexão libera o botão para tentar no
   assert.equal(button.disabled,false);assert.equal(button.textContent,'ACESSAR SISTEMA');assert.equal(errors.length,1);
 });
 
-await test('Leitura lenta de perfil retenta uma vez; indisponibilidade continua limitada',async()=>{
-  for(const recover of [true,false]){
-    const time=clock();let reads=0,result;
-    const context=vm.createContext({...time,navigator:{onLine:true},PROFILE_READ_TIMEOUT_MS:2500,
-      isNetworkLikeError:error=>error.code==='team-bulls/timeout',
-      db:{collection:()=>({doc:()=>({get:()=>{reads++;return new Promise(resolve=>{if(recover&&reads===2)time.setTimeout(()=>resolve({exists:true}),100);});}})})}});
-    vm.runInContext(between(core,'function withTimeout(', '\nfunction cloudGet(')+between(core,'async function getUserProfileWithRetry(', '\nlet AUTH_CALLBACK_SEEN='),context);
-    vm.runInContext("getUserProfileWithRetry('trainer-a')",context).then(value=>{result=value;},error=>{result=error;});
-    await time.until(()=>result!==undefined);
-    assert.equal(reads,2,'A primeira demora transitória não deve cancelar a segunda tentativa.');
-    if(recover){assert.equal(result.exists,true);assert.equal(time.now,2850);}
-    else{assert.equal(result.code,'team-bulls/timeout');assert.equal(time.now,5250);}
-  }
+await test('Leitura inicial do perfil mantém um listener e o reutiliza como guarda',async()=>{
+  let listenerCount=0,unsubscribeCount=0,oneShotReads=0,nextSnapshot=null,result;
+  const cache=[];
+  const context=vm.createContext({navigator:{onLine:true},console:quiet,PROFILE_READ_TIMEOUT_MS:2500,
+    db:{collection:()=>({doc:()=>({get(){oneShotReads++;return Promise.resolve({exists:false});},onSnapshot(options,next){
+      assert.equal(options.includeMetadataChanges,true,'A confirmação do servidor precisa ser observável mesmo quando os dados não mudam.');
+      listenerCount++;nextSnapshot=next;return()=>unsubscribeCount++;
+    }})})},
+    auth:{signOut:async()=>{}},CURRENT_USER:{uid:'trainer-a',role:'trainer'},ACCESS_MODE:'trainer',
+    sanitizeCachedProfile:(profile,uid)=>({...profile,uid}),cacheUserProfile:profile=>cache.push(profile),updateOfflineCredentialProfile(){},
+    setTimeout,clearTimeout});
+  vm.runInContext(between(core,'function withTimeout(', '\nfunction cloudGet(')+between(core,'let AUTH_HANDLED=false;', '\nlet AUTH_CALLBACK_SEEN='),context);
+  vm.runInContext("getUserProfileWithRetry('trainer-a')",context).then(value=>{result=value;},error=>{result=error;});
+  await flush();assert.equal(listenerCount,1);assert.equal(oneShotReads,0,'O cold start não pode abrir um get() que encerra o alvo temporário.');
+  const profile=(fromCache,name='Treinador')=>({exists:true,metadata:{fromCache},data:()=>({role:'trainer',name,status:'active'})});
+  nextSnapshot(profile(true));await flush();assert.equal(result,undefined,'Cache isolado não deve liberar um perfil online antes da confirmação do servidor.');
+  nextSnapshot(profile(false));await flush();assert.equal(result.exists,true);assert.equal(unsubscribeCount,0,'O primeiro snapshot precisa manter a escuta aberta.');
+  vm.runInContext("startProfileGuard('trainer-a')",context);await flush();
+  assert.equal(listenerCount,1,'A guarda permanente reutiliza a leitura inicial.');assert.equal(unsubscribeCount,0);
+  nextSnapshot(profile(false,'Nome atualizado'));await flush();assert.equal(cache.at(-1).name,'Nome atualizado');
+  vm.runInContext('stopProfileGuard()',context);assert.equal(unsubscribeCount,1,'A escuta só encerra no ciclo normal de saída.');
+});
+
+await test('Perfil criado durante a janela inicial ausente não é rejeitado nem perde o listener',async()=>{
+  const time=clock();let nextSnapshot=null,result;
+  const context=vm.createContext({...time,navigator:{onLine:true},console:quiet,PROFILE_READ_TIMEOUT_MS:2500,
+    db:{collection:()=>({doc:()=>({onSnapshot(options,next){nextSnapshot=next;return()=>{};}})})}});
+  vm.runInContext(between(core,'function withTimeout(', '\nfunction cloudGet(')+between(core,'let AUTH_HANDLED=false;', '\nlet AUTH_CALLBACK_SEEN='),context);
+  vm.runInContext("getUserProfileWithRetry('new-trainer')",context).then(value=>{result=value;},error=>{result=error;});
+  await flush();nextSnapshot({exists:false,metadata:{fromCache:false},data:()=>({})});
+  time.setTimeout(()=>nextSnapshot({exists:true,metadata:{fromCache:false},data:()=>({role:'trainer'})}),150);
+  await time.until(()=>result!==undefined);
+  assert.equal(result.exists,true,'O documento criado logo após Auth deve chegar pela mesma escuta.');
+  assert.equal(time.now,150,'A gravação do perfil vence a janela curta de documento ausente.');
 });
 
 await test('Senha incorreta preserva validação e libera nova tentativa sem acesso offline',async()=>{
@@ -146,12 +167,13 @@ await test('Falha de perfil libera tela de acesso mesmo com usuário Firebase re
 });
 
 function authFixture(){
-  const pending=new Map(),screens=[],calls={subscribe:0,unsubscribe:0,profiles:0,trainer:0};
+  const pending=new Map(),screens=[],calls={subscribe:0,unsubscribe:0,profiles:0,trainer:0,profileGuard:0,inactive:0,stopProfileGuard:0};
   let callback,onError;
   const auth={currentUser:null,onAuthStateChanged(next,error){calls.subscribe++;callback=next;onError=error;return()=>calls.unsubscribe++;}};
   const context=vm.createContext({auth,console:quiet,queueMicrotask,AUTH_UNSUBSCRIBE:null,AUTH_HANDLED:false,AUTH_EXPECTED_LOCAL_SIGNOUT:false,
-    CURRENT_USER:null,ACCESS_MODE:'cloud-active',document:{body:{classList:{add(){},remove(){}}}},stopProfileGuard(){},startProfileGuard(){},
-    setLoadingMessage(){},restoreCachedStudentAccess:()=>false,getUserProfileWithRetry:uid=>{calls.profiles++;return new Promise((resolve,reject)=>pending.set(uid,{resolve,reject}));},
+    CURRENT_USER:null,ACCESS_MODE:'cloud-active',document:{body:{classList:{add(){},remove(){}}}},stopProfileGuard(){calls.stopProfileGuard++;},startProfileGuard(){calls.profileGuard++;},
+    enterInactiveLocalMode:async()=>{calls.inactive++;context.ACCESS_MODE='local-inactive';return true;},renderHome(){},MODE:'cloud',
+    storageGet:()=>'',storageSet(){},selectLocalOwner(){},setLoadingMessage(){},restoreCachedStudentAccess:()=>false,getUserProfileWithRetry:uid=>{calls.profiles++;return new Promise((resolve,reject)=>pending.set(uid,{resolve,reject}));},
     cacheUserProfile(){},updateOfflineCredentialProfile(){},configureAuthPersistence(){},showScreen:screen=>screens.push(screen),renderTrainer:()=>calls.trainer++,bootToAuth:()=>screens.push('error'),isNetworkLikeError:()=>false});
   vm.runInContext(between(core,'let AUTH_CALLBACK_SEEN=', '\n/* ══════════════════════════════════════════════════\n   SCREENS'),context);
   return {context,auth,pending,screens,calls,emit(user){auth.currentUser=user;return callback(user);},error(error){onError(error);},start(){return vm.runInContext('startAuthListener()',context);}};
@@ -164,6 +186,18 @@ await test('Retomar app reutiliza listener; falha real permite nova assinatura',
   for(let i=0;i<20;i++)f.start();await flush();
   assert.equal(f.calls.trainer,1);assert.equal(f.calls.subscribe,1);
   f.error(new Error('listener encerrado'));f.start();await flush();assert.equal(f.calls.subscribe,2);
+});
+await test('Conta inativa mantém a guarda de perfil sem abrir outra assinatura',async()=>{
+  const f=authFixture();f.start();const login=f.emit({uid:'student-a'});await flush();
+  f.pending.get('student-a').resolve({data:()=>({role:'student',status:'inactive'})});await login;await flush();
+  assert.equal(f.calls.inactive,1);assert.equal(f.calls.profileGuard,1,'A leitura inicial permanece como única guarda enquanto o aluno usa o plano local.');
+  assert.equal(f.calls.unsubscribe,0);
+});
+await test('Perfil sem função válida encerra a guarda que começou a leitura inicial',async()=>{
+  const f=authFixture();f.start();const login=f.emit({uid:'unknown-a'});await flush();
+  f.pending.get('unknown-a').resolve({data:()=>({role:'unknown',status:'active'})});await login;await flush();
+  assert.equal(f.calls.stopProfileGuard,1,'Um perfil inválido não pode deixar uma assinatura de Firestore ociosa.');
+  assert.equal(f.calls.profileGuard,0);
 });
 await test('Perfil atrasado não reabre conta anterior após saída ou troca de usuário',async()=>{
   const f=authFixture();f.start();const old=f.emit({uid:'trainer-a'});await flush();
