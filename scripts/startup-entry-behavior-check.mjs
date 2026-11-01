@@ -51,6 +51,7 @@ await test('Home conclui carga sem navegação; retomadas não duplicam scripts 
   const r=runtime();await r.time.until(()=>r.loaded.length>=4);
   for(let i=0;i<20;i++)r.window.dispatchEvent({type:'pageshow'});
   await r.time.until(()=>r.window.TeamBullsRuntimeLoader.state().complete,600);
+  assert.equal(r.window.TeamBullsRuntimeLoader.state().loaded,r.window.TeamBullsRuntimeLoader.state().total,'A contagem deve incluir somente módulos obrigatórios do perfil atual.');
   assert.ok(r.loaded.some(src=>src.includes('usability-checkup-')),'Suíte pós-sessão deve carregar mesmo permanecendo na Home.');
   assert.equal(r.loaded.filter(src=>src.includes('student-home-profile-')).length,1);
   assert.equal(new Set(r.loaded).size,r.loaded.length,'Eventos simultâneos não podem executar módulos duas vezes.');
@@ -60,6 +61,7 @@ await test('Home conclui carga sem navegação; retomadas não duplicam scripts 
   for(let i=0;i<20;i++)r.window.dispatchEvent({type:'pageshow'});
   await r.time.until(()=>r.time.pending===0,100);assert.equal(r.loaded.length,count);
   r.change('trainer');await r.time.until(()=>r.window.TeamBullsRuntimeLoader.state().complete);
+  assert.equal(r.window.TeamBullsRuntimeLoader.state().loaded,r.window.TeamBullsRuntimeLoader.state().total,'Módulos do aluno não podem aparecer como ausentes no perfil treinador.');
   assert.ok(r.loaded.some(src=>src.includes('trainer-workspace-')));
 });
 
@@ -74,6 +76,7 @@ await test('Treinador carrega módulos sem esperar recursos exclusivos do aluno'
   const r=runtime('trainer');await r.time.until(()=>r.window.TeamBullsRuntimeLoader.state().complete);
   assert.ok(r.loaded.some(src=>src.includes('trainer-workspace-')));
   assert.ok(!r.loaded.some(src=>src.includes('student-home-profile-')));
+  assert.equal(r.window.TeamBullsRuntimeLoader.state().loaded,r.window.TeamBullsRuntimeLoader.state().total,'O diagnóstico deve comparar apenas módulos exigidos do treinador.');
 });
 
 await test('Cold start permite duas etapas de SDK sem anunciar falha antecipada',async()=>{

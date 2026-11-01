@@ -51,7 +51,7 @@ has(firestore,"getAfter(/databases/$(database)/documents/studentInvites/$(reques
 has(firestore,"getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.inviteId == id",'Consumo do convite não está vinculado ao perfil criado na mesma operação.');
 has(firestore,'match /trainerActivity/{trainerUid}','Firestore não possui caixa privada de atividade por treinador.');
 has(firestore,'match /trainerBilling/{trainerUid}','Firestore não possui domínio financeiro privado por treinador.');
-has(firestore,"request.resource.data.planType in ['quarterly','semiannual']",'Planos financeiros aceitam valores fora do escopo solicitado.');
+has(firestore,"request.resource.data.planType in ['quarterly','semiannual','annual','custom']",'Planos financeiros aceitam valores fora do escopo solicitado.');
 has(firestore,'paymentReceiptPath','Firestore não valida o namespace do comprovante financeiro.');
 has(firestore,'allow read: if isTrainer() && request.auth.uid == trainerUid;','Leitura financeira não está limitada ao treinador dono.');
 has(firestore,'match /{document=**} { allow read, write: if false; }','Firestore perdeu o deny-all final.');
@@ -111,7 +111,9 @@ has(config,'security-hardening-v10_10_9.js?v=10.10.10-security8','Loader não in
 has(config,'legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','Loader não inclui o reconciliador legacy-links6 com URL nova.');
 has(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration2','Loader não inclui a revisão passiva/cache-safe do cadastro.');
 lacks(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration1','Loader ainda referencia a revisão antiga do cadastro.');
-has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments2','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
+has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
+has(read('firebase/firestore_28_compacto.rules'),'function paymentDurationValid(data)','Rules não validam a duração permitida para os planos.');
+has(read('firebase/firestore_28_compacto.rules'),"type == 'custom' && months is int && months >= 1 && months <= 60",'Rules não limitam o plano ajustável a 1–60 meses inteiros.');
 
 const index=read('index.html');
 has(index,"object-src 'none'",'CSP não bloqueia plugins/objetos.');

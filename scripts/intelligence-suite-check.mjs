@@ -28,11 +28,11 @@ assert(src.bootstrap.includes("intelligence-suite-loader-v10_10_42.js?v=10.10.58
 assert(src.bootstrap.includes("EXPECTED_VERSION='10.10.58-intelsuite9'"),'bootstrap: versão esperada do loader auditado está incorreta');
 assert(src.loader.includes("VERSION='10.10.58-intelsuite9'"),'loader: revisão auditada não está ativa');
 assert(src.loader.includes('weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity7'),'loader: guarda semanal com retry seguro não está ativa');
-for(const version of ['inteldata3','contextguard5','command3','studentinsights3','studentprogress3'])assert(src.loader.includes(version),`loader: módulo auditado ausente — ${version}`);
+for(const version of ['inteldata3','contextguard5','command3','studentinsights4','studentprogress3'])assert(src.loader.includes(version),`loader: módulo auditado ausente — ${version}`);
 assert(src.loader.indexOf('trainer-intelligence-data-v10_10_42.js')<src.loader.indexOf('trainer-command-center-v10_10_42.js'),'loader: dados precisam carregar antes da central');
 assert(src.loader.indexOf('trainer-canonical-context-guard-v10_10_42.js')<src.loader.indexOf('trainer-student-insights-v10_10_42.js'),'loader: guarda canônica deve carregar antes das telas do treinador');
 assert(src.loader.includes("MODE==='cloud'"),'loader: recursos sincronizados devem exigir cloud');
-assert(src.loader.includes('10.10.56-contextguard5')&&src.loader.includes('10.10.66-studentinsights3')&&src.loader.includes('10.10.66-studentprogress3'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
+assert(src.loader.includes('10.10.56-contextguard5')&&src.loader.includes('10.10.66-studentinsights4')&&src.loader.includes('10.10.66-studentprogress3'),'loader: revisões estabilizadas da suíte não estão sendo exigidas');
 
 assert(src.data.includes('trainerActivity')&&src.data.includes('trainerBilling'),'dados: deve reaproveitar índices globais já existentes');
 assert(src.data.includes("db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500)"),'dados: roster do radar deve restringir trainerId + role=student para respeitar Rules 28');

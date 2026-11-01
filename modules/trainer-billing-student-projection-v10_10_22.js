@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_BILLING_STUDENT_PROJECTION_101022__)return;
   window.__TEAM_BULLS_TRAINER_BILLING_STUDENT_PROJECTION_101022__=true;
 
-  const VERSION='10.10.22-billingprojection1';
+  const VERSION='10.10.22-billingprojection2';
   const PAYMENT_LIMIT=500;
   const TARGET_COLLECTION='studentBilling';
   let unsubscribe=null;
@@ -23,10 +23,13 @@
     const data=doc?.data?.()||{};
     const studentId=cleanId(data.studentId),paymentId=cleanId(doc?.id||'');
     if(!studentId||!paymentId)return null;
-    if(!['quarterly','semiannual'].includes(data.planType))return null;
+    if(!['quarterly','semiannual','annual','custom'].includes(data.planType))return null;
     if(!iso(data.validFrom)||!iso(data.nextDueDate))return null;
+    const fixedMonths=data.planType==='quarterly'?3:data.planType==='semiannual'?6:data.planType==='annual'?12:0;
+    const durationMonths=Number.isInteger(data.durationMonths)?data.durationMonths:fixedMonths;
+    if(data.planType==='custom'?(durationMonths<1||durationMonths>60):(durationMonths!==fixedMonths))return null;
     const amountCents=Math.max(0,Math.min(100000000,Math.trunc(number(data.amountCents))));
-    return{studentId,paymentId,planType:data.planType,amountCents,validFrom:data.validFrom,nextDueDate:data.nextDueDate,createdAt:data.createdAt};
+    return{studentId,paymentId,planType:data.planType,durationMonths,amountCents,validFrom:data.validFrom,nextDueDate:data.nextDueDate,createdAt:data.createdAt};
   }
   function millis(value){try{if(value?.toMillis)return value.toMillis();if(value?.seconds)return Number(value.seconds)*1000;return Number(value)||0;}catch(error){return 0;}}
   function latestPerStudent(snapshot){
@@ -38,7 +41,7 @@
     }
     return map;
   }
-  function fingerprint(map){return JSON.stringify([...map.values()].sort((a,b)=>a.studentId.localeCompare(b.studentId)).map(item=>[item.studentId,item.paymentId,item.planType,item.amountCents,item.validFrom,item.nextDueDate]));}
+  function fingerprint(map){return JSON.stringify([...map.values()].sort((a,b)=>a.studentId.localeCompare(b.studentId)).map(item=>[item.studentId,item.paymentId,item.planType,item.durationMonths,item.amountCents,item.validFrom,item.nextDueDate]));}
 
   async function commitProjection(map,uid){
     if(!trainer()||String(CURRENT_USER.uid)!==uid||typeof db==='undefined'||!db)return false;
@@ -48,7 +51,7 @@
       const batch=db.batch();
       for(const row of rows.slice(offset,offset+350)){
         const ref=db.collection(TARGET_COLLECTION).doc(row.studentId);
-        batch.set(ref,{schemaVersion:1,studentId:row.studentId,trainerId:uid,paymentId:row.paymentId,planType:row.planType,amountCents:row.amountCents,validFrom:row.validFrom,nextDueDate:row.nextDueDate,updatedAt:stamp()});
+        batch.set(ref,{schemaVersion:1,studentId:row.studentId,trainerId:uid,paymentId:row.paymentId,planType:row.planType,durationMonths:row.durationMonths,amountCents:row.amountCents,validFrom:row.validFrom,nextDueDate:row.nextDueDate,updatedAt:stamp()});
       }
       const task=batch.commit();
       if(typeof cloudWrite==='function')await cloudWrite(task,'sincronizar pagamentos visíveis ao aluno');else await task;

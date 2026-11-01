@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_STUDENT_INSIGHTS_101042__)return;
   window.__TEAM_BULLS_TRAINER_STUDENT_INSIGHTS_101042__=true;
 
-  const VERSION='10.10.66-studentinsights3';
+  const VERSION='10.10.66-studentinsights4';
   const SCREEN_ID='screen-trainer-student-insights';
   const STYLE_ID='tb-trainer-student-insights-style';
   const ENTRY_ID='tb-trainer-student-insights-entry';
@@ -68,7 +68,7 @@
     sessionDateGroups(bundle.sessions).forEach(row=>events.push({date:row.date,type:'training',title:`Treino registrado · ${row.count} registro${row.count===1?'':'s'}`,text:`${row.sets} séries · ${[...row.names].slice(0,5).join(', ')}${row.names.size>5?'…':''}`}));
     bundle.checkins.forEach(item=>events.push({date:iso(item.submittedDate||item.dueDate)||dateFromStamp(item.createdAt),type:'report',title:item.requestKind==='manual'?'Relatório extra enviado':'Relatório semanal enviado',text:`${Number(item.weight)>0?Number(item.weight).toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg · ':''}${Array.isArray(item.photoIds)?item.photoIds.length:0} fotos`}));
     bundle.feedbacks.forEach(item=>events.push({date:dateFromStamp(item.createdAt),type:'feedback',title:item.title||'Feedback enviado',text:String(item.message||'').replace(/\s+/g,' ').slice(0,180)+(String(item.message||'').length>180?'…':'')}));
-    bundle.payments.forEach(item=>events.push({date:iso(item.validFrom)||dateFromStamp(item.createdAt),type:'payment',title:'Pagamento registrado',text:`Plano ${item.planType==='semiannual'?'semestral':'trimestral'} · próximo vencimento ${fmtDate(item.nextDueDate)}`}));
+    bundle.payments.forEach(item=>{const months=Number(item.durationMonths)||(item.planType==='annual'?12:item.planType==='semiannual'?6:item.planType==='quarterly'?3:0),label=item.planType==='custom'?`ajustável · ${months} ${months===1?'mês':'meses'}`:item.planType==='annual'?'anual':item.planType==='semiannual'?'semestral':'trimestral';events.push({date:iso(item.validFrom)||dateFromStamp(item.createdAt),type:'payment',title:'Pagamento registrado',text:`Plano ${label} · próximo vencimento ${fmtDate(item.nextDueDate)}`});});
     const protocol=bundle.protocolSchedule;
     if(protocol?.startDate)events.push({date:protocol.startDate,type:'protocol',title:'Ciclo de acompanhamento iniciado',text:`Atualização completa a cada ${Number(protocol.intervalWeeks)||4} semanas`});
     if(protocol?.lastCompletedDate)events.push({date:protocol.lastCompletedDate,type:'protocol',title:`Atualização completa nº ${Number(protocol.lastCompletedCycle)||1} concluída`,text:'Ciclo oficial marcado como revisado pelo treinador.'});
