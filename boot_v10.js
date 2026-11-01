@@ -541,3 +541,69 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
     if(loadingActive())reveal('O servidor demorou para responder. Seus registros locais foram preservados.');
   });
 })();
+
+// BEGIN LOGIN ACCOUNT PICKER BOOTSTRAP
+/* Login account picker: keep known student emails available during session fail-open. */
+(()=>{
+  if(window.__TEAM_BULLS_KNOWN_ACCOUNTS_BOOTSTRAP__)return;
+  window.__TEAM_BULLS_KNOWN_ACCOUNTS_BOOTSTRAP__=true;
+  const KEY='team_bulls_known_accounts_v1';
+  const CREDENTIALS_KEY='team_bulls_offline_credentials';
+  const MAX=8;
+  const normalize=value=>String(value||'').normalize('NFKC').trim().toLowerCase().slice(0,320);
+  const readJson=(key,fallback)=>{try{const value=localStorage.getItem(key);return value?JSON.parse(value):fallback;}catch(error){return fallback;}};
+  const known=()=>{
+    const emails=new Set();
+    const saved=readJson(KEY,[]);
+    if(Array.isArray(saved))saved.forEach(value=>{const email=normalize(value);if(email)emails.add(email);});
+    const credentials=readJson(CREDENTIALS_KEY,{});
+    if(credentials&&typeof credentials==='object')Object.values(credentials).forEach(record=>{const email=normalize(record?.email);if(email)emails.add(email);});
+    return Array.from(emails).slice(0,MAX);
+  };
+  let host=null,installedInput=null;
+  function render(){
+    const emailInput=document.getElementById('login-email');
+    if(!emailInput)return false;
+    const accounts=known();
+    host=document.getElementById('tb-known-accounts')||host;
+    if(!accounts.length){host?.remove();host=null;return false;}
+    if(!host){
+      host=document.createElement('div');host.id='tb-known-accounts';host.className='tb-known-accounts';host.setAttribute('role','group');host.setAttribute('aria-label','Contas neste aparelho');
+      const field=emailInput.closest('.form-group');
+      if(!field)return false;
+      field.insertAdjacentElement('afterend',host);
+    }
+    host.replaceChildren();
+    const title=document.createElement('span');title.className='tb-known-accounts-title';title.textContent='Contas neste aparelho';
+    const list=document.createElement('div');list.className='tb-known-accounts-list';
+    const hint=document.createElement('span');hint.className='tb-password-manager-hint';hint.textContent='A senha pode ser preenchida pelo gerenciador seguro do Android/iPhone/navegador.';
+    const current=normalize(emailInput.value);
+    accounts.forEach(email=>{
+      const button=document.createElement('button');button.type='button';button.className='tb-known-account'+(email===current?' active':'');button.textContent=email;button.title='Usar '+email;
+      button.addEventListener('click',()=>{
+        emailInput.value=email;emailInput.dispatchEvent(new Event('input',{bubbles:true}));render();document.getElementById('login-pass')?.focus();
+      });
+      list.appendChild(button);
+    });
+    host.append(title,list,hint);
+    if(installedInput!==emailInput){installedInput=emailInput;emailInput.addEventListener('input',render,{passive:true});}
+    return true;
+  }
+  function remember(value){
+    const email=normalize(value);if(!email)return known();
+    const saved=readJson(KEY,[]),list=Array.isArray(saved)?saved.map(normalize).filter(Boolean):[];
+    const next=[email,...list.filter(item=>item!==email)].slice(0,MAX);
+    try{localStorage.setItem(KEY,JSON.stringify(next));}catch(error){}
+    render();return next;
+  }
+  window.TeamBullsKnownAccounts=Object.freeze({version:'10.10.9-quickpick1',render,remember,list:known});
+  window.addEventListener('pageshow',render,{passive:true});
+  window.addEventListener('storage',event=>{if(!event.key||event.key===KEY||event.key===CREDENTIALS_KEY)render();},{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')render();},{passive:true});
+  if(!render()&&document.readyState==='loading'&&typeof MutationObserver==='function'){
+    const observer=new MutationObserver(()=>{if(render())observer.disconnect();});
+    observer.observe(document.documentElement,{childList:true,subtree:true});
+    document.addEventListener('DOMContentLoaded',()=>{if(!render())observer.disconnect();},{once:true});
+  }else if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',render,{once:true});
+})();
+// END LOGIN ACCOUNT PICKER BOOTSTRAP

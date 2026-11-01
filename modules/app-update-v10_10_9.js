@@ -68,12 +68,6 @@
       .tb-bulk-photo-picker button{width:100%;min-height:44px;border:1px solid rgba(198,61,61,.55);border-radius:10px;background:#241414;color:#fff;font:800 12px/1.2 'Barlow Condensed',system-ui;letter-spacing:.06em;cursor:pointer}
       .tb-bulk-photo-picker small{display:block;margin-top:8px;color:#aaa;font:500 10px/1.45 'DM Mono',monospace}
       .tb-bulk-photo-status{display:block;margin-top:7px;color:#d8d8d8;font:700 10px/1.3 'DM Mono',monospace}
-      .tb-known-accounts{margin:-2px 0 13px;padding:10px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:rgba(255,255,255,.025)}
-      .tb-known-accounts-title{display:block;margin-bottom:7px;color:#777;font:700 9px/1.2 'DM Mono',monospace;letter-spacing:.07em;text-transform:uppercase}
-      .tb-known-accounts-list{display:flex;flex-wrap:wrap;gap:6px}
-      .tb-known-account{max-width:100%;border:1px solid rgba(255,255,255,.12);border-radius:999px;background:#181818;color:#ddd;padding:7px 10px;font:600 10px/1 'DM Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
-      .tb-known-account.active{border-color:rgba(198,61,61,.65);background:#261515;color:#fff}
-      .tb-password-manager-hint{display:block;margin-top:7px;color:#777;font:500 9px/1.35 'DM Mono',monospace}
     `;
     document.head.appendChild(style);
   }
@@ -190,8 +184,9 @@
   function normalizeEmail(value){return String(value||'').normalize('NFKC').trim().toLowerCase().slice(0,320);}
   function storedKnownAccounts(){try{const list=JSON.parse(localStorage.getItem(KNOWN_ACCOUNTS_KEY)||'[]');return Array.isArray(list)?list.map(normalizeEmail).filter(Boolean):[];}catch(error){return[];}}
   function knownAccounts(){const emails=new Set(storedKnownAccounts());try{Object.values(offlineCredentialMap()).forEach(record=>{const email=normalizeEmail(record?.email);if(email)emails.add(email);});}catch(error){}return Array.from(emails).slice(0,MAX_KNOWN_ACCOUNTS);}
-  function rememberKnownAccount(email){email=normalizeEmail(email);if(!email)return;const list=[email,...storedKnownAccounts().filter(item=>item!==email)].slice(0,MAX_KNOWN_ACCOUNTS);try{localStorage.setItem(KNOWN_ACCOUNTS_KEY,JSON.stringify(list));}catch(error){}renderKnownAccounts();}
+  function rememberKnownAccount(email){email=normalizeEmail(email);if(!email)return;if(window.TeamBullsKnownAccounts){window.TeamBullsKnownAccounts.remember(email);return;}const list=[email,...storedKnownAccounts().filter(item=>item!==email)].slice(0,MAX_KNOWN_ACCOUNTS);try{localStorage.setItem(KNOWN_ACCOUNTS_KEY,JSON.stringify(list));}catch(error){}renderKnownAccounts();}
   function renderKnownAccounts(){
+    if(window.TeamBullsKnownAccounts)return window.TeamBullsKnownAccounts.render();
     const emailInput=document.getElementById('login-email');if(!emailInput)return;let host=document.getElementById('tb-known-accounts');const accounts=knownAccounts();if(!accounts.length){host?.remove();return;}
     if(!host){host=document.createElement('div');host.id='tb-known-accounts';host.className='tb-known-accounts';emailInput.closest('.form-group')?.insertAdjacentElement('afterend',host);}
     const current=normalizeEmail(emailInput.value);host.innerHTML='<span class="tb-known-accounts-title">Contas neste aparelho</span><div class="tb-known-accounts-list"></div><span class="tb-password-manager-hint">A senha pode ser preenchida pelo gerenciador seguro do Android/iPhone/navegador.</span>';
@@ -199,7 +194,7 @@
   }
   function removePasswordManagerBlockers(input){['data-1p-ignore','data-lpignore','data-form-type','aria-autocomplete'].forEach(attr=>input?.removeAttribute(attr));}
   function prepareAuthAutofill(){
-    const form=document.getElementById('panel-login'),email=document.getElementById('login-email'),pass=document.getElementById('login-pass');if(form){form.autocomplete='on';form.removeAttribute('data-form-type');}if(email){email.autocomplete='username';email.name='username';removePasswordManagerBlockers(email);email.addEventListener('input',renderKnownAccounts,{passive:true});}if(pass){pass.autocomplete='current-password';pass.name='password';removePasswordManagerBlockers(pass);pass.removeAttribute('data-sensitive');}
+    const form=document.getElementById('panel-login'),email=document.getElementById('login-email'),pass=document.getElementById('login-pass');if(form){form.autocomplete='on';form.removeAttribute('data-form-type');}if(email){email.autocomplete='username';email.name='username';removePasswordManagerBlockers(email);if(!window.TeamBullsKnownAccounts)email.addEventListener('input',renderKnownAccounts,{passive:true});}if(pass){pass.autocomplete='current-password';pass.name='password';removePasswordManagerBlockers(pass);pass.removeAttribute('data-sensitive');}
     const loginButton=document.getElementById('btn-login');if(loginButton&&form){loginButton.type='submit';loginButton.removeAttribute('onclick');}
     const registerForm=document.getElementById('panel-register'),regEmail=document.getElementById('reg-email'),regPass=document.getElementById('reg-pass'),registerButton=document.getElementById('btn-register');if(registerForm){registerForm.autocomplete='on';registerForm.removeAttribute('data-form-type');}if(regEmail){regEmail.autocomplete='username';regEmail.name='username';removePasswordManagerBlockers(regEmail);}if(regPass){regPass.autocomplete='new-password';regPass.name='new-password';regPass.removeAttribute('data-sensitive');}if(registerButton&&registerForm){registerButton.type='submit';registerButton.removeAttribute('onclick');}
     renderKnownAccounts();try{auth?.onAuthStateChanged?.(user=>{if(user?.email)rememberKnownAccount(user.email);});}catch(error){}
