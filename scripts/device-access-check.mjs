@@ -9,20 +9,22 @@ const fault=code=>Object.assign(new Error(code),{code});
 const values=new Map(),sessions=new Map(),refreshes=[],activated=[];
 const user=(uid,email,code='')=>({uid,email,async getIdToken(force){assert.equal(force,true);refreshes.push(uid);if(code)throw fault(code);return 'private-token';}});
 function runtime(){
+  const attested=new Set();
   const apps=[],main={currentUser:null,app:{options:{projectId:'test-project'}},async setPersistence(value){assert.equal(value,'local');},async updateCurrentUser(value){activated.push(value.uid);this.currentUser=value;},async signOut(){this.currentUser=null;}};
   const firebase={apps,initializeApp(options,name){
     assert.equal(options.projectId,'test-project');
-    const app={name,options,auth(){return service;},async delete(){apps.splice(apps.indexOf(app),1);}};
-    const service={app,currentUser:null,async setPersistence(value){assert.equal(value,'local');this.currentUser=sessions.get(name)||null;},
+    const app={name,options,appCheck:()=>({activate(provider,auto){assert.equal(provider.key,'test-site-key');assert.equal(auto,false);attested.add(name);}}),auth(){return service;},async delete(){apps.splice(apps.indexOf(app),1);}};
+    const service={app,currentUser:null,async setPersistence(value){assert.ok(attested.has(name),'App Check precisa ser configurado antes de restaurar a conta.');assert.equal(value,'local');this.currentUser=sessions.get(name)||null;},
       onAuthStateChanged(next){let alive=true;queueMicrotask(()=>{if(alive)next(this.currentUser);});return()=>{alive=false;};},
       async updateCurrentUser(value){this.currentUser=value;sessions.set(name,value);},async signOut(){this.currentUser=null;sessions.delete(name);}};
     apps.push(app);return app;
   }};
   firebase.auth=Object.assign(()=>main,{Auth:{Persistence:{LOCAL:'local'}}});
+  firebase.appCheck=Object.assign(()=>{}, {ReCaptchaEnterpriseProvider:class{constructor(key){this.key=key;}}});
   const window={},navigator={onLine:true};
-  const context=vm.createContext({window,auth:main,firebase,navigator,setTimeout,clearTimeout,console:{warn(){}},localStorage:{getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)}});
+  const context=vm.createContext({window,auth:main,firebase,CFG:{appCheckSiteKey:'test-site-key'},navigator,setTimeout,clearTimeout,console:{warn(){}},localStorage:{getItem:key=>values.get(key)||null,setItem:(key,value)=>values.set(key,value)}});
   vm.runInContext(block,context);
-  return {access:window.TeamBullsDeviceAccess,main,navigator,context};
+  return {access:window.TeamBullsDeviceAccess,main,navigator,context,firebase};
 }
 const a=user('uid-a','aluno.a@example.test'),b=user('uid-b','aluno.b@example.test');
 let r=runtime();
@@ -31,6 +33,10 @@ r.main.currentUser=b;assert.equal(await r.access.remember(b),true);
 assert.equal(await r.access.remember(a),false,'Uma conta alheia à sessão autenticada não pode ser adicionada.');
 assert.deepEqual(JSON.parse(values.get('team_bulls_device_accounts_v1')),[{email:b.email,uid:b.uid},{email:a.email,uid:a.uid}]);
 assert.ok(![...values.values()].join().includes('private-token'),'A lista própria não pode copiar tokens ou senhas.');
+const blocked=runtime();blocked.firebase.appCheck=undefined;
+await assert.rejects(blocked.access.restore(a.email),{code:'team-bulls/device-attestation-unavailable'});
+assert.equal(blocked.main.currentUser,null,'Não deve ativar acesso sem o App Check configurado.');
+assert.equal(blocked.access.has(a.email),true,'Falha na atestação não deve apagar uma sessão válida.');
 
 // Fechar/reabrir: novas instâncias Auth restauram as sessões pelo SDK LOCAL.
 r=runtime();assert.equal(r.main.currentUser,null);

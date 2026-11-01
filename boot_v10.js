@@ -547,6 +547,7 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
   const normalize=value=>String(value||'').normalize('NFKC').trim().toLowerCase();
   const failure=code=>Object.assign(new Error(code),{code});
   const expired=new Set(['auth/user-token-expired','auth/invalid-user-token','auth/user-disabled','auth/user-not-found','team-bulls/device-account-mismatch']);
+  const attestedApps=new WeakSet();
   let pending=Promise.resolve();
   const serial=task=>{const result=pending.then(task);pending=result.catch(()=>{});return result;};
   const records=()=>{
@@ -560,10 +561,21 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
     let timer;
     return Promise.race([Promise.resolve(task),new Promise((_,reject)=>{timer=setTimeout(()=>reject(failure('team-bulls/device-timeout')),ms);})]).finally(()=>clearTimeout(timer));
   }
-  function accountAuth(uid){
+  async function accountAuth(uid,attest=true){
     const source=mainAuth();if(!source)throw failure('team-bulls/device-unavailable');
     const name='tb-device-v1-'+uid;
     const app=firebase.apps.find(item=>item.name===name)||firebase.initializeApp(source.app.options,name);
+    const key=typeof CFG!=='undefined'?String(CFG.appCheckSiteKey||'').trim():'';
+    if(attest&&key&&!attestedApps.has(app)){
+      // Auth também envia App Check. A instância que lembra a conta precisa da
+      // mesma atestação do app principal antes de restaurar/renovar seus tokens.
+      if(typeof firebase.appCheck!=='function'&&typeof initOptionalAppCheck==='function')await bounded(initOptionalAppCheck());
+      if(typeof firebase.appCheck!=='function'||typeof app.appCheck!=='function')throw failure('team-bulls/device-attestation-unavailable');
+      const Provider=firebase.appCheck.ReCaptchaEnterpriseProvider||firebase.appCheck.ReCaptchaV3Provider;
+      if(!Provider)throw failure('team-bulls/device-attestation-unavailable');
+      app.appCheck().activate(new Provider(key),false);
+      attestedApps.add(app);
+    }
     return app.auth(); // Não cria Firestore nem listeners de dados para estas instâncias.
   }
   async function ready(service){
@@ -574,7 +586,7 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
     finally{unsubscribe?.();}
   }
   async function clearSession(record){
-    const service=accountAuth(record.uid);
+    const service=await accountAuth(record.uid,false);
     await bounded(service.signOut());
     await service.app.delete();
   }
@@ -596,7 +608,7 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
       const remaining=list.filter(item=>normalize(item.email)!==email&&item.uid!==user.uid);
       for(const old of list.filter(item=>normalize(item.email)===email&&item.uid!==user.uid))await clearSession(old);
       for(const old of remaining.slice(MAX-1))await clearSession(old);
-      const service=accountAuth(user.uid);
+      const service=await accountAuth(user.uid);
       await ready(service);
       await bounded(service.updateCurrentUser(user));
       write([{email,uid:user.uid},...remaining.slice(0,MAX-1)]);
@@ -609,7 +621,7 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
     if(navigator.onLine===false)throw failure('auth/network-request-failed');
     const target=mainAuth();
     try{
-      const service=accountAuth(record.uid),user=await ready(service);
+      const service=await accountAuth(record.uid),user=await ready(service);
       if(!user||user.uid!==record.uid||normalize(user.email)!==email)throw failure('team-bulls/device-account-mismatch');
       // Renova no servidor: senha alterada, sessão revogada e conta desativada
       // exigem um novo login. Nenhum perfil é liberado só pelos metadados locais.

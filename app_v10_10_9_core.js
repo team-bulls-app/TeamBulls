@@ -1338,6 +1338,9 @@ async function loginWithSavedDeviceAccount(email){
     clearTransientAuthSecrets();
   }catch(error){
     if(error?.code==='team-bulls/device-cancelled')return;
+    if(error?.code==='team-bulls/device-attestation-unavailable'){
+      showAuthError('login-error','A conexão segura ainda está carregando. Aguarde alguns segundos e tente novamente.');return;
+    }
     const network=['auth/network-request-failed','team-bulls/device-timeout'].includes(error?.code);
     showAuthError('login-error',network?'Não foi possível conectar para usar o acesso salvo. Verifique a conexão e tente novamente.':'O acesso salvo expirou. Informe sua senha para renová-lo neste aparelho.');
   }finally{btn.disabled=false;btn.textContent='ACESSAR MINHA CONSULTORIA';window.TeamBullsKnownAccounts?.render();}
