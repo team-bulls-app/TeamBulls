@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110201,
-  "revision": "mobile-login-light-glass-1",
+  "build": 2026110202,
+  "revision": "installed-update-recovery-1",
   "publishedAt": "2026-11-02T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Login no celular com vidro leve e fundo mais visível."
+  "message": "Atualização de instalações antigas com confirmação da revisão carregada e recuperação sem reinstalar."
 }
