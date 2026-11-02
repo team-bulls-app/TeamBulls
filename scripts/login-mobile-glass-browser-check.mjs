@@ -41,6 +41,10 @@ assert(executable && fs.existsSync(executable), 'Chrome is required (set CHROME_
 await new Promise(resolve => server.listen(0,'127.0.0.1',resolve));
 const profile = fs.mkdtempSync(path.join(os.tmpdir(),'tb-login-css-'));
 const args = ['--headless=new','--no-first-run','--disable-gpu','--hide-scrollbars','--remote-debugging-port=0',`--user-data-dir=${profile}`,'about:blank'];
+// Headless hosts without a mouse otherwise expose pointer:none/hover:none.
+// Same baseline used by Playwright's Chromium headless launcher:
+// https://github.com/microsoft/playwright/blob/main/packages/playwright-core/src/server/chromium/chromium.ts
+args.push('--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4');
 if (process.platform !== 'win32') args.push('--no-sandbox');
 const chrome = spawn(executable,args,{stdio:['ignore','ignore','pipe'],windowsHide:true});
 let stderr = '';
@@ -93,12 +97,6 @@ try {
   for(const theme of ['dark','light']) for(const [width,height,touch,panel,count,error] of matrix) {
     await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:touch});
     await command('Emulation.setTouchEmulationEnabled',{enabled:touch,maxTouchPoints:1});
-    // Headless Linux may have no native mouse. Model pointer/hover explicitly,
-    // so the same real CSS media queries run on Windows and the CI host.
-    await command('Emulation.setEmulatedMedia',{features:[
-      {name:'pointer',value:touch?'coarse':'fine'},
-      {name:'hover',value:touch?'none':'hover'}
-    ]});
     await command('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/`});
     for(let i=0;i<50;i++) { if(await evaluate('document.readyState === "complete" && !!document.querySelector("#login-email")'))break;await sleep(50); }
     await evaluate(`(() => {
