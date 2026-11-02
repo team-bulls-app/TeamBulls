@@ -102,6 +102,7 @@ jobs:
           node scripts/weekly-report-access-check.mjs
           node scripts/startup-cache-recovery-check.mjs
           node scripts/installed-update-recovery-check.mjs
+          node scripts/legacy-installation-endpoints-check.mjs
           node scripts/installed-update-browser-check.mjs
           node testes/testar_atualizacao_pwa_v10_10_9.js
           node scripts/runtime-delivery-coherence-check.mjs

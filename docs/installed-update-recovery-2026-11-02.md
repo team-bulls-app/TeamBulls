@@ -6,7 +6,7 @@ Build da correção: **2026110202**, versão **10.10.9**.
 ## Evidências e causas verificadas
 
 - Produção consultada somente por HTTP: `version.json`, `recuperar.html` e `sw_47.js` responderam 200; produção anunciava build 2026110201. Nenhuma conta ou banco de produção foi consultado.
-- O histórico mantém `sw.js` e `sw_47.js`; instalações anteriores usam cache-first para HTML. Os dois endpoints precisam continuar publicados e entregar o mesmo worker.
+- A revisão inicial cobriu `sw.js` e `sw_47.js`; instalações anteriores usam cache-first para HTML. O levantamento posterior do histórico completo encontrou outros caminhos removidos, documentados em `legacy-installation-endpoints-2026-11-02.md`.
 - O atualizador aceitava o build solicitado na URL como atualização concluída, sem conferir o HTML/runtime realmente carregado. Um marcador persistido podia ocultar avisos enquanto o código continuava antigo.
 - Falhas/travamentos na consulta do manifesto impediam registrar o worker. Uma tentativa offline podia manter a trava de verificação preenchida. Retomadas `pageshow` não disparavam consulta.
 - A navegação dependia de `preloadResponse.catch`; sem essa API, retornava cache sem tentar a rede. Se a gravação do cache falhasse por quota, também descartava HTML novo que já havia chegado.
