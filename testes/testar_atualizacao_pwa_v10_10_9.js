@@ -27,8 +27,8 @@ assert(updater.includes('navigator.serviceWorker.register(`./sw.js?v=${encodeURI
 assert(updater.includes("fetch(`${VERSION_URL}?t=${Date.now()}`"),'verificação de versão não evita cache HTTP');
 assert(updater.includes('sessionStorage.setItem(UPDATE_RELOAD_KEY,releaseKey(target))'),'recarga de atualização não grava versão + build');
 assert(updater.includes("const APPLIED_RELEASE_KEY='team-bulls-applied-release'"),'release aplicada não possui memória persistente para encerrar o aviso após recarga');
-assert(updater.includes('const newer=compareRelease(info)>0&&!isReleaseApplied(info)'),'aviso volta a aparecer para a mesma revisão já aplicada');
-assert(updater.includes('if(updated&&stored===targetKey){rememberAppliedRelease(target);'),'conclusão não registra a revisão efetivamente preparada');
+assert(updater.includes('const newer=compareRelease(info)>0||(compareRelease(info)===0&&!pageMatchesRelease(info))'),'aviso precisa comparar HTML e runtime, sem confiar no marcador de uma tentativa anterior');
+assert(updater.includes('if(updated&&stored===targetKey&&pageMatchesRelease(target)){'),'conclusão precisa confirmar a revisão realmente carregada');
 assert(updater.includes("success:true,visible:true"),'notificação de sucesso não é preservada enquanto a versão atualiza');
 assert(html.includes(`update_v10_10_9.js?v=10.10.9&b=${BUILD}`),'script do atualizador não invalida cache ao mudar o build');
 assert(updater.includes('function compareRelease(info)'),'atualizador não compara versão + build');
