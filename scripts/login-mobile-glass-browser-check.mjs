@@ -93,6 +93,12 @@ try {
   for(const theme of ['dark','light']) for(const [width,height,touch,panel,count,error] of matrix) {
     await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:touch});
     await command('Emulation.setTouchEmulationEnabled',{enabled:touch,maxTouchPoints:1});
+    // Headless Linux may have no native mouse. Model pointer/hover explicitly,
+    // so the same real CSS media queries run on Windows and the CI host.
+    await command('Emulation.setEmulatedMedia',{features:[
+      {name:'pointer',value:touch?'coarse':'fine'},
+      {name:'hover',value:touch?'none':'hover'}
+    ]});
     await command('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/`});
     for(let i=0;i<50;i++) { if(await evaluate('document.readyState === "complete" && !!document.querySelector("#login-email")'))break;await sleep(50); }
     await evaluate(`(() => {
@@ -122,10 +128,13 @@ try {
         card:style.backgroundColor,cardOpacity:style.opacity,input:input.backgroundColor,inputOpacity:input.opacity,font:parseFloat(input.fontSize),
         background:getComputedStyle(screen).backgroundImage,logoTop:screen.querySelector('.auth-logo').getBoundingClientRect().top,
         outside:visible.filter(el=>{const r=el.getBoundingClientRect();return r.left<-.5||r.right>innerWidth+.5}).map(el=>el.id||el.className),
-        accounts:screen.querySelectorAll('.tb-known-account').length,blur:style.backdropFilter};
+        accounts:screen.querySelectorAll('.tb-known-account').length,blur:style.backdropFilter,
+        finePointer:matchMedia('(pointer:fine)').matches,hover:matchMedia('(hover:hover)').matches};
     })()`);
     const name=`${theme}-${width}x${height}-${panel}-${count}${error?'-error':''}`;
     assert.equal(metrics.width,width,name);
+    assert.equal(metrics.finePointer,!touch,`${name}: pointer emulation`);
+    assert.equal(metrics.hover,!touch,`${name}: hover emulation`);
     assert.equal(metrics.overflow,false,`${name}: horizontal overflow`);
     assert.deepEqual(metrics.outside,[],`${name}: clipped controls`);
     assert(metrics.logoTop>=-.5,`${name}: login starts above reachable content`);
