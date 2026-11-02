@@ -2636,8 +2636,8 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
     overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;
     padding:calc(22px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) calc(16px + env(safe-area-inset-left,0px))!important;
     background-color:#070706;
-    background-image:linear-gradient(180deg,rgba(4,4,4,.34) 0%,rgba(4,4,4,.34) 28%,rgba(4,4,4,.82) 51%,#070706 73%),linear-gradient(90deg,rgba(4,4,4,.46),rgba(4,4,4,.04) 48%,rgba(4,4,4,.42)),url('team-bulls-consultoria-bg-v1.jpg');
-    background-size:cover,cover,cover;background-position:center,center,center top;background-repeat:no-repeat;background-attachment:scroll;
+    background-image:linear-gradient(180deg,rgba(0,0,0,.24),rgba(0,0,0,.13) 24%,rgba(0,0,0,.13) 76%,rgba(0,0,0,.78)),url('team-bulls-consultoria-bg-v1.jpg');
+    background-size:cover,cover;background-position:center,center top;background-repeat:no-repeat;background-attachment:scroll;
   }
   #screen-auth::before,#screen-auth::after{content:none}
   #screen-auth .auth-logo{
@@ -2649,10 +2649,14 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
   #screen-auth .auth-logo::before{content:none}
   #screen-auth .auth-logo .dim{color:#9f2224}
   #screen-auth .auth-sub{display:none}
-  #screen-auth .auth-card{
-    width:100%;max-width:480px;margin:0 auto;padding:18px;border:1px solid rgba(117,99,84,.72);
-    border-top:3px solid #a51e20;border-radius:19px;background:rgba(15,14,13,.95);
-    box-shadow:0 20px 54px rgba(0,0,0,.58);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  /* Vidro leve: transparência somente no fundo, nunca nos textos ou controles.
+     A leitura não depende do blur, que o modo de desempenho pode desativar. */
+  #screen-auth .auth-card,
+  html[data-theme="light"] #screen-auth .auth-card{
+    width:100%;max-width:480px;margin:0 auto;padding:18px;border:1px solid rgba(234,219,195,.3);
+    border-top:3px solid #ca3b40;border-radius:19px;background:rgba(10,9,8,.34);color:#f2ece0;
+    box-shadow:inset 0 1px 0 rgba(245,226,194,.1),0 12px 40px rgba(0,0,0,.27);
+    backdrop-filter:blur(1px);-webkit-backdrop-filter:blur(1px);
   }
   #screen-auth .auth-card::before{
     content:'ÁREA DO ALUNO  //  TEAM BULLS';display:block;margin-bottom:8px;
@@ -2661,12 +2665,12 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
   #screen-auth .auth-card-intro{display:block;margin:0 0 15px}
   #screen-auth .auth-card-intro h2{
     margin:0;color:#f5efe6;font-family:'Barlow Condensed','Arial Narrow',sans-serif;
-    font-size:22px;font-weight:800;line-height:1.1;letter-spacing:.2px;
+    font-size:22px;font-weight:800;line-height:1.1;letter-spacing:.2px;text-shadow:0 2px 7px #000;
   }
-  #screen-auth .auth-card-intro p{margin:5px 0 0;color:#bcb2a7;font-size:11px;line-height:1.45}
+  #screen-auth .auth-card-intro p{margin:5px 0 0;color:#ddd2c5;font-size:11px;line-height:1.45;text-shadow:0 1px 4px #000}
   #screen-auth .auth-tabs{
     display:flex;gap:4px;margin:0 0 14px;padding:4px;border:1px solid #453c35;
-    border-radius:10px;background:#211f1d;
+    border-radius:10px;background:rgba(22,18,17,.87);
   }
   #screen-auth .auth-tab{
     min-height:38px;padding:8px 6px;border:1px solid transparent;border-radius:7px;
@@ -2678,11 +2682,20 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
     box-shadow:0 3px 10px rgba(90,10,12,.28);
   }
   #screen-auth .auth-panel .form-group{margin-bottom:11px}
-  #screen-auth .form-label{margin-bottom:5px;color:#d3c8bc;font-size:9px;letter-spacing:.8px}
+  #screen-auth .form-label{margin-bottom:5px;color:#e2d6c7;font-size:9px;letter-spacing:.8px;text-shadow:0 1px 4px #000}
   #screen-auth .form-input{
     min-height:44px;padding:11px 12px;border:1px solid #51463d;border-radius:8px;
-    background:#191816;color:#f0e8de;font-size:14px;
+    background:rgba(25,22,20,.76);color:#f6f0e7;font-size:16px;
   }
+  #screen-auth .tb-known-accounts,
+  html[data-theme="light"] #screen-auth .tb-known-accounts{
+    background:rgba(13,12,11,.62);border-color:rgba(199,177,151,.16);color:#f2ece0;
+  }
+  #screen-auth .tb-known-accounts-title,
+  html[data-theme="light"] #screen-auth .tb-known-accounts-title{color:#d5cabd}
+  #screen-auth .tb-password-manager-hint,
+  html[data-theme="light"] #screen-auth .tb-password-manager-hint{color:#d0c5b6}
+  #screen-auth .tb-forget-device-access{color:#e2d6c7;text-shadow:0 1px 4px #000}
   #screen-auth .form-input:focus{border-color:#a51e20;box-shadow:0 0 0 2px rgba(165,30,32,.22)}
   #screen-auth .btn-primary{
     min-height:48px;margin-top:5px;border:1px solid #c64749;border-radius:9px;
@@ -2702,11 +2715,12 @@ html[data-theme="light"] .v107-tabs button{background:#2b2927;color:var(--tb-lig
     background:#1c1a18;color:#d5cabd;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.8px;
   }
   #screen-auth .auth-help{color:#c1b7ab;font-size:12px}
-  #screen-auth .auth-error{border-radius:8px}
+  #screen-auth .auth-error{border-radius:8px;background:#321a1a}
+  #screen-auth .auth-success{background:#142d1c}
   html[data-theme="light"] #screen-auth.active{
     background-color:#070706!important;
-    background-image:linear-gradient(180deg,rgba(4,4,4,.34) 0%,rgba(4,4,4,.34) 28%,rgba(4,4,4,.82) 51%,#070706 73%),linear-gradient(90deg,rgba(4,4,4,.46),rgba(4,4,4,.04) 48%,rgba(4,4,4,.42)),url('team-bulls-consultoria-bg-v1.jpg')!important;
-    background-size:cover,cover,cover!important;background-position:center,center,center top!important;background-repeat:no-repeat!important;
+    background-image:linear-gradient(180deg,rgba(0,0,0,.24),rgba(0,0,0,.13) 24%,rgba(0,0,0,.13) 76%,rgba(0,0,0,.78)),url('team-bulls-consultoria-bg-v1.jpg')!important;
+    background-size:cover,cover!important;background-position:center,center top!important;background-repeat:no-repeat!important;
   }
   html[data-theme="light"] #screen-auth .auth-logo{color:#f2eadf;text-shadow:0 2px 16px #000}
   html[data-theme="light"] #screen-auth .auth-logo .dim{color:#9f2224}

@@ -22,6 +22,7 @@ jobs:
         run: |
           node scripts/quality-check.mjs
           node testes/testar_login_consultoria_mobile.js
+          node scripts/login-mobile-glass-browser-check.mjs
           node testes/testar_login_contas_retomada.js
           node scripts/device-access-check.mjs
           node scripts/app-support-controls-check.mjs
