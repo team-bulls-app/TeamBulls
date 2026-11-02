@@ -5,10 +5,13 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import {spawn,spawnSync} from 'node:child_process';
+import {inventory} from './legacy-installation-endpoints.mjs';
 
 const read=file=>fs.readFileSync(file,'utf8');
 const release=JSON.parse(read('version.json'));
-let published=false,available=true;
+let published=false,available=true,removedLegacy=false;
+const historicalWorkers=new Map(['sw_15.js','sw_40.js','sw_46.js'].map(name=>[name,read(`testes/fixtures/legacy-workers/${name}.fixture`)]));
+const historicalNames=new Set(inventory.workers.map(entry=>entry.path));
 const oldHtml='<!doctype html><meta name="viewport" content="width=device-width"><title>OLD APP</title><main id="old-app">OLD APP WITHOUT UPDATE SETTINGS</main>';
 const newHtml=`<!doctype html><meta name="team-bulls-build" content="${release.build}"><title>CURRENT APP</title><main id="current-app"><div class="screen active" id="screen-auth"></div></main><script src="./update_v10_10_9.js?b=${release.build}"></script>`;
 // Historical failure mode: a stable legacy endpoint and cache-first HTML, with no update UI.
@@ -18,6 +21,10 @@ const server=http.createServer((req,res)=>{
   if(!available){res.writeHead(503);res.end('OFFLINE');return;}
   let body,type='text/javascript';
   if(name==='index.html'||name===''){type='text/html';body=published?newHtml:oldHtml;}
+  else if(historicalNames.has(name)){
+    if(published&&(removedLegacy||!fs.existsSync(name))){res.writeHead(404,{'Content-Type':'text/html'});res.end('Historical worker removed');return;}
+    body=published?read(name):historicalWorkers.get(name)||legacyWorker;
+  }
   else if(name==='sw.js'||name==='sw_47.js')body=published?read(name):legacyWorker;
   else if(name==='version.json'){type='application/json';body=JSON.stringify(release);}
   else if(name==='update_v10_10_9.js'||name==='recovery_v10.js')body=read(name);
@@ -100,6 +107,27 @@ try{
   assert(await evaluate(preserved));
   assert.equal(await evaluate('localStorage.getItem("team-bulls-applied-release")'),`${release.version}@${release.build}`);
   console.log('PASS recovery page upgrades an active legacy worker before validating the new HTML');
+  // Regression for deleted worker URLs. Cover every previously published endpoint;
+  // three versions execute the original archived worker bytes, including old CSP/cache logic.
+  for(const {path:endpoint} of inventory.workers){
+    published=false;removedLegacy=false;
+    await command('Storage.clearDataForOrigin',{origin,storageTypes:'all'});
+    const launch=endpoint==='sw_3.js'?'':endpoint==='sw_40.js'?'index.html?v=10.8.2':'index.html?v=9.8';
+    await navigate(launch);
+    await evaluate(`navigator.serviceWorker.register('./${endpoint}',{scope:'./',updateViaCache:'none'}).then(()=>navigator.serviceWorker.ready).then(()=>true)`);
+    await until('!!navigator.serviceWorker.controller');await evaluate(seed);
+    published=true;removedLegacy=true;
+    const rejected=await evaluate('navigator.serviceWorker.getRegistration().then(reg=>reg.update()).then(()=>false,()=>true)');
+    assert(rejected,`${endpoint}: a deleted script must reproduce a failed update.`);
+    assert(await evaluate(`navigator.serviceWorker.getRegistration().then(reg=>reg.active.scriptURL.includes('/${endpoint}'))`));
+    removedLegacy=false;
+    await evaluate('navigator.serviceWorker.getRegistration().then(reg=>reg.update()).then(()=>true)');
+    await until(`new Promise(resolve=>{const worker=navigator.serviceWorker.controller;const listener=e=>{if(e.data?.type==='TEAM_BULLS_VERSION'){navigator.serviceWorker.removeEventListener('message',listener);resolve(e.data.build===${release.build});}};navigator.serviceWorker.addEventListener('message',listener);worker.postMessage({type:'GET_VERSION'});setTimeout(()=>{navigator.serviceWorker.removeEventListener('message',listener);resolve(false);},200);})`);
+    await navigate(launch);await until('!!document.getElementById("current-app") && !!window.TeamBullsUpdater');
+    assert(await evaluate(preserved),`${endpoint}: account storage and pending drafts must survive.`);
+    assert.equal(await evaluate('navigator.serviceWorker.getRegistrations().then(regs=>regs.filter(reg=>reg.scope===new URL("./",location.href).href).length)'),1);
+    console.log(`PASS ${endpoint}: deleted URL blocks update; restored bridge delivers current app without reinstall${historicalWorkers.has(endpoint)?' (original historical worker)':''}`);
+  }
 }finally{
   socket?.close();chrome.kill();await new Promise(resolve=>server.close(resolve));
   // Only the temporary profile created by this test, never the user's browser profile.

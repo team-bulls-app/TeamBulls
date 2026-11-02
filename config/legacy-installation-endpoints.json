@@ -1,0 +1,241 @@
+{
+  "audit": "Complete Git history through afd1012; endpoints previously published, then deleted. Keep these URLs available for installed clients.",
+  "workers": [
+    {
+      "path": "sw_10.js",
+      "lastExistingCommit": "42f4d5d72678cc0283f984fc5c90ea0771f96875"
+    },
+    {
+      "path": "sw_11.js",
+      "lastExistingCommit": "52fd34bea558b4e8cbf3ea0ac7269db99523a616"
+    },
+    {
+      "path": "sw_15.js",
+      "lastExistingCommit": "d9af7341194f7e97760af2c568ba35dff197745b"
+    },
+    {
+      "path": "sw_16.js",
+      "lastExistingCommit": "ddddb0fb65935ceb9224d91fb750cec812b38be2"
+    },
+    {
+      "path": "sw_19.js",
+      "lastExistingCommit": "714453370f75c5aee186b8228600b82996f1308e"
+    },
+    {
+      "path": "sw_21.js",
+      "lastExistingCommit": "3d2f20354a708ea34f2b1b76062fd48de2312154"
+    },
+    {
+      "path": "sw_22.js",
+      "lastExistingCommit": "784dd83efde0598907b651773d7709bcbec08556"
+    },
+    {
+      "path": "sw_23.js",
+      "lastExistingCommit": "1b34c7c3b68254970705395c67d687aa19c6849a"
+    },
+    {
+      "path": "sw_24.js",
+      "lastExistingCommit": "ad3fc45560ea89ecf68f3a06d191eaec282e5328"
+    },
+    {
+      "path": "sw_25.js",
+      "lastExistingCommit": "f0a6f96cd0bccc222d80af0658b76db6716d1dcb"
+    },
+    {
+      "path": "sw_26.js",
+      "lastExistingCommit": "0769cf32e0277839deef8e6ee575f047c4838b2a"
+    },
+    {
+      "path": "sw_27.js",
+      "lastExistingCommit": "2a7c7d2d7a2163eee8d6800ccec6c43a8ccc2cac"
+    },
+    {
+      "path": "sw_3.js",
+      "lastExistingCommit": "75d7d6b32778c878757f1ed87f615a7193fc2e87"
+    },
+    {
+      "path": "sw_30.js",
+      "lastExistingCommit": "37cf6d0dc62f61e4be6f03d8e1890dd0b6191d57"
+    },
+    {
+      "path": "sw_32.js",
+      "lastExistingCommit": "9dd834505ca1530c54c6b3fd63a54191a900d9bf"
+    },
+    {
+      "path": "sw_34.js",
+      "lastExistingCommit": "91e06b6ce8c63970e32c2599502b977e034285dc"
+    },
+    {
+      "path": "sw_35.js",
+      "lastExistingCommit": "645ed51a597fd44cbbfb536877b79307869d6089"
+    },
+    {
+      "path": "sw_36.js",
+      "lastExistingCommit": "545b7d73d70a71ed5d47bc1197935a9c34651ea2"
+    },
+    {
+      "path": "sw_37.js",
+      "lastExistingCommit": "b02757544c43e7d47ee12eb223af81fe5953540b"
+    },
+    {
+      "path": "sw_4.js",
+      "lastExistingCommit": "c7390ce65adbc77ab6585259486286045894a0d5"
+    },
+    {
+      "path": "sw_40.js",
+      "lastExistingCommit": "6806f56caa5e2ccf5094ccf3ce5bbfb309f8f73c"
+    },
+    {
+      "path": "sw_42.js",
+      "lastExistingCommit": "030a5ffab2890cc3e5f7ee68db0b4d08d77a95a2"
+    },
+    {
+      "path": "sw_44.js",
+      "lastExistingCommit": "a4ac1a34b6325ac0b626c1a1be9680d5e826683c"
+    },
+    {
+      "path": "sw_46.js",
+      "lastExistingCommit": "f5cd361615838310934c83b6c44f60d91bdd713d"
+    },
+    {
+      "path": "sw_5.js",
+      "lastExistingCommit": "6ff13f560974a848564174524a1acaad3e4d150f"
+    },
+    {
+      "path": "sw_6.js",
+      "lastExistingCommit": "f83bf2e15156e7e2bfa6ad760a90f73cea05fb5b"
+    },
+    {
+      "path": "sw_9.js",
+      "lastExistingCommit": "a6eeb035a6a943db2969dd873647e065ae4f0eb3"
+    }
+  ],
+  "manifests": [
+    {
+      "path": "manifest_10.json",
+      "lastExistingCommit": "52fd34bea558b4e8cbf3ea0ac7269db99523a616",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_13.json",
+      "lastExistingCommit": "d9af7341194f7e97760af2c568ba35dff197745b",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_14.json",
+      "lastExistingCommit": "ddddb0fb65935ceb9224d91fb750cec812b38be2",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_17.json",
+      "lastExistingCommit": "714453370f75c5aee186b8228600b82996f1308e",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_19.json",
+      "lastExistingCommit": "3d2f20354a708ea34f2b1b76062fd48de2312154",
+      "id": "./",
+      "start_url": "./index.html?v=10.4",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_20.json",
+      "lastExistingCommit": "784dd83efde0598907b651773d7709bcbec08556",
+      "id": "./",
+      "start_url": "./index.html?v=10.5",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_21.json",
+      "lastExistingCommit": "91e06b6ce8c63970e32c2599502b977e034285dc",
+      "id": "./",
+      "start_url": "./index.html?v=10.6",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_22.json",
+      "lastExistingCommit": "645ed51a597fd44cbbfb536877b79307869d6089",
+      "id": "./",
+      "start_url": "./index.html?v=10.7",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_23.json",
+      "lastExistingCommit": "545b7d73d70a71ed5d47bc1197935a9c34651ea2",
+      "id": "./",
+      "start_url": "./index.html?v=10.7.1",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_24.json",
+      "lastExistingCommit": "b02757544c43e7d47ee12eb223af81fe5953540b",
+      "id": "./",
+      "start_url": "./index.html?v=10.7.2",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_27.json",
+      "lastExistingCommit": "6806f56caa5e2ccf5094ccf3ce5bbfb309f8f73c",
+      "id": "./",
+      "start_url": "./index.html?v=10.8.2",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_29.json",
+      "lastExistingCommit": "030a5ffab2890cc3e5f7ee68db0b4d08d77a95a2",
+      "id": "./",
+      "start_url": "./index.html?v=10.9.0",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_31.json",
+      "lastExistingCommit": "a4ac1a34b6325ac0b626c1a1be9680d5e826683c",
+      "id": "./",
+      "start_url": "./index.html?v=10.10.1",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_33.json",
+      "lastExistingCommit": "f5cd361615838310934c83b6c44f60d91bdd713d",
+      "id": "./",
+      "start_url": "./index.html?v=10.10.3",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_4.json",
+      "lastExistingCommit": "c7390ce65adbc77ab6585259486286045894a0d5",
+      "id": "./",
+      "start_url": "./",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_5.json",
+      "lastExistingCommit": "f83bf2e15156e7e2bfa6ad760a90f73cea05fb5b",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_8.json",
+      "lastExistingCommit": "a6eeb035a6a943db2969dd873647e065ae4f0eb3",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    },
+    {
+      "path": "manifest_9.json",
+      "lastExistingCommit": "42f4d5d72678cc0283f984fc5c90ea0771f96875",
+      "id": "./",
+      "start_url": "./index.html",
+      "scope": "./"
+    }
+  ]
+}
