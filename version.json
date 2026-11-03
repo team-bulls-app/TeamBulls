@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110202,
-  "revision": "installed-update-recovery-1",
-  "publishedAt": "2026-11-02T00:00:00Z",
+  "build": 2026110301,
+  "revision": "light-theme-contrast-1",
+  "publishedAt": "2026-11-03T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Atualização de instalações antigas com confirmação da revisão carregada e recuperação sem reinstalar."
+  "message": "Correções de contraste no tema claro: títulos, avisos, dieta, pagamentos e configurações."
 }

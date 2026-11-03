@@ -24,7 +24,7 @@ const fixture = `<!doctype html><html><head><meta charset="utf-8"><meta name="vi
 const allowed = new Map([
   ['/styles_v10_10_9.css', 'text/css'], ['/viewport_v10_10_9.js','text/javascript'],
   ['/team-bulls-consultoria-bg-v1.jpg','image/jpeg'],
-  ['/team-bulls-desktop-login-minotaurs-v1.webp','image/webp'],
+  ['/team-bulls-desktop-login-stone-v2.png','image/png'],
   ['/team-bulls-auth-bg-v9-8-2.webp','image/webp']
 ]);
 const server = http.createServer((req,res) => {
@@ -148,7 +148,7 @@ try {
       assert.equal(metrics.blur,'none',`${name}: appearance must survive performance mode`);
     } else {
       assert.notEqual(metrics.card,'rgba(10, 9, 8, 0.34)',`${name}: mobile style leaked to desktop`);
-      assert(metrics.background.includes('team-bulls-desktop-login-minotaurs-v1.webp'),name);
+      assert(metrics.background.includes('team-bulls-desktop-login-stone-v2.png'),name);
     }
     if(screenshotDir && ((width===390&&panel==='login')||(width===1440))) {
       const shot=await command('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
