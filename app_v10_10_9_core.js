@@ -6895,10 +6895,10 @@ function themeContrastRatio(foreground,background){
   const luminance=hex=>themeHexChannels(hex).reduce((total,value,index)=>{const channel=value/255,linear=channel<=.04045?channel/12.92:Math.pow((channel+.055)/1.055,2.4);return total+linear*[.2126,.7152,.0722][index];},0);
   const first=luminance(foreground),second=luminance(background);return(Math.max(first,second)+.05)/(Math.min(first,second)+.05);
 }
-function ensureThemeTextContrast(color,background,minimum=4.5){
+function ensureThemeTextContrast(color,background,minimum=4.5,target='#ffffff'){
   if(themeContrastRatio(color,background)>=minimum)return color;
-  let low=0,high=1,result='#ffffff';
-  for(let step=0;step<12;step++){const amount=(low+high)/2,candidate=blendThemeHex(color,'#ffffff',amount);if(themeContrastRatio(candidate,background)>=minimum){result=candidate;high=amount;}else low=amount;}
+  let low=0,high=1,result=target;
+  for(let step=0;step<12;step++){const amount=(low+high)/2,candidate=blendThemeHex(color,target,amount);if(themeContrastRatio(candidate,background)>=minimum){result=candidate;high=amount;}else low=amount;}
   return result;
 }
 let FONT_SCALE_RULES_PREPARED=false;
@@ -6920,7 +6920,7 @@ applyAppSettings=function(){
   }else{
     const text=Math.max(45,Math.min(180,Number(APP_SETTINGS.text)||100));
     const canvas=adjustLightSurfaceHex('#ffffff',bg),canvasSoft=adjustLightSurfaceHex('#f7f5f3',bg);
-    const ink=adjustLightTextHex('#25211e','#0c0b0a','#625a53',text),muted=adjustLightTextHex('#574f49','#28231f','#625a53',text),subtle=adjustLightTextHex('#5d554f','#2b2723','#625a53',text);
+    const ink=ensureThemeTextContrast(adjustLightTextHex('#25211e','#0c0b0a','#625a53',text),canvasSoft,4.5,'#000000'),muted=ensureThemeTextContrast(adjustLightTextHex('#574f49','#28231f','#625a53',text),canvasSoft,4.5,'#000000'),subtle=ensureThemeTextContrast(adjustLightTextHex('#5d554f','#2b2723','#625a53',text),canvasSoft,4.5,'#000000');
     const panelInk=adjustLightTextHex('#f0e8de','#aaa9a8','#ffffff',text),panelMuted=adjustLightTextHex('#d0c7bc','#9f9f9f','#f0ece6',text),panelSubtle=adjustLightTextHex('#bdb1a2','#929292','#ddd8d0',text);
     root.setProperty('--tb-light-canvas',canvas);root.setProperty('--tb-light-canvas-soft',canvasSoft);
     root.setProperty('--tb-light-line','#bcb2a8');root.setProperty('--tb-light-line-strong','#8e8175');

@@ -1446,7 +1446,7 @@ button,a,input,select,textarea,[role="button"]{touch-action:manipulation;}
     background-color:#050202;
     background-image:
       linear-gradient(90deg,rgba(0,0,0,.06) 0%,rgba(0,0,0,.05) 40%,rgba(0,0,0,.32) 60%,rgba(0,0,0,.6) 100%),
-      url('team-bulls-desktop-login-minotaurs-v1.webp');
+      url('team-bulls-desktop-login-stone-v2.png');
     background-size:cover,cover;
     background-position:center,left center;
     background-repeat:no-repeat;
@@ -2487,6 +2487,22 @@ html[data-theme="light"] .v107-kpi-grid article,
 html[data-theme="light"] .v107-sync-grid article,
 html[data-theme="light"] .day-block,
 html[data-theme="light"] .day-folder-card,
+html[data-theme="light"] .settings-card,
+html[data-theme="light"] .tb-notice-card,
+html[data-theme="light"] .tb-device-notice-panel,
+html[data-theme="light"] .tb-trainer-profile-card,
+html[data-theme="light"] .v107-list-card,
+html[data-theme="light"] .tb-command-head,
+html[data-theme="light"] .tb-summary-card,
+html[data-theme="light"] .tb-activity-card,
+html[data-theme="light"] .tb-protocol-card,
+html[data-theme="light"] .tb-payment-card,
+html[data-theme="light"] .tb-student-payments-hero,
+html[data-theme="light"] .tb-student-payment-card,
+html[data-theme="light"] .tb-student-payment-empty,
+html[data-theme="light"] .tb-v17-feedback,
+html[data-theme="light"] .tb-v17-weight-panel,
+html[data-theme="light"] .tb-v17-empty,
 html[data-theme="light"] .protocol-summary{
   --bg:var(--tb-light-panel);
   --surface:var(--tb-light-panel-raised);
@@ -2917,6 +2933,72 @@ html[data-theme="light"] .supplements-free-meal-card svg{stroke:#f0e8de}
 html[data-theme="light"] .supplements-free-meal-card:hover{background:linear-gradient(110deg,#5a292b,#2b2927 58%,#1b1a19);border-color:#a28361}
 html[data-theme="light"] .tb-guidance-card .tb-guidance-head small{color:var(--tb-light-panel-muted)}
 html[data-theme="light"] .tb-guidance-card .tb-hydration-note{color:var(--tb-light-panel-muted)}
+
+/* Superfícies carregadas sob demanda também precisam de tinta própria.
+   O canvas claro não pode fornecer texto escuro a um cartão carvão. */
+html[data-theme="light"] :is(.settings-card,.tb-notice-card,.tb-trainer-profile-card) :is(h1,h2,h3,strong){color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .settings-card :is(.setting-label,.pdf-note),
+html[data-theme="light"] .tb-notice-card :is(p,.tb-notice-meta),
+html[data-theme="light"] .tb-device-notice-panel p,
+html[data-theme="light"] .tb-trainer-profile-copy span{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .settings-card .setting-value{color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .settings-card a{color:var(--tb-light-brand-on-panel);text-decoration:underline;text-underline-offset:3px}
+html[data-theme="light"] .settings-card a:focus-visible{outline:2px solid var(--tb-light-panel-ink);outline-offset:3px}
+html[data-theme="light"] .settings-card .setting-row{border-color:var(--tb-light-panel-border)}
+html[data-theme="light"] .setting-switch button{background:var(--tb-light-panel-raised);color:var(--tb-light-panel-muted);border-color:var(--tb-light-panel-border-strong)}
+html[data-theme="light"] .setting-switch button.active{background:#472526;color:var(--tb-light-panel-ink);border-color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .tb-notice-screen-head{background:var(--tb-light-canvas-soft);color:var(--tb-light-ink);border-color:var(--tb-light-line)}
+html[data-theme="light"] .tb-notice-screen-head .tb-notice-meta,
+html[data-theme="light"] .tb-notice-empty{color:var(--tb-light-muted)}
+html[data-theme="light"] .tb-notice-actions button{background:#472526;color:var(--tb-light-panel-ink);border-color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .tb-notice-card.unread{border-color:var(--tb-light-brand-on-panel);box-shadow:inset 3px 0 var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .v107-list-card.notice.read,
+html[data-theme="light"] .tb-payment-card.none{opacity:1;border-style:dashed}
+
+/* Os módulos compactos usam seletores por tela e !important.
+   Aqui a mesma prioridade corrige somente cores, preservando o layout. */
+html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"]{
+  background:var(--tb-light-panel)!important;
+  border-color:var(--tb-light-panel-border)!important;
+}
+html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head strong,
+html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details summary{
+  color:var(--tb-light-panel-muted)!important;
+}
+html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details{border-color:var(--tb-light-panel-border)!important}
+html[data-theme="light"] #screen-diet-detail #diet-energy-summary .diet-energy-metric>span{color:var(--tb-light-panel-muted)!important}
+
+/* Históricos, cobranças e resumos usam a mesma escala legível dos protocolos. */
+html[data-theme="light"] :is(.tb-command-head,.tb-summary-card,.tb-activity-card,.tb-protocol-card,.tb-payment-card) :is(h2,h3,strong,b){color:var(--tb-light-panel-ink)}
+html[data-theme="light"] :is(.tb-command-head,.tb-summary-card,.tb-activity-card,.tb-protocol-card,.tb-payment-card) :is(p,small,.tb-history-row,.tb-payment-history summary){color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .tb-payment-pill{color:var(--tb-light-panel-muted);border-color:var(--tb-light-panel-border-strong)}
+html[data-theme="light"] .tb-payment-pill.ok{color:#86d6a0}
+html[data-theme="light"] :is(.tb-payment-pill.soon,.tb-payment-pill.today){color:#ffd27c}
+html[data-theme="light"] .tb-payment-pill.late{color:#ff8b8b}
+html[data-theme="light"] .tb-student-payment-metric{background:var(--tb-light-panel-raised);border-color:var(--tb-light-panel-border)}
+html[data-theme="light"] .tb-student-payment-private{background:var(--tb-light-panel-raised);color:var(--tb-light-panel-muted);border-color:var(--tb-light-panel-border)}
+html[data-theme="light"] :is(.tb-student-payments-hero p,.tb-student-payment-status small,.tb-student-payment-metric span){color:var(--tb-light-panel-muted)}
+html[data-theme="light"] :is(.tb-student-payments-hero h2,.tb-student-payment-status strong,.tb-student-payment-metric strong,.tb-student-payment-empty strong){color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .tb-payment-editor-grid label{color:var(--tb-light-muted)}
+html[data-theme="light"] .tb-payment-due-preview{background:#e6f3e9;border-color:#538364}
+html[data-theme="light"] .tb-payment-due-preview :is(span,strong){color:#185b2f}
+html[data-theme="light"] .tb-empty{color:var(--tb-light-muted);border-color:var(--tb-light-line-strong)}
+html[data-theme="light"] :is(.tb-summary-card>span,.tb-activity-main>span,.tb-protocol-main>span,.tb-payment-main>span){color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .tb-command-head .eyebrow{color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .tb-summary-card.warn strong{color:#ffd27c}
+html[data-theme="light"] .tb-summary-card.bad strong{color:#ff8b8b}
+html[data-theme="light"] .tb-summary-card.good strong{color:#86d6a0}
+html[data-theme="light"] :is(.tb-hub-tab,.tb-toolbar button.active){background:var(--tb-light-panel);color:var(--tb-light-panel-muted);border-color:var(--tb-light-panel-border-strong)}
+html[data-theme="light"] :is(.tb-hub-tab.active,.tb-hub-tab:hover){background:#472526;color:var(--tb-light-panel-ink);border-color:var(--tb-light-brand-on-panel)}
+html[data-theme="light"] .tb-inbox-section-title{color:var(--tb-light-muted)}
+html[data-theme="light"] :is(.tb-v17-feedback-copy small,.tb-v17-feedback-chevron,.tb-v17-feedback-body,.tb-v17-weight-current small,.tb-v17-weight-delta){color:var(--tb-light-panel-muted)}
+html[data-theme="light"] :is(.tb-v17-feedback-copy strong,.tb-v17-weight-current){color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .tb-v17-hotbar button{color:var(--tb-light-panel-muted)}
+html[data-theme="light"] .tb-v17-hotbar button.is-active{color:var(--tb-light-panel-ink)}
+html[data-theme="light"] #screen-diet-detail .tb-supply-options-header-btn{background:var(--tb-light-canvas-soft);color:var(--tb-light-ink);border-color:var(--tb-light-line)}
+html[data-theme="light"] #screen-diet-detail .tb-supply-options-header-btn:hover,
+html[data-theme="light"] #screen-diet-detail .tb-supply-options-header-btn:focus-visible{background:var(--tb-light-panel);color:var(--tb-light-panel-ink)}
+html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-panel);color:var(--tb-light-panel-ink);border-color:var(--tb-light-panel-border-strong)}
 
 /* Layout móvel fluido: usa toda a largura útil, respeita safe areas e mantém
    os nomes da navegação em uma linha em Android e iOS. */
