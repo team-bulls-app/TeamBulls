@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110301,
-  "revision": "light-theme-contrast-1",
+  "build": 2026110302,
+  "revision": "mobile-login-stone-1",
   "publishedAt": "2026-11-03T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Correções de contraste no tema claro: títulos, avisos, dieta, pagamentos e configurações."
+  "message": "Nova arte no login mobile com enquadramento adaptável, preservando os personagens."
 }
