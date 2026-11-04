@@ -1,5 +1,6 @@
 // Isolated browser regression: real auth markup/CSS, no Firebase or production data.
 import assert from 'node:assert/strict';
+import {waitForChromePage} from './chrome-readiness.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -71,12 +72,7 @@ const screenshotDir = screenshotIndex < 0 ? null : path.resolve(process.argv[scr
 if (screenshotDir) fs.mkdirSync(screenshotDir,{recursive:true});
 const results = [];
 try {
-  const portFile = path.join(profile,'DevToolsActivePort');
-  for(let i=0;i<150&&!fs.existsSync(portFile);i++) { if(chrome.exitCode!==null)throw new Error(stderr);await sleep(100); }
-  assert(fs.existsSync(portFile),`Chrome did not start: ${stderr}`);
-  const port = fs.readFileSync(portFile,'utf8').split('\n')[0];
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  socket = new WebSocket(targets.find(target=>target.type==='page').webSocketDebuggerUrl);
+  socket = new WebSocket(await waitForChromePage(chrome, profile, {stderr: () => stderr}));
   await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject;});
   socket.onmessage = event => {
     const message=JSON.parse(event.data); const task=pending.get(message.id); if(!task)return;

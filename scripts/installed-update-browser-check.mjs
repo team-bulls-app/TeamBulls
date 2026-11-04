@@ -1,5 +1,6 @@
 // Real browser migration with isolated localhost storage. No Firebase or user account.
 import assert from 'node:assert/strict';
+import {waitForChromePage} from './chrome-readiness.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -56,12 +57,7 @@ const preserved=`(async()=>{
   return localStorage.getItem('fixture-pending-workout')==='saved-on-device'&&value==='unsent-workout';
 })()`;
 try{
-  const portFile=path.join(profile,'DevToolsActivePort');
-  for(let i=0;i<150&&!fs.existsSync(portFile);i++){if(chrome.exitCode!==null)throw new Error(stderr);await sleep(100);}
-  assert(fs.existsSync(portFile),stderr);
-  const port=fs.readFileSync(portFile,'utf8').split('\n')[0];
-  const targets=await(await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  socket=new WebSocket(targets.find(x=>x.type==='page').webSocketDebuggerUrl);
+  socket = new WebSocket(await waitForChromePage(chrome, profile, {stderr: () => stderr}));
   await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject;});
   socket.onmessage=event=>{const message=JSON.parse(event.data),task=pending.get(message.id);if(!task)return;pending.delete(message.id);message.error?task.reject(new Error(JSON.stringify(message.error))):task.resolve(message.result);};
   await command('Page.enable');await command('Network.enable');await command('Network.setBlockedURLs',{urls:['https://*']});

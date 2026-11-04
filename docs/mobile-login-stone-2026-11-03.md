@@ -13,3 +13,5 @@ Validação: 38 cenários Chrome em dois temas, larguras 320–1440 px, telas 9:
 Limite: testes em Chrome isolado, sem Firebase ou conta real. Conferência visual em Safari/iPhone e Android físicos segue recomendada após publicação; não é garantia sobre todo aparelho existente. Nenhuma alteração em dados, autenticação ou regras Firebase.
 
 Verificações locais: 93/93 comandos do workflow de qualidade aprovados. Após incluir a arte na ativação do worker, repetidos os checks de entrega, coerência e recuperação de instalações. Security-check e diff --check aprovados.
+
+CI em 04/11: duas tentativas no Ubuntu encerraram antes das asserções porque o Chrome não publicou a porta em 15 segundos. O aviso de D-Bus sozinho não comprova a causa da demora. Os três testes de navegador agora compartilham espera de até 45 segundos, validam a resposta DevTools e a presença da página, detectam falha de processo e abortam consultas HTTP travadas. Não há retry dos cenários nem alteração de suas asserções. Sete testes de regressão cobrem inicialização após 16 segundos, arquivo parcial, HTTP inválido, página indisponível, processo encerrado, erro de spawn e prazo excedido.
