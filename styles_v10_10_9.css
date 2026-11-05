@@ -3155,3 +3155,16 @@ html[data-theme="light"] #modal-trainer-progress .tb-progress-chart{color:#a51c2
 html[data-theme="light"] .training-recommendations,html[data-theme="light"] #modal-training-recommendations .modal-sheet{background:#faf7f2;color:#302820;border-color:#8b7e6d}
 html[data-theme="light"] #modal-training-recommendations :is(button,input,textarea){background:#fff;color:#302820;border-color:#8b7e6d}
 @media(max-width:480px){#modal-training-recommendations .modal-sheet{padding:16px}.training-weekdays{grid-template-columns:1fr}}
+
+/* Protocol guidance follows the same editorial hierarchy as workout folders. */
+.training-recommendations{border-radius:0;border-left:3px solid var(--accent);padding:18px;background:linear-gradient(110deg,#1b100e,#11100f 55%);color:var(--text)}
+.training-recommendations-head{padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+.training-recommendations .archive-file-kicker{display:block;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:1.4px;color:var(--text-dim);margin-bottom:5px}
+.training-recommendations h3{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:22px;font-weight:900;letter-spacing:.5px;margin:0;line-height:1.15;text-transform:uppercase}
+.training-recommendations :is(.training-frequency>strong,p>strong){display:block;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);margin-bottom:5px}
+.training-recommendations p{font-size:14px;line-height:1.6;margin:0 0 14px;overflow-wrap:anywhere}
+.training-recommendations .btn-add-set{margin-top:4px;border-radius:0}.cardio-card-actions .cardio-delete-btn{border-color:var(--accent);color:var(--text);padding:5px 9px}
+#modal-training-recommendations :is(h2,button){font-family:'Barlow Condensed','Arial Narrow',sans-serif;text-transform:uppercase;font-weight:800;letter-spacing:.5px}
+html[data-theme="light"] .training-recommendations{border-left-color:#a51e20}html[data-theme="light"] .training-recommendations :is(.archive-file-kicker,.training-frequency>strong,p>strong){color:#635244}
+
+html[data-theme="light"] .training-recommendations .btn-add-set{color:#302820;background:#fff;border-color:#8b7e6d}

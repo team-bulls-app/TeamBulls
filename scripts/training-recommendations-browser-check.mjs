@@ -67,15 +67,21 @@ try {
     await command('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/`});
     for(let i=0;i<60;i++){if(await evaluate('document.readyState === "complete"'))break;await sleep(50);}
     await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)};openTrainingRecommendations()`);
-    await sleep(300);
-    const check=await evaluate(`(() => {const m=document.getElementById('modal-training-recommendations'),r=m.querySelector('.modal-sheet').getBoundingClientRect();return {open:m.classList.contains('open'),fits:r.width<=innerWidth+1&&r.height>200&&r.top<innerHeight,days:m.querySelectorAll('input[type=checkbox]').length,input:getComputedStyle(document.getElementById('training-frequency')).fontSize};})()`);
+    for(let ready=0;ready<60;ready++){
+      if(await evaluate('(() => {const m=document.querySelector("#modal-training-recommendations .modal-sheet"),r=m?.getBoundingClientRect();return !!r&&r.height>200&&r.width<=innerWidth+1&&r.top<innerHeight-200&&Number(getComputedStyle(m).opacity)===1;})()'))break;
+      await sleep(50);
+    }
+    const check=await evaluate(`(() => {const m=document.getElementById('modal-training-recommendations'),r=m.querySelector('.modal-sheet').getBoundingClientRect();return {theme:document.documentElement.dataset.theme,width:innerWidth,rect:{width:r.width,height:r.height,top:r.top},open:m.classList.contains('open'),fits:r.width<=innerWidth+1&&r.height>200&&r.top<innerHeight,days:m.querySelectorAll('input[type=checkbox]').length,input:getComputedStyle(document.getElementById('training-frequency')).fontSize};})()`);
     assert(check.open&&check.fits&&check.days===7&&parseFloat(check.input)>=16,JSON.stringify(check));
     await evaluate(`document.getElementById('training-frequency').value='Treine 2 dias e descanse 1; treine os outros 2 dias, descanse 2 dias e repita.';document.querySelector('#modal-training-recommendations input[value="0"]').checked=true;saveTrainingRecommendations()`);
     const saved=await evaluate(`({text:document.getElementById('summary').textContent,days:VIEW_STUDENT_WORKOUT.days.length,fields:Object.keys(window.saved).join(',')})`);
     assert(saved.text.includes('Treine 2 dias')&&saved.text.includes('Segunda-feira'));assert.equal(saved.days,4);assert.equal(saved.fields,'trainingRecommendations');
     await evaluate('CURRENT_USER.role="student";renderTsWorkout(VIEW_STUDENT_WORKOUT)');assert(!(await evaluate('document.getElementById("summary").innerHTML')).includes('EDITAR FREQUÊNCIA'));
     await evaluate('CURRENT_USER.role="trainer";openTrainingRecommendations()');assert((await evaluate('document.getElementById("training-frequency").value')).includes('descanse 2 dias'));
-    await sleep(300);
+    for(let ready=0;ready<60;ready++){
+      if(await evaluate('(() => {const m=document.querySelector("#modal-training-recommendations .modal-sheet"),r=m?.getBoundingClientRect();return !!r&&r.height>200&&r.width<=innerWidth+1&&r.top<innerHeight-200&&Number(getComputedStyle(m).opacity)===1;})()'))break;
+      await sleep(50);
+    }
     assert(await evaluate('document.querySelector("#modal-training-recommendations .modal-sheet").getBoundingClientRect().top < innerHeight-200'));
     if(screenshotDir)fs.writeFileSync(path.join(screenshotDir,`${theme}-${width}.png`),Buffer.from((await command('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false})).data,'base64'));
     results.push({theme,width});
