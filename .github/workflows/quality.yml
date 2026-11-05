@@ -21,6 +21,8 @@ jobs:
       - name: Run Team Bulls regression checks
         run: |
           node --test scripts/chrome-readiness.test.mjs
+          node scripts/trainer-progression-check.mjs
+          node scripts/trainer-progression-browser-check.mjs
           node scripts/quality-check.mjs
           node testes/testar_login_consultoria_mobile.js
           node scripts/login-mobile-glass-browser-check.mjs

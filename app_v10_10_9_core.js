@@ -1714,6 +1714,7 @@ function canUseCatalogVideos(){return MODE==='cloud'&&CURRENT_USER?.role==='stud
 function beginAsyncNavigation(){return ++NAVIGATION_SEQ;}
 function isNavigationCurrent(token){return token===NAVIGATION_SEQ;}
 function showScreen(id,expectedToken=null){
+  if(!['screen-trainer-student','screen-ts-workout','screen-ts-day','screen-ts-exercise'].includes(id))closeTrainerProgress();
   if(expectedToken!==null&&!isNavigationCurrent(expectedToken))return false;
   const target=document.getElementById(id);
   if(!target){console.error('Tela inexistente:',id);window.TeamBullsRecovery?.reveal?.('Uma parte da interface não foi carregada corretamente.');return false;}
@@ -4603,6 +4604,7 @@ async function deleteTsExercise(eid){
    MODALS
 ══════════════════════════════════════════════════ */
 function openModal(id){
+  if(id==='modal-exercise'){const button=document.getElementById('tb-progress-edit-access');if(button)button.hidden=!(CURRENT_USER?.role==='trainer'&&MODAL_TARGET==='student'&&VIEW_STUDENT?.uid);}
   document.getElementById(id).classList.add('open');
   if(id==='modal-workout')setWorkoutSaveStatus('');
 }
@@ -5414,6 +5416,7 @@ async function toggleStudent(suid,isActive){
 }
 
 async function viewStudent(suid,sname,email,status){
+  closeTrainerProgress();
   const navigation=beginAsyncNavigation();
   VIEW_STUDENT={uid:suid,name:sname,email:email||'',status:status||'active'};
   await renderTrainerStudent(VIEW_STUDENT);
@@ -9133,3 +9136,87 @@ populateSessionEditorForWeek=function(week){
   if(exerciseHasBcTechnique(exercise,week))document.querySelectorAll('#sets-editor .performed-set-row[data-target-min] .performed-target').forEach(replaceBcRangeText);
   return result;
 };
+
+// Trainer progression: read-only history, including orphaned/previous protocols.
+let TRAINER_PROGRESS=null,TRAINER_PROGRESS_SEQ=0;
+function trainerProgressRows(sessions,workouts){
+  const exercises=new Map(),protocols=new Map();
+  for(const w of workouts||[]){protocols.set(String(w.id),w.name);for(const e of w.exercises||[])exercises.set(String(e.id),e);}
+  return mergeHistorySessions(sessions,sessionsFromWorkoutTree(workouts)).map(s=>{
+    const e=exercises.get(String(s.exerciseId)),name=s.performedExerciseName||s.exerciseName||e?.name||'Exercício sem identificação';
+    const time=e?exerciseUsesResistedTime(e):null;
+    const unit=time===true?'seg':time===false?'reps':'registrado';
+    const mode=s.performedTechniqueMode||'não informado';
+    const sets=s.sets||[],max=Math.max(0,...sets.map(x=>Number(x.weight)||0)),reps=sets.reduce((n,x)=>n+(Number(x.reps)||0),0);
+    return {...s,name,unit,mode,group:normalizedName(name)+'|'+unit+'|'+mode,protocol:protocols.get(String(s.workoutId))||'Protocolo anterior / removido',max,reps,count:sets.length,volume:unit==='reps'?sets.reduce((n,x)=>n+Number(x.weight)*Number(x.reps),0):null};
+  }).sort((a,b)=>String(a.date).localeCompare(String(b.date))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)));
+}
+function trainerProgressSummary(rows){
+  if(!rows.length)return null;
+  const first=rows[0],last=rows[rows.length-1];
+  const change=key=>({first:first[key],last:last[key],delta:last[key]-first[key],percent:first[key]>0?100*(last[key]-first[key])/first[key]:null});
+  return {first,last,load:change('max'),reps:change('reps'),sets:change('count'),volume:first.volume===null||last.volume===null?null:change('volume')};
+}
+function trainerProgressAllowed(state=TRAINER_PROGRESS){return !!state&&CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===state.trainerUid&&VIEW_STUDENT?.uid===state.uid;}
+function closeTrainerProgress(){
+  TRAINER_PROGRESS_SEQ++;TRAINER_PROGRESS=null;
+  const modal=document.getElementById('modal-trainer-progress');if(modal){modal.classList.remove('open');modal.remove();}
+}
+async function openTrainerProgress(scope='all'){
+  if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT?.uid||MODE!=='cloud')return;
+  closeTrainerProgress();
+  const state={uid:VIEW_STUDENT.uid,trainerUid:CURRENT_USER.uid,workouts:VIEW_STUDENT.workouts||[],rows:[],limit:50,source:'Carregando histórico completo…'};
+  TRAINER_PROGRESS=state;const seq=++TRAINER_PROGRESS_SEQ;
+  const modal=document.createElement('div');modal.id='modal-trainer-progress';modal.className='modal-backdrop';
+  modal.innerHTML=`<div class="modal-sheet tb-progress-sheet" role="dialog" aria-modal="true" aria-labelledby="tb-progress-title"><div class="modal-handle"></div><div class="tb-progress-head"><div><h2 id="tb-progress-title">Evolução do aluno</h2><p id="tb-progress-student"></p></div><button class="btn-ghost" type="button" onclick="closeTrainerProgress()">FECHAR QUADRO</button></div><p id="tb-progress-source" role="status"></p><div class="tb-progress-filters"><label>Exercício / execução<select class="form-input" id="tb-progress-exercise" onchange="renderTrainerProgress(true)"></select></label><label>Desde<input class="form-input" type="date" id="tb-progress-from" onchange="renderTrainerProgress(true)"></label><label>Até<input class="form-input" type="date" id="tb-progress-to" onchange="renderTrainerProgress(true)"></label></div><button type="button" class="btn-add-set" onclick="refreshTrainerProgress()">ATUALIZAR HISTÓRICO</button><p class="plan-help">Comparações entre primeiro e último registro do período, por execução. Carga = maior carga da sessão; repetições e séries = totais da sessão. Volume = soma de carga × repetições. Volume não representa técnica, amplitude ou esforço. Registros sem unidade identificada são exibidos sem inferir repetições ou tempo.</p><div id="tb-progress-content"></div><button type="button" class="btn-add-set" id="tb-progress-more" onclick="TRAINER_PROGRESS.limit+=50;renderTrainerProgress()">MOSTRAR MAIS 50 REGISTROS</button></div>`;
+  document.body.appendChild(modal);document.getElementById('tb-progress-student').textContent=VIEW_STUDENT.name||'Aluno';
+  state.rows=trainerProgressRows(loadSessionArchive(state.uid),state.workouts);populateTrainerProgress(scope);renderTrainerProgress();openModal(modal.id);
+  await refreshTrainerProgress(seq);
+}
+function populateTrainerProgress(scope='keep'){
+  if(!trainerProgressAllowed())return;
+  const select=document.getElementById('tb-progress-exercise'),old=select.value;
+  const groups=new Map(TRAINER_PROGRESS.rows.map(r=>[r.group,r]));
+  select.innerHTML='<option value="">Todos os exercícios</option>'+[...groups.values()].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(r=>`<option value="${esc(r.group)}">${esc(r.name)} · ${esc(r.unit)} · ${esc(r.mode)}</option>`).join('');
+  const editing=document.getElementById('modal-exercise')?.classList.contains('open');
+  const exercise=scope==='exercise'?(editing?TRAINER_PROGRESS.workouts.flatMap(w=>w.exercises||[]).find(e=>String(e.id)===String(EDIT_EXERCISE_ID)):VIEW_STUDENT_EXERCISE):null;
+  const match=exercise&&TRAINER_PROGRESS.rows.find(r=>String(r.exerciseId)===String(exercise.id));
+  select.value=match?.group||(scope==='keep'&&groups.has(old)?old:'');
+}
+async function refreshTrainerProgress(expectedSeq=TRAINER_PROGRESS_SEQ){
+  const state=TRAINER_PROGRESS;if(!trainerProgressAllowed(state)||state.loading)return;
+  state.loading=true;state.source='Atualizando histórico…';renderTrainerProgress();
+  try{
+    const result=await fetchCloudSessions(state.uid);
+    if(expectedSeq!==TRAINER_PROGRESS_SEQ||TRAINER_PROGRESS!==state||!trainerProgressAllowed(state))return;
+    state.rows=trainerProgressRows(result.sessions,state.workouts);
+    state.source=result.source==='server'?'Histórico consultado na nuvem agora · inclui registros preservados de protocolos anteriores':'Sem confirmação da nuvem · mostrando histórico disponível no aparelho, que pode estar incompleto';
+    populateTrainerProgress();
+  }catch(error){
+    if(TRAINER_PROGRESS!==state||!trainerProgressAllowed(state))return;
+    state.source='Não foi possível atualizar. Histórico disponível no aparelho; pode estar incompleto. Use ATUALIZAR HISTÓRICO para tentar novamente.';
+  }finally{state.loading=false;if(TRAINER_PROGRESS===state&&trainerProgressAllowed(state))renderTrainerProgress();}
+}
+function trainerProgressPlot(rows){
+  if(rows.length<2)return '<p>Registre ao menos duas sessões para comparar a evolução.</p>';
+  const peak=Math.max(1,...rows.map(r=>r.max));
+  const points=rows.map((r,i)=>`${10+i*480/(rows.length-1)},${90-r.max/peak*80}`).join(' ');
+  return `<svg viewBox="0 0 500 110" class="tb-progress-chart" role="img" aria-label="Maior carga por registro em ordem cronológica; valores detalhados na tabela"><polyline points="${points}" fill="none" stroke="currentColor" stroke-width="2"/><text x="10" y="107" fill="currentColor" font-size="11">${esc(rows[0].date)} → ${esc(rows[rows.length-1].date)} · até ${peak} kg</text></svg>`;
+}
+function renderTrainerProgress(reset=false){
+  if(!trainerProgressAllowed()){closeTrainerProgress();return;}
+  const state=TRAINER_PROGRESS;if(reset)state.limit=50;
+  const choice=document.getElementById('tb-progress-exercise').value,from=document.getElementById('tb-progress-from').value,to=document.getElementById('tb-progress-to').value;
+  document.getElementById('tb-progress-source').textContent=state.source;
+  const host=document.getElementById('tb-progress-content'),more=document.getElementById('tb-progress-more');
+  if(from&&to&&from>to){host.textContent='A data inicial deve ser anterior ou igual à data final.';more.hidden=true;return;}
+  const rows=state.rows.filter(r=>(!choice||r.group===choice)&&(!from||r.date>=from)&&(!to||r.date<=to));
+  const groups=new Map();for(const r of rows){if(!groups.has(r.group))groups.set(r.group,[]);groups.get(r.group).push(r);}
+  const number=n=>Number(n).toLocaleString('pt-BR',{maximumFractionDigits:2});
+  const metric=(label,m,unit)=>`<div><span>${label}</span><strong>${number(m.first)} → ${number(m.last)} ${unit}</strong><small>Variação: ${m.delta>0?'+':''}${number(m.delta)} ${unit}${m.percent===null?' · percentual indisponível (base zero)':' · '+number(m.percent)+'%'}</small></div>`;
+  host.innerHTML=rows.length?`<p>${rows.length} registros · ${new Set(rows.map(r=>r.date)).size} dias · ${groups.size} execuções</p>`+[...groups.values()].map(list=>{
+    const s=trainerProgressSummary(list),r=list[0];
+    return `<section class="tb-progress-summary"><h3>${esc(r.name)} <small>${esc(r.unit)} · ${esc(r.mode)}</small></h3><p>${fmt(s.first.date)} → ${fmt(s.last.date)} · ${list.length} registros</p><div class="tb-progress-metrics">${metric('Maior carga',s.load,'kg')}${metric('Total '+r.unit,s.reps,r.unit)}${metric('Séries',s.sets,'')}${s.volume?metric('Volume',s.volume,'kg·reps'):''}</div>${choice?trainerProgressPlot(list):''}</section>`;
+  }).join('')+`<h3>Histórico detalhado · mais recentes primeiro</h3>`+[...rows].reverse().slice(0,state.limit).map(r=>`<details class="tb-progress-record"><summary>${esc(fmt(r.date))} · ${esc(r.name)} · ${r.count} séries · até ${number(r.max)} kg</summary><p>${esc(r.protocol)} · semana ${esc(r.week)} · ${esc(r.mode)}</p><div class="tb-progress-table"><table class="sets-table"><thead><tr><th>Série</th><th>Carga (kg)</th><th>${esc(r.unit)}</th><th>Alvo registrado</th><th>GER</th></tr></thead><tbody>${r.sets.map((s,i)=>`<tr><td>${i+1}${s.backoff?' · backoff':''}</td><td>${number(s.weight)}</td><td>${number(s.reps)}</td><td>${s.targetMin!=null&&s.targetMax!=null?esc(s.targetMin)+'–'+esc(s.targetMax):'—'}</td><td>${s.ger==null?'—':esc(s.ger)}</td></tr>`).join('')}</tbody></table></div>${r.note?`<p class="tb-progress-note">${esc(r.note)}</p>`:''}</details>`).join(''):'<p>Nenhum registro disponível neste filtro. Somente séries efetivamente registradas aparecem aqui.</p>';
+  more.hidden=rows.length<=state.limit;
+}

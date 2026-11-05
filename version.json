@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110302,
-  "revision": "mobile-login-stone-1",
-  "publishedAt": "2026-11-03T00:00:00Z",
+  "build": 2026110501,
+  "revision": "trainer-progression-1",
+  "publishedAt": "2026-11-05T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Nova arte no login mobile com enquadramento adaptável, preservando os personagens."
+  "message": "Painel de evolução de cargas, repetições e séries disponível para o treinador no perfil e na edição do treino."
 }
