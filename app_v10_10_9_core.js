@@ -1714,6 +1714,7 @@ function canUseCatalogVideos(){return MODE==='cloud'&&CURRENT_USER?.role==='stud
 function beginAsyncNavigation(){return ++NAVIGATION_SEQ;}
 function isNavigationCurrent(token){return token===NAVIGATION_SEQ;}
 function showScreen(id,expectedToken=null){
+  if(id!=='screen-ts-workout')closeModal('modal-training-recommendations');
   if(!['screen-trainer-student','screen-ts-workout','screen-ts-day','screen-ts-exercise'].includes(id))closeTrainerProgress();
   if(expectedToken!==null&&!isNavigationCurrent(expectedToken))return false;
   const target=document.getElementById(id);
@@ -2299,7 +2300,7 @@ function protocolSummaryHtml(workout,dayName=''){
   const title=dayName?safeDayName(dayName):workout?.name||'Treino';
   const meta=dayName?`${workout?.name||'Protocolo'} · ${items.length} exercícios · ${sessions} registros`:`${days.length} ${days.length===1?'pasta de dia':'pastas de dias'} · ${items.length} exercícios · ${sessions} registros`;
   const day=dayName?days.find(item=>normalizedName(item.name)===normalizedName(dayName)):null,groups=normalizeMuscleGroups(day?.muscleGroups),guidance=[day?.frequencyGuidance,day?.restGuidance].filter(Boolean);
-  return`<div class="archive-file-kicker">${dayName?'PASTA DO DIA':'PASTA PRINCIPAL DO PROTOCOLO'}</div><div class="protocol-summary-title">${esc(title)}</div><div class="protocol-summary-meta">${esc(meta)}</div>${day&&(groups.length||guidance.length)?`<div class="protocol-summary-guidance">${groups.length?`<span>Grupos musculares: ${esc(groups.join(', '))}</span>`:''}${day.frequencyGuidance?`<span>Frequência: ${esc(day.frequencyGuidance)}</span>`:''}${day.restGuidance?`<span>Descanso: ${esc(day.restGuidance)}</span>`:''}</div>`:''}`;
+  return`<div class="archive-file-kicker">${dayName?'PASTA DO DIA':'PASTA PRINCIPAL DO PROTOCOLO'}</div><div class="protocol-summary-title">${esc(title)}</div><div class="protocol-summary-meta">${esc(meta)}</div>${day&&(groups.length||guidance.length)?`<div class="protocol-summary-guidance">${groups.length?`<span>Grupos musculares: ${esc(groups.join(', '))}</span>`:''}${day.frequencyGuidance?`<span>Frequência: ${esc(day.frequencyGuidance)}</span>`:''}${day.restGuidance?`<span>Descanso: ${esc(day.restGuidance)}</span>`:''}</div>`:''}${dayName?'':trainingRecommendationsHtml(workout)}`;
 }
 function toggleWorkoutOverview(trainerMode){
   const panel=document.getElementById(trainerMode?'trainer-workout-overview':'student-workout-overview'),button=document.getElementById(trainerMode?'trainer-overview-toggle':'student-overview-toggle');if(!panel||!button)return;
@@ -4609,6 +4610,7 @@ function openModal(id){
   if(id==='modal-workout')setWorkoutSaveStatus('');
 }
 function closeModal(id){
+  if(id==='modal-training-recommendations')TRAINING_RECOMMENDATIONS_CONTEXT=null;
   const modal=document.getElementById(id);if(!modal)return;
   if(id==='modal-catalog-video'){const body=document.getElementById('catalog-video-body');if(body)body.innerHTML='';}
   if(id==='modal-session')resetRestTimer();
@@ -9138,7 +9140,8 @@ populateSessionEditorForWeek=function(week){
 };
 
 // Trainer progression: read-only history, including orphaned/previous protocols.
-let TRAINER_PROGRESS=null,TRAINER_PROGRESS_SEQ=0;
+// Hoisted for the synchronous guest startup path in showScreen.
+var TRAINER_PROGRESS=null,TRAINER_PROGRESS_SEQ=0;
 function trainerProgressRows(sessions,workouts){
   const exercises=new Map(),protocols=new Map();
   for(const w of workouts||[]){protocols.set(String(w.id),w.name);for(const e of w.exercises||[])exercises.set(String(e.id),e);}
@@ -9219,4 +9222,53 @@ function renderTrainerProgress(reset=false){
     return `<section class="tb-progress-summary"><h3>${esc(r.name)} <small>${esc(r.unit)} · ${esc(r.mode)}</small></h3><p>${fmt(s.first.date)} → ${fmt(s.last.date)} · ${list.length} registros</p><div class="tb-progress-metrics">${metric('Maior carga',s.load,'kg')}${metric('Total '+r.unit,s.reps,r.unit)}${metric('Séries',s.sets,'')}${s.volume?metric('Volume',s.volume,'kg·reps'):''}</div>${choice?trainerProgressPlot(list):''}</section>`;
   }).join('')+`<h3>Histórico detalhado · mais recentes primeiro</h3>`+[...rows].reverse().slice(0,state.limit).map(r=>`<details class="tb-progress-record"><summary>${esc(fmt(r.date))} · ${esc(r.name)} · ${r.count} séries · até ${number(r.max)} kg</summary><p>${esc(r.protocol)} · semana ${esc(r.week)} · ${esc(r.mode)}</p><div class="tb-progress-table"><table class="sets-table"><thead><tr><th>Série</th><th>Carga (kg)</th><th>${esc(r.unit)}</th><th>Alvo registrado</th><th>GER</th></tr></thead><tbody>${r.sets.map((s,i)=>`<tr><td>${i+1}${s.backoff?' · backoff':''}</td><td>${number(s.weight)}</td><td>${number(s.reps)}</td><td>${s.targetMin!=null&&s.targetMax!=null?esc(s.targetMin)+'–'+esc(s.targetMax):'—'}</td><td>${s.ger==null?'—':esc(s.ger)}</td></tr>`).join('')}</tbody></table></div>${r.note?`<p class="tb-progress-note">${esc(r.note)}</p>`:''}</details>`).join(''):'<p>Nenhum registro disponível neste filtro. Somente séries efetivamente registradas aparecem aqui.</p>';
   more.hidden=rows.length<=state.limit;
+}
+
+// Protocol-wide training/rest guidance, authored only by the trainer.
+// Hoisted: synchronous guest startup can close modals before this section runs.
+var TRAINING_RECOMMENDATIONS_CONTEXT=null;
+const TRAINING_WEEKDAYS=['Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado','Domingo'];
+function normalizeTrainingRecommendations(value){
+  return {frequency:String(value?.frequency||'').normalize('NFKC').trim().slice(0,800),weekdays:[...new Set((Array.isArray(value?.weekdays)?value.weekdays:[]).filter(day=>Number.isInteger(day)&&day>=0&&day<7))].sort((a,b)=>a-b)};
+}
+function trainingRecommendationsHtml(workout){
+  const advice=normalizeTrainingRecommendations(workout?.trainingRecommendations),editable=CURRENT_USER?.role==='trainer'&&VIEW_STUDENT?.uid&&VIEW_STUDENT_WORKOUT===workout;
+  if(!editable&&!advice.frequency&&!advice.weekdays.length)return '';
+  return `<section class="training-recommendations" aria-label="Orientações de frequência do treino"><h3>Frequência e dias recomendados</h3>${advice.frequency?`<div class="training-frequency"><strong>Sequência de treino e descanso</strong><p>${esc(advice.frequency)}</p></div>`:'<p>Sequência de treino e descanso não definida.</p>'}<p><strong>Dias recomendados:</strong> ${advice.weekdays.length?advice.weekdays.map(day=>TRAINING_WEEKDAYS[day]).join(', '):'Sem dias fixos — siga a sequência orientada.'}</p>${editable?'<button type="button" class="btn-add-set" onclick="openTrainingRecommendations()">EDITAR FREQUÊNCIA E DIAS</button>':''}</section>`;
+}
+function openTrainingRecommendations(){
+  if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT?.uid||!VIEW_STUDENT_WORKOUT?.id||MODE!=='cloud')return;
+  const workout=VIEW_STUDENT_WORKOUT,advice=normalizeTrainingRecommendations(workout.trainingRecommendations);
+  TRAINING_RECOMMENDATIONS_CONTEXT={workout,studentUid:VIEW_STUDENT.uid,trainerUid:CURRENT_USER.uid};
+  let modal=document.getElementById('modal-training-recommendations');if(modal)modal.remove();
+  modal=document.createElement('div');modal.id='modal-training-recommendations';modal.className='modal-backdrop';
+  modal.innerHTML=`<div class="modal-sheet training-recommendations-sheet" role="dialog" aria-modal="true" aria-labelledby="training-recommendations-title"><div class="modal-handle"></div><h2 id="training-recommendations-title">Frequência e dias recomendados</h2><p id="training-recommendations-workout"></p><label class="form-label" for="training-frequency">Frequência recomendada / sequência de treino e descanso</label><textarea class="form-input" id="training-frequency" rows="5" maxlength="800" placeholder="Ex.: Treine 2 dias e descanse 1; treine os outros 2 dias, descanse 2 dias e repita."></textarea><button type="button" class="btn-ghost" onclick="document.getElementById('training-frequency').value='Treine 2 dias e descanse 1; treine os outros 2 dias, descanse 2 dias e repita.'">USAR EXEMPLO: 2 TREINOS / 1 DESCANSO / 2 TREINOS / 2 DESCANSOS</button><fieldset class="training-weekdays"><legend>Dias recomendados para treinar (opcional)</legend>${TRAINING_WEEKDAYS.map((day,index)=>`<label><input type="checkbox" value="${index}" ${advice.weekdays.includes(index)?'checked':''}> ${day}</label>`).join('')}</fieldset><p class="plan-help">Sem dias fixos? Deixe os dias desmarcados e descreva o ciclo acima. As orientações serão exibidas ao aluno neste protocolo. Isso não altera as pastas ou a programação das 8 semanas.</p><p id="training-recommendations-status" role="status"></p><button type="button" class="btn-primary" onclick="saveTrainingRecommendations()">SALVAR ORIENTAÇÕES</button><button type="button" class="btn-ghost" onclick="closeModal('modal-training-recommendations')">CANCELAR</button></div>`;
+  document.body.appendChild(modal);document.getElementById('training-recommendations-workout').textContent=workout.name||'Protocolo';document.getElementById('training-frequency').value=advice.frequency;openModal(modal.id);
+}
+function trainingRecommendationsContextCurrent(context){return !!context&&TRAINING_RECOMMENDATIONS_CONTEXT===context&&MODE==='cloud'&&CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===context.trainerUid&&VIEW_STUDENT?.uid===context.studentUid&&VIEW_STUDENT_WORKOUT===context.workout;}
+async function saveTrainingRecommendations(){
+  const context=TRAINING_RECOMMENDATIONS_CONTEXT;
+  if(!trainingRecommendationsContextCurrent(context))return;
+  const key='training-recommendations-'+context.workout.id;
+  if(!beginAction(key,'modal-training-recommendations'))return;
+  const status=document.getElementById('training-recommendations-status');
+  try{
+    const frequency=document.getElementById('training-frequency').value.trim();
+    if(frequency.length>800)throw new Error('Use até 800 caracteres para a sequência.');
+    const advice=normalizeTrainingRecommendations({frequency,weekdays:[...document.querySelectorAll('#modal-training-recommendations input:checked')].map(input=>Number(input.value))});
+    status.textContent='Salvando orientações…';
+    const ref=db.collection('workouts').doc(context.workout.id);
+    await cloudWrite(db.runTransaction(async transaction=>{
+      if(!trainingRecommendationsContextCurrent(context))throw new Error('O aluno ou protocolo selecionado mudou. Abra as orientações novamente.');
+      const snapshot=await transaction.get(ref);
+      if(!snapshot.exists)throw new Error('Este protocolo não está mais disponível.');
+      if(String(snapshot.data()?.userId||'')!==context.studentUid)throw new Error('O protocolo não pertence ao aluno selecionado.');
+      if(!trainingRecommendationsContextCurrent(context))throw new Error('A sessão mudou. Abra as orientações novamente.');
+      transaction.update(ref,{trainingRecommendations:advice});
+    }),'salvar frequência e dias recomendados');
+    if(!trainingRecommendationsContextCurrent(context))return;
+    context.workout.trainingRecommendations=advice;
+    renderTsWorkout(context.workout);closeModal('modal-training-recommendations');showToast('✓ Orientações salvas para o aluno');
+  }catch(error){if(trainingRecommendationsContextCurrent(context))status.textContent='Não foi possível salvar: '+error.message+' Seu texto continua disponível para tentar novamente.';}
+  finally{endAction(key,'modal-training-recommendations');}
 }

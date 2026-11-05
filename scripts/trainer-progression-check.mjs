@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
-const block=core.slice(core.indexOf('// Trainer progression: read-only history'));
+const block=core.slice(core.indexOf('// Trainer progression: read-only history'),core.indexOf('// Protocol-wide training/rest guidance'));
 function extract(name){const start=core.indexOf(`function ${name}(`),end=core.indexOf('\nfunction ',start+1);return core.slice(start,end);}
 const elements=new Map();
 const element=id=>{if(!elements.has(id))elements.set(id,{value:'',innerHTML:'',textContent:'',hidden:false,classList:{contains:()=>false,remove(){}},remove(){elements.delete(id);}});return elements.get(id);};

@@ -3143,3 +3143,15 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
 html[data-theme="light"] #modal-trainer-progress .tb-progress-sheet{background:#faf7f2;color:#302820}
 html[data-theme="light"] #modal-trainer-progress :is(.tb-progress-summary,.tb-progress-record,button,input,select){background:#fff;color:#302820;border-color:#8b7e6d}
 html[data-theme="light"] #modal-trainer-progress .tb-progress-chart{color:#a51c25}
+
+.training-recommendations{margin-top:16px;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text)}
+.training-recommendations h3{margin:0 0 12px;font-size:18px;color:inherit}.training-frequency p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;font-size:15px}
+#modal-training-recommendations .modal-sheet{width:min(720px,100%);max-width:720px;max-height:90vh;overflow:auto;background:#100f0e;color:#efe8df}
+#modal-training-recommendations :is(h2,p,label,legend){color:inherit}#modal-training-recommendations textarea{width:100%;resize:vertical;min-height:120px;line-height:1.5;font-size:16px}
+#modal-training-recommendations :is(button,input,textarea){color:#efe8df;background:#191715;border-color:#62594e}
+#modal-training-recommendations .plan-help{font-size:13px;line-height:1.5}
+.training-weekdays{margin:16px 0;padding:12px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border:1px solid #62594e}
+.training-weekdays label{display:flex;gap:8px;align-items:center;min-height:40px;font-size:14px}.training-weekdays input{width:18px;height:18px;flex-shrink:0}
+html[data-theme="light"] .training-recommendations,html[data-theme="light"] #modal-training-recommendations .modal-sheet{background:#faf7f2;color:#302820;border-color:#8b7e6d}
+html[data-theme="light"] #modal-training-recommendations :is(button,input,textarea){background:#fff;color:#302820;border-color:#8b7e6d}
+@media(max-width:480px){#modal-training-recommendations .modal-sheet{padding:16px}.training-weekdays{grid-template-columns:1fr}}
