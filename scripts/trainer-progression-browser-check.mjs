@@ -7,7 +7,7 @@ import path from 'node:path';
 import {spawn,spawnSync} from 'node:child_process';
 import {waitForChromePage} from './chrome-readiness.mjs';
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
-const block=core.slice(core.indexOf('// Trainer progression: read-only history'));
+const block=core.slice(core.indexOf('// Trainer progression: read-only history'),core.indexOf('// Protocol-wide training/rest guidance'));
 function extract(name){const start=core.indexOf(`function ${name}(`),end=core.indexOf('\nfunction ',start+1);return core.slice(start,end);}
 const fixture=`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles_v10_10_9.css"><body><main id="app"><div class="screen active" id="screen-ts-exercise"></div></main><div class="modal-backdrop open" id="modal-exercise"><div class="modal-sheet"><h2>Editar exercício</h2><textarea id="draft">Rascunho ainda não salvo</textarea></div></div><script>
 let CURRENT_USER={uid:'coach',role:'trainer'},MODE='cloud',EDIT_EXERCISE_ID='e',VIEW_STUDENT_EXERCISE={id:'e'};
