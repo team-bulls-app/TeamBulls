@@ -8977,7 +8977,7 @@ function normalizeCardioItem(value,index=0){
 }
 function normalizeCardioDocument(value){
   const raw=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-  const mainSource=raw.main||raw.primary||raw.prescription||null;
+  const mainSource=Object.prototype.hasOwnProperty.call(raw,'main')?raw.main:(raw.primary||raw.prescription||null);
   const main=mainSource?normalizeCardioItem(mainSource,0):null;
   const substitutions=(Array.isArray(raw.substitutions)?raw.substitutions:Array.isArray(raw.alternatives)?raw.alternatives:[]).map(normalizeCardioItem).filter(item=>item.type).slice(0,20).sort((a,b)=>a.order-b.order||a.type.localeCompare(b.type,'pt-BR')).map((item,index)=>({...item,order:index}));
   return{main:main&&main.type?main:null,substitutions};
@@ -9014,7 +9014,7 @@ async function persistCardioDocument(){
 }
 function cardioItemCard(item,isMain,trainer){
   const selected=String(CURRENT_CARDIO_ITEM_ID)===String(item.id),index=CARDIO_DOCUMENT.substitutions.findIndex(entry=>entry.id===item.id);
-  const controls=trainer?`<div class="cardio-card-actions"><button class="primary" type="button" onclick="selectCardioTimer(${jsArg(item.id)})">CRONÔMETRO</button>${!isMain?`<button type="button" ${index<=0?'disabled':''} onclick="moveCardioSubstitution(${jsArg(item.id)},-1)">↑</button><button type="button" ${index<0||index>=CARDIO_DOCUMENT.substitutions.length-1?'disabled':''} onclick="moveCardioSubstitution(${jsArg(item.id)},1)">↓</button>`:''}<button type="button" onclick="openEditCardioItem(${jsArg(isMain?'main':'substitution')},${jsArg(item.id)})">EDITAR</button></div>`:`<div class="cardio-card-actions"><button class="primary" type="button" onclick="selectCardioTimer(${jsArg(item.id)})">USAR TIMER</button></div>`;
+  const controls=trainer?`<div class="cardio-card-actions"><button class="primary" type="button" onclick="selectCardioTimer(${jsArg(item.id)})">CRONÔMETRO</button>${!isMain?`<button type="button" ${index<=0?'disabled':''} onclick="moveCardioSubstitution(${jsArg(item.id)},-1)">↑</button><button type="button" ${index<0||index>=CARDIO_DOCUMENT.substitutions.length-1?'disabled':''} onclick="moveCardioSubstitution(${jsArg(item.id)},1)">↓</button>`:''}<button type="button" onclick="openEditCardioItem(${jsArg(isMain?'main':'substitution')},${jsArg(item.id)})">EDITAR</button><button type="button" class="cardio-delete-btn" onclick="deleteCardioItem(${jsArg(isMain?'main':'substitution')},${jsArg(item.id)})">EXCLUIR</button></div>`:`<div class="cardio-card-actions"><button class="primary" type="button" onclick="selectCardioTimer(${jsArg(item.id)})">USAR TIMER</button></div>`;
   return`<article class="cardio-prescription-card ${isMain?'main':''} ${selected?'selected':''}"><div class="cardio-prescription-icon">${isMain?'C':'↺'}</div><div class="cardio-prescription-main"><div class="cardio-prescription-kicker">${isMain?'CARDIO PRINCIPAL':'SUBSTITUIÇÃO AUTORIZADA'}</div><div class="cardio-prescription-name">${esc(item.type)}</div><div class="cardio-metrics"><span class="cardio-metric">TEMPO <b>${esc(cardioDurationText(item.durationMinutes))}</b></span><span class="cardio-metric">FREQUÊNCIA <b>${esc(cardioFrequencyText(item.daysPerWeek))}</b></span></div>${item.notes?`<div class="cardio-prescription-notes">${esc(item.notes)}</div>`:''}</div>${controls}</article>`;
 }
 function cardioTimerMarkup(item){
@@ -9025,8 +9025,8 @@ function renderCardioScreen(){
   const host=document.getElementById(CARDIO_CONTEXT.trainer?'ts-cardio-content':'cardio-content');if(!host)return;const canEdit=cardioCanEdit(),main=CARDIO_DOCUMENT.main,subs=CARDIO_DOCUMENT.substitutions;
   if(!CURRENT_CARDIO_ITEM_ID||!cardioItemById(CURRENT_CARDIO_ITEM_ID))CURRENT_CARDIO_ITEM_ID=main?.id||subs[0]?.id||'';
   const intro=`<div class="cardio-page-intro"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h3l2-5 4 10 2-5h5"/><path d="M3 5h18v14H3z"/></svg><div><strong>CARDIO PRESCRITO</strong><span>Modalidade, duração e frequência definidas individualmente. As substituições abaixo possuem tempos e cronômetros próprios.</span></div></div>`;
-  const mainBlock=`<section class="cardio-section"><div class="cardio-section-head"><span>PRESCRIÇÃO PRINCIPAL</span>${canEdit?`<button type="button" onclick="${main?`openEditCardioItem('main',${jsArg(main.id)})`:`openAddCardioMain()`}">${main?'EDITAR':'＋ PRESCREVER'}</button>`:''}</div>${main?cardioItemCard(main,true,CARDIO_CONTEXT.trainer):`<div class="cardio-empty">${canEdit?'Nenhum cardio principal foi prescrito.':'O treinador ainda não prescreveu o cardio.'}${canEdit?'<button type="button" onclick="openAddCardioMain()">PRESCREVER CARDIO PRINCIPAL</button>':''}</div>`}</section>`;
-  const subsBlock=`<section class="cardio-section"><div class="cardio-section-head"><span>SUBSTITUIÇÕES DE CARDIO</span>${canEdit?'<button type="button" onclick="openAddCardioSubstitution()">＋ SUBSTITUIÇÃO</button>':''}</div><div class="cardio-options-list">${subs.length?subs.map(item=>cardioItemCard(item,false,CARDIO_CONTEXT.trainer)).join(''):`<div class="cardio-empty">${canEdit?'Cadastre alternativas para os dias em que o cardio principal não puder ser realizado.':'Nenhuma substituição de cardio foi liberada.'}</div>`}</div></section>`;
+  const mainBlock=`<section class="cardio-section"><div class="cardio-section-head"><span>PRESCRIÇÃO PRINCIPAL</span>${canEdit?`<button type="button" onclick="${main?`openEditCardioItem('main',${jsArg(main.id)})`:`openAddCardioMain()`}">${main?'EDITAR':'＋ PRESCREVER'}</button>`:''}</div>${main?cardioItemCard(main,true,canEdit):`<div class="cardio-empty">${canEdit?'Nenhum cardio principal foi prescrito.':'O treinador ainda não prescreveu o cardio.'}${canEdit?'<button type="button" onclick="openAddCardioMain()">PRESCREVER CARDIO PRINCIPAL</button>':''}</div>`}</section>`;
+  const subsBlock=`<section class="cardio-section"><div class="cardio-section-head"><span>SUBSTITUIÇÕES DE CARDIO</span>${canEdit?'<button type="button" onclick="openAddCardioSubstitution()">＋ SUBSTITUIÇÃO</button>':''}</div><div class="cardio-options-list">${subs.length?subs.map(item=>cardioItemCard(item,false,canEdit)).join(''):`<div class="cardio-empty">${canEdit?'Cadastre alternativas para os dias em que o cardio principal não puder ser realizado.':'Nenhuma substituição de cardio foi liberada.'}</div>`}</div></section>`;
   const selected=cardioItemById(CURRENT_CARDIO_ITEM_ID);host.innerHTML=intro+mainBlock+subsBlock+cardioTimerMarkup(selected);updateCardioTimerDisplay();
 }
 async function openCardioModule(source='workout',trainerMode=false){
@@ -9050,11 +9050,67 @@ function openAddCardioMain(){if(!cardioCanEdit())return;EDIT_CARDIO_KIND='main';
 function openAddCardioSubstitution(){if(!cardioCanEdit())return;if(CARDIO_DOCUMENT.substitutions.length>=20){alert('Limite seguro de 20 substituições de cardio atingido.');return;}EDIT_CARDIO_KIND='substitution';EDIT_CARDIO_ITEM_ID='';document.getElementById('modal-cardio-title').textContent='Nova substituição de cardio';document.getElementById('input-cardio-type').value='';document.getElementById('input-cardio-duration').value=String(CARDIO_DOCUMENT.main?.durationMinutes||30);document.getElementById('input-cardio-frequency').value=String(CARDIO_DOCUMENT.main?.daysPerWeek||3);document.getElementById('input-cardio-notes').value='';document.getElementById('btn-delete-cardio-item').style.display='none';openModal('modal-cardio-item');focusEditorField('input-cardio-type',250);}
 function openEditCardioItem(kind,id){if(!cardioCanEdit())return;const item=kind==='main'?CARDIO_DOCUMENT.main:CARDIO_DOCUMENT.substitutions.find(entry=>entry.id===id);if(!item)return;EDIT_CARDIO_KIND=kind==='main'?'main':'substitution';EDIT_CARDIO_ITEM_ID=item.id;document.getElementById('modal-cardio-title').textContent=EDIT_CARDIO_KIND==='main'?'Editar cardio principal':'Editar substituição de cardio';document.getElementById('input-cardio-type').value=item.type;document.getElementById('input-cardio-duration').value=String(item.durationMinutes);document.getElementById('input-cardio-frequency').value=String(item.daysPerWeek);document.getElementById('input-cardio-notes').value=item.notes;document.getElementById('btn-delete-cardio-item').style.display='block';openModal('modal-cardio-item');}
 async function saveCardioItem(){
-  if(!cardioCanEdit()||!beginAction('save-cardio-item','modal-cardio-item'))return;const type=document.getElementById('input-cardio-type').value.normalize('NFKC').trim(),durationMinutes=Math.trunc(Number(document.getElementById('input-cardio-duration').value)),daysPerWeek=Math.trunc(Number(document.getElementById('input-cardio-frequency').value)),notes=document.getElementById('input-cardio-notes').value.normalize('NFKC').trim();if(!type){alert('Informe o tipo de cardio.');endAction('save-cardio-item','modal-cardio-item');return;}if(!Number.isInteger(durationMinutes)||durationMinutes<1||durationMinutes>600){alert('Informe um tempo entre 1 e 600 minutos.');endAction('save-cardio-item','modal-cardio-item');return;}if(!Number.isInteger(daysPerWeek)||daysPerWeek<1||daysPerWeek>7){alert('Informe uma frequência entre 1 e 7 dias por semana.');endAction('save-cardio-item','modal-cardio-item');return;}const before=JSON.stringify(CARDIO_DOCUMENT);
-  try{let item;if(EDIT_CARDIO_KIND==='main'){const old=CARDIO_DOCUMENT.main;item=normalizeCardioItem({id:old?.id||EDIT_CARDIO_ITEM_ID||uid(),type,durationMinutes,daysPerWeek,notes,order:0});CARDIO_DOCUMENT.main=item;}else{const index=CARDIO_DOCUMENT.substitutions.findIndex(entry=>entry.id===EDIT_CARDIO_ITEM_ID);item=normalizeCardioItem({id:index>=0?CARDIO_DOCUMENT.substitutions[index].id:uid(),type,durationMinutes,daysPerWeek,notes,order:index>=0?CARDIO_DOCUMENT.substitutions[index].order:CARDIO_DOCUMENT.substitutions.length});if(index>=0)CARDIO_DOCUMENT.substitutions[index]=item;else CARDIO_DOCUMENT.substitutions.push(item);}clearCardioTimer(item.id);CURRENT_CARDIO_ITEM_ID=item.id;await persistCardioDocument();closeModal('modal-cardio-item');renderCardioScreen();showToast('✓ Prescrição de cardio salva');}catch(error){CARDIO_DOCUMENT=normalizeCardioDocument(JSON.parse(before));alert(cloudWriteError(error,'salvar o cardio'));}finally{endAction('save-cardio-item','modal-cardio-item');}
+  if(!cardioCanEdit()||!beginAction('cardio-mutation','modal-cardio-item'))return;const type=document.getElementById('input-cardio-type').value.normalize('NFKC').trim(),durationMinutes=Math.trunc(Number(document.getElementById('input-cardio-duration').value)),daysPerWeek=Math.trunc(Number(document.getElementById('input-cardio-frequency').value)),notes=document.getElementById('input-cardio-notes').value.normalize('NFKC').trim();if(!type){alert('Informe o tipo de cardio.');endAction('cardio-mutation','modal-cardio-item');return;}if(!Number.isInteger(durationMinutes)||durationMinutes<1||durationMinutes>600){alert('Informe um tempo entre 1 e 600 minutos.');endAction('cardio-mutation','modal-cardio-item');return;}if(!Number.isInteger(daysPerWeek)||daysPerWeek<1||daysPerWeek>7){alert('Informe uma frequência entre 1 e 7 dias por semana.');endAction('cardio-mutation','modal-cardio-item');return;}const before=JSON.stringify(CARDIO_DOCUMENT);
+  try{let item;if(EDIT_CARDIO_KIND==='main'){const old=CARDIO_DOCUMENT.main;item=normalizeCardioItem({id:old?.id||EDIT_CARDIO_ITEM_ID||uid(),type,durationMinutes,daysPerWeek,notes,order:0});CARDIO_DOCUMENT.main=item;}else{const index=CARDIO_DOCUMENT.substitutions.findIndex(entry=>entry.id===EDIT_CARDIO_ITEM_ID);item=normalizeCardioItem({id:index>=0?CARDIO_DOCUMENT.substitutions[index].id:uid(),type,durationMinutes,daysPerWeek,notes,order:index>=0?CARDIO_DOCUMENT.substitutions[index].order:CARDIO_DOCUMENT.substitutions.length});if(index>=0)CARDIO_DOCUMENT.substitutions[index]=item;else CARDIO_DOCUMENT.substitutions.push(item);}clearCardioTimer(item.id);CURRENT_CARDIO_ITEM_ID=item.id;await persistCardioDocument();closeModal('modal-cardio-item');renderCardioScreen();showToast('✓ Prescrição de cardio salva');}catch(error){CARDIO_DOCUMENT=normalizeCardioDocument(JSON.parse(before));alert(cloudWriteError(error,'salvar o cardio'));}finally{endAction('cardio-mutation','modal-cardio-item');}
 }
-function deleteCardioItem(){if(!cardioCanEdit()||!EDIT_CARDIO_ITEM_ID)return;const kind=EDIT_CARDIO_KIND,id=EDIT_CARDIO_ITEM_ID;closeModal('modal-cardio-item');showConfirm('Excluir cardio',kind==='main'?'Remover a prescrição principal de cardio? As substituições serão preservadas.':'Remover esta substituição de cardio?',async()=>{const before=JSON.stringify(CARDIO_DOCUMENT);try{if(kind==='main')CARDIO_DOCUMENT.main=null;else CARDIO_DOCUMENT.substitutions=CARDIO_DOCUMENT.substitutions.filter(item=>item.id!==id);clearCardioTimer(id);if(CURRENT_CARDIO_ITEM_ID===id)CURRENT_CARDIO_ITEM_ID=CARDIO_DOCUMENT.main?.id||CARDIO_DOCUMENT.substitutions[0]?.id||'';await persistCardioDocument();renderCardioScreen();showToast('✓ Cardio removido');}catch(error){CARDIO_DOCUMENT=normalizeCardioDocument(JSON.parse(before));alert(cloudWriteError(error,'excluir o cardio'));}});}
-async function moveCardioSubstitution(id,delta){if(!cardioCanEdit())return;const index=CARDIO_DOCUMENT.substitutions.findIndex(item=>item.id===id),target=index+Number(delta);if(index<0||target<0||target>=CARDIO_DOCUMENT.substitutions.length)return;[CARDIO_DOCUMENT.substitutions[index],CARDIO_DOCUMENT.substitutions[target]]=[CARDIO_DOCUMENT.substitutions[target],CARDIO_DOCUMENT.substitutions[index]];CARDIO_DOCUMENT.substitutions.forEach((item,i)=>item.order=i);try{await persistCardioDocument();renderCardioScreen();}catch(error){showToast(cloudWriteError(error,'alterar a ordem dos cardios'),true);}}
+function cardioDeleteContextCurrent(context){
+  return CARDIO_CONTEXT===context.cardio&&cardioOwnerKey()===context.owner&&CURRENT_USER?.uid===context.userUid&&CURRENT_USER?.role===context.role&&cardioCanEdit()&&(!context.cardio.trainer||(CURRENT_USER?.role==='trainer'&&VIEW_STUDENT?.uid===context.cardio.targetUid));
+}
+function cardioWithoutItem(document,kind,id){
+  const next=normalizeCardioDocument(document);
+  if(kind==='main'){
+    if(next.main&&next.main.id!==id)throw new Error('O cardio principal mudou. Atualize a tela antes de excluir.');
+    next.main=null;
+  }else next.substitutions=next.substitutions.filter(item=>item.id!==id);
+  const raw=document&&typeof document==='object'&&!Array.isArray(document)?document:{};
+  const {primary,prescription,alternatives,...extra}=raw;
+  const oldItems=[raw.main,raw.primary,raw.prescription,...(Array.isArray(raw.substitutions)?raw.substitutions:Array.isArray(raw.alternatives)?raw.alternatives:[])].filter(Boolean);
+  const preserve=item=>item?{...(oldItems.find(old=>String(old.id)===item.id)||{}),...item}:null;
+  return {...extra,main:preserve(next.main),substitutions:next.substitutions.map(preserve)};
+}
+function deleteCardioItem(kind=EDIT_CARDIO_KIND,id=EDIT_CARDIO_ITEM_ID){
+  if(!cardioCanEdit()||!id||!['main','substitution'].includes(kind))return false;
+  const item=kind==='main'?CARDIO_DOCUMENT.main:CARDIO_DOCUMENT.substitutions.find(entry=>entry.id===id);
+  if(!item||item.id!==id)return false;
+  const context={cardio:CARDIO_CONTEXT,owner:cardioOwnerKey(),userUid:CURRENT_USER?.uid,role:CURRENT_USER?.role};
+  if(!cardioDeleteContextCurrent(context))return false;
+  showConfirm('Excluir cardio',`Remover “${item.type}”? ${kind==='main'?'As substituições serão preservadas.':'Os demais cardios serão preservados.'}`,()=>deleteCardioItemConfirmed(context,kind,id));
+  return true;
+}
+async function deleteCardioItemConfirmed(context,kind,id){
+  if(!cardioDeleteContextCurrent(context)){showToast('O aluno ou a sessão mudou. Abra o cardio novamente.',true);return false;}
+  const action='cardio-mutation';if(!beginAction(action))return false;
+  try{
+    let saved;
+    if(context.cardio.local){
+      saved=cardioWithoutItem(CARDIO_DOCUMENT,kind,id);
+      const before=LOCAL_DB.cardioPlan;LOCAL_DB.cardioPlan=JSON.parse(JSON.stringify(saved));
+      if(!localSave()){LOCAL_DB.cardioPlan=before;throw new Error('Falha ao salvar o cardio neste aparelho.');}
+    }else{
+      if(!context.cardio.trainer||CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode excluir o cardio.');
+      const ref=db.collection('mealPlans').doc(context.cardio.targetUid);
+      saved=await cloudWrite(db.runTransaction(async transaction=>{
+        if(!cardioDeleteContextCurrent(context))throw new Error('O aluno ou a sessão mudou.');
+        const snapshot=await transaction.get(ref);
+        if(!snapshot.exists)throw new Error('A prescrição não está mais disponível. Atualize a tela.');
+        if(!cardioDeleteContextCurrent(context))throw new Error('O aluno ou a sessão mudou.');
+        const next=cardioWithoutItem(snapshot.data().cardioPlan,kind,id);
+        // Replace only the cardio map. Diet and unrelated fields remain intact;
+        // legacy aliases inside cardioPlan must not resurrect removed items.
+        transaction.set(ref,{cardioPlan:next,cardioUpdatedBy:context.userUid,cardioUpdatedAt:firebase.firestore.FieldValue.serverTimestamp()},{mergeFields:['cardioPlan','cardioUpdatedBy','cardioUpdatedAt']});
+        return next;
+      }),'excluir o cardio');
+    }
+    if(!cardioDeleteContextCurrent(context))return true;
+    CARDIO_DOCUMENT=normalizeCardioDocument(saved);clearCardioTimer(id);
+    if(CURRENT_CARDIO_ITEM_ID===id)CURRENT_CARDIO_ITEM_ID=CARDIO_DOCUMENT.main?.id||CARDIO_DOCUMENT.substitutions[0]?.id||'';
+    if(EDIT_CARDIO_ITEM_ID===id)closeModal('modal-cardio-item');
+    renderCardioScreen();showToast('✓ Cardio removido');return true;
+  }catch(error){if(cardioDeleteContextCurrent(context))alert(cloudWriteError(error,'excluir o cardio'));return false;}
+  finally{endAction(action);}
+}
+
+async function moveCardioSubstitution(id,delta){if(!cardioCanEdit()||!beginAction('cardio-mutation'))return;const index=CARDIO_DOCUMENT.substitutions.findIndex(item=>item.id===id),target=index+Number(delta);if(index<0||target<0||target>=CARDIO_DOCUMENT.substitutions.length){endAction('cardio-mutation');return;}[CARDIO_DOCUMENT.substitutions[index],CARDIO_DOCUMENT.substitutions[target]]=[CARDIO_DOCUMENT.substitutions[target],CARDIO_DOCUMENT.substitutions[index]];CARDIO_DOCUMENT.substitutions.forEach((item,i)=>item.order=i);try{await persistCardioDocument();renderCardioScreen();}catch(error){showToast(cloudWriteError(error,'alterar a ordem dos cardios'),true);}finally{endAction('cardio-mutation');}}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCardioTimerDisplay();},{passive:true});
 const V10109_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){if(CARDIO_TIMER_INTERVAL){clearInterval(CARDIO_TIMER_INTERVAL);CARDIO_TIMER_INTERVAL=0;}CARDIO_DOCUMENT={main:null,substitutions:[]};CARDIO_CONTEXT={targetUid:'',trainer:false,local:false,source:'workout'};CURRENT_CARDIO_ITEM_ID='';return V10109_CONFIRM_LOGOUT_BASE();};
@@ -9234,7 +9290,7 @@ function normalizeTrainingRecommendations(value){
 function trainingRecommendationsHtml(workout){
   const advice=normalizeTrainingRecommendations(workout?.trainingRecommendations),editable=CURRENT_USER?.role==='trainer'&&VIEW_STUDENT?.uid&&VIEW_STUDENT_WORKOUT===workout;
   if(!editable&&!advice.frequency&&!advice.weekdays.length)return '';
-  return `<section class="training-recommendations" aria-label="Orientações de frequência do treino"><h3>Frequência e dias recomendados</h3>${advice.frequency?`<div class="training-frequency"><strong>Sequência de treino e descanso</strong><p>${esc(advice.frequency)}</p></div>`:'<p>Sequência de treino e descanso não definida.</p>'}<p><strong>Dias recomendados:</strong> ${advice.weekdays.length?advice.weekdays.map(day=>TRAINING_WEEKDAYS[day]).join(', '):'Sem dias fixos — siga a sequência orientada.'}</p>${editable?'<button type="button" class="btn-add-set" onclick="openTrainingRecommendations()">EDITAR FREQUÊNCIA E DIAS</button>':''}</section>`;
+  return `<section class="training-recommendations" aria-label="Orientações de frequência do treino"><div class="training-recommendations-head"><span class="archive-file-kicker">ORIENTAÇÕES DO PROTOCOLO</span><h3>FREQUÊNCIA E DIAS RECOMENDADOS</h3></div>${advice.frequency?`<div class="training-frequency"><strong>Sequência de treino e descanso</strong><p>${esc(advice.frequency)}</p></div>`:'<p>Sequência de treino e descanso não definida.</p>'}<p><strong>Dias recomendados:</strong> ${advice.weekdays.length?advice.weekdays.map(day=>TRAINING_WEEKDAYS[day]).join(', '):'Sem dias fixos — siga a sequência orientada.'}</p>${editable?'<button type="button" class="btn-add-set" onclick="openTrainingRecommendations()">EDITAR FREQUÊNCIA E DIAS</button>':''}</section>`;
 }
 function openTrainingRecommendations(){
   if(CURRENT_USER?.role!=='trainer'||!VIEW_STUDENT?.uid||!VIEW_STUDENT_WORKOUT?.id||MODE!=='cloud')return;
