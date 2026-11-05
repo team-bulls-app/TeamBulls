@@ -1,5 +1,6 @@
 // Isolated browser regression: real auth markup/CSS, no Firebase or production data.
 import assert from 'node:assert/strict';
+import {waitForChromePage} from './chrome-readiness.mjs';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -71,12 +72,7 @@ const screenshotDir = screenshotIndex < 0 ? null : path.resolve(process.argv[scr
 if (screenshotDir) fs.mkdirSync(screenshotDir,{recursive:true});
 const results = [];
 try {
-  const portFile = path.join(profile,'DevToolsActivePort');
-  for(let i=0;i<150&&!fs.existsSync(portFile);i++) { if(chrome.exitCode!==null)throw new Error(stderr);await sleep(100); }
-  assert(fs.existsSync(portFile),`Chrome did not start: ${stderr}`);
-  const port = fs.readFileSync(portFile,'utf8').split('\n')[0];
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
-  socket = new WebSocket(targets.find(target=>target.type==='page').webSocketDebuggerUrl);
+  socket = new WebSocket(await waitForChromePage(chrome, profile, {stderr: () => stderr}));
   await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject;});
   socket.onmessage = event => {
     const message=JSON.parse(event.data); const task=pending.get(message.id); if(!task)return;
@@ -87,7 +83,9 @@ try {
   await command('Network.enable');
   await command('Network.setBlockedURLs',{urls:['https://*']});
   const matrix = [
-    [320,568,true,'login',2,false],[360,740,true,'login',2,false],
+    [320,568,true,'login',2,false],[360,640,true,'login',2,false],[360,740,true,'login',2,false],
+    [360,800,true,'login',2,false],[393,852,true,'login',2,false],[412,915,true,'login',2,false],
+    [768,1024,true,'login',2,false],[932,430,true,'login',2,false],[1024,768,true,'login',2,false],
     [390,844,true,'login',2,false],[430,932,true,'login',2,false],
     [844,390,true,'login',2,true],[899,900,true,'login',2,false],
     [900,900,false,'login',2,false],[1440,900,false,'login',2,false],
@@ -124,7 +122,7 @@ try {
       const visible=[...screen.querySelectorAll('input,button,.tb-known-account-row')].filter(el=>el.getClientRects().length);
       return {width:innerWidth,overflow:document.documentElement.scrollWidth>innerWidth,
         card:style.backgroundColor,cardOpacity:style.opacity,input:input.backgroundColor,inputOpacity:input.opacity,font:parseFloat(input.fontSize),
-        background:getComputedStyle(screen).backgroundImage,logoTop:screen.querySelector('.auth-logo').getBoundingClientRect().top,
+        layout:getComputedStyle(screen).display,cardTop:card.getBoundingClientRect().top,logoBottom:screen.querySelector('.auth-logo').getBoundingClientRect().bottom,background:getComputedStyle(screen).backgroundImage,art:(()=>{const el=screen.querySelector('.auth-mobile-art'),r=el.getBoundingClientRect(),s=getComputedStyle(el);return {display:s.display,width:r.width,height:r.height,left:r.left,right:r.right,image:s.backgroundImage,size:s.backgroundSize,position:s.backgroundPosition,pointer:s.pointerEvents};})(),logoTop:screen.querySelector('.auth-logo').getBoundingClientRect().top,
         outside:visible.filter(el=>{const r=el.getBoundingClientRect();return r.left<-.5||r.right>innerWidth+.5}).map(el=>el.id||el.className),
         accounts:screen.querySelectorAll('.tb-known-account').length,blur:style.backdropFilter,
         finePointer:matchMedia('(pointer:fine)').matches,hover:matchMedia('(hover:hover)').matches};
@@ -138,21 +136,48 @@ try {
     assert(metrics.logoTop>=-.5,`${name}: login starts above reachable content`);
     assert.equal(metrics.accounts,count,name);
     assert.equal(metrics.cardOpacity,'1',`${name}: transparency must not fade children`);
-    if(width<900){
+    if(width<900||touch){
       assert.equal(metrics.card,'rgba(10, 9, 8, 0.34)',`${name}: selected glass missing`);
       assert.equal(metrics.input,'rgba(25, 22, 20, 0.76)',`${name}: inputs must retain contrast`);
       assert.equal(metrics.inputOpacity,'1',name);
       assert(metrics.font>=16,`${name}: input may trigger iOS zoom`);
-      assert(metrics.background.includes('team-bulls-consultoria-bg-v1.jpg'),name);
-      assert(metrics.background.includes('0.13'),`${name}: artwork covered by old gradient`);
+      assert(metrics.art.image.includes('team-bulls-desktop-login-stone-v2.png'),name);
+      assert(metrics.art.image.includes('0.13'),`${name}: artwork covered by old gradient`);
+      assert.equal(metrics.layout,'flex',`${name}: touch login must use one column`);
+      assert(metrics.cardTop>=metrics.logoBottom,`${name}: card must follow title`);
+      assert.equal(metrics.art.display,'block',name);
+      assert(await evaluate(`new Promise(resolve=>{const img=new Image();img.onload=()=>resolve(img.naturalWidth===1672&&img.naturalHeight===941);img.onerror=()=>resolve(false);img.src='/team-bulls-desktop-login-stone-v2.png'})`),`${name}: source image must load intact`);
+      assert.equal(metrics.art.pointer,'none',`${name}: art must not intercept form taps`);
+      assert(Math.abs(metrics.art.width/metrics.art.height-9/16)<.001,`${name}: portrait framing distorted`);
+      assert(metrics.art.left>=-.5&&metrics.art.right<=width+.5,`${name}: artwork outside screen`);
+      // Source x=0..740 includes both characters; source height must fit the 9:16 frame.
+      const scale=metrics.art.width/740,renderedHeight=941*scale;
+      assert(renderedHeight<=metrics.art.height,`${name}: artwork cropped vertically`);
+      assert(metrics.art.size.includes('225.946%')||metrics.art.size.includes('225.945946%'),`${name}: source crop changed`);
       assert.equal(metrics.blur,'none',`${name}: appearance must survive performance mode`);
     } else {
       assert.notEqual(metrics.card,'rgba(10, 9, 8, 0.34)',`${name}: mobile style leaked to desktop`);
       assert(metrics.background.includes('team-bulls-desktop-login-stone-v2.png'),name);
+      assert.equal(metrics.art.display,'none',`${name}: mobile framing leaked to desktop`);
     }
-    if(screenshotDir && ((width===390&&panel==='login')||(width===1440))) {
-      const shot=await command('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
+    if(screenshotDir && (([360,390,932,1024].includes(width)&&panel==='login')||(width===1440))) {
+      const shot=await command('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false});
       fs.writeFileSync(path.join(screenshotDir,`${name}.png`),Buffer.from(shot.data,'base64'));
+    }
+    if(width===390&&height===844&&panel==='login'){
+      const keyboard=await evaluate(`(async()=>{
+        const art=document.querySelector('.auth-mobile-art'),before=art.getBoundingClientRect().height;
+        const original=Object.getOwnPropertyDescriptor(window,'visualViewport');
+        const field=document.getElementById('login-pass');field.focus({preventScroll:true});
+        Object.defineProperty(window,'visualViewport',{configurable:true,value:{height:360,width:innerWidth,offsetTop:0,offsetLeft:0}});
+        dispatchEvent(new Event('resize'));await new Promise(r=>setTimeout(r,300));
+        field.scrollIntoView({block:'center'});
+        const opened=document.documentElement.classList.contains('virtual-keyboard-open');
+        const stable=Math.abs(art.getBoundingClientRect().height-before)<1;
+        Object.defineProperty(window,'visualViewport',original);field.blur();dispatchEvent(new Event('resize'));
+        return {opened,stable};
+      })()`);
+      assert(keyboard.opened&&keyboard.stable,`${name}: keyboard resize must preserve artwork scale`);
     }
     results.push({name,...metrics});
   }
