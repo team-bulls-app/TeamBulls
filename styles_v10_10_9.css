@@ -3121,3 +3121,25 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
 }
 #modal-exercise .catalog-picker-grid .form-input:disabled{opacity:1;color:#81766b!important;-webkit-text-fill-color:#81766b}
 #modal-exercise .catalog-picker-grid option{background:#0d0c0b;color:#e8e0d3}
+/* Read-only progression workspace for the trainer. */
+.tb-progress-sheet{width:min(1100px,100%);max-width:1100px;max-height:90vh;overflow:auto;color:var(--text);background:var(--bg)}
+.tb-progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tb-progress-head h2,.tb-progress-summary h3{color:var(--text);margin:8px 0}
+.tb-progress-filters{display:grid;grid-template-columns:minmax(0,2fr) repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.tb-progress-filters label{min-width:0;font-size:13px}.tb-progress-filters input,.tb-progress-filters select{width:100%;min-width:0;margin-top:6px}
+.tb-progress-summary,.tb-progress-record{border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0;background:var(--surface)}
+.tb-progress-summary small{font-size:12px;font-weight:400}.tb-progress-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tb-progress-metrics span,.tb-progress-metrics strong,.tb-progress-metrics small{display:block;overflow-wrap:anywhere}.tb-progress-metrics strong{margin:6px 0}
+.tb-progress-record summary{cursor:pointer;font-weight:600;overflow-wrap:anywhere}.tb-progress-record p{overflow-wrap:anywhere}
+.tb-progress-table{max-width:100%;overflow-x:auto}.tb-progress-table table{min-width:420px;width:100%}.tb-progress-chart{width:100%;max-height:180px;color:var(--accent)}
+.tb-progress-note{white-space:pre-wrap}.tb-progress-access{margin-bottom:12px}
+@media(max-width:600px){.tb-progress-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.tb-progress-filters label:first-child{grid-column:1/-1}.tb-progress-metrics{grid-template-columns:1fr}.tb-progress-sheet{padding:16px}}
+
+#modal-trainer-progress .plan-help{font-size:13px;line-height:1.5;color:inherit}
+#modal-trainer-progress .tb-progress-sheet{color:#efe8df;background:#100f0e}
+#modal-trainer-progress :is(h2,h3,strong,small,span,p,label,summary){color:inherit}
+#modal-trainer-progress :is(.tb-progress-summary,.tb-progress-record){background:#191715;border-color:#62594e}
+#modal-trainer-progress :is(button,input,select){color:#efe8df;background:#191715;border-color:#62594e}
+html[data-theme="light"] #modal-trainer-progress .tb-progress-sheet{background:#faf7f2;color:#302820}
+html[data-theme="light"] #modal-trainer-progress :is(.tb-progress-summary,.tb-progress-record,button,input,select){background:#fff;color:#302820;border-color:#8b7e6d}
+html[data-theme="light"] #modal-trainer-progress .tb-progress-chart{color:#a51c25}
