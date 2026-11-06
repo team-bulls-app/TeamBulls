@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110601,
-  "revision": "runtime-stability-1",
+  "build": 2026110602,
+  "revision": "action-audit-1",
   "publishedAt": "2026-11-06T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Menos redesenhos repetidos da dieta, reconexão do histórico ao vivo e proteção contra gravações simultâneas."
+  "message": "Correções nas fotos e comparações, confirmação de salvamento das bibliotecas e reordenação do cardio."
 }

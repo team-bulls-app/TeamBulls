@@ -3881,6 +3881,7 @@ function deleteExOptItemFromModal(){
 ══════════════════════════════════════════════════ */
 let PHOTOS_CACHE=[];
 let CUR_PHOTO_ID=null;
+var PHOTO_VIEW_REQUEST=0,PHOTO_COMPARE_REQUEST=0;
 let PHOTOS_CACHE_UID=null;
 let PHOTOS_LOAD_SEQ=0;
 let PENDING_PHOTO_WEIGHT=null;
@@ -4018,18 +4019,24 @@ async function handlePhotoSelected(ev){
     }
   }finally{endAction('upload-photo','modal-photo-upload');}
 }
+function capturePhotoReadContext(record){return {record,uid:CURRENT_USER?.uid,role:CURRENT_USER?.role,cacheUid:PHOTOS_CACHE_UID,navigation:NAVIGATION_SEQ};}
+function photoReadContextCurrent(context){return CURRENT_USER?.uid===context.uid&&CURRENT_USER?.role===context.role&&PHOTOS_CACHE_UID===context.cacheUid&&NAVIGATION_SEQ===context.navigation&&PHOTOS_CACHE.includes(context.record);}
+function beginPhotoViewRequest(record,pid){CUR_PHOTO_ID=pid;const button=document.getElementById('btn-download-photo');if(button)button.style.display='none';return {...capturePhotoReadContext(record),request:++PHOTO_VIEW_REQUEST};}
+function photoViewRequestCurrent(context){return context.request===PHOTO_VIEW_REQUEST&&String(CUR_PHOTO_ID)===String(context.record.id)&&photoReadContextCurrent(context);}
+
 async function openPhotoView(pid,readonly){
   const p=PHOTOS_CACHE.find(x=>x.id===pid);if(!p)return;
-  CUR_PHOTO_ID=pid;
+  const context=beginPhotoViewRequest(p,pid);
   document.getElementById('photo-view-title').textContent='Evidência // '+fmt(p.date);
   const img=document.getElementById('photo-view-img');
   img.removeAttribute('src');
   const src=await resolvePhotoSource(p,{full:CURRENT_USER?.role==='trainer'});
+  if(!photoViewRequestCurrent(context))return false;
   if(!src){showToast('A fotografia não está disponível neste momento.',true);return;}
   img.src=src;
   document.getElementById('photo-view-meta').textContent=Number(p.weight)>0?'PESO REGISTRADO: '+Number(p.weight).toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'PESO NÃO INFORMADO NESTE REGISTRO';
   document.getElementById('btn-delete-photo').style.display=(readonly||p.checkinId||p.reportId||p.questionnaireId)?'none':'block';
-  openModal('modal-photo-view');
+  openModal('modal-photo-view');return true;
 }
 async function deleteCurrentPhoto(){
   if(!CUR_PHOTO_ID)return;
@@ -4046,16 +4053,19 @@ async function deleteCurrentPhoto(){
   });
 }
 function openComparePhotos(){
+  PHOTO_COMPARE_REQUEST++;
   if(PHOTOS_CACHE.length<2){alert('Envie ao menos duas fotos para comparar.');return;}
   const opts=PHOTOS_CACHE.map(p=>`<option value="${esc(p.id)}">${fmt(p.date)}${Number(p.weight)>0?' · '+esc(Number(p.weight).toLocaleString('pt-BR',{maximumFractionDigits:1}))+' kg':''}</option>`).join('');
   document.getElementById('select-compare-a').innerHTML=opts;document.getElementById('select-compare-b').innerHTML=opts;
-  document.getElementById('select-compare-b').selectedIndex=1;document.getElementById('compare-result').style.display='none';openModal('modal-compare-photos');
+  document.getElementById('select-compare-a').selectedIndex=PHOTOS_CACHE.length-1;document.getElementById('select-compare-b').selectedIndex=0;document.getElementById('compare-result').style.display='none';openModal('modal-compare-photos');
 }
 async function runComparePhotos(){
   const aid=document.getElementById('select-compare-a').value,bid=document.getElementById('select-compare-b').value;
   if(aid===bid){alert('Selecione duas fotos diferentes.');return;}
   const a=PHOTOS_CACHE.find(x=>x.id===aid),b=PHOTOS_CACHE.find(x=>x.id===bid);if(!a||!b)return;
+  const request=++PHOTO_COMPARE_REQUEST,context=capturePhotoReadContext(a);
   const full=CURRENT_USER?.role==='trainer';const [srcA,srcB]=await Promise.all([resolvePhotoSource(a,{full}),resolvePhotoSource(b,{full})]);
+  if(request!==PHOTO_COMPARE_REQUEST||!photoReadContextCurrent(context)||!PHOTOS_CACHE.includes(b)||!document.getElementById('modal-compare-photos').classList.contains('open')||document.getElementById('select-compare-a').value!==aid||document.getElementById('select-compare-b').value!==bid)return false;
   if(!srcA||!srcB){alert('Uma das fotografias não pôde ser carregada. Tente novamente com internet.');return;}
   document.getElementById('compare-img-a').src=srcA;document.getElementById('compare-label-a').textContent=fmt(a.date)+(Number(a.weight)>0?' · '+Number(a.weight).toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'');
   document.getElementById('compare-img-b').src=srcB;document.getElementById('compare-label-b').textContent=fmt(b.date)+(Number(b.weight)>0?' · '+Number(b.weight).toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'');
@@ -4614,7 +4624,8 @@ function closeModal(id){
   const modal=document.getElementById(id);if(!modal)return;
   if(id==='modal-catalog-video'){const body=document.getElementById('catalog-video-body');if(body)body.innerHTML='';}
   if(id==='modal-session')resetRestTimer();
-  if(id==='modal-photo-view'){const img=document.getElementById('photo-view-img');if(img)img.removeAttribute('src');}
+  if(id==='modal-compare-photos'){PHOTO_COMPARE_REQUEST++;document.getElementById('compare-result').style.display='none';for(const name of ['compare-img-a','compare-img-b'])document.getElementById(name)?.removeAttribute('src');}
+  if(id==='modal-photo-view'){PHOTO_VIEW_REQUEST++;CUR_PHOTO_ID=null;const img=document.getElementById('photo-view-img');if(img)img.removeAttribute('src');}
   modal.classList.remove('open');
 }
 
@@ -6232,10 +6243,12 @@ async function loadGeneralInstructions(){
   }catch(error){console.warn('loadGeneralInstructions',error);GENERAL_INSTRUCTIONS=cachedGeneralInstructions();}
   cacheGeneralInstructions();return GENERAL_INSTRUCTIONS;
 }
-async function persistGeneralInstructions(){
-  if(CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode editar as instruções.');
-  GENERAL_INSTRUCTIONS=normalizeGeneralInstructions({...GENERAL_INSTRUCTIONS,revision:(GENERAL_INSTRUCTIONS.revision||1)+1});cacheGeneralInstructions();
-  await cloudWrite(db.collection('trainingInstructions').doc('main').set({...GENERAL_INSTRUCTIONS,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'salvar instruções gerais');
+async function persistGeneralInstructions(draft=GENERAL_INSTRUCTIONS){
+  if(CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode editar esta biblioteca.');
+  const owner=CURRENT_USER.uid,next=normalizeGeneralInstructions({...draft,revision:(draft.revision||1)+1});
+  await cloudWrite(db.collection('trainingInstructions').doc('main').set({...next,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'salvar instruções gerais');
+  if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
+  GENERAL_INSTRUCTIONS=next;cacheGeneralInstructions();return true;
 }
 let TECHNIQUE_CATALOG_LOAD_PROMISE=null,TECHNIQUE_CATALOG_LOADED_AT=0;
 async function loadTechniqueCatalog(force=false){
@@ -6252,10 +6265,12 @@ async function loadTechniqueCatalog(force=false){
   })();
   try{return await TECHNIQUE_CATALOG_LOAD_PROMISE;}finally{TECHNIQUE_CATALOG_LOAD_PROMISE=null;}
 }
-async function persistTechniqueCatalog(){
-  if(CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode editar as técnicas.');
-  TECHNIQUE_CATALOG=normalizeTechniqueCatalog({...TECHNIQUE_CATALOG,revision:(TECHNIQUE_CATALOG.revision||1)+1});cacheTechniqueCatalog();
-  await cloudWrite(db.collection('trainingTechniques').doc('main').set({...TECHNIQUE_CATALOG,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'salvar biblioteca de técnicas');
+async function persistTechniqueCatalog(draft=TECHNIQUE_CATALOG){
+  if(CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode editar esta biblioteca.');
+  const owner=CURRENT_USER.uid,next=normalizeTechniqueCatalog({...draft,revision:(draft.revision||1)+1});
+  await cloudWrite(db.collection('trainingTechniques').doc('main').set({...next,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'salvar biblioteca de técnicas');
+  if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
+  TECHNIQUE_CATALOG=next;cacheTechniqueCatalog();return true;
 }
 
 const ensureGlobalCatalogsV101=ensureGlobalCatalogs;
@@ -6287,24 +6302,73 @@ function renderInstructions(){
     return`<section class="instruction-folder ${folder.active?'':'inactive'}"><div class="instruction-folder-head"><div class="instruction-folder-icon">📁</div><div class="instruction-folder-title">${esc(folder.name)}</div>${admin?`<div class="instruction-folder-state">${folder.active?'VISÍVEL':'OCULTA'}</div>`:''}${actions}</div>${itemHtml||'<div class="no-data-inline">Pasta sem orientações.</div>'}</section>`;}).join('');
   host.innerHTML=html;empty.style.display=html?'none':'block';
 }
+async function commitCatalogAction(kind,mutate,modalId='',message=''){
+  if(CURRENT_USER?.role!=='trainer')return false;
+  const owner=CURRENT_USER.uid,key='catalog-action-'+kind;
+  if(!beginAction(key,modalId))return false;
+  try{
+    const draft=JSON.parse(JSON.stringify(kind==='instructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG));
+    if(mutate(draft)===false)return false;
+    const editor=JSON.stringify([EDIT_INSTRUCTION_FOLDER_ID,EDIT_INSTRUCTION_ITEM_ID,EDIT_TECHNIQUE_ID]);
+    const saved=await (kind==='instructions'?persistGeneralInstructions(draft):persistTechniqueCatalog(draft));
+    if(saved===false||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
+    if(modalId&&editor===JSON.stringify([EDIT_INSTRUCTION_FOLDER_ID,EDIT_INSTRUCTION_ITEM_ID,EDIT_TECHNIQUE_ID]))closeModal(modalId);
+    if(kind==='instructions')renderInstructions();else renderTechniques();
+    if(message)showToast(message);return true;
+  }catch(error){if(CURRENT_USER?.uid===owner)alert(error.message);return false;}
+  finally{endAction(key,modalId);}
+}
+async function saveInstructionFolder(){
+  return commitCatalogAction('instructions',draft=>{
+    const name=document.getElementById('input-instruction-folder-name').value.normalize('NFKC').trim().slice(0,80),active=document.getElementById('input-instruction-folder-active').value==='true';
+    if(!name)throw new Error('Digite o nome da pasta.');
+    const folder=draft.folders.find(item=>item.id===EDIT_INSTRUCTION_FOLDER_ID);
+    if(folder){if(folder.locked)throw new Error('A pasta padrão não pode ser renomeada.');Object.assign(folder,{name,active});}
+    else draft.folders.push({id:EDIT_INSTRUCTION_FOLDER_ID||(EDIT_INSTRUCTION_FOLDER_ID=uid()),name,active,locked:false,order:draft.folders.length,items:[]});
+  },'modal-instruction-folder','✓ Pasta salva');
+}
+async function saveInstructionItem(){
+  return commitCatalogAction('instructions',draft=>{
+    const targetFolderId=document.getElementById('input-instruction-item-folder').value,title=document.getElementById('input-instruction-item-title').value.normalize('NFKC').trim().slice(0,120),text=document.getElementById('input-instruction-item-text').value.normalize('NFKC').trim().slice(0,20000),videoUrl=document.getElementById('input-instruction-item-video').value.trim().slice(0,2000),active=document.getElementById('input-instruction-item-active').value==='true';
+    if(!title)throw new Error('Digite o título da orientação.');if(videoUrl&&!extractYouTubeId(videoUrl))throw new Error('Use um link válido do YouTube.');
+    const source=draft.folders.find(f=>f.id===EDIT_INSTRUCTION_FOLDER_ID),target=draft.folders.find(f=>f.id===targetFolderId);if(!target)throw new Error('Pasta não encontrada.');
+    let item=source?.items.find(i=>i.id===EDIT_INSTRUCTION_ITEM_ID);
+    if(item){if(item.locked&&target.id!==source.id)throw new Error('A página padrão não pode ser movida.');Object.assign(item,{title,text,videoUrl,active});if(source!==target){source.items=source.items.filter(i=>i.id!==item.id);item.order=target.items.length;target.items.push(item);}}
+    else target.items.push({id:EDIT_INSTRUCTION_ITEM_ID||(EDIT_INSTRUCTION_ITEM_ID=uid()),title,text,videoUrl,active,locked:false,order:target.items.length});
+  },'modal-instruction-item','✓ Orientação salva');
+}
+async function toggleInstructionFolder(id){return commitCatalogAction('instructions',draft=>{const folder=draft.folders.find(f=>f.id===id);if(!folder)return false;folder.active=!folder.active;});}
+async function toggleInstructionItem(folderId,itemId){return commitCatalogAction('instructions',draft=>{const item=draft.folders.find(f=>f.id===folderId)?.items.find(i=>i.id===itemId);if(!item)return false;item.active=!item.active;});}
+function deleteInstructionFolder(id){
+  if(CURRENT_USER?.role!=='trainer')return;const folder=GENERAL_INSTRUCTIONS.folders.find(f=>f.id===id);if(!folder||folder.locked)return;
+  showConfirm('Excluir pasta','Excluir esta pasta e todas as orientações dentro dela?',()=>commitCatalogAction('instructions',draft=>{const folder=draft.folders.find(f=>f.id===id);if(!folder||folder.locked)return false;draft.folders=draft.folders.filter(f=>f.id!==id);}));
+}
+function deleteInstructionItem(folderId,itemId){
+  if(CURRENT_USER?.role!=='trainer')return;const item=GENERAL_INSTRUCTIONS.folders.find(f=>f.id===folderId)?.items.find(i=>i.id===itemId);if(!item||item.locked)return;
+  showConfirm('Excluir orientação','Excluir esta orientação?',()=>commitCatalogAction('instructions',draft=>{const folder=draft.folders.find(f=>f.id===folderId),item=folder?.items.find(i=>i.id===itemId);if(!item||item.locked)return false;folder.items=folder.items.filter(i=>i.id!==itemId);}));
+}
+async function moveInstructionFolder(id,direction){return commitCatalogAction('instructions',draft=>{const items=draft.folders,index=items.findIndex(i=>i.id===id),next=index+Number(direction);if(index<0||next<0||next>=items.length)return false;[items[index],items[next]]=[items[next],items[index]];items.forEach((item,i)=>item.order=i);});}
+async function moveInstructionItem(folderId,itemId,direction){return commitCatalogAction('instructions',draft=>{const items=draft.folders.find(f=>f.id===folderId)?.items||[],index=items.findIndex(i=>i.id===itemId),next=index+Number(direction);if(index<0||next<0||next>=items.length)return false;[items[index],items[next]]=[items[next],items[index]];items.forEach((item,i)=>item.order=i);});}
+async function saveTechnique(){
+  return commitCatalogAction('techniques',draft=>{
+    const code=document.getElementById('input-technique-code').value.normalize('NFKC').trim().toUpperCase().slice(0,12),name=document.getElementById('input-technique-name').value.normalize('NFKC').trim().slice(0,100),description=document.getElementById('input-technique-description').value.normalize('NFKC').trim().slice(0,12000),videoUrl=document.getElementById('input-technique-video').value.trim().slice(0,2000);
+    if(!code||!name)throw new Error('Preencha a sigla e o nome.');if(videoUrl&&!extractYouTubeId(videoUrl))throw new Error('Use um link válido do YouTube.');
+    const item=draft.items.find(i=>i.id===EDIT_TECHNIQUE_ID);if(item)Object.assign(item,{code,name,description,videoUrl});else draft.items.push({id:EDIT_TECHNIQUE_ID||(EDIT_TECHNIQUE_ID=uid()),code,name,description,videoUrl,locked:false,order:draft.items.length});
+  },'modal-technique-editor','✓ Técnica salva');
+}
+function deleteTechnique(id){
+  if(CURRENT_USER?.role!=='trainer')return;const item=TECHNIQUE_CATALOG.items.find(i=>i.id===id);if(!item||item.locked)return;
+  showConfirm('Excluir técnica','Excluir esta técnica personalizada? Exercícios antigos manterão o identificador, mas ela deixará de aparecer na biblioteca.',()=>commitCatalogAction('techniques',draft=>{const item=draft.items.find(i=>i.id===id);if(!item||item.locked)return false;draft.items=draft.items.filter(i=>i.id!==id);}));
+}
+
 function openInstructionFolderModal(id=''){if(CURRENT_USER?.role!=='trainer')return;EDIT_INSTRUCTION_FOLDER_ID=id;const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===id);document.getElementById('instruction-folder-modal-title').textContent=folder?'Editar pasta':'Nova pasta';document.getElementById('input-instruction-folder-name').value=folder?.name||'';document.getElementById('input-instruction-folder-active').value=String(folder?.active!==false);openModal('modal-instruction-folder');}
-async function saveInstructionFolder(){if(!beginAction('save-instruction-folder','modal-instruction-folder'))return;try{const name=document.getElementById('input-instruction-folder-name').value.normalize('NFKC').trim().slice(0,80),active=document.getElementById('input-instruction-folder-active').value==='true';if(!name)throw new Error('Digite o nome da pasta.');const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===EDIT_INSTRUCTION_FOLDER_ID);if(folder){if(folder.locked)throw new Error('A pasta padrão não pode ser renomeada.');Object.assign(folder,{name,active});}else GENERAL_INSTRUCTIONS.folders.push({id:uid(),name,active,locked:false,order:GENERAL_INSTRUCTIONS.folders.length,items:[]});await persistGeneralInstructions();closeModal('modal-instruction-folder');renderInstructions();showToast('✓ Pasta salva');}catch(error){alert(error.message);}finally{endAction('save-instruction-folder','modal-instruction-folder');}}
 function openInstructionItemModal(folderId,itemId=''){if(CURRENT_USER?.role!=='trainer')return;EDIT_INSTRUCTION_FOLDER_ID=folderId;EDIT_INSTRUCTION_ITEM_ID=itemId;const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===folderId),item=folder?.items.find(entry=>entry.id===itemId);const select=document.getElementById('input-instruction-item-folder');select.innerHTML=GENERAL_INSTRUCTIONS.folders.map(entry=>`<option value="${esc(entry.id)}">${esc(entry.name)}</option>`).join('');select.value=folderId;select.disabled=!!item?.locked;document.getElementById('instruction-item-modal-title').textContent=item?'Editar orientação':'Nova orientação';document.getElementById('input-instruction-item-title').value=item?.title||'';document.getElementById('input-instruction-item-text').value=item?.text||'';document.getElementById('input-instruction-item-video').value=item?.videoUrl||'';document.getElementById('input-instruction-item-active').value=String(item?.active!==false);openModal('modal-instruction-item');}
-async function saveInstructionItem(){if(!beginAction('save-instruction-item','modal-instruction-item'))return;try{const targetFolderId=document.getElementById('input-instruction-item-folder').value,title=document.getElementById('input-instruction-item-title').value.normalize('NFKC').trim().slice(0,120),text=document.getElementById('input-instruction-item-text').value.normalize('NFKC').trim().slice(0,20000),videoUrl=document.getElementById('input-instruction-item-video').value.trim().slice(0,2000),active=document.getElementById('input-instruction-item-active').value==='true';if(!title)throw new Error('Digite o título da orientação.');if(videoUrl&&!extractYouTubeId(videoUrl))throw new Error('Use um link válido do YouTube.');const sourceFolder=GENERAL_INSTRUCTIONS.folders.find(folder=>folder.id===EDIT_INSTRUCTION_FOLDER_ID),targetFolder=GENERAL_INSTRUCTIONS.folders.find(folder=>folder.id===targetFolderId);if(!targetFolder)throw new Error('Pasta não encontrada.');let item=sourceFolder?.items.find(entry=>entry.id===EDIT_INSTRUCTION_ITEM_ID);if(item){if(item.locked&&targetFolderId!==sourceFolder.id)throw new Error('A página padrão não pode ser movida.');Object.assign(item,{title,text,videoUrl,active});if(sourceFolder.id!==targetFolder.id){sourceFolder.items=sourceFolder.items.filter(entry=>entry.id!==item.id);item.order=targetFolder.items.length;targetFolder.items.push(item);}}else targetFolder.items.push({id:uid(),title,text,videoUrl,active,locked:false,order:targetFolder.items.length});await persistGeneralInstructions();closeModal('modal-instruction-item');renderInstructions();showToast('✓ Orientação salva');}catch(error){alert(error.message);}finally{endAction('save-instruction-item','modal-instruction-item');}}
-async function toggleInstructionFolder(id){const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===id);if(!folder||CURRENT_USER?.role!=='trainer')return;folder.active=!folder.active;try{await persistGeneralInstructions();renderInstructions();}catch(error){folder.active=!folder.active;alert(error.message);}}
-async function toggleInstructionItem(folderId,itemId){const item=GENERAL_INSTRUCTIONS.folders.find(folder=>folder.id===folderId)?.items.find(entry=>entry.id===itemId);if(!item||CURRENT_USER?.role!=='trainer')return;item.active=!item.active;try{await persistGeneralInstructions();renderInstructions();}catch(error){item.active=!item.active;alert(error.message);}}
-function deleteInstructionFolder(id){const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===id);if(!folder||folder.locked)return;showConfirm('Excluir pasta','Excluir esta pasta e todas as orientações dentro dela?',async()=>{GENERAL_INSTRUCTIONS.folders=GENERAL_INSTRUCTIONS.folders.filter(item=>item.id!==id);try{await persistGeneralInstructions();renderInstructions();}catch(error){alert(error.message);}});}
-function deleteInstructionItem(folderId,itemId){const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===folderId),item=folder?.items.find(entry=>entry.id===itemId);if(!item||item.locked)return;showConfirm('Excluir orientação','Excluir esta orientação?',async()=>{folder.items=folder.items.filter(entry=>entry.id!==itemId);try{await persistGeneralInstructions();renderInstructions();}catch(error){alert(error.message);}});}
-async function moveInstructionFolder(id,direction){const items=GENERAL_INSTRUCTIONS.folders,index=items.findIndex(item=>item.id===id),next=index+Number(direction);if(index<0||next<0||next>=items.length)return;[items[index],items[next]]=[items[next],items[index]];items.forEach((item,i)=>item.order=i);await persistGeneralInstructions();renderInstructions();}
-async function moveInstructionItem(folderId,itemId,direction){const items=GENERAL_INSTRUCTIONS.folders.find(folder=>folder.id===folderId)?.items||[],index=items.findIndex(item=>item.id===itemId),next=index+Number(direction);if(index<0||next<0||next>=items.length)return;[items[index],items[next]]=[items[next],items[index]];items.forEach((item,i)=>item.order=i);await persistGeneralInstructions();renderInstructions();}
 
 async function openTechniques(){await loadTechniqueCatalog();renderTechniques();showScreen('screen-techniques');}
 function closeTechniquesScreen(){if(CURRENT_USER?.role==='trainer')goTrainer();else goHome();}
 function renderTechniques(){const admin=CURRENT_USER?.role==='trainer';document.getElementById('techniques-add-btn').style.display=admin?'flex':'none';document.getElementById('techniques-list').innerHTML=TECHNIQUE_CATALOG.items.map(item=>`<div class="technique-card" onclick="openTechniqueDetail(${jsArg(item.id)})"><div class="technique-code">${esc(item.code)}</div><div class="technique-card-main"><div class="technique-card-name">${esc(item.name)}</div><div class="technique-card-summary">${esc(item.description||'Explicação a ser cadastrada pelo treinador.')}</div></div>${admin?`<div class="technique-card-actions"><button onclick="event.stopPropagation();openTechniqueEditor(${jsArg(item.id)})">✎</button>${item.locked?'':`<button onclick="event.stopPropagation();deleteTechnique(${jsArg(item.id)})">🗑</button>`}</div>`:'<div class="exercise-row-arrow">›</div>'}</div>`).join('');}
 function openTechniqueDetail(id){const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);if(!item)return;document.getElementById('technique-detail-title').textContent=item.name;document.getElementById('technique-detail-body').innerHTML=`<div class="technique-detail-code">${esc(item.code)}</div><div class="technique-detail-text">${esc(item.description||'O treinador ainda não cadastrou a explicação desta técnica.')}</div>`;const video=document.getElementById('technique-detail-video-btn');video.style.display=item.videoUrl?'block':'none';video.onclick=()=>{closeModal('modal-technique-detail');if(MODE==='cloud')openCatalogVideo(item.videoUrl,item.name);else showToast('Conecte-se à internet para assistir ao vídeo.',true);};openModal('modal-technique-detail');}
 function openTechniqueEditor(id=''){if(CURRENT_USER?.role!=='trainer')return;EDIT_TECHNIQUE_ID=id;const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);document.getElementById('technique-editor-title').textContent=item?'Editar técnica':'Nova técnica';document.getElementById('input-technique-code').value=item?.code||'';document.getElementById('input-technique-name').value=item?.name||'';document.getElementById('input-technique-description').value=item?.description||'';document.getElementById('input-technique-video').value=item?.videoUrl||'';openModal('modal-technique-editor');}
-async function saveTechnique(){if(!beginAction('save-technique','modal-technique-editor'))return;try{const code=document.getElementById('input-technique-code').value.normalize('NFKC').trim().toUpperCase().slice(0,12),name=document.getElementById('input-technique-name').value.normalize('NFKC').trim().slice(0,100),description=document.getElementById('input-technique-description').value.normalize('NFKC').trim().slice(0,12000),videoUrl=document.getElementById('input-technique-video').value.trim().slice(0,2000);if(!code||!name)throw new Error('Preencha a sigla e o nome.');if(videoUrl&&!extractYouTubeId(videoUrl))throw new Error('Use um link válido do YouTube.');const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===EDIT_TECHNIQUE_ID);if(item)Object.assign(item,{code,name,description,videoUrl});else TECHNIQUE_CATALOG.items.push({id:uid(),code,name,description,videoUrl,locked:false,order:TECHNIQUE_CATALOG.items.length});await persistTechniqueCatalog();closeModal('modal-technique-editor');renderTechniques();showToast('✓ Técnica salva');}catch(error){alert(error.message);}finally{endAction('save-technique','modal-technique-editor');}}
-function deleteTechnique(id){const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);if(!item||item.locked)return;showConfirm('Excluir técnica','Excluir esta técnica personalizada? Exercícios antigos manterão o identificador, mas ela deixará de aparecer na biblioteca.',async()=>{TECHNIQUE_CATALOG.items=TECHNIQUE_CATALOG.items.filter(entry=>entry.id!==id);try{await persistTechniqueCatalog();renderTechniques();}catch(error){alert(error.message);}});}
 
 function normalizeExerciseTechniqueIds(value){if(!Array.isArray(value))return[];const out=[];for(const id of value){const clean=String(id||'').slice(0,100);if(clean&&!out.includes(clean))out.push(clean);}return out;}
 function workoutContainingExercise(exercise){const sources=[VIEW_STUDENT_WORKOUT,getW(CUR_WORKOUT),...(VIEW_STUDENT?.workouts||[]),...(CLOUD_WORKOUTS||[]),...(LOCAL_DB.workouts||[])];return sources.find(workout=>(workout?.exercises||[]).some(item=>item.id===exercise?.id))||null;}
@@ -9110,7 +9174,20 @@ async function deleteCardioItemConfirmed(context,kind,id){
   finally{endAction(action);}
 }
 
-async function moveCardioSubstitution(id,delta){if(!cardioCanEdit()||!beginAction('cardio-mutation'))return;const index=CARDIO_DOCUMENT.substitutions.findIndex(item=>item.id===id),target=index+Number(delta);if(index<0||target<0||target>=CARDIO_DOCUMENT.substitutions.length){endAction('cardio-mutation');return;}[CARDIO_DOCUMENT.substitutions[index],CARDIO_DOCUMENT.substitutions[target]]=[CARDIO_DOCUMENT.substitutions[target],CARDIO_DOCUMENT.substitutions[index]];CARDIO_DOCUMENT.substitutions.forEach((item,i)=>item.order=i);try{await persistCardioDocument();renderCardioScreen();}catch(error){showToast(cloudWriteError(error,'alterar a ordem dos cardios'),true);}finally{endAction('cardio-mutation');}}
+async function moveCardioSubstitution(id,delta){
+  if(!cardioCanEdit()||!beginAction('cardio-mutation'))return false;
+  const context={cardio:CARDIO_CONTEXT,owner:cardioOwnerKey(),userUid:CURRENT_USER?.uid,role:CURRENT_USER?.role},before=JSON.stringify(CARDIO_DOCUMENT),localBefore=LOCAL_DB.cardioPlan;
+  try{
+    if(!cardioDeleteContextCurrent(context))return false;
+    const items=CARDIO_DOCUMENT.substitutions,index=items.findIndex(item=>item.id===id),target=index+Number(delta);
+    if(index<0||target<0||target>=items.length)return false;
+    [items[index],items[target]]=[items[target],items[index]];items.forEach((item,i)=>item.order=i);
+    await persistCardioDocument();
+    if(cardioDeleteContextCurrent(context))renderCardioScreen();return true;
+  }catch(error){
+    if(cardioDeleteContextCurrent(context)){CARDIO_DOCUMENT=normalizeCardioDocument(JSON.parse(before));if(context.cardio.local)LOCAL_DB.cardioPlan=localBefore;renderCardioScreen();showToast(cloudWriteError(error,'alterar a ordem dos cardios'),true);}return false;
+  }finally{endAction('cardio-mutation');}
+}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCardioTimerDisplay();},{passive:true});
 const V10109_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){if(CARDIO_TIMER_INTERVAL){clearInterval(CARDIO_TIMER_INTERVAL);CARDIO_TIMER_INTERVAL=0;}CARDIO_DOCUMENT={main:null,substitutions:[]};CARDIO_CONTEXT={targetUid:'',trainer:false,local:false,source:'workout'};CURRENT_CARDIO_ITEM_ID='';return V10109_CONFIRM_LOGOUT_BASE();};

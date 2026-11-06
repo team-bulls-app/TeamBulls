@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_PHOTO_QUALITY_V10109__)return;
   window.__TEAM_BULLS_PHOTO_QUALITY_V10109__=true;
 
-  const VERSION='10.10.9-photoquality2';
+  const VERSION='10.10.9-photoquality3';
   const ORIGINAL_KIND='progressPhotoOriginals';
   const MAX_ORIGINAL_BYTES=25*1024*1024;
   const WEB_IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp','image/gif','image/avif']);
@@ -252,8 +252,10 @@
   }
 
   async function downloadRecord(record){
-    if(!record)return;
+    if(!record||CURRENT_USER?.role!=='trainer')return;
+    const context=capturePhotoReadContext(record);if(!photoReadContextCurrent(context))return;
     const original=await resolveOriginal(record,{forDisplay:false});
+    if(!photoReadContextCurrent(context))return;
     let url=original?.url||'',name=original?.name||'';
     if(!url){
       const path=typeof safePhotoPath==='function'?safePhotoPath(record?.photoPath):'';
@@ -267,14 +269,16 @@
       const direct=safePhotoDataUrl(record?.dataUrl);
       if(direct){url=direct;name=name||`team-bulls-${String(record?.date||'foto')}-${safeToken(record?.id)||'foto'}.jpg`;}
     }
+    if(!photoReadContextCurrent(context))return;
     if(!url){showToast?.('A fotografia não está disponível para download neste momento.',true);return;}
     try{
       const response=await fetch(url,{credentials:'omit'});if(!response.ok)throw new Error('download');
-      const blob=await response.blob(),objectUrl=URL.createObjectURL(blob),anchor=document.createElement('a');
+      const blob=await response.blob();if(!photoReadContextCurrent(context))return;const objectUrl=URL.createObjectURL(blob),anchor=document.createElement('a');
       anchor.href=objectUrl;anchor.download=name||'team-bulls-foto';anchor.rel='noopener';document.body.appendChild(anchor);anchor.click();anchor.remove();
       setTimeout(()=>URL.revokeObjectURL(objectUrl),3000);
       showToast?.('✓ Download da fotografia iniciado');
     }catch(error){
+      if(!photoReadContextCurrent(context))return;
       const anchor=document.createElement('a');anchor.href=url;anchor.target='_blank';anchor.rel='noopener';anchor.download=name||'team-bulls-foto';document.body.appendChild(anchor);anchor.click();anchor.remove();
       showToast?.('A foto foi aberta para você salvar no dispositivo.');
     }
@@ -297,15 +301,16 @@
   if(typeof openPhotoView==='function'&&!openPhotoView.__tbOriginalArchive){
     const wrapped=async function(pid,readonly){
       const p=typeof PHOTOS_CACHE!=='undefined'?PHOTOS_CACHE.find(item=>String(item.id)===String(pid)):null;if(!p)return;
-      CUR_PHOTO_ID=pid;
+      const context=beginPhotoViewRequest(p,pid);
       const title=document.getElementById('photo-view-title');if(title)title.textContent='Evidência // '+fmt(p.date);
       const img=document.getElementById('photo-view-img');if(!img)return;img.removeAttribute('src');
       const src=await resolvePhotoSource(p,{full:true});
+      if(!photoViewRequestCurrent(context))return false;
       if(!src){showToast?.('A fotografia não está disponível neste momento.',true);return;}
       img.src=src;
       const meta=document.getElementById('photo-view-meta');if(meta)meta.textContent=Number(p.weight)>0?'PESO REGISTRADO: '+Number(p.weight).toLocaleString('pt-BR',{maximumFractionDigits:1})+' kg':'PESO NÃO INFORMADO NESTE REGISTRO';
       const deleteButton=document.getElementById('btn-delete-photo');if(deleteButton)deleteButton.style.display=(readonly||p.checkinId||p.reportId||p.questionnaireId)?'none':'block';
-      ensureDownloadButton(p);openModal('modal-photo-view');
+      ensureDownloadButton(p);openModal('modal-photo-view');return true;
     };
     wrapped.__tbOriginalArchive=true;
     openPhotoView=wrapped;
