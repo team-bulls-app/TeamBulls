@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.63-sessionperf5';
+  const VERSION='10.10.63-sessionperf6';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   const SYNC_DIAGNOSTIC_PREFIX='team_bulls_session_sync_diag_v1_';
   const SESSION_SNAPSHOT_VERSION=3;
@@ -12,6 +12,8 @@
   const MUTABLE_FIELDS=new Set(['date','week','note','sets','exerciseName','performedTechniqueMode','performedExerciseItemId','performedExerciseName','variantId','variantName']);
   const pendingArchiveByUser=new Map(),pendingArchiveScheduled=new Set(),syncDiagnosticCache=new Map();
   const indexedSnapshots=new Map(),queueReady=new Map(),queueMutations=new Map(),remoteWrites=new Map();
+  const DELETE_PREFIX='team_bulls_session_deletions_v1_';
+  const deletionSnapshots=new Map(),deletionParsed=new Map(),deletionReady=new Map(),deletionMutations=new Map(),remoteDeletes=new Map();
   let snapshotClock=0;
   let flushing=null;
   let flushAgain=false;
@@ -80,9 +82,9 @@
   }
   function syncDiagnostics(uidValue=String(CURRENT_USER?.uid||'')){
     if(!registeredStudent()||String(uidValue)!==String(CURRENT_USER?.uid||''))return{available:false,pending:0,failed:0,lastError:'',lastErrorAt:0,lastAttemptAt:0,lastDurationMs:0,lastSuccessAt:0,localSaveFailures:0,lastLocalSaveError:'',lastLocalSaveErrorAt:0,lastLocalSaveSuccessAt:0};
-    const queue=readQueue(uidValue),state=readSyncDiagnostic(uidValue),ids=new Set(queue.map(item=>String(item.id||''))),failures=Object.entries(state.failures).filter(([id])=>ids.has(id));
+    const queue=filterDeleted(readQueue(uidValue),uidValue),deletions=readDeletions(uidValue).entries.filter(item=>item.pending),state=readSyncDiagnostic(uidValue),ids=new Set([...queue,...deletions].map(item=>String(item.id||''))),failures=Object.entries(state.failures).filter(([id])=>ids.has(id));
     failures.sort((a,b)=>Number(b[1]?.at||0)-Number(a[1]?.at||0));
-    return{available:true,pending:queue.length,failed:failures.length,lastError:failures[0]?.[1]?.category||'',lastErrorAt:Math.max(0,Math.min(8640000000000000,Number(failures[0]?.[1]?.at)||0)),lastAttemptAt:state.lastAttemptAt,lastDurationMs:state.lastDurationMs,lastSuccessAt:state.lastSuccessAt,localSaveFailures:state.localSaveFailures,lastLocalSaveError:state.lastLocalSaveError,lastLocalSaveErrorAt:state.lastLocalSaveErrorAt,lastLocalSaveSuccessAt:state.lastLocalSaveSuccessAt};
+    return{available:true,pending:queue.length+deletions.length,pendingDeletes:deletions.length,failed:failures.length,lastError:failures[0]?.[1]?.category||'',lastErrorAt:Math.max(0,Math.min(8640000000000000,Number(failures[0]?.[1]?.at)||0)),lastAttemptAt:state.lastAttemptAt,lastDurationMs:state.lastDurationMs,lastSuccessAt:state.lastSuccessAt,localSaveFailures:state.localSaveFailures,lastLocalSaveError:state.lastLocalSaveError,lastLocalSaveErrorAt:state.lastLocalSaveErrorAt,lastLocalSaveSuccessAt:state.lastLocalSaveSuccessAt};
   }
   function queueKey(uidValue){return QUEUE_PREFIX+safeUid(uidValue);}
   function indexedQueueKey(uidValue){return 'pending-sessions:'+String(uidValue);}
@@ -125,18 +127,27 @@
     return durable||session||{items:[],updatedAt:0};
   }
   function readQueue(uidValue){return readQueueSnapshot(uidValue).items;}
-  async function indexedQueue(mode,uidValue,value){
+  async function indexedQueue(mode,uidValue,value,kind='queue'){
     if(typeof openMediaDb!=='function')return mode==='readonly'?null:false;
     const database=await withTimeout(openMediaDb(),2500,'abrir armazenamento dos registros');
     if(!database)return mode==='readonly'?null:false;
     return new Promise((resolve,reject)=>{
       let tx,timer,result=null,settled=false;
-      const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);if(error)reject(error);else resolve(mode==='readonly'?result:true);};
+      const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);if(error)reject(error);else resolve(mode==='readonly'||kind==='deletions'?result:true);};
       try{
         tx=database.transaction('media',mode);
-        const store=tx.objectStore('media'),key=indexedQueueKey(uidValue);
-        const request=mode==='readonly'?store.get(key):store.put(value,key);
-        request.onsuccess=()=>{if(mode==='readonly')result=request.result||null;};
+        const store=tx.objectStore('media'),key=kind==='deletions'?'session-deletions:'+String(uidValue):indexedQueueKey(uidValue);
+        const request=mode==='readonly'||kind==='deletions'?store.get(key):store.put(value,key);
+        request.onsuccess=()=>{
+          if(mode==='readonly')result=request.result||null;
+          else if(kind==='deletions'){
+            // Read/merge/write in one IndexedDB transaction: parallel tabs must
+            // not overwrite each other's durable deletion requests.
+            const previous=parseDeletions(request.result,uidValue),entries=new Map(previous.entries.map(item=>[item.id,item]));
+            for(const item of value.entries){const old=entries.get(item.id);entries.set(item.id,{...old,...item,pending:old?.pending===false||item.pending===false?false:true});}
+            result={v:1,updatedAt:Math.max(value.updatedAt,previous.updatedAt+1),entries:[...entries.values()]};store.put(result,key);
+          }
+        };
         tx.oncomplete=()=>finish();
         tx.onerror=()=>finish(tx.error||new Error('Falha no armazenamento dos registros.'));
         tx.onabort=()=>finish(tx.error||new Error('Gravação dos registros interrompida.'));
@@ -208,11 +219,13 @@
     if(!uidValue||!id)return null;
     return readQueue(uidValue).find(item=>String(item.id)===String(id))||null;
   }
-  function pendingCount(uidValue=String(CURRENT_USER?.uid||'')){return readQueue(uidValue).length;}
+  function pendingCount(uidValue=String(CURRENT_USER?.uid||'')){return filterDeleted(readQueue(uidValue),uidValue).length+readDeletions(uidValue).entries.filter(item=>item.pending).length;}
   function pendingSession(id,uidValue=String(CURRENT_USER?.uid||'')){return !!queuedEntry(id,uidValue);}
   async function updatePending(id,patch={},uidValue=String(CURRENT_USER?.uid||'')){
+    if(isDeleted(id,uidValue))return null;
     const safePatch={};for(const [key,value] of Object.entries(patch||{}))if(MUTABLE_FIELDS.has(key))safePatch[key]=value;
     const next=await mutateQueue(uidValue,queue=>{
+      if(isDeleted(id,uidValue))return{items:queue,result:null,changed:false};
       const index=queue.findIndex(item=>String(item.id)===String(id)),current=queue[index];
       if(!current)return{items:queue,result:null,changed:false};
       const next=normalizeQueuedEntry({...current,...safePatch,id:current.id,userId:current.userId,workoutId:current.workoutId,exerciseId:current.exerciseId,queuedAt:current.queuedAt,createdAtMs:current.createdAtMs,revision:current.revision+1});
@@ -225,6 +238,87 @@
   }
   async function discardPending(id,uidValue=String(CURRENT_USER?.uid||'')){
     return await removeQueued(uidValue,id)&&!queuedEntry(id,uidValue);
+  }
+  function parseDeletions(raw,uidValue){
+    const cached=deletionParsed.get(uidValue);if(cached&&cached.raw===raw)return cached.state;
+    let state={v:1,updatedAt:0,entries:[]};
+    try{const value=typeof raw==='string'?JSON.parse(raw):raw;if(value?.v===1&&Array.isArray(value.entries))state={v:1,updatedAt:Math.max(0,Number(value.updatedAt)||0),entries:value.entries.filter(item=>item?.userId===uidValue&&typeof item.id==='string'&&item.id.length>0&&item.id.length<=190&&!item.id.includes('/')).map(item=>({...item,pending:item.pending!==false}))};}catch(error){}
+    deletionParsed.set(uidValue,{raw,state});return state;
+  }
+  function readDeletions(uidValue){
+    let durable=null,mirror=null;try{durable=storageGet(DELETE_PREFIX+safeUid(uidValue));}catch(error){}try{mirror=sessionStorage.getItem(DELETE_PREFIX+safeUid(uidValue));}catch(error){}
+    const candidates=[durable===null?null:parseDeletions(durable,uidValue),mirror===null?null:parseDeletions(mirror,uidValue),deletionSnapshots.get(uidValue)].filter(Boolean);
+    return candidates.reduce((latest,item)=>item.updatedAt>latest.updatedAt?item:latest,{v:1,updatedAt:0,entries:[]});
+  }
+  function ensureDeletionsReady(uidValue){
+    if(!uidValue)return Promise.resolve();if(deletionReady.has(uidValue))return deletionReady.get(uidValue);
+    const task=indexedQueue('readonly',uidValue,undefined,'deletions').then(value=>{if(value)deletionSnapshots.set(uidValue,parseDeletions(value,uidValue));}).catch(error=>{deletionReady.delete(uidValue);throw error;});
+    deletionReady.set(uidValue,task);return task;
+  }
+  function mutateDeletions(uidValue,change){
+    const previous=deletionMutations.get(uidValue)||Promise.resolve();
+    const task=previous.catch(()=>{}).then(async()=>{
+      await ensureDeletionsReady(uidValue);const current=readDeletions(uidValue),entries=current.entries.map(item=>({...item}));
+      if(change(entries)===false)return false;
+      snapshotClock=Math.max(Date.now(),snapshotClock+1,current.updatedAt+1);
+      let state={v:1,updatedAt:snapshotClock,entries};const key=DELETE_PREFIX+safeUid(uidValue);let durable=false,indexed=false;
+      try{const saved=await indexedQueue('readwrite',uidValue,state,'deletions');if(saved?.v===1){state=saved;indexed=true;deletionSnapshots.set(uidValue,state);}}catch(error){}
+      const serialized=JSON.stringify(state);try{durable=storageSet(key,serialized)===true;}catch(error){}
+      if(!durable&&!indexed)throw new Error('Não foi possível guardar a exclusão neste aparelho. Libere espaço e tente novamente.');
+      try{sessionStorage.setItem(key,serialized);}catch(error){}return true;
+    });
+    deletionMutations.set(uidValue,task);task.finally(()=>{if(deletionMutations.get(uidValue)===task)deletionMutations.delete(uidValue);}).catch(()=>{});return task;
+  }
+  function isDeleted(id,uidValue){return !!uidValue&&readDeletions(uidValue).entries.some(item=>item.id===String(id));}
+  function filterDeleted(sessions,uidValue){
+    if(!uidValue||CURRENT_USER?.uid!==uidValue||!registeredStudent())return sessions;
+    const ids=new Set(readDeletions(uidValue).entries.map(item=>item.id));return sessions.filter(item=>!ids.has(String(item?.id||'')));
+  }
+  function projectDeletion(entry){
+    if(CURRENT_USER?.uid!==entry.userId||!registeredStudent())return;
+    try{for(const workout of getWorkouts())for(const exercise of(workout.exercises||[]))exercise.sessions=(exercise.sessions||[]).filter(item=>String(item.id)!==entry.id);}catch(error){}
+    try{removeSessionFromHistory(entry.id);}catch(error){}try{removeSessionFromArchive(entry.userId,entry.id);}catch(error){}
+  }
+  async function requestDelete(id,session={}){
+    const userId=String(CURRENT_USER?.uid||''),sessionId=String(id||'');
+    if(!registeredStudent()||!sessionId||sessionId.length>190||sessionId.includes('/'))throw new Error('Registro ou sessão inválida.');
+    await Promise.all([ensureQueueReady(userId),ensureDeletionsReady(userId)]);
+    if(CURRENT_USER?.uid!==userId||!registeredStudent())throw new Error('A sessão mudou. Abra o registro novamente.');
+    const queued=queuedEntry(sessionId,userId),source=queued||session,existing=readDeletions(userId).entries.find(item=>item.id===sessionId);
+    if(!existing&&(!source?.id||String(source.id)!==sessionId||(source.userId&&source.userId!==userId)))throw new Error('O registro não foi encontrado neste perfil. Abra o exercício novamente.');
+    if(!existing)await mutateDeletions(userId,entries=>{if(!entries.some(item=>item.id===sessionId))entries.push({id:sessionId,userId,queuedAt:Date.now(),pending:true});});
+    // The durable deletion marker must exist before canceling a queued create.
+    // A failed queue cleanup is safe: commitEntry also checks this marker.
+    try{await removeQueued(userId,sessionId);}catch(error){console.warn('[Team Bulls] criação cancelada pela solicitação de exclusão durável',error);}
+    pendingArchiveByUser.get(userId)?.delete(sessionId);projectDeletion({id:sessionId,userId});clearSyncFailure(userId,sessionId);
+    const entry=readDeletions(userId).entries.find(item=>item.id===sessionId);
+    if(entry?.pending&&networkReady()&&CURRENT_USER?.uid===userId)void syncDeletion(entry).catch(error=>markSyncFailure(userId,sessionId,error));
+    scheduleFlush(80);return true;
+  }
+  async function commitDeletion(entry){
+    const current=()=>networkReady()&&CURRENT_USER?.uid===entry.userId;
+    if(!current())return false;
+    // Await only an already-started write for this ID, never the entire queue.
+    const writing=remoteWrites.get(entry.userId+':'+entry.id);if(writing)await writing.catch(()=>{});
+    if(!current())return false;
+    const ref=db.collection('sessions').doc(entry.id);
+    try{await ref.delete();}
+    catch(error){
+      const code=String(error?.code||'');if(!/permission-denied|not-found/.test(code))throw error;
+      if(!current())return false;
+      // Rules deny deleting/reading a missing document. An owner-scoped server
+      // query can prove absence without broadening permissions or trusting cache.
+      const snapshot=await withTimeout(db.collection('sessions').where('userId','==',entry.userId).where(firebase.firestore.FieldPath.documentId(),'==',entry.id).limit(1).get({source:'server'}),8000,'confirmar exclusão de série');
+      if(snapshot.docs.length)throw error;
+    }
+    await mutateDeletions(entry.userId,entries=>{const marker=entries.find(item=>item.id===entry.id);if(!marker||marker.pending===false)return false;marker.pending=false;});
+    try{await removeQueued(entry.userId,entry.id);}catch(error){}
+    clearSyncFailure(entry.userId,entry.id);projectDeletion(entry);return true;
+  }
+  function syncDeletion(entry){
+    const key=entry.userId+':'+entry.id;let task=remoteDeletes.get(key);
+    if(!task){task=commitDeletion(entry);remoteDeletes.set(key,task);task.finally(()=>{if(remoteDeletes.get(key)===task)remoteDeletes.delete(key);}).catch(()=>{});}
+    return cloudWrite(task,'sincronizar exclusão de série');
   }
   function networkReady(){return navigator.onLine!==false&&MODE==='cloud'&&CURRENT_USER?.role==='student'&&CURRENT_USER?.uid&&db;}
   function stableCreatedAt(entry){
@@ -281,7 +375,7 @@
     pendingArchiveScheduled.add(userId);
     const flush=()=>{
       pendingArchiveScheduled.delete(userId);
-      const batch=[...(pendingArchiveByUser.get(userId)?.values()||[])];pendingArchiveByUser.delete(userId);
+      const batch=filterDeleted([...(pendingArchiveByUser.get(userId)?.values()||[])],userId);pendingArchiveByUser.delete(userId);
       if(!batch.length)return;
       try{if(typeof saveSessionArchive==='function')saveSessionArchive(userId,batch);}catch(error){console.warn('[Team Bulls] fallback do arquivo local será reconstruído depois',error);}
     };
@@ -291,6 +385,7 @@
   function ensureLocalSession(entry,exerciseOverride=null,pendingSync=true){
     try{
       if(CURRENT_USER?.uid!==entry.userId||!registeredStudent())return false;
+      if(isDeleted(entry.id,entry.userId))return false;
       const exercise=exerciseOverride||(typeof getE==='function'?getE(entry.workoutId,entry.exerciseId):null);
       if(!exercise)return false;
       if(!Array.isArray(exercise.sessions))exercise.sessions=[];
@@ -324,12 +419,17 @@
     try{
       const uidValue=String(CURRENT_USER?.uid||'');
       if(!uidValue||!registeredStudent())return 0;
-      const queue=readQueue(uidValue);let inserted=0,visible=false;
+      const deleted=new Set(readDeletions(uidValue).entries.map(item=>item.id));
+      const queue=readQueue(uidValue);let inserted=0,removed=0,visible=false;
+      try{for(const workout of getWorkouts())for(const exercise of(workout.exercises||[])){
+        const previous=exercise.sessions||[],next=previous.filter(item=>!deleted.has(String(item.id)));
+        if(next.length!==previous.length){removed+=previous.length-next.length;exercise.sessions=next;if(CUR_WORKOUT===workout.id&&CUR_EX===exercise.id)visible=true;}
+      }}catch(error){}
       for(const entry of queue){
         if(ensureLocalSession(entry,null,true))inserted++;
         try{if(CUR_WORKOUT===entry.workoutId&&CUR_EX===entry.exerciseId)visible=true;}catch(error){}
       }
-      if(rerender&&visible&&inserted>0&&!document.getElementById('modal-session')?.classList.contains('open')){
+      if(rerender&&visible&&(inserted>0||removed>0)&&!document.getElementById('modal-session')?.classList.contains('open')){
         try{if(typeof renderExercise==='function')renderExercise();}catch(error){}
       }
       return inserted;
@@ -338,6 +438,7 @@
   function markLocalSynced(entry){
     try{
       if(CURRENT_USER?.uid!==entry.userId||!registeredStudent())return;
+      if(isDeleted(entry.id,entry.userId))return;
       const owner=typeof findSessionOwner==='function'?findSessionOwner(entry.id):null;
       if(owner?.session){owner.session.pendingSync=false;syncSessionToHistory?.(owner.session);saveSessionArchive?.(entry.userId,[owner.session]);}
       else ensureLocalSession(entry,null,false);
@@ -348,6 +449,7 @@
   }
   async function commitEntry(entry){
     if(!networkReady()||CURRENT_USER.uid!==entry.userId)return false;
+    if(isDeleted(entry.id,entry.userId))return false;
     const ref=db.collection('sessions').doc(entry.id);
     const current=queuedEntry(entry.id,entry.userId);
     if(!current)return false;
@@ -358,6 +460,7 @@
     try{
       await ref.set(firestorePayload(entry));
     }catch(error){
+      if(isDeleted(entry.id,entry.userId))return false;
       if(!String(error?.code||'').includes('permission-denied'))throw error;
       if(!networkReady()||CURRENT_USER?.uid!==entry.userId)return false;
       // Filas antigas podem ter usado serverTimestamp. Se o write anterior
@@ -370,8 +473,10 @@
       const latest=queuedEntry(entry.id,entry.userId);
       if(!latest)return false;
       if(latest.revision!==entry.revision){scheduleFlush(80);return false;}
+      if(isDeleted(entry.id,entry.userId))return false;
       await ref.update(mutablePayload(entry));
     }
+    if(isDeleted(entry.id,entry.userId)){scheduleFlush(30);return true;}
     const latest=queuedEntry(entry.id,entry.userId);
     if(latest&&latest.revision!==entry.revision){scheduleFlush(30);return true;}
     if(latest){
@@ -397,10 +502,17 @@
       restorePendingSessions({rerender:false});
       if(!networkReady())return false;
       const uidValue=String(CURRENT_USER.uid);
-      await ensureQueueReady(uidValue);
-      const queue=readQueue(uidValue);
-      if(!queue.length)return true;
+      await Promise.all([ensureQueueReady(uidValue),ensureDeletionsReady(uidValue)]);
       const startedAt=Date.now();let synced=0;
+      for(const entry of readDeletions(uidValue).entries.filter(item=>item.pending)){
+        if(!networkReady()||CURRENT_USER?.uid!==uidValue)break;
+        try{if(await syncDeletion(entry))synced++;}catch(error){
+          markSyncFailure(uidValue,entry.id,error);
+          if(!networkReady()||/timeout|unavailable|unauthenticated|deadline-exceeded/.test(String(error?.code||'')))break;
+        }
+      }
+      const queue=filterDeleted(readQueue(uidValue),uidValue);
+      if(!queue.length){const pending=pendingCount(uidValue);recordSyncAttempt(uidValue,startedAt,Date.now()-startedAt,synced,pending);return pending===0;}
       for(const entry of queue){
         if(!networkReady()||CURRENT_USER?.uid!==uidValue)break;
         try{
@@ -415,7 +527,7 @@
           if(!networkReady()||code.includes('timeout')||code.includes('unavailable')||code.includes('unauthenticated')||code.includes('deadline-exceeded'))break;
         }
       }
-      const pending=readQueue(uidValue).length;
+      const pending=pendingCount(uidValue);
       recordSyncAttempt(uidValue,startedAt,Date.now()-startedAt,synced,pending);
       if(synced){
         try{runWhenIdle(()=>saveCloudBackup(),3500);}catch(error){}
@@ -518,12 +630,17 @@
       pending:pendingCount,
       diagnostics:syncDiagnostics,
       failureFor:syncFailureFor,
-      ready:ensureQueueReady,
-      sessions:(uidValue=String(CURRENT_USER?.uid||''))=>uidValue===CURRENT_USER?.uid&&registeredStudent()?readQueue(uidValue).map(entry=>sessionDataFromEntry(entry,true)):[],
+      ready:(uidValue=String(CURRENT_USER?.uid||''))=>Promise.all([ensureQueueReady(uidValue),ensureDeletionsReady(uidValue)]),
+      sessions:(uidValue=String(CURRENT_USER?.uid||''))=>uidValue===CURRENT_USER?.uid&&registeredStudent()?filterDeleted(readQueue(uidValue),uidValue).map(entry=>sessionDataFromEntry(entry,true)):[],
       hasPending:pendingSession,
       getPending:queuedEntry,
       updatePending,
       discardPending,
+      requestDelete,
+      filterDeleted,
+      isDeletePending:(id,uidValue=String(CURRENT_USER?.uid||''))=>CURRENT_USER?.uid===uidValue&&registeredStudent()&&readDeletions(uidValue).entries.some(item=>item.id===String(id)&&item.pending),
+      isDeleted:(id,uidValue=String(CURRENT_USER?.uid||''))=>CURRENT_USER?.uid===uidValue&&registeredStudent()&&isDeleted(id,uidValue),
+      pendingDeletes:(uidValue=String(CURRENT_USER?.uid||''))=>CURRENT_USER?.uid===uidValue&&registeredStudent()?readDeletions(uidValue).entries.filter(item=>item.pending).length:0,
       restore:()=>restorePendingSessions({rerender:true}),
       flush:()=>flushPending({silent:false}),
       schedule:()=>scheduleFlush(80)
@@ -538,7 +655,7 @@
   function recoverAndSchedule(delay=180){
     if(!registeredStudent())return;
     const userId=String(CURRENT_USER.uid);
-    ensureQueueReady(userId).then(()=>{
+    Promise.all([ensureQueueReady(userId),ensureDeletionsReady(userId)]).then(()=>{
       if(CURRENT_USER?.uid!==userId)return;
       restorePendingSessions({rerender:true});scheduleFlush(delay);
     }).catch(error=>console.warn('[Team Bulls] Não foi possível recuperar a fila de registros.',error));

@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110604,
-  "revision": "deep-action-audit-2",
+  "build": 2026110605,
+  "revision": "student-session-delete-1",
   "publishedAt": "2026-11-06T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Correções de troca de aluno e gravação do cardio, conflitos de bibliotecas e segurança das confirmações de pagamentos e comprovantes."
+  "message": "Exclusão durável de registros de séries, inclusive offline, com sincronização após reconectar e proteção contra retorno de cópias antigas."
 }

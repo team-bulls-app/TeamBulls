@@ -7,7 +7,7 @@ const mutation=fs.readFileSync('modules/pending-session-mutations-v10_10_34.js',
 const config=fs.readFileSync('config_v10_7.js','utf8');
 const rules=fs.readFileSync('firebase/firestore_28_compacto.rules','utf8');
 
-need(perf.includes("VERSION='10.10.63-sessionperf5'"),'fila rápida não está na revisão esperada');
+need(perf.includes("VERSION='10.10.63-sessionperf6'"),'fila rápida não está na revisão esperada');
 need(perf.includes('createdAtMs')&&perf.includes('stableCreatedAt(entry)'),'fila não preserva timestamp estável da criação');
 need(!/createdAt\s*:\s*firebase\.firestore\.FieldValue\.serverTimestamp\(\)/.test(perf),'fila rápida ainda recria createdAt com serverTimestamp a cada tentativa');
 need(perf.includes('revision:current.revision+1'),'edição pendente não versiona a fila contra corrida de sincronização');
@@ -18,14 +18,21 @@ need(perf.includes('restorePendingSessions'),'fila pendente não é reconstruíd
 need(mutation.includes("saveEditSession=wrapped"),'edição de sessão pendente não foi interceptada');
 need(mutation.includes('updatePending?.(sessionId'),'edição pendente não atualiza a fila persistente');
 need(mutation.includes('pendingSync:true'),'sessão editada localmente perde indicação de sincronização pendente');
-need(mutation.includes('discardPending?.(sessionId)'),'exclusão pendente não cancela a criação enfileirada');
-need(mutation.indexOf('discardPending?.(sessionId)')<mutation.indexOf("db.collection('sessions').doc(sessionId).delete()"),'exclusão remota acontece antes de cancelar a criação local');
-need(mutation.includes('await Promise.resolve(sessionPerf.flush?.()).catch(()=>false)'),'exclusão não aguarda uma criação que já pudesse estar em voo');
-need((mutation.match(/cloudWrite\(/g)||[]).length===1,'hotfix criou mais de uma escrita Firebase; deve existir somente a limpeza explícita pedida pelo aluno');
+need(mutation.includes('__tbDurableSessionDelete'),'a camada de mutações não delega ao delete durável canônico');
+const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
+need(core.includes('await runtime.requestDelete(sessionId,owner?.session)'),'core não aguarda persistência da intenção de exclusão');
+const deletion=perf.slice(perf.indexOf('async function requestDelete('),perf.indexOf('async function commitDeletion('));
+need(deletion.indexOf('await mutateDeletions')<deletion.indexOf('await removeQueued'),'criação foi cancelada antes de persistir intenção de exclusão');
+need(perf.includes("const writing=remoteWrites.get(entry.userId+':'+entry.id)"),'exclusão não identifica a criação em voo do mesmo ID');
+need(perf.includes("if(writing)await writing.catch(()=>{})"),'exclusão não espera a Promise real da criação');
+need(perf.includes("where('userId','==',entry.userId)")&&perf.includes("get({source:'server'})"),'confirmação de ausência não usa consulta limitada ao dono e servidor');
+need(perf.includes('if(snapshot.docs.length)throw error'),'permissão negada em documento existente pode virar sucesso falso');
+need(perf.includes('requestDelete,')&&perf.includes('filterDeleted,')&&perf.includes('isDeletePending:'),'API da exclusão durável incompleta');
+need(!mutation.includes('cloudWrite('),'a camada de mutações voltou a duplicar o delete remoto');
 need(!mutation.includes('setInterval('),'hotfix não pode adicionar polling');
 
-const perfUrl='./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf5';
-const mutationUrl='./modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession2';
+const perfUrl='./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf6';
+const mutationUrl='./modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession3';
 need(config.includes(perfUrl),'loader não entrega a revisão nova da fila');
 need(config.includes(mutationUrl),'loader não entrega o hotfix de edição/exclusão pendente');
 need(config.indexOf(perfUrl)<config.indexOf(mutationUrl),'hotfix pendente carrega antes da API da fila');

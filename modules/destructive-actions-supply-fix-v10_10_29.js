@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_DESTRUCTIVE_SUPPLY_FIX_101029__)return;
   window.__TEAM_BULLS_DESTRUCTIVE_SUPPLY_FIX_101029__=true;
 
-  const VERSION='10.10.29-destructive-supply2';
+  const VERSION='10.10.29-destructive-supply3';
   const SESSION_QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   let screenObserver=null;
 
@@ -133,6 +133,7 @@
     const wrapped=async function(sid){
       const sessionId=String(sid||'');
       if(sessionId&&student()&&typeof MODE!=='undefined'&&MODE==='cloud'){
+        if(base.__tbDurableSessionDelete)return base.apply(this,arguments);
         // A camada de exclusão pendente já cancela a fila e resolve a corrida
         // com uma criação em voo. Impedir seu acesso aqui prende o aluno no aviso
         // "ainda não foi sincronizado" mesmo após confirmar a exclusão.
@@ -157,9 +158,11 @@
       const rows=editor?[...editor.querySelectorAll('.performed-set-row')]:[];
       let sessionId='';try{sessionId=String(EDIT_SESSION_ID||'');}catch(error){}
       if(row&&rows.length===1&&rows[0]===row&&sessionId&&student()){
+        const userId=CURRENT_USER?.uid;
         const task=async()=>{
+          if(CURRENT_USER?.uid!==userId||String(EDIT_SESSION_ID||'')!==sessionId)return false;
           const deleted=await performDeleteSession(sessionId);
-          if(deleted&&typeof closeModal==='function')closeModal('modal-edit-session');
+          if(deleted&&CURRENT_USER?.uid===userId&&String(EDIT_SESSION_ID||'')===sessionId&&typeof closeModal==='function')closeModal('modal-edit-session');
           return deleted;
         };
         const text='Esta é a última série deste registro. Deseja apagar o registro completo, incluindo as cargas, repetições e anotações desta sessão?';

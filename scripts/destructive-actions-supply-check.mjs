@@ -8,8 +8,9 @@ const core=read('app_v10_10_9_core.js');
 
 function assert(condition,message){if(!condition)throw new Error(message);}
 
-const moduleUrl='./modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply2';
+const moduleUrl='./modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply3';
 assert(config.includes(moduleUrl),'O módulo de correção não está carregado pelo runtime com URL nova.');
+for(const file of ['sw.js','sw_47.js','update_v10_10_9.js'])assert(read(file).includes(moduleUrl),file+' não aquece a camada ativa de exclusão.');
 
 // Exclusão de dieta deve preservar o editor/contexto até a confirmação e usar o persist canônico.
 assert(moduleCode.includes("function safeDeleteCurrentDiet()"),'A exclusão segura da dieta não foi instalada.');
@@ -27,7 +28,9 @@ assert(moduleCode.includes("await runtime.flush()"),'A exclusão cloud não agua
 assert(moduleCode.includes("if(queuedSession(uidValue,sessionId))"),'A exclusão não bloqueia quando o registro ainda permanece pendente.');
 assert(!moduleCode.includes('setInterval('),'O hotfix não deve criar polling contínuo.');
 assert(!moduleCode.includes('cloudWrite('),'O hotfix não deve duplicar/repetir a escrita/delete do core.');
-assert(core.includes("await cloudWrite(db.collection('sessions').doc(sessionId).delete(),'excluir registro')"),'O delete canônico de sessions deixou de existir no core.');
+assert(core.includes('await runtime.requestDelete(sessionId,owner?.session)'),'O core não registra a intenção durável de exclusão.');
+assert(moduleCode.includes('if(base.__tbDurableSessionDelete)return base.apply(this,arguments);'),'A guarda antiga ainda pode bloquear a exclusão durável.');
+assert(read('modules/session-save-performance-v10_10_9.js').includes('try{await ref.delete();}'),'O delete remoto canônico não está no runtime da exclusão durável.');
 
 // A última série não pode virar sets=[]; deve oferecer exclusão completa do registro.
 assert(moduleCode.includes("rows.length===1&&rows[0]===row&&sessionId&&student()"),'A última série não é tratada separadamente.');
@@ -48,4 +51,4 @@ assert(moduleCode.includes("repairSupplyButton('screen-ts-diet-detail')"),'O ata
 assert(moduleCode.includes('openFoodOptionsFromDiet'),'O destino canônico das opções de suprimentos não foi preservado.');
 assert(moduleCode.includes("screenObserver.observe(screen,{attributes:true,attributeFilter:['class']})"),'O reparo não acompanha a ativação das duas telas de dieta.');
 
-console.log('APROVADO — exclusão de dieta mantém contexto/rollback; sessões aguardam a fila rápida e a última série oferece exclusão completa; atalho de suprimentos reconstrói ícone/texto reais.');
+console.log('APROVADO — exclusão de dieta mantém contexto/rollback; sessões usam exclusão durável e a última série oferece exclusão completa; atalho de suprimentos reconstrói ícone/texto reais.');

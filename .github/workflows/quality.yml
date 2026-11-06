@@ -44,6 +44,7 @@ jobs:
           node scripts/cloudflare-feedback-push-check.mjs
           node scripts/student-session-delete-shared-history-check.mjs
           node scripts/session-durability-regression-check.mjs
+          node scripts/student-session-delete-browser-check.mjs
           node scripts/prescription-propagation-check.mjs
           node scripts/diet-deletion-check.mjs
           node scripts/diet-division-deletion-check.mjs

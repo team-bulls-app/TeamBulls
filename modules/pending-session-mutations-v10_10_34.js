@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_PENDING_SESSION_MUTATIONS_101034__)return;
   window.__TEAM_BULLS_PENDING_SESSION_MUTATIONS_101034__=true;
 
-  const VERSION='10.10.63-pendingsession2';
+  const VERSION='10.10.63-pendingsession3';
 
   const perf=()=>window.TeamBullsSessionPerformance||null;
   const studentCloud=()=>{
@@ -63,6 +63,7 @@
         // nesse caso o fluxo canônico remoto já pode editar o documento existente.
         if(!queued){
           endAction('edit-session','modal-edit-session');
+          if(perf()?.isDeleted?.(sessionId)){showToast('Este registro foi excluído. Abra o exercício novamente.',true);return false;}
           return base.apply(this,arguments);
         }
         Object.assign(e.sessions[idx],{date,week,note,sets,exerciseName:e.name,pendingSync:true},variant,{performedTechniqueMode});
@@ -83,48 +84,14 @@
     wrapped.__tbPendingSessionMutation=true;wrapped.__tbBase=base;saveEditSession=wrapped;return true;
   }
 
-  function removeLocalSession(sessionId,owner){
-    if(owner?.exercise)owner.exercise.sessions=(owner.exercise.sessions||[]).filter(session=>String(session.id)!==sessionId);
-    try{removeSessionFromHistory(sessionId);}catch(error){}
-    try{removeSessionFromArchive(CURRENT_USER.uid,sessionId);}catch(error){}
-    try{saveCloudBackup();}catch(error){}
-    try{EDIT_SESSION_ID=null;EDIT_SESSION_WID=null;EDIT_SESSION_EID=null;}catch(error){}
-    try{closeModal('modal-edit-session');}catch(error){}
-    try{renderExercise();}catch(error){}
-  }
-
   function installDeletePatch(){
-    if(typeof performDeleteSession!=='function'||performDeleteSession.__tbPendingSessionMutation)return false;
+    if(typeof performDeleteSession!=='function')return false;
+    if(performDeleteSession.__tbDurableSessionDelete)return true;
+    // The core entry point now persists the deletion intent through the same
+    // runtime for both synced and unsynced records, including registered offline.
     const base=performDeleteSession;
-    const wrapped=async function(rawId){
-      const sessionId=String(rawId||'');if(!sessionId||!pending(sessionId))return base.apply(this,arguments);
-      const owner=typeof findSessionOwner==='function'?findSessionOwner(sessionId):null;
-      if(!beginAction('delete-session-'+sessionId))return false;
-      try{
-        const sessionPerf=perf();
-        if(!await sessionPerf?.discardPending?.(sessionId))throw new Error('Não foi possível retirar este registro da fila local.');
-
-        // Se uma criação já estava em voo no exato momento do toque, aguarda
-        // somente essa operação já iniciada. Não dispara retry automático.
-        if(navigator.onLine!==false)await Promise.resolve(sessionPerf.flush?.()).catch(()=>false);
-
-        // Uma única limpeza remota cobre a corrida rara em que a criação chegou
-        // ao servidor enquanto o aluno confirmava a exclusão. Para registros que
-        // nunca chegaram ao servidor, Rules podem responder permission-denied;
-        // isso é esperado e não deve impedir a exclusão da cópia pendente local.
-        if(navigator.onLine!==false&&typeof db!=='undefined'&&db){
-          try{await cloudWrite(db.collection('sessions').doc(sessionId).delete(),'excluir registro pendente');}
-          catch(error){if(!permissionLike(error))console.warn('[Team Bulls] limpeza remota do registro pendente',error?.code||error?.message||error);}
-        }
-        removeLocalSession(sessionId,owner);
-        showToast('✓ Registro excluído.');
-        return true;
-      }catch(error){
-        console.error('[Team Bulls] exclusão de registro pendente',error);
-        alert('Não foi possível excluir o registro: '+(error?.message||error));return false;
-      }finally{endAction('delete-session-'+sessionId);}
-    };
-    wrapped.__tbPendingSessionMutation=true;wrapped.__tbBase=base;performDeleteSession=wrapped;return true;
+    const wrapped=function(){return base.apply(this,arguments);};
+    wrapped.__tbPendingSessionMutation=true;wrapped.__tbDurableSessionDelete=true;wrapped.__tbBase=base;performDeleteSession=wrapped;return true;
   }
 
   function install(){
