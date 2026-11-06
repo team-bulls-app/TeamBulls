@@ -18,9 +18,10 @@ const workouts=[
   {id:'workout-1',name:'Treino 1',exercises:[{id:'old-exercise',name:'Supino reto',sessions:[oldSession]}]},
   {id:'workout-2',name:'Treino 2',exercises:[{id:'new-exercise',name:'Supino reto',sessions:[currentSession]},{id:'other',name:'Supino inclinado',sessions:[]}]}
 ];
+const helperStart=core.indexOf('function filterDeletedSessions('),helperEnd=core.indexOf('\n}',helperStart)+2;
 const historyContext={getWorkouts:()=>workouts,createdMillis:()=>0};
 vm.createContext(historyContext);
-vm.runInContext(`${nameFunction}\n${core.slice(start,end)}`,historyContext);
+vm.runInContext(`${nameFunction}\n${core.slice(helperStart,helperEnd)}\n${core.slice(start,end)}`,historyContext);
 vm.runInContext('HISTORY_BY_NAME=buildHistoryByName(input)',Object.assign(historyContext,{input:[oldSession,currentSession,orphan]}));
 for(const exercise of [workouts[0].exercises[0],workouts[1].exercises[0]]){
   const rows=historyContext.getSharedSessions(exercise);
@@ -51,6 +52,7 @@ assert.equal(await deleteContext.performDeleteSession('pending-session'),true);
 assert.equal(cancelled,1,'pending deletion must call the cancellation layer');
 assert.equal(flushed,0,'the old queue guard must not block pending deletion');
 assert.equal(toasts.some(item=>item.message.includes('não foi sincronizado')),false);
-assert.match(pending,/discardPending\?\.\(sessionId\)/,'the inner cancellation removes the queued write');
+assert(pending.includes('__tbDurableSessionDelete'),'The active wrapper must delegate synced and pending deletion to the durable core entry point');
+assert(core.includes('await runtime.requestDelete(sessionId,owner?.session)'),'Core deletion must record durable intent before changing the UI');
 console.log('APROVADO — aluno exclui sessão pendente e vê histórico do mesmo exercício em todos os treinos.');
 

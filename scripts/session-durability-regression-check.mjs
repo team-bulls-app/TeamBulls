@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {execFileSync} from 'node:child_process';
+const baselineIndex=process.argv.indexOf('--baseline'),baseline=process.argv[baselineIndex+1];assert(baselineIndex<0||/^[a-f0-9]{7,40}$/.test(baseline));
+const read=file=>baselineIndex<0?fs.readFileSync(file,'utf8'):execFileSync('git',['show',`${baseline}:${file}`],{encoding:'utf8'});
 
-const perfSource=fs.readFileSync('modules/session-save-performance-v10_10_9.js','utf8');
-const integritySource=fs.readFileSync('modules/session-integrity-v10_10_39.js','utf8');
-const mutationSource=fs.readFileSync('modules/pending-session-mutations-v10_10_34.js','utf8');
-const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
+const perfSource=read('modules/session-save-performance-v10_10_9.js');
+const integritySource=read('modules/session-integrity-v10_10_39.js');
+const mutationSource=read('modules/pending-session-mutations-v10_10_34.js');
+const core=read('app_v10_10_9_core.js');
 const queueKey='team_bulls_pending_sessions_v1_student-a';
 const clone=value=>JSON.parse(JSON.stringify(value));
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};};
@@ -28,20 +31,21 @@ export function app(options={}){
   const addListener=(name,fn)=>{const items=listeners.get(name)||[];items.push(fn);listeners.set(name,items);};
   const emit=name=>{for(const fn of listeners.get(name)||[])fn({persisted:true});};
   const indexDb={transaction(_store,mode){
+    let outstanding=0;
     const tx={error:null,aborted:false,abort(){this.aborted=true;this.onabort?.();},objectStore(){return{
       get:key=>request(key),put:(value,key)=>request(key,value)
     };}};
     function request(key,value){
-      const req={result:undefined};
+      const writing=arguments.length>1,req={result:undefined};outstanding++;
       const complete=()=>{
         if(tx.aborted)return;
-        if(options.failIndexedWrite&&mode==='readwrite'){tx.error=new Error('quota');tx.onerror?.();return;}
-        if(mode==='readwrite')indexed.set(key,clone(value));
+        if(options.failIndexedWrite&&writing){tx.error=new Error('quota');tx.onerror?.();return;}
+        if(writing)indexed.set(key,clone(value));
         else req.result=indexed.has(key)?clone(indexed.get(key)):undefined;
-        req.onsuccess?.();queueMicrotask(()=>tx.oncomplete?.());
+        req.onsuccess?.();outstanding--;queueMicrotask(()=>{if(!outstanding)tx.oncomplete?.();});
       };
       queueMicrotask(()=>{
-        if(mode==='readwrite'&&options.indexedGate)options.indexedGate.promise.then(complete);
+        if(writing&&options.indexedGate)options.indexedGate.promise.then(complete);
         else complete();
       });
       return req;
@@ -55,7 +59,7 @@ export function app(options={}){
     requestAnimationFrame:fn=>frames.push(fn),
     MODE:options.mode||'cloud',CURRENT_USER:{uid:'student-a',role:'student',...(options.offlineRegistered?{offlineRegistered:true}:{})},
     navigator:{onLine:options.online!==false},
-    CUR_WORKOUT:'workout-a',CUR_EX:'exercise-a',SESSION_WID:'workout-a',SESSION_EID:'exercise-a',SESSION_CREATE_ID:'',LAST_SESSION_WEEK:2,
+    CUR_WORKOUT:'workout-a',CUR_EX:'exercise-a',SESSION_WID:'workout-a',SESSION_EID:'exercise-a',SESSION_CREATE_ID:'',LAST_SESSION_WEEK:2,LOCAL_OWNER_UID:'student-a',INACTIVE_UID:'',NAVIGATION_SEQ:1,
     EDIT_SESSION_ID:'',EDIT_SESSION_WID:'workout-a',EDIT_SESSION_EID:'exercise-a',
     storageGet:key=>local.get(key)??null,
     storageSet:(key,value)=>{if(options.failLocal)return false;local.set(key,value);return true;},
@@ -76,7 +80,7 @@ export function app(options={}){
       for(const workout of tree)for(const exercise of workout.exercises){const session=exercise.sessions.find(s=>s.id===id);if(session)return{workout,exercise,session};}
       return null;
     },
-    syncSessionToHistory:()=>{},saveSessionArchive:()=>true,saveCloudBackup:()=>{},renderExercise:()=>{},
+    syncSessionToHistory:()=>{},saveSessionArchive:()=>true,saveCloudBackup:()=>{},renderExercise:()=>{},removeSessionFromHistory:()=>{},removeSessionFromArchive:()=>{},firestoreWriteMessage:e=>e.message,
     runWhenIdle:()=>{},resetRestTimer:()=>{},showToast:message=>toasts.push(message),alert:message=>alerts.push(message),
     closeModal:id=>{if(id==='modal-session')modal.open=false;else editModal.open=false;},
     beginAction:()=>{if(button.disabled)return false;button.disabled=true;return true;},endAction:()=>{button.disabled=false;},
@@ -123,13 +127,15 @@ export function app(options={}){
         if(options.writeGate)await options.writeGate.promise;
         remote.set(id,{...remote.get(id),...clone(value)});
       },
-      async delete(){calls.push(['delete',id]);remote.delete(id);}
+      async delete(){calls.push(['delete',id]);if(!context.navigator.onLine)throw Object.assign(new Error('offline'),{code:'unavailable'});if(options.deleteGate)await options.deleteGate.promise;if(options.deleteFailure)throw options.deleteFailure;if(!remote.has(id)||remote.get(id).userId!==context.CURRENT_USER.uid)throw permission();remote.delete(id);options.afterDelete?.();}
     };}};
     return query;
   }};
   context.db=options.db||context.db;
   context.firebase=options.firebase||context.firebase;
   vm.createContext(context);
+  const coreFunction=name=>{const start=core.indexOf(`function ${name}(`);if(start<0)return '';const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));};
+  vm.runInContext(['filterDeletedSessions','performDeleteSession','deleteSession','deleteEditedSession'].map(coreFunction).join('\n'),context);
   vm.runInContext(perfSource,context);
   vm.runInContext(integritySource,context);
   vm.runInContext(mutationSource,context);
@@ -269,6 +275,83 @@ await check('reabertura por uma camada antiga não bloqueia a submissão seguint
 await check('mais de 60 séries falha antes do servidor e conserva o editor',async()=>{
   const a=app({online:false});await a.ready();const row=a.rows[0];a.rows.push(...Array(60).fill(row));
   const {result}=await a.save();assert.equal(result,false);assert.equal(a.modal.open,true);assert.equal(a.api.pending(),0);assert.ok(a.alerts.length);
+});
+
+function seedSaved(a,id='saved',extra={}){
+  const session={id,userId:'student-a',workoutId:'workout-a',exerciseId:'exercise-a',exerciseName:'Supino reto',date:'2026-10-06',week:2,note:'preservar',sets:[{weight:80,reps:8}],createdAt:{ms:123},...extra};
+  a.tree[0].exercises[0].sessions.push(clone(session));a.remote.set(id,clone(session));return session;
+}
+await check('exclusão offline de sessão confirmada sobrevive ao fechamento e preserva outros registros',async()=>{
+  const a=app({online:false});await a.ready();const deleted=seedSaved(a),kept=seedSaved(a,'keep');
+  assert.equal(await a.context.performDeleteSession(deleted.id),true,'A confirmed session must be removable offline after its deletion intent is durable');assert.deepEqual(a.tree[0].exercises[0].sessions.map(s=>s.id),['keep']);assert.equal(a.remote.has(deleted.id),true);assert.equal(a.api.pendingDeletes(),1);
+  const b=app({online:false,local:a.local,indexed:a.indexed,remote:a.remote});b.tree[0].exercises[0].sessions=[clone(deleted),clone(kept)];await b.ready();b.api.restore();
+  assert.equal(b.tree[0].exercises[0].sessions.some(s=>s.id===deleted.id),false);assert.equal(b.api.filterDeleted([deleted,kept],'student-a').length,1);
+  b.context.navigator.onLine=true;await b.api.flush();assert.equal(b.remote.has(deleted.id),false);assert.deepEqual(b.remote.get('keep'),kept);assert.equal(b.api.pending(),0);assert.equal(b.api.isDeleted(deleted.id),true);
+  const c=app({online:false,local:b.local,indexed:b.indexed,remote:b.remote});await c.ready();assert.equal(c.api.filterDeleted([deleted,kept],'student-a')[0].id,'keep','Confirmed marker must keep old backups from restoring the deleted session');
+});
+await check('exclusão pendente cancela criação offline e confirma ausência pelas Rules fechadas',async()=>{
+  const a=app({online:false});await a.ready();const {id}=await a.save();a.frames();assert.equal(await a.context.performDeleteSession(id),true);
+  assert.equal(a.api.hasPending(id),false);assert.equal(a.api.pendingDeletes(),1);assert.equal(a.tree[0].exercises[0].sessions.length,0);
+  a.context.navigator.onLine=true;assert.equal(await a.api.flush(),true);assert.equal(a.remote.has(id),false);assert.equal(a.calls.filter(([type])=>type==='set').length,0);assert(a.calls.some(([type])=>type==='query'));assert.equal(a.api.pendingDeletes(),0);
+});
+await check('criação em voo seguida de timeout e exclusão não ressuscita nem reenvia a série',async()=>{
+  const gate=deferred(),a=app({writeGate:gate,writeTimeout:true});await a.ready();const {id}=await a.save();a.frames();await a.api.flush();
+  assert.equal(await a.context.performDeleteSession(id),true);await a.api.flush();await settle();assert.equal(a.tree[0].exercises[0].sessions.length,0);assert.equal(a.calls.filter(([type])=>type==='delete').length,0,'Delete must await the real creation promise for this ID');
+  gate.resolve();await settle();await settle();assert.equal(a.remote.has(id),false);assert.equal(a.api.pendingDeletes(),0);assert.equal(a.calls.filter(([type])=>type==='set').length,1);assert.equal(a.calls.filter(([type])=>type==='delete').length,1);
+});
+await check('exclusão não aguarda gravação pendente de outro registro',async()=>{
+  const gate=deferred(),a=app({writeGate:gate,writeTimeout:true});await a.ready();await a.save();await a.api.flush();seedSaved(a,'delete-other');
+  assert.equal(await a.context.performDeleteSession('delete-other'),true);await settle();await settle();assert.equal(a.remote.has('delete-other'),false,'Unrelated slow write must not block deletion');gate.resolve();await settle();
+});
+await check('timeout de delete mantém uma única operação em voo e aceita confirmação tardia',async()=>{
+  const gate=deferred(),a=app({deleteGate:gate,writeTimeout:true});await a.ready();seedSaved(a);await a.context.performDeleteSession('saved');await a.api.flush();await a.api.flush();
+  assert.equal(a.calls.filter(([type])=>type==='delete').length,1);assert.equal(a.api.pendingDeletes(),1);gate.resolve();await settle();await settle();assert.equal(a.remote.has('saved'),false);assert.equal(a.api.pendingDeletes(),0);
+});
+await check('reinício após delete remoto e falha ao guardar confirmação reconhece ausência sem erro falso',async()=>{
+  const opts={},a=app(opts);await a.ready();seedSaved(a);opts.afterDelete=()=>{opts.failLocal=true;opts.failIndexedWrite=true;};await a.context.performDeleteSession('saved');await settle();await settle();assert.equal(a.remote.has('saved'),false);assert.equal(a.api.pendingDeletes(),1);
+  const b=app({local:a.local,indexed:a.indexed,remote:a.remote});await b.ready();assert.equal(await b.api.flush(),true);assert.equal(b.api.pendingDeletes(),0);assert(b.calls.some(([type])=>type==='query'),'Server absence must reconcile the interrupted confirmation');
+});
+await check('exclusão usa IndexedDB quando localStorage falha e recupera em nova VM',async()=>{
+  const a=app({online:false,failLocal:true});await a.ready();const session=seedSaved(a);assert.equal(await a.context.performDeleteSession('saved'),true);
+  const b=app({online:false,failLocal:true,local:a.local,indexed:a.indexed,remote:a.remote});await b.ready();assert.equal(b.api.isDeleted('saved'),true);assert.equal(b.api.filterDeleted([session],'student-a').length,0);b.context.navigator.onLine=true;await b.api.flush();assert.equal(b.remote.has('saved'),false);
+});
+await check('falha em todos os armazenamentos não remove registro nem fecha editor',async()=>{
+  const a=app({online:false,failLocal:true,failIndexedWrite:true});await a.ready();seedSaved(a);a.editModal.open=true;a.context.EDIT_SESSION_ID='saved';
+  assert.equal(await a.context.performDeleteSession('saved'),false);assert.equal(a.tree[0].exercises[0].sessions.length,1);assert.equal(a.api.isDeleted('saved'),false);assert.equal(a.editModal.open,true);assert.equal(a.remote.has('saved'),true);assert.equal(a.button.disabled,false);
+});
+await check('permissão negada em documento existente não vira confirmação falsa de exclusão',async()=>{
+  const opts={deleteFailure:permission()},a=app(opts);await a.ready();seedSaved(a);await a.context.performDeleteSession('saved');await settle();assert.equal(await a.api.flush(),false);
+  assert.equal(a.remote.has('saved'),true);assert.equal(a.api.pendingDeletes(),1);assert.equal(a.api.diagnostics().failed,1);assert.equal(a.api.diagnostics().lastError,'permission');
+  opts.deleteFailure=null;assert.equal(await a.api.flush(),true);assert.equal(a.remote.has('saved'),false);assert.equal(a.api.pendingDeletes(),0);
+});
+await check('aluno registrado offline exclui remotamente após reconectar',async()=>{
+  const a=app({mode:'local',offlineRegistered:true,online:false});await a.ready();seedSaved(a);assert.equal(await a.context.performDeleteSession('saved'),true);assert.equal(a.api.pendingDeletes(),1);
+  a.context.MODE='cloud';a.context.navigator.onLine=true;await a.api.flush();assert.equal(a.remote.has('saved'),false);
+});
+await check('troca de conta durante exclusão não limpa editor ou histórico do outro aluno',async()=>{
+  const gate=deferred(),a=app({online:false,failLocal:true,indexedGate:gate});await a.ready();seedSaved(a);a.context.EDIT_SESSION_ID='saved';const removing=a.context.performDeleteSession('saved');await settle();
+  a.context.CURRENT_USER={uid:'student-b',role:'student'};a.context.EDIT_SESSION_ID='other-edit';a.tree=[{id:'workout-b',exercises:[{id:'exercise-b',sessions:[{id:'other-edit',sets:[{weight:5,reps:9}]}]}]}];gate.resolve();assert.equal(await removing,true);
+  assert.equal(a.context.EDIT_SESSION_ID,'other-edit');assert.equal(a.tree[0].exercises[0].sessions.length,1);assert.equal(a.calls.filter(([type])=>type==='delete').length,0);assert.equal(a.api.isDeleted('saved'),false);
+});
+await check('backup legado não restaura registro excluído nem apaga outros dados',async()=>{
+  const a=app({online:false});await a.ready();const removed=seedSaved(a),kept=seedSaved(a,'keep');await a.context.performDeleteSession('saved');
+  Object.assign(a.context,{SESSION_ARCHIVE_MEMORY:new Map(),sessionArchiveKey:uid=>'archive:'+uid,legacySessionArchiveKey:uid=>'legacy:'+uid,indexedSessionArchiveKey:uid=>'indexed:'+uid,sanitizeHistorySession:v=>v,sessionIdentity:v=>v.id,createdMillis:()=>0});
+  for(const key of ['archive:student-a','legacy:student-a'])a.local.set(key,JSON.stringify([removed,kept]));a.local.set('teamms_cloud_student-a',JSON.stringify([{id:'old',exercises:[{id:'old-e',sessions:[removed,kept]}]}]));
+  const get=name=>{const start=core.indexOf(`function ${name}(`);if(start<0)return '';const line=core.slice(start).split('\n')[0].trimEnd();return line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2);};
+  vm.runInContext(['mergeHistorySessions','sessionsFromWorkoutTree','loadSessionArchive'].map(get).join('\n'),a.context);
+  assert.deepEqual(Array.from(a.context.loadSessionArchive('student-a'),s=>s.id),['keep']);assert.equal(JSON.parse(a.local.get('legacy:student-a')).length,2,'Legacy backup is preserved; the explicit deletion marker filters the target only');
+});
+await check('confirmação antiga não exclui após troca de aluno',async()=>{
+  const a=app({online:false});await a.ready();seedSaved(a);let confirm;a.context.showConfirm=(_title,_text,fn)=>confirm=fn;
+  a.context.deleteSession('saved');a.context.CURRENT_USER={uid:'student-b',role:'student'};assert.equal(await confirm(),false);assert.equal(a.remote.has('saved'),true);assert.equal(a.calls.filter(([type])=>type==='delete').length,0);
+});
+await check('retorno atrasado não fecha uma nova confirmação aberta durante o delete',async()=>{
+  const elements=new Map(['confirm-title','confirm-text','confirm-ok-btn'].map(id=>[id,{disabled:false,textContent:'',onclick:null}]));let closed=0;const gate=deferred();
+  const c=vm.createContext({console,document:{getElementById:id=>elements.get(id)},openModal(){},closeModal:()=>closed++,alert(){}});
+  const start=core.indexOf('function showConfirm('),end=core.indexOf('\n}',start)+2;vm.runInContext(core.slice(start,end),c);
+  c.showConfirm('Excluir antiga','',()=>gate.promise);const button=elements.get('confirm-ok-btn'),old=button.onclick();c.showConfirm('Outra ação','',()=>false);const current=button.onclick;
+  gate.resolve(true);await old;assert.equal(closed,0,'Old completion must not close the new prompt');assert.equal(button.onclick,current);assert.equal(button.disabled,false);await current();assert.equal(closed,0);
+  c.showConfirm('Confirmar atual','',()=>true);await button.onclick();assert.equal(closed,1);
 });
 
 console.log(`APROVADO — ${tests.length} cenários executaram a lógica real de persistência, reabertura, sincronização, edição e isolamento de registros.`);

@@ -1972,13 +1972,13 @@ function loadSessionArchive(userId){
   for(const key of['teamms_cloud_'+userId,'teamms_local_'+userId]){
     try{const parsed=JSON.parse(storageGet(key)||'null');const workouts=Array.isArray(parsed)?parsed:(parsed?.workouts||[]);result=mergeHistorySessions(sessionsFromWorkoutTree(workouts),result);}catch(error){}
   }
-  SESSION_ARCHIVE_MEMORY.set(userId,result);
+  result=filterDeletedSessions(result,userId);SESSION_ARCHIVE_MEMORY.set(userId,result);
   return result;
 }
 function saveSessionArchive(userId,sessions){
   if(!userId)return false;
   try{
-    const merged=mergeHistorySessions(sessions,loadSessionArchive(userId));
+    const merged=filterDeletedSessions(mergeHistorySessions(sessions,loadSessionArchive(userId)),userId);
     SESSION_ARCHIVE_MEMORY.set(userId,merged);
     const serialized=JSON.stringify(merged),saved=storageSet(sessionArchiveKey(userId),serialized);
     runWhenIdle(()=>mediaPut(indexedSessionArchiveKey(userId),merged),1500);
@@ -2085,7 +2085,19 @@ function pendingSessionHistory(userId){
   if(!userId||CURRENT_USER?.role!=='student'||CURRENT_USER.uid!==userId)return[];
   try{return window.TeamBullsSessionPerformance?.sessions?.(userId)||[];}catch(error){return[];}
 }
+function filterDeletedSessions(sessions,userId){
+  try{
+    if(typeof CURRENT_USER==='undefined'||CURRENT_USER?.role!=='student'||CURRENT_USER.uid!==userId)return sessions;
+    const runtime=window.TeamBullsSessionPerformance;if(runtime?.filterDeleted)return runtime.filterDeleted(sessions,userId);
+    // The synchronous durable copy also protects early startup before modules.
+    const key='team_bulls_session_deletions_v1_'+String(userId).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,160);
+    const sources=[];try{sources.push(JSON.parse(storageGet(key)||'null'));}catch(error){}try{sources.push(JSON.parse(sessionStorage.getItem(key)||'null'));}catch(error){}
+    const latest=sources.filter(item=>item?.v===1&&Array.isArray(item.entries)).sort((a,b)=>(Number(b.updatedAt)||0)-(Number(a.updatedAt)||0))[0];
+    const ids=new Set((latest?.entries||[]).filter(item=>item.userId===userId).map(item=>String(item.id)));return sessions.filter(item=>!ids.has(String(item.id)));
+  }catch(error){return sessions;}
+}
 async function fetchCloudSessions(userId){
+  if(CURRENT_USER?.uid===userId&&CURRENT_USER?.role==='student')await window.TeamBullsSessionPerformance?.ready?.(userId);
   const query=db.collection('sessions').where('userId','==',userId);
   let result;
   try{result={snapshot:await withTimeout(query.get({source:'server'}),SESSION_READ_TIMEOUT_MS,'histórico de séries'),source:'server'};}
@@ -2094,12 +2106,12 @@ async function fetchCloudSessions(userId){
     catch(cacheError){throw serverError;}
   }
   const remote=[];for(const d of result.snapshot.docs){const session=sanitizeHistorySession(d.data(),d.id);if(session)remote.push(session);}
-  const sessions=mergeHistorySessions(pendingSessionHistory(userId),mergeHistorySessions(remote,loadSessionArchive(userId)));
+  const sessions=filterDeletedSessions(mergeHistorySessions(pendingSessionHistory(userId),mergeHistorySessions(remote,loadSessionArchive(userId))),userId);
   if(remote.length||result.source==='server')saveSessionArchive(userId,sessions);
   return{sessions,remoteSessionCount:remote.length,recoveredSessionCount:Math.max(0,sessions.length-remote.length),source:result.source};
 }
 function hydrateWorkoutSessions(workouts,sessions){
-  sessions=mergeHistorySessions(pendingSessionHistory(CURRENT_USER?.uid),sessions);
+  sessions=filterDeletedSessions(mergeHistorySessions(pendingSessionHistory(CURRENT_USER?.uid),sessions),CURRENT_USER?.uid);
   attachSessionsWithoutLosingOrphans(workouts,sessions);
   workouts.forEach(w=>w.exercises.forEach(e=>e.sessions.sort((a,b)=>String(a.date).localeCompare(String(b.date))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)))));
   return workouts;
@@ -2230,7 +2242,7 @@ function getSharedSessions(exerciseOrName,ws){
     seen.add(session.id);
     all.push({...session,_archived:!liveMatches.some(({exercise})=>String(exercise.id)===String(session.exerciseId||''))});
   }
-  return all.sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)));
+  return filterDeletedSessions(all,typeof CURRENT_USER==='undefined'?'':CURRENT_USER?.uid).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||createdMillis(a)-createdMillis(b)||String(a.id).localeCompare(String(b.id)));
 }
 function refreshVisibleSessionHistory(role){
   if(role==='student'&&document.getElementById('screen-exercise')?.classList.contains('active')){
@@ -4463,6 +4475,22 @@ async function performDeleteSession(sid){
   const sessionId=String(sid||'');
   if(!sessionId){showToast('Registro inválido.',true);return false;}
   const owner=findSessionOwner(sessionId);
+  const registered=CURRENT_USER?.role==='student'&&CURRENT_USER.uid&&(MODE==='cloud'||CURRENT_USER.offlineRegistered===true);
+  if(registered){
+    const runtime=window.TeamBullsSessionPerformance;
+    if(typeof runtime?.requestDelete!=='function'){showToast('A exclusão ainda está carregando. Aguarde alguns segundos e tente novamente.',true);return false;}
+    const userId=CURRENT_USER.uid,workoutId=CUR_WORKOUT,exerciseId=CUR_EX,navigation=typeof NAVIGATION_SEQ==='number'?NAVIGATION_SEQ:null;
+    const action='delete-session-'+userId+'-'+sessionId;if(!beginAction(action))return false;
+    try{
+      await runtime.requestDelete(sessionId,owner?.session);
+      if(CURRENT_USER?.uid!==userId||CURRENT_USER?.role!=='student')return true;
+      if(String(EDIT_SESSION_ID||'')===sessionId){EDIT_SESSION_ID=null;EDIT_SESSION_WID=null;EDIT_SESSION_EID=null;closeModal('modal-edit-session');}
+      saveCloudBackup();
+      if(CUR_WORKOUT===workoutId&&CUR_EX===exerciseId&&(navigation===null||NAVIGATION_SEQ===navigation))renderExercise();
+      showToast(runtime.isDeletePending?.(sessionId)?'Registro removido. A exclusão será sincronizada assim que possível.':'Registro excluído.');return true;
+    }catch(error){if(CURRENT_USER?.uid===userId)alert(firestoreWriteMessage(error,'registro'));return false;}
+    finally{endAction(action);}
+  }
   if(MODE==='local'){
     if(!owner){showToast('Registro não encontrado.',true);return false;}
     const snapshot=JSON.stringify(LOCAL_DB);
@@ -4470,33 +4498,24 @@ async function performDeleteSession(sid){
     if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(snapshot));showToast('Não foi possível apagar o registro.',true);return false;}
     removeSessionFromHistory(sessionId);
     removeSessionFromArchive(LOCAL_OWNER_UID||INACTIVE_UID||CURRENT_USER?.uid,sessionId);
+    if(String(EDIT_SESSION_ID||'')===sessionId)closeModal('modal-edit-session');
     EDIT_SESSION_ID=null;EDIT_SESSION_WID=null;EDIT_SESSION_EID=null;
     renderExercise();showToast('Registro excluído.');return true;
   }
-  if(!CURRENT_USER||CURRENT_USER.role!=='student'){showToast('Somente o aluno pode excluir o próprio registro.',true);return false;}
-  if(!beginAction('delete-session-'+sessionId))return false;
-  try{
-    await cloudWrite(db.collection('sessions').doc(sessionId).delete(),'excluir registro');
-    if(owner)owner.exercise.sessions=owner.exercise.sessions.filter(s=>String(s.id)!==sessionId);
-    removeSessionFromHistory(sessionId);
-    removeSessionFromArchive(CURRENT_USER.uid,sessionId);
-    EDIT_SESSION_ID=null;EDIT_SESSION_WID=null;EDIT_SESSION_EID=null;
-    saveCloudBackup();
-    renderExercise();showToast('Registro excluído.');return true;
-  }catch(e){alert(firestoreWriteMessage(e,'registro'));return false;}
-  finally{endAction('delete-session-'+sessionId);}
+  showToast('Somente o aluno pode excluir o próprio registro.',true);return false;
 }
 function deleteSession(sid){
-  const sessionId=String(sid||'');
+  const sessionId=String(sid||''),userId=CURRENT_USER?.uid,mode=MODE,localOwner=LOCAL_OWNER_UID;
   if(!sessionId)return;
-  showConfirm('Excluir registro','Apagar definitivamente as repetições, cargas e anotações desta sessão?',()=>performDeleteSession(sessionId));
+  showConfirm('Excluir registro','Apagar definitivamente as repetições, cargas e anotações desta sessão?',()=>{if(CURRENT_USER?.uid!==userId||MODE!==mode||LOCAL_OWNER_UID!==localOwner){showToast('A sessão mudou. Abra o registro novamente.',true);return false;}return performDeleteSession(sessionId);});
 }
 function deleteEditedSession(){
-  const sessionId=String(EDIT_SESSION_ID||'');
+  const sessionId=String(EDIT_SESSION_ID||''),userId=CURRENT_USER?.uid,mode=MODE,localOwner=LOCAL_OWNER_UID;
   if(!sessionId){showToast('Registro não encontrado.',true);return;}
   showConfirm('Excluir registro completo','Apagar definitivamente todas as repetições, cargas e anotações desta sessão?',async()=>{
+    if(CURRENT_USER?.uid!==userId||MODE!==mode||LOCAL_OWNER_UID!==localOwner)return false;
     const deleted=await performDeleteSession(sessionId);
-    if(deleted)closeModal('modal-edit-session');
+    if(deleted&&CURRENT_USER?.uid===userId&&String(EDIT_SESSION_ID||'')===sessionId)closeModal('modal-edit-session');
     return deleted;
   });
 }
@@ -5817,21 +5836,21 @@ function showConfirm(title,text,cb){
   const button=document.getElementById('confirm-ok-btn');
   button.disabled=false;
   button.textContent='CONFIRMAR';
-  button.onclick=async function(){
+  const handler=async function(){
     if(button.disabled)return;
     button.disabled=true;
     button.textContent='PROCESSANDO...';
     try{
       const completed=await cb();
-      if(completed!==false)closeModal('modal-confirm');
+      if(button.onclick===handler&&completed!==false)closeModal('modal-confirm');
     }catch(error){
       console.error('confirm action',error);
       alert('Não foi possível concluir a ação: '+error.message);
     }finally{
-      button.disabled=false;
-      button.textContent='CONFIRMAR';
+      if(button.onclick===handler){button.disabled=false;button.textContent='CONFIRMAR';}
     }
   };
+  button.onclick=handler;
   openModal('modal-confirm');
 }
 
