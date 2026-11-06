@@ -5,19 +5,22 @@ const source=baseline?spawnSync('git',['show',`${baseline}:app_v10_10_9_core.js`
 function fn(name){const start=source.indexOf(`function ${name}(`);if(start<0)return '';const line=source.slice(start).split('\n')[0].trimEnd(),prefix=source.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:source.slice(start,source.indexOf('\n}',start)+2));}
 const actions=['saveInstructionFolder','saveInstructionItem','toggleInstructionFolder','toggleInstructionItem','deleteInstructionFolder','deleteInstructionItem','moveInstructionFolder','moveInstructionItem','saveTechnique','deleteTechnique'];
 const elements=new Map();const element=id=>{if(!elements.has(id))elements.set(id,{value:'',disabled:false,style:{},classList:{remove(){}},removeAttribute(){}});return elements.get(id);};
-let attempted=[],sequence=0,fail=false,writes=0,cached=0,closed=[],confirm,hold=null,rendered=0;const locks=new Set();
-const c=vm.createContext({console,CURRENT_USER:{uid:'trainer',role:'trainer'},MODE:'cloud',EDIT_INSTRUCTION_FOLDER_ID:'f1',EDIT_INSTRUCTION_ITEM_ID:'i1',EDIT_TECHNIQUE_ID:'t1',
+let attempted=[],sequence=0,fail=false,writes=0,cached=0,closed=[],confirm,hold=null,rendered=0,remote={};const locks=new Set();
+const c=vm.createContext({console,CATALOG_EDITOR_CONTEXTS:{},CURRENT_USER:{uid:'trainer',role:'trainer'},MODE:'cloud',EDIT_INSTRUCTION_FOLDER_ID:'f1',EDIT_INSTRUCTION_ITEM_ID:'i1',EDIT_TECHNIQUE_ID:'t1',
  document:{getElementById:element},uid:()=> 'new-'+(++sequence),extractYouTubeId:()=>true,
  normalizeGeneralInstructions:data=>structuredClone(data),normalizeTechniqueCatalog:data=>structuredClone(data),
  cacheGeneralInstructions:()=>cached++,cacheTechniqueCatalog:()=>cached++,cloudWrite:async p=>p,
- firebase:{firestore:{FieldValue:{serverTimestamp:()=>123}}},db:{collection:()=>({doc:()=>({set:async payload=>{attempted.push(structuredClone(payload));if(fail)throw new Error('network');if(hold)await hold;writes++;}})})},
+ firebase:{firestore:{FieldValue:{serverTimestamp:()=>123}}},db:{collection:collection=>({doc:()=>({collection})}),runTransaction:async task=>{
+ let staged;await task({get:async ref=>({exists:true,data:()=>remote[ref.collection]||structuredClone(ref.collection==='trainingInstructions'?c.GENERAL_INSTRUCTIONS:c.TECHNIQUE_CATALOG)}),set:(ref,payload)=>{staged={ref,payload};}});
+ if(staged){attempted.push(structuredClone(staged.payload));if(fail)throw new Error('network');if(hold)await hold;remote[staged.ref.collection]=structuredClone(staged.payload);delete remote[staged.ref.collection].updatedAt;writes++;}
+ }},
  beginAction:(key)=>{if(locks.has(key))return false;locks.add(key);return true;},endAction:key=>locks.delete(key),
  renderInstructions:()=>rendered++,renderTechniques:()=>rendered++,showToast(){},alert(){},closeModal:id=>closed.push(id),showConfirm:(_title,_text,cb)=>{confirm=cb;}});
-vm.runInContext(['persistGeneralInstructions','persistTechniqueCatalog','commitCatalogAction',...actions].map(fn).join('\n'),c);
+vm.runInContext(['catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','captureCatalogEditor','commitCatalogAction',...actions].map(fn).join('\n'),c);
 function setup(){
  c.CURRENT_USER={uid:'trainer',role:'trainer'};c.GENERAL_INSTRUCTIONS={revision:1,folders:[{id:'f1',name:'Original',active:true,items:[{id:'i1',title:'Original',text:'Texto',active:true},{id:'i2',title:'Segundo',active:true}]},{id:'f2',name:'Destino',active:true,items:[]}]};c.TECHNIQUE_CATALOG={revision:1,items:[{id:'t1',code:'T',name:'Original',description:'Texto'}]};
  for(const [id,value] of Object.entries({'input-instruction-folder-name':'Renomeada','input-instruction-folder-active':'true','input-instruction-item-folder':'f2','input-instruction-item-title':'Nova orientação','input-instruction-item-text':'Novo texto','input-instruction-item-video':'','input-instruction-item-active':'true','input-technique-code':'NEW','input-technique-name':'Nova técnica','input-technique-description':'Descrição nova','input-technique-video':''}))element(id).value=value;
- writes=0;cached=0;closed=[];attempted=[];sequence=0;c.EDIT_INSTRUCTION_FOLDER_ID='f1';c.EDIT_INSTRUCTION_ITEM_ID='i1';c.EDIT_TECHNIQUE_ID='t1';confirm=null;rendered=0;fail=false;locks.clear();hold=null;
+ c.CATALOG_EDITOR_CONTEXTS={};remote={};writes=0;cached=0;closed=[];attempted=[];sequence=0;c.EDIT_INSTRUCTION_FOLDER_ID='f1';c.EDIT_INSTRUCTION_ITEM_ID='i1';c.EDIT_TECHNIQUE_ID='t1';confirm=null;rendered=0;fail=false;locks.clear();hold=null;
 }
 const run=code=>vm.runInContext(code,c);
 const expressions=['saveInstructionFolder()','saveInstructionItem()','toggleInstructionFolder("f1")','toggleInstructionItem("f1","i1")','deleteInstructionFolder("f1")','deleteInstructionItem("f1","i1")','moveInstructionFolder("f1",1)','moveInstructionItem("f1","i1",1)','saveTechnique()','deleteTechnique("t1")'];
@@ -38,8 +41,8 @@ c.CURRENT_USER={uid:'other',role:'trainer'};release();await pending;assert.equal
 // Cardio arrow: a failed persistence must restore both order and local copy.
 setup();c.CARDIO_CONTEXT={trainer:true,targetUid:'a',local:false};c.VIEW_STUDENT={uid:'a'};c.CARDIO_DOCUMENT={main:null,substitutions:[{id:'a',type:'Bike',order:0},{id:'b',type:'Elíptico',order:1}]};c.LOCAL_DB={};
 c.cardioCanEdit=()=>true;c.cardioOwnerKey=()=> 'a';c.renderCardioScreen=()=>rendered++;c.cloudWriteError=e=>e.message;c.normalizeCardioDocument=data=>structuredClone(data);
-c.persistCardioDocument=async()=>{if(fail)throw new Error('network');};
-vm.runInContext(fn('cardioDeleteContextCurrent')+'\n'+fn('moveCardioSubstitution'),c);
+c.persistCardioMutation=async(_context,mutate)=>{if(fail)throw new Error('network');return mutate(structuredClone(c.CARDIO_DOCUMENT));};
+vm.runInContext(fn('captureCardioContext')+'\n'+fn('cardioDeleteContextCurrent')+'\n'+fn('moveCardioSubstitution'),c);
 fail=true;const order=JSON.stringify(c.CARDIO_DOCUMENT);assert.equal(await run('moveCardioSubstitution("a",1)'),false);assert.equal(JSON.stringify(c.CARDIO_DOCUMENT),order,'Failed reorder must restore the original order');
 fail=false;assert.equal(await run('moveCardioSubstitution("a",1)'),true);assert.equal(c.CARDIO_DOCUMENT.substitutions[0].id,'b');
 console.log('PASS 10 catalog actions: reject/unchanged cache, successful save, student denied; shared lock, late owner change and cardio reorder rollback.');
