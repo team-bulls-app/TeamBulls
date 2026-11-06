@@ -24,8 +24,8 @@ assert(sw.includes(`const BUILD_REVISION=${BUILD};`),'Service Worker divergiu do
 assert(bridge.includes(`const BUILD_REVISION=${BUILD};`),'Service Worker legado divergiu do build publicado.');
 assert(sw===bridge,'sw.js e sw_47.js divergiram durante a estabilização.');
 assert(update.includes('const CHECK_INTERVAL_MS=2*60*1000;'),'Atualizador voltou a esperar vinte minutos entre verificações em primeiro plano.');
-assert(update.includes("const STUDENT_DIET_COMPACT_MODULE='./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1';"),'Atualizador não aquece a revisão compacta da dieta do aluno.');
-assert(sw.includes("./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1"),'Shell offline não inclui a revisão compacta da dieta do aluno.');
+assert(update.includes("const STUDENT_DIET_COMPACT_MODULE='./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact2';"),'Atualizador não aquece a revisão compacta da dieta do aluno.');
+assert(sw.includes("./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact2"),'Shell offline não inclui a revisão compacta da dieta do aluno.');
 const cacheHotfix=sw.match(/const CACHE_HOTFIX='([^']+)'/)?.[1]||'';
 const heicRecovery=cacheHotfix==='heic-recovery1';
 assert(cacheHotfix==='update-unblock1'||heicRecovery,'Build atual rotacionou o cache de resgate sem uma recuperação explicitamente auditada.');

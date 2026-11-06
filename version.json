@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110503,
-  "revision": "cardio-delete-guidance-style-1",
-  "publishedAt": "2026-11-05T00:00:00Z",
+  "build": 2026110601,
+  "revision": "runtime-stability-1",
+  "publishedAt": "2026-11-06T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Exclusão segura de cardio e orientações de frequência com visual alinhado aos protocolos."
+  "message": "Menos redesenhos repetidos da dieta, reconexão do histórico ao vivo e proteção contra gravações simultâneas."
 }

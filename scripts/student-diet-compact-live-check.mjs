@@ -16,13 +16,13 @@ for(const file of [modulePath,'config_v10_7.js','update_v10_10_9.js']){
   assert(syntax.status===0,`${file} possui JavaScript inválido: ${String(syntax.stderr||'').trim()}`);
 }
 
-const src='./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact1';
+const src='./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact2';
 assert(config.includes(src),'Módulo compacto da dieta não está no runtime prioritário do aluno.');
 assert(config.indexOf(src)<config.indexOf('./modules/student-hotbar-payments-v10_10_22.js'),'Dieta compacta deve entrar antes dos recursos secundários da hotbar.');
 assert(sw.includes(src),'Service Worker não aquece o módulo compacto da dieta.');
 assert(update.includes('STUDENT_DIET_COMPACT_MODULE'),'Atualizador não inclui o módulo compacto no refresh crítico.');
 
-assert(moduleCode.includes("const VERSION='10.10.23-dietcompact1';"),'Versão do módulo compacto divergiu.');
+assert(moduleCode.includes("const VERSION='10.10.23-dietcompact2';"),'Versão do módulo compacto divergiu.');
 assert(moduleCode.includes('#screen-diet-detail #diet-cycle-summary'),'Datas não estão estritamente limitadas à tela de dieta do aluno.');
 assert(moduleCode.includes('grid-template-columns:repeat(3,minmax(0,1fr))'),'Datas/calorias perderam o alinhamento em três colunas.');
 assert(moduleCode.includes('#screen-diet-detail #diet-energy-summary .diet-energy-card-head{display:none!important}'),'Cabeçalho grande da tabela calórica reapareceu.');

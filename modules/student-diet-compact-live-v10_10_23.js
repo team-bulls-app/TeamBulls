@@ -4,13 +4,14 @@
   if(window.__TEAM_BULLS_STUDENT_DIET_COMPACT_LIVE_101023__)return;
   window.__TEAM_BULLS_STUDENT_DIET_COMPACT_LIVE_101023__=true;
 
-  const VERSION='10.10.23-dietcompact1';
+  const VERSION='10.10.23-dietcompact2';
   let observer=null;
   let patchFrame=0;
   let dietUnsubscribe=null;
   let dietUid='';
   let dietFingerprint='';
   let renderSequence=0;
+  let listenerGeneration=0,retryUid='',retryAfter=0,retryTimer=0,retryAttempts=0;
 
   const currentUser=()=>{try{return typeof CURRENT_USER!=='undefined'?CURRENT_USER:null;}catch(error){return null;}};
   const coreMode=()=>{try{return typeof MODE!=='undefined'?MODE:'';}catch(error){return'';}};
@@ -182,17 +183,20 @@
   }
 
   function stopDietLiveSync(){
+    listenerGeneration++;clearTimeout(retryTimer);retryTimer=0;
     if(typeof dietUnsubscribe==='function')try{dietUnsubscribe();}catch(error){}
     dietUnsubscribe=null;dietUid='';dietFingerprint='';
   }
 
   function ensureDietLiveSync(){
     if(!cloudStudent()||!uid()){stopDietLiveSync();return false;}
-    const nextUid=uid();if(dietUnsubscribe&&dietUid===nextUid)return true;
+    const nextUid=uid();if(nextUid!==retryUid){retryUid=nextUid;retryAttempts=0;retryAfter=0;}if(nextUid===retryUid&&Date.now()<retryAfter)return false;if(dietUnsubscribe&&dietUid===nextUid)return true;
     stopDietLiveSync();dietUid=nextUid;dietFingerprint=currentDietFingerprint();
+    const generation=listenerGeneration;
     try{
-      dietUnsubscribe=db.collection('mealPlans').doc(nextUid).onSnapshot(snapshot=>{
-        if(uid()!==nextUid||!cloudStudent())return;
+      const unsubscribe=db.collection('mealPlans').doc(nextUid).onSnapshot(snapshot=>{
+        if(generation!==listenerGeneration||uid()!==nextUid||!cloudStudent())return;
+        if(snapshot.metadata?.fromCache===false)retryAttempts=0;
         const normalized=normalizeDietPayload(snapshot.exists?snapshot.data():{});
         const fingerprint=JSON.stringify(normalized);
         if(fingerprint===dietFingerprint||fingerprint===currentDietFingerprint()){dietFingerprint=fingerprint;return;}
@@ -200,8 +204,15 @@
         if(!setDietDocument(normalized))return;
         try{if(typeof cacheOwnDietDocument==='function')cacheOwnDietDocument(nextUid,normalized);}catch(error){}
         rerenderDietFromLiveUpdate(normalized).catch(error=>console.warn('[Team Bulls] Dieta atualizada, mas a tela não pôde ser redesenhada imediatamente.',error));
-      },error=>console.warn('[Team Bulls] Sincronização em tempo real da dieta indisponível; leitura normal preservada.',error));
-      return true;
+      },error=>{
+        if(generation!==listenerGeneration)return;
+        stopDietLiveSync();retryUid=nextUid;retryAttempts++;retryAfter=Date.now()+Math.min(60000,5000*2**(retryAttempts-1));
+        const code=String(error?.code||'').replace(/^.*\//,'');
+        if(retryAttempts<=3&&!['permission-denied','unauthenticated'].includes(code))retryTimer=setTimeout(()=>{retryTimer=0;if(!document.hidden&&navigator.onLine!==false&&uid()===nextUid&&cloudStudent())ensureDietLiveSync();},Math.max(1,retryAfter-Date.now()));
+        console.warn('[Team Bulls] Sincronização em tempo real da dieta indisponível; leitura normal preservada.',error);
+      });
+      if(generation!==listenerGeneration){try{unsubscribe?.();}catch(error){}return false;}
+      dietUnsubscribe=unsubscribe;return true;
     }catch(error){console.warn('[Team Bulls] Não foi possível iniciar a sincronização em tempo real da dieta.',error);stopDietLiveSync();return false;}
   }
 

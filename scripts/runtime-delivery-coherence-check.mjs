@@ -34,12 +34,12 @@ assert(sw===sw47,'sw.js e sw_47.js divergiram.');
 
 const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1';
 const recoveredModalRef='modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4';
-const foregroundRecoveryRef='modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2';
+const foregroundRecoveryRef='modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3';
 assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length>=2,'HTML precisa pré-carregar e executar a revisão nova do runtime Firestore.');
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='cardio-delete-guidance-style-1','A revisão publicada não identifica o enquadramento do login mobile.');
+assert(version.revision==='runtime-stability-1','A revisão publicada não identifica o enquadramento do login mobile.');
 
 assert(config.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4'),'Loader ainda pede conversor HEIC antigo.');
 assert(updater.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&updater.includes('heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4'),'Atualizador ainda aquece revisão HEIC antiga.');
@@ -47,11 +47,11 @@ assert(sw.includes('heic-report-conversion-v10_10_12.js?v=10.10.12-heic4')&&sw.i
 assert(heic.includes("const VERSION='10.10.12-heic4'")&&heic.includes('heicworker4'),'Conversor HEIC canônico não corresponde às referências publicadas.');
 assert(sw.includes("'/modules/heic-report-conversion-v10_10_12.js'")&&sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'HEIC precisa permanecer network-first.');
 
-assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite9')&&usability.includes("const EXPECTED_VERSION='10.10.58-intelsuite9'"),'Bootstrap ainda espera suíte de inteligência antiga.');
-assert(intelligence.includes("const VERSION='10.10.58-intelsuite9'"),'Suíte de inteligência canônica não está na revisão esperada.');
+assert(usability.includes('intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite10')&&usability.includes("const EXPECTED_VERSION='10.10.58-intelsuite10'"),'Bootstrap ainda espera suíte de inteligência antiga.');
+assert(intelligence.includes("const VERSION='10.10.58-intelsuite10'"),'Suíte de inteligência canônica não está na revisão esperada.');
 assert(intelligence.includes('student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7'),'Suíte não entrega a correção atual do envio semanal.');
 const trainerSpec=intelligence.slice(intelligence.indexOf('trainer:['),intelligence.indexOf('],\n    student:['));
-assert(trainerSpec.includes('foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2'),'A retomada segura do Firestore precisa ser carregada também no fluxo do treinador.');
+assert(trainerSpec.includes('foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3'),'A retomada segura do Firestore precisa ser carregada também no fluxo do treinador.');
 assert(core.includes('firebasejs/13.1.0/firebase-firestore-compat.js')&&!core.includes('firebasejs/10.7.1/'),'O runtime ainda usa uma versão antiga/inconsistente do Firebase.');
 assert(config.includes('firebasejs/13.1.0/firebase-app-check-compat.js')&&!config.includes('firebasejs/10.7.1/'),'App Check ainda usa uma versão antiga do Firebase.');
 for(const [name,source] of [['avisos do aluno',messaging],['App Check legado',v107Core],['service worker de push',messagingWorker]]){
