@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__)return;
   window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__=true;
 
-  const VERSION='10.10.12-inboxpayments3';
+  const VERSION='10.10.12-inboxpayments4';
   const ACTIVITY_INDEX_VERSION=1;
   const PAYMENT_MAX_FILE=15*1024*1024;
   const ACTIVITY_LIMIT=200;
@@ -11,6 +11,7 @@
   let activityUnsub=null,paymentUnsub=null,listenerPrimed=false,trainerInitUid='';
   let activityEvents=[],protocolDue=[],students=[],paymentRecords=[];
   let inboxFilter='all',paymentSearch='',paymentEditorId='',pendingPaymentId='',pendingPaymentStudentId='',paymentFile=null,paymentPreviewUrl='';
+  let paymentEditorRequest=0,paymentSaving=false,receiptViewRequest=0;
   const studentMap=new Map();
 
   const trainer=()=>typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'&&typeof MODE!=='undefined'&&MODE==='cloud';
@@ -248,37 +249,62 @@
   function handleReceiptFile(event){const file=event.target.files?.[0]||null,preview=document.getElementById('tb-payment-receipt-preview');revokePaymentPreview();paymentFile=null;if(!file){preview?.classList.remove('active');if(preview)preview.removeAttribute('src');return;}if(!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.type||'')){toast('O comprovante precisa ser uma imagem.',true);event.target.value='';return;}if(file.size>PAYMENT_MAX_FILE){toast('O comprovante precisa ter no máximo 15 MB.',true);event.target.value='';return;}paymentFile=file;paymentPreviewUrl=URL.createObjectURL(file);if(preview){preview.src=paymentPreviewUrl;preview.classList.add('active');}}
   function populatePaymentStudents(selected=''){const select=document.getElementById('tb-payment-student');if(!select)return;select.innerHTML='<option value="">Escolha o aluno...</option>'+students.map(item=>`<option value="${h(item.uid)}">${h(item.name||'Aluno')}</option>`).join('');if(selected)select.value=selected;}
   async function openPaymentEditor(studentId='',recordId=''){
-    if(!trainer())return;ensureUi();await loadStudents();paymentEditorId=recordId||'';pendingPaymentId=recordId?'':'pay-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);pendingPaymentStudentId='';paymentFile=null;revokePaymentPreview();const input=document.getElementById('tb-payment-receipt');if(input)input.value='';const preview=document.getElementById('tb-payment-receipt-preview');if(preview){preview.classList.remove('active');preview.removeAttribute('src');}
+    if(!trainer()||paymentSaving)return;const request=++paymentEditorRequest,owner=CURRENT_USER.uid;ensureUi();await loadStudents();if(request!==paymentEditorRequest||!trainer()||CURRENT_USER.uid!==owner)return;paymentEditorId=recordId||'';pendingPaymentId=recordId?'':'pay-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);pendingPaymentStudentId='';paymentFile=null;revokePaymentPreview();const input=document.getElementById('tb-payment-receipt');if(input)input.value='';const preview=document.getElementById('tb-payment-receipt-preview');if(preview){preview.classList.remove('active');preview.removeAttribute('src');}
     const record=recordId?paymentRecords.find(item=>item.id===recordId):null;populatePaymentStudents(record?.studentId||studentId);const studentSelect=document.getElementById('tb-payment-student');if(studentSelect)studentSelect.disabled=!!record;document.getElementById('tb-payment-plan').value=record?.planType||'quarterly';document.getElementById('tb-payment-duration').value=String(record?.durationMonths||planMonths(record?.planType||'quarterly'));document.getElementById('tb-payment-amount').value=record?String(Number(record.amountCents||0)/100):'';document.getElementById('tb-payment-valid-from').value=record?.validFrom||todayIso();document.getElementById('tb-payment-note').value=record?.note||'';document.getElementById('tb-payment-modal-title').textContent=record?'Corrigir pagamento':'Registrar pagamento';updatePaymentDuePreview();openModal('modal-trainer-payment');
   }
   function receiptExtension(file){const type=String(file?.type||'').toLowerCase();if(type==='image/png')return'png';if(type==='image/webp')return'webp';if(type==='image/heic')return'heic';if(type==='image/heif')return'heif';return'jpg';}
   async function uploadReceipt(trainerUid,studentId,paymentId,file){
-    if(!file)return'';const service=await ensureStorageService();if(!service)throw new Error('Armazenamento de comprovantes indisponível.');const path=`paymentReceipts/${cleanId(trainerUid)}/${cleanId(studentId)}/${cleanId(paymentId)}.${receiptExtension(file)}`,ref=service.ref(path);await withTimeout(ref.put(file,{contentType:file.type||'image/jpeg'}),30000,'enviar comprovante');return path;
+    if(!file)return'';const service=await ensureStorageService();if(!service)throw new Error('Armazenamento de comprovantes indisponível.');
+    // A replacement must not overwrite the previous receipt before its link is confirmed.
+    const fileId=cleanId(paymentId).slice(0,140)+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+    const path=`paymentReceipts/${cleanId(trainerUid)}/${cleanId(studentId)}/${fileId}.${receiptExtension(file)}`,ref=service.ref(path);await withTimeout(ref.put(file,{contentType:file.type||'image/jpeg'}),30000,'enviar comprovante');return path;
   }
   async function deleteReceipt(path){if(!path)return;try{const service=await ensureStorageService();await service?.ref(path)?.delete();}catch(error){}}
   async function savePayment(){
-    if(!trainer())return;const studentId=String(document.getElementById('tb-payment-student')?.value||''),planType=document.getElementById('tb-payment-plan')?.value||'quarterly',amount=Number(document.getElementById('tb-payment-amount')?.value||0),validFrom=document.getElementById('tb-payment-valid-from')?.value||'',note=String(document.getElementById('tb-payment-note')?.value||'').normalize('NFKC').trim().slice(0,500),existing=paymentEditorId?paymentRecords.find(item=>item.id===paymentEditorId):null;
+    if(!trainer()||paymentSaving)return false;const studentId=String(document.getElementById('tb-payment-student')?.value||''),planType=document.getElementById('tb-payment-plan')?.value||'quarterly',amount=Number(document.getElementById('tb-payment-amount')?.value||0),validFrom=document.getElementById('tb-payment-valid-from')?.value||'',note=String(document.getElementById('tb-payment-note')?.value||'').normalize('NFKC').trim().slice(0,500),existing=paymentEditorId?paymentRecords.find(item=>item.id===paymentEditorId):null;
     const requestedDuration=planType==='custom'?Number(document.getElementById('tb-payment-duration')?.value):planMonths(planType);
     if(!studentMap.has(studentId)){toast('Escolha um aluno válido.',true);return;}if(existing&&existing.studentId!==studentId){toast('O aluno de um pagamento existente não pode ser alterado. Use Renovar para criar outro registro.',true);return;}if(pendingPaymentStudentId&&pendingPaymentStudentId!==studentId){toast('Este registro já está sendo confirmado para outro aluno. Feche e abra o formulário novamente para trocar o aluno.',true);return;}if(!['quarterly','semiannual','annual','custom'].includes(planType)){toast('Escolha um plano trimestral, semestral, anual ou ajustável.',true);return;}if(!Number.isInteger(requestedDuration)||requestedDuration<1||requestedDuration>60){toast('A duração precisa ser de 1 a 60 meses inteiros.',true);return;}if(!Number.isFinite(amount)||amount<=0||amount>1000000){toast('Informe um valor de pagamento maior que zero.',true);return;}if(!iso(validFrom)){toast('Informe a data de início da vigência.',true);return;}
     const durationMonths=requestedDuration,nextDueDate=addCalendarMonths(validFrom,durationMonths),id=paymentEditorId||pendingPaymentId||('pay-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)),button=document.getElementById('tb-payment-save');if(!paymentEditorId){pendingPaymentId=id;pendingPaymentStudentId=studentId;}if(button){button.disabled=true;button.textContent='SALVANDO PAGAMENTO...';}
-    let newPath='';try{
-      const ref=paymentCollection(CURRENT_USER.uid).doc(id);
-      const payload={trainerId:CURRENT_USER.uid,studentId,planType,durationMonths,amountCents:Math.round(amount*100),validFrom,nextDueDate,receiptPath:existing?.receiptPath||'',receiptName:existing?.receiptName||'',note,updatedAt:nowStamp()};if(!existing)payload.createdAt=nowStamp();
+    const owner=CURRENT_USER.uid,request=paymentEditorRequest,file=paymentFile,current=()=>trainer()&&CURRENT_USER.uid===owner&&request===paymentEditorRequest;
+    paymentSaving=true;
+    const finish=()=>{if(!current())return;closeModal('modal-trainer-payment');paymentEditorId='';pendingPaymentId='';pendingPaymentStudentId='';paymentFile=null;revokePaymentPreview();};
+    try{
+      const ref=paymentCollection(owner).doc(id);
+      const payload={trainerId:owner,studentId,planType,durationMonths,amountCents:Math.round(amount*100),validFrom,nextDueDate,note,updatedAt:nowStamp()};
       // Primeiro grava o registro financeiro. Um upload lento/indisponível do
       // comprovante nunca deve impedir o lançamento do pagamento.
-      await cloudWrite(ref.set(payload,{merge:true}),'salvar pagamento');
-      if(paymentFile){
+      await cloudWrite(db.runTransaction(async transaction=>{
+        if(!current())throw new Error('A sessão mudou. Abra o pagamento novamente.');
+        const snapshot=await transaction.get(ref);
+        if(!current())throw new Error('A sessão mudou. Abra o pagamento novamente.');
+        if(snapshot.exists&&(snapshot.data().trainerId!==owner||snapshot.data().studentId!==studentId))throw new Error('Este pagamento pertence a outro cadastro. Reabra o formulário.');
+        // createdAt is immutable in the existing Rules. A retry after a lost
+        // acknowledgement must update the same record without replacing it.
+        transaction.set(ref,{...payload,...(!snapshot.exists?{createdAt:nowStamp()}:{})},{merge:true});
+      }),'salvar pagamento');
+      if(!current())return true;
+      if(file){
         if(button)button.textContent='ENVIANDO COMPROVANTE...';
         try{
-          newPath=await uploadReceipt(CURRENT_USER.uid,studentId,id,paymentFile);
-          await cloudWrite(ref.set({receiptPath:newPath,receiptName:paymentFile.name?.slice(0,180)||'',updatedAt:nowStamp()},{merge:true}),'vincular comprovante ao pagamento');
-          if(existing?.receiptPath&&newPath!==existing.receiptPath)deleteReceipt(existing.receiptPath);
-        }catch(receiptError){if(newPath&&newPath!==existing?.receiptPath)deleteReceipt(newPath);closeModal('modal-trainer-payment');paymentEditorId='';pendingPaymentId='';pendingPaymentStudentId='';paymentFile=null;revokePaymentPreview();toast('✓ Pagamento salvo, mas o comprovante não foi enviado. Você pode anexá-lo depois em Corrigir pagamento.',true);return;}
+          const newPath=await uploadReceipt(owner,studentId,id,file);
+          if(!current())return true;
+          await cloudWrite(ref.set({receiptPath:newPath,receiptName:file.name?.slice(0,180)||'',updatedAt:nowStamp()},{merge:true}),'vincular comprovante ao pagamento');
+          // Keep both versions: a timeout cannot prove that a write was rejected.
+          // Client cleanup could delete a receipt referenced by a late commit.
+        }catch(receiptError){if(current()){finish();toast('✓ Pagamento salvo. Não foi possível confirmar o comprovante. Confira em Corrigir pagamento antes de reenviar.',true);}return true;}
       }
-      closeModal('modal-trainer-payment');paymentEditorId='';pendingPaymentId='';pendingPaymentStudentId='';paymentFile=null;revokePaymentPreview();toast('✓ Pagamento salvo · próximo vencimento '+fmtDate(nextDueDate));
-    }catch(error){if(newPath&&newPath!==existing?.receiptPath)deleteReceipt(newPath);toast('Não foi possível salvar o pagamento: '+String(error?.message||error),true);}finally{if(button){button.disabled=false;button.textContent='SALVAR PAGAMENTO';}}
+      if(current()){finish();toast('✓ Pagamento salvo · próximo vencimento '+fmtDate(nextDueDate));}return true;
+    }catch(error){if(current())toast('Não foi possível confirmar o pagamento. Tente novamente neste formulário: '+String(error?.message||error),true);return false;}
+    finally{paymentSaving=false;if(button&&current()){button.disabled=false;button.textContent='SALVAR PAGAMENTO';}}
   }
-  async function openReceipt(path){if(!trainer()||!path)return;ensureUi();const state=document.getElementById('tb-payment-receipt-state'),image=document.getElementById('tb-payment-receipt-view');if(state){state.style.display='block';state.textContent='Carregando comprovante...';}if(image){image.style.display='none';image.removeAttribute('src');}openModal('modal-payment-receipt');try{const service=await ensureStorageService(),url=await service.ref(path).getDownloadURL();if(image){image.src=url;image.style.display='block';}if(state)state.style.display='none';}catch(error){if(state){state.style.display='block';state.textContent='Não foi possível abrir este comprovante agora.';}}}
+  async function openReceipt(path){
+    if(!trainer()||!path)return false;ensureUi();
+    const request=++receiptViewRequest,owner=CURRENT_USER.uid,state=document.getElementById('tb-payment-receipt-state'),image=document.getElementById('tb-payment-receipt-view');
+    const current=()=>request===receiptViewRequest&&trainer()&&CURRENT_USER.uid===owner&&document.getElementById('modal-payment-receipt')?.classList.contains('open');
+    if(state){state.style.display='block';state.textContent='Carregando comprovante...';}if(image){image.style.display='none';image.removeAttribute('src');}openModal('modal-payment-receipt');
+    try{const service=await ensureStorageService(),url=await service.ref(path).getDownloadURL();if(!current())return false;if(image){image.src=url;image.style.display='block';}if(state)state.style.display='none';return true;}
+    catch(error){if(current()&&state){state.style.display='block';state.textContent='Não foi possível abrir este comprovante agora.';}return false;}
+  }
 
   function updateBadges(){if(!trainer())return;const unread=activityEvents.filter(item=>item.read!==true).length,pay=paymentAttentionCount();document.querySelectorAll('[data-tb-inbox-count]').forEach(element=>element.textContent=unread?String(unread):'');document.querySelectorAll('[data-tb-payment-count]').forEach(element=>element.textContent=pay?String(pay):'');const home=document.getElementById('tb-trainer-home-tabs');if(home)home.innerHTML=hubTabs('students');}
 
@@ -288,7 +314,7 @@
   function cleanupListeners(){try{activityUnsub?.();}catch(error){}try{paymentUnsub?.();}catch(error){}activityUnsub=null;paymentUnsub=null;listenerPrimed=false;trainerInitUid='';activityEvents=[];protocolDue=[];students=[];paymentRecords=[];studentMap.clear();}
   function installTrainerHooks(){
     if(typeof renderTrainer==='function'&&!renderTrainer.__tbInboxPayments){const base=renderTrainer;const wrapped=async function(){const result=await base.apply(this,arguments);if(trainer())initTrainer().catch(error=>console.warn('Central do treinador',error));if(trainer()){ensureUi();updateBadges();}return result;};wrapped.__tbInboxPayments=true;renderTrainer=wrapped;}
-    if(typeof confirmLogout==='function'&&!confirmLogout.__tbInboxPayments){const base=confirmLogout;const wrapped=function(){cleanupListeners();revokePaymentPreview();return base.apply(this,arguments);};wrapped.__tbInboxPayments=true;confirmLogout=wrapped;}
+    if(typeof confirmLogout==='function'&&!confirmLogout.__tbInboxPayments){const base=confirmLogout;const wrapped=function(){paymentEditorRequest++;receiptViewRequest++;cleanupListeners();revokePaymentPreview();return base.apply(this,arguments);};wrapped.__tbInboxPayments=true;confirmLogout=wrapped;}
   }
   function boot(){installSubmissionHooks();installTrainerHooks();if(trainer()){ensureUi();initTrainer().catch(error=>console.warn('Central do treinador',error));}}
 

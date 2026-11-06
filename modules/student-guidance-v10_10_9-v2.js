@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_GUIDANCE_V2_V10109__)return;
   window.__TEAM_BULLS_STUDENT_GUIDANCE_V2_V10109__=true;
 
-  const VERSION='10.10.9-guidance2';
+  const VERSION='10.10.9-guidance3';
   const STATIC_REVISION='nutrition-stretch-2';
   const ACK_PREFIX='team_bulls_instruction_ack_v2_';
   const NUTRITION_GUIDANCE=[
@@ -103,8 +103,31 @@
   function instructionAcknowledged(){const uid=instructionIdentity();return !!uid&&typeof storageGet==='function'&&storageGet(ackKey(uid))===instructionToken();}
   function markInstructionAcknowledged(){const uid=instructionIdentity();if(!uid)return false;const token=instructionToken();storageSet?.(ackKey(uid),token);if(typeof instructionAckKey==='function')storageSet?.(instructionAckKey(),String(GENERAL_INSTRUCTIONS?.revision||1));return true;}
   function patchInstructionPrompt(){
-    if(typeof openInstructions==='function'&&!openInstructions.__tbPromptV2){const base=openInstructions;const wrapped=async function(forced=false){if(forced&&CURRENT_USER?.role!=='trainer'){if(instructionAcknowledged())return false;const token=instructionIdentity()+'|'+instructionToken();if(forcedPromptToken===token&&document.getElementById('screen-instructions')?.classList.contains('active'))return false;forcedPromptToken=token;}return base.apply(this,arguments);};wrapped.__tbPromptV2=true;openInstructions=wrapped;}
-    if(typeof maybePromptInitialInstructions==='function'&&!maybePromptInitialInstructions.__tbPromptV2){const wrapped=async function(){if((typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined'&&INSTRUCTIONS_PROMPT_RUNNING)||CURRENT_USER?.role==='trainer'||typeof activeScreenId==='function'&&activeScreenId()!=='screen-home'||instructionAcknowledged())return;const uid=instructionIdentity();if(!uid)return;const token=uid+'|'+instructionToken();if(typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined')INSTRUCTIONS_PROMPT_RUNNING=true;try{await loadGeneralInstructions?.();if(!visibleInstructionCount?.()||instructionAcknowledged()){forcedPromptToken='';return;}if(forcedPromptToken===token)return;forcedPromptToken=token;await openInstructions(true);}catch(error){console.warn('[Team Bulls] Falha ao abrir orientações iniciais',error);forcedPromptToken='';}finally{if(typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined')INSTRUCTIONS_PROMPT_RUNNING=false;}};wrapped.__tbPromptV2=true;maybePromptInitialInstructions=wrapped;}
+    if(typeof openInstructions==='function'&&!openInstructions.__tbPromptV2){
+      const base=openInstructions;
+      const wrapped=async function(forced=false){
+        let token='';
+        if(forced&&CURRENT_USER?.role!=='trainer'){if(instructionAcknowledged())return false;token=instructionIdentity()+'|'+instructionToken();if(forcedPromptToken===token&&document.getElementById('screen-instructions')?.classList.contains('active'))return false;forcedPromptToken=token;}
+        try{const result=await base.apply(this,arguments);if(result===false&&token&&forcedPromptToken===token)forcedPromptToken='';return result;}
+        catch(error){if(token&&forcedPromptToken===token)forcedPromptToken='';throw error;}
+      };wrapped.__tbPromptV2=true;openInstructions=wrapped;
+    }
+    if(typeof maybePromptInitialInstructions==='function'&&!maybePromptInitialInstructions.__tbPromptV2){
+      const wrapped=async function(){
+        if((typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined'&&INSTRUCTIONS_PROMPT_RUNNING)||CURRENT_USER?.role==='trainer'||typeof activeScreenId==='function'&&activeScreenId()!=='screen-home'||instructionAcknowledged())return;
+        const uid=instructionIdentity();if(!uid)return;
+        const navigation=NAVIGATION_SEQ,role=CURRENT_USER?.role,mode=MODE;
+        if(typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined')INSTRUCTIONS_PROMPT_RUNNING=true;
+        try{
+          await loadGeneralInstructions?.();
+          if(NAVIGATION_SEQ!==navigation||instructionIdentity()!==uid||CURRENT_USER?.role!==role||MODE!==mode||activeScreenId()!=='screen-home')return false;
+          if(!visibleInstructionCount?.()||instructionAcknowledged()){forcedPromptToken='';return false;}
+          const token=uid+'|'+instructionToken();if(forcedPromptToken===token)return false;
+          forcedPromptToken=token;const result=await openInstructions(true);if(result===false&&forcedPromptToken===token)forcedPromptToken='';return result;
+        }catch(error){console.warn('[Team Bulls] Falha ao abrir orientações iniciais',error);forcedPromptToken='';return false;}
+        finally{if(typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined')INSTRUCTIONS_PROMPT_RUNNING=false;}
+      };wrapped.__tbPromptV2=true;maybePromptInitialInstructions=wrapped;
+    }
     if(typeof acknowledgeInstructions==='function'&&!acknowledgeInstructions.__tbPromptV2){const base=acknowledgeInstructions;const wrapped=function(){markInstructionAcknowledged();forcedPromptToken='';return base.apply(this,arguments);};wrapped.__tbPromptV2=true;acknowledgeInstructions=wrapped;}
   }
 

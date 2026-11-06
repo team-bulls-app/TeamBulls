@@ -6191,6 +6191,7 @@ let INSTRUCTIONS_PROMPT_RUNNING=false;
 let EDIT_INSTRUCTION_FOLDER_ID='';
 let EDIT_INSTRUCTION_ITEM_ID='';
 let EDIT_TECHNIQUE_ID='';
+const CATALOG_EDITOR_CONTEXTS={};
 
 function defaultGeneralInstructionsLibrary(){
   return{catalogVersion:1,revision:1,folders:[{id:'general',name:'Orientações gerais',active:true,locked:true,order:0,items:[{id:'general-main',title:'Instruções gerais',text:DEFAULT_GENERAL_INSTRUCTIONS_TEXT,videoUrl:'',active:true,locked:true,order:0}]}]};
@@ -6239,14 +6240,14 @@ async function loadGeneralInstructions(){
   if(MODE==='local'||!db){GENERAL_INSTRUCTIONS=cachedGeneralInstructions();return GENERAL_INSTRUCTIONS;}
   try{const doc=await cloudGet(db.collection('trainingInstructions').doc('main'),'instruções gerais');
     if(doc.exists)GENERAL_INSTRUCTIONS=normalizeGeneralInstructions(doc.data());
-    else{GENERAL_INSTRUCTIONS=defaultGeneralInstructionsLibrary();if(CURRENT_USER?.role==='trainer')await cloudWrite(db.collection('trainingInstructions').doc('main').set({...GENERAL_INSTRUCTIONS,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'criar instruções gerais');}
+    else GENERAL_INSTRUCTIONS=await initializeSharedCatalog('trainingInstructions',defaultGeneralInstructionsLibrary(),normalizeGeneralInstructions);
   }catch(error){console.warn('loadGeneralInstructions',error);GENERAL_INSTRUCTIONS=cachedGeneralInstructions();}
   cacheGeneralInstructions();return GENERAL_INSTRUCTIONS;
 }
-async function persistGeneralInstructions(draft=GENERAL_INSTRUCTIONS){
+async function persistGeneralInstructions(draft=GENERAL_INSTRUCTIONS,expected=GENERAL_INSTRUCTIONS){
   if(CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode editar esta biblioteca.');
   const owner=CURRENT_USER.uid,next=normalizeGeneralInstructions({...draft,revision:(draft.revision||1)+1});
-  await cloudWrite(db.collection('trainingInstructions').doc('main').set({...next,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'salvar instruções gerais');
+  await persistSharedCatalog('trainingInstructions',expected,next,normalizeGeneralInstructions,owner);
   if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
   GENERAL_INSTRUCTIONS=next;cacheGeneralInstructions();return true;
 }
@@ -6259,18 +6260,51 @@ async function loadTechniqueCatalog(force=false){
     const cached=cachedTechniqueCatalog();if(cached?.items?.length)TECHNIQUE_CATALOG=cached;
     try{const doc=await cloudGet(db.collection('trainingTechniques').doc('main'),'biblioteca de técnicas');
       if(doc.exists)TECHNIQUE_CATALOG=normalizeTechniqueCatalog(doc.data());
-      else{TECHNIQUE_CATALOG=defaultTechniqueCatalog();if(CURRENT_USER?.role==='trainer')await cloudWrite(db.collection('trainingTechniques').doc('main').set({...TECHNIQUE_CATALOG,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'criar biblioteca de técnicas');}
+      else TECHNIQUE_CATALOG=await initializeSharedCatalog('trainingTechniques',defaultTechniqueCatalog(),normalizeTechniqueCatalog);
     }catch(error){console.warn('loadTechniqueCatalog',error);if(!TECHNIQUE_CATALOG.items?.length)TECHNIQUE_CATALOG=cachedTechniqueCatalog();}
     TECHNIQUE_CATALOG_LOADED_AT=Date.now();cacheTechniqueCatalog();return TECHNIQUE_CATALOG;
   })();
   try{return await TECHNIQUE_CATALOG_LOAD_PROMISE;}finally{TECHNIQUE_CATALOG_LOAD_PROMISE=null;}
 }
-async function persistTechniqueCatalog(draft=TECHNIQUE_CATALOG){
+async function persistTechniqueCatalog(draft=TECHNIQUE_CATALOG,expected=TECHNIQUE_CATALOG){
   if(CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode editar esta biblioteca.');
   const owner=CURRENT_USER.uid,next=normalizeTechniqueCatalog({...draft,revision:(draft.revision||1)+1});
-  await cloudWrite(db.collection('trainingTechniques').doc('main').set({...next,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'salvar biblioteca de técnicas');
+  await persistSharedCatalog('trainingTechniques',expected,next,normalizeTechniqueCatalog,owner);
   if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
   TECHNIQUE_CATALOG=next;cacheTechniqueCatalog();return true;
+}
+
+function catalogPreserveFields(raw,next){
+  const nodes=(items,previous)=>(items||[]).map(item=>{
+    const old=(Array.isArray(previous)?previous:[]).find(entry=>String(entry.id)===item.id)||{};
+    return {...old,...item,...(item.items?{items:nodes(item.items,old.items)}:{})};
+  });
+  return {...next,...(next.folders?{folders:nodes(next.folders,raw?.folders)}:{items:nodes(next.items,raw?.items)})};
+}
+async function initializeSharedCatalog(collection,fallback,normalize){
+  if(CURRENT_USER?.role!=='trainer')return fallback;
+  const owner=CURRENT_USER.uid,ref=db.collection(collection).doc('main');
+  return cloudWrite(db.runTransaction(async transaction=>{
+    const snapshot=await transaction.get(ref);
+    if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')throw new Error('A sessão mudou.');
+    if(snapshot.exists)return normalize(snapshot.data());
+    transaction.set(ref,{...fallback,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});return fallback;
+  }),'inicializar biblioteca');
+}
+async function persistSharedCatalog(collection,expected,next,normalize,owner){
+  const ref=db.collection(collection).doc('main'),current=()=>CURRENT_USER?.uid===owner&&CURRENT_USER?.role==='trainer';
+  const base=JSON.stringify(normalize(expected)),wanted=JSON.stringify(normalize(next));
+  await cloudWrite(db.runTransaction(async transaction=>{
+    if(!current())throw new Error('A sessão mudou. Abra a biblioteca novamente.');
+    const snapshot=await transaction.get(ref);
+    if(!current())throw new Error('A sessão mudou. Abra a biblioteca novamente.');
+    if(!snapshot.exists)throw new Error('A biblioteca não está disponível. Feche e abra a tela novamente.');
+    const raw=snapshot.data(),actual=JSON.stringify(normalize(raw));
+    // A delayed acknowledgement may be retried with the same draft.
+    if(actual===wanted)return;
+    if(actual!==base)throw new Error('A biblioteca foi alterada em outro acesso. Sua edição continua no formulário. Copie o texto e reabra a biblioteca antes de salvar.');
+    transaction.set(ref,{...catalogPreserveFields(raw,next),updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+  }),'salvar biblioteca');
 }
 
 const ensureGlobalCatalogsV101=ensureGlobalCatalogs;
@@ -6282,13 +6316,17 @@ function visibleInstructionCount(){return GENERAL_INSTRUCTIONS.folders.filter(fo
 async function maybePromptInitialInstructions(){
   if(INSTRUCTIONS_PROMPT_RUNNING||CURRENT_USER?.role==='trainer'||activeScreenId()!=='screen-home')return;
   INSTRUCTIONS_PROMPT_RUNNING=true;
-  try{await loadGeneralInstructions();if(!visibleInstructionCount())return;const revision=String(GENERAL_INSTRUCTIONS.revision||1);if(storageGet(instructionAckKey())===revision)return;await openInstructions(true);}catch(error){console.warn('maybePromptInitialInstructions',error);}finally{INSTRUCTIONS_PROMPT_RUNNING=false;}
+  const navigation=NAVIGATION_SEQ,owner=CURRENT_USER?.uid,role=CURRENT_USER?.role;
+  try{await loadGeneralInstructions();if(navigation!==NAVIGATION_SEQ||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!==role||activeScreenId()!=='screen-home'||!visibleInstructionCount())return;const revision=String(GENERAL_INSTRUCTIONS.revision||1);if(storageGet(instructionAckKey())===revision)return;await openInstructions(true);}catch(error){console.warn('maybePromptInitialInstructions',error);}finally{INSTRUCTIONS_PROMPT_RUNNING=false;}
 }
 const renderHomeV101=renderHome;
 renderHome=function(){const result=renderHomeV101.apply(this,arguments);setTimeout(maybePromptInitialInstructions,450);return result;};
 
 async function openInstructions(forced=false){
-  INSTRUCTIONS_RETURN_SCREEN=forced?'screen-home':activeScreenId();INSTRUCTIONS_FORCED=!!forced;await loadGeneralInstructions();renderInstructions();showScreen('screen-instructions');
+  const navigation=beginAsyncNavigation(),owner=CURRENT_USER?.uid,role=CURRENT_USER?.role,returnScreen=forced?'screen-home':activeScreenId();
+  await loadGeneralInstructions();
+  if(!isNavigationCurrent(navigation)||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!==role)return false;
+  INSTRUCTIONS_RETURN_SCREEN=returnScreen;INSTRUCTIONS_FORCED=!!forced;renderInstructions();showScreen('screen-instructions',navigation);return true;
 }
 function closeInstructionsScreen(){if(INSTRUCTIONS_FORCED){showToast('Leia e confirme as orientações para continuar.',true);return;}if(CURRENT_USER?.role==='trainer')goTrainer();else goHome();}
 function acknowledgeInstructions(){storageSet(instructionAckKey(),String(GENERAL_INSTRUCTIONS.revision||1));INSTRUCTIONS_FORCED=false;goHome();}
@@ -6302,17 +6340,22 @@ function renderInstructions(){
     return`<section class="instruction-folder ${folder.active?'':'inactive'}"><div class="instruction-folder-head"><div class="instruction-folder-icon">📁</div><div class="instruction-folder-title">${esc(folder.name)}</div>${admin?`<div class="instruction-folder-state">${folder.active?'VISÍVEL':'OCULTA'}</div>`:''}${actions}</div>${itemHtml||'<div class="no-data-inline">Pasta sem orientações.</div>'}</section>`;}).join('');
   host.innerHTML=html;empty.style.display=html?'none':'block';
 }
+function captureCatalogEditor(modalId,kind){
+  CATALOG_EDITOR_CONTEXTS[modalId]={owner:CURRENT_USER?.uid,base:JSON.parse(JSON.stringify(kind==='instructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG))};
+}
 async function commitCatalogAction(kind,mutate,modalId='',message=''){
   if(CURRENT_USER?.role!=='trainer')return false;
   const owner=CURRENT_USER.uid,key='catalog-action-'+kind;
   if(!beginAction(key,modalId))return false;
   try{
-    const draft=JSON.parse(JSON.stringify(kind==='instructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG));
+    const context=CATALOG_EDITOR_CONTEXTS[modalId];
+    if(context&&context.owner!==owner)throw new Error('A sessão mudou. Abra a biblioteca novamente.');
+    const expected=context?.base||(kind==='instructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG),draft=JSON.parse(JSON.stringify(expected));
     if(mutate(draft)===false)return false;
     const editor=JSON.stringify([EDIT_INSTRUCTION_FOLDER_ID,EDIT_INSTRUCTION_ITEM_ID,EDIT_TECHNIQUE_ID]);
-    const saved=await (kind==='instructions'?persistGeneralInstructions(draft):persistTechniqueCatalog(draft));
+    const saved=await (kind==='instructions'?persistGeneralInstructions(draft,expected):persistTechniqueCatalog(draft,expected));
     if(saved===false||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
-    if(modalId&&editor===JSON.stringify([EDIT_INSTRUCTION_FOLDER_ID,EDIT_INSTRUCTION_ITEM_ID,EDIT_TECHNIQUE_ID]))closeModal(modalId);
+    if(modalId&&CATALOG_EDITOR_CONTEXTS[modalId]===context&&editor===JSON.stringify([EDIT_INSTRUCTION_FOLDER_ID,EDIT_INSTRUCTION_ITEM_ID,EDIT_TECHNIQUE_ID])){closeModal(modalId);delete CATALOG_EDITOR_CONTEXTS[modalId];}
     if(kind==='instructions')renderInstructions();else renderTechniques();
     if(message)showToast(message);return true;
   }catch(error){if(CURRENT_USER?.uid===owner)alert(error.message);return false;}
@@ -6361,14 +6404,19 @@ function deleteTechnique(id){
   showConfirm('Excluir técnica','Excluir esta técnica personalizada? Exercícios antigos manterão o identificador, mas ela deixará de aparecer na biblioteca.',()=>commitCatalogAction('techniques',draft=>{const item=draft.items.find(i=>i.id===id);if(!item||item.locked)return false;draft.items=draft.items.filter(i=>i.id!==id);}));
 }
 
-function openInstructionFolderModal(id=''){if(CURRENT_USER?.role!=='trainer')return;EDIT_INSTRUCTION_FOLDER_ID=id;const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===id);document.getElementById('instruction-folder-modal-title').textContent=folder?'Editar pasta':'Nova pasta';document.getElementById('input-instruction-folder-name').value=folder?.name||'';document.getElementById('input-instruction-folder-active').value=String(folder?.active!==false);openModal('modal-instruction-folder');}
-function openInstructionItemModal(folderId,itemId=''){if(CURRENT_USER?.role!=='trainer')return;EDIT_INSTRUCTION_FOLDER_ID=folderId;EDIT_INSTRUCTION_ITEM_ID=itemId;const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===folderId),item=folder?.items.find(entry=>entry.id===itemId);const select=document.getElementById('input-instruction-item-folder');select.innerHTML=GENERAL_INSTRUCTIONS.folders.map(entry=>`<option value="${esc(entry.id)}">${esc(entry.name)}</option>`).join('');select.value=folderId;select.disabled=!!item?.locked;document.getElementById('instruction-item-modal-title').textContent=item?'Editar orientação':'Nova orientação';document.getElementById('input-instruction-item-title').value=item?.title||'';document.getElementById('input-instruction-item-text').value=item?.text||'';document.getElementById('input-instruction-item-video').value=item?.videoUrl||'';document.getElementById('input-instruction-item-active').value=String(item?.active!==false);openModal('modal-instruction-item');}
+function openInstructionFolderModal(id=''){if(CURRENT_USER?.role!=='trainer')return;captureCatalogEditor('modal-instruction-folder','instructions');EDIT_INSTRUCTION_FOLDER_ID=id;const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===id);document.getElementById('instruction-folder-modal-title').textContent=folder?'Editar pasta':'Nova pasta';document.getElementById('input-instruction-folder-name').value=folder?.name||'';document.getElementById('input-instruction-folder-active').value=String(folder?.active!==false);openModal('modal-instruction-folder');}
+function openInstructionItemModal(folderId,itemId=''){if(CURRENT_USER?.role!=='trainer')return;captureCatalogEditor('modal-instruction-item','instructions');EDIT_INSTRUCTION_FOLDER_ID=folderId;EDIT_INSTRUCTION_ITEM_ID=itemId;const folder=GENERAL_INSTRUCTIONS.folders.find(item=>item.id===folderId),item=folder?.items.find(entry=>entry.id===itemId);const select=document.getElementById('input-instruction-item-folder');select.innerHTML=GENERAL_INSTRUCTIONS.folders.map(entry=>`<option value="${esc(entry.id)}">${esc(entry.name)}</option>`).join('');select.value=folderId;select.disabled=!!item?.locked;document.getElementById('instruction-item-modal-title').textContent=item?'Editar orientação':'Nova orientação';document.getElementById('input-instruction-item-title').value=item?.title||'';document.getElementById('input-instruction-item-text').value=item?.text||'';document.getElementById('input-instruction-item-video').value=item?.videoUrl||'';document.getElementById('input-instruction-item-active').value=String(item?.active!==false);openModal('modal-instruction-item');}
 
-async function openTechniques(){await loadTechniqueCatalog();renderTechniques();showScreen('screen-techniques');}
+async function openTechniques(){
+  const navigation=beginAsyncNavigation(),owner=CURRENT_USER?.uid,role=CURRENT_USER?.role;
+  await loadTechniqueCatalog(true);
+  if(!isNavigationCurrent(navigation)||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!==role)return false;
+  renderTechniques();showScreen('screen-techniques',navigation);return true;
+}
 function closeTechniquesScreen(){if(CURRENT_USER?.role==='trainer')goTrainer();else goHome();}
 function renderTechniques(){const admin=CURRENT_USER?.role==='trainer';document.getElementById('techniques-add-btn').style.display=admin?'flex':'none';document.getElementById('techniques-list').innerHTML=TECHNIQUE_CATALOG.items.map(item=>`<div class="technique-card" onclick="openTechniqueDetail(${jsArg(item.id)})"><div class="technique-code">${esc(item.code)}</div><div class="technique-card-main"><div class="technique-card-name">${esc(item.name)}</div><div class="technique-card-summary">${esc(item.description||'Explicação a ser cadastrada pelo treinador.')}</div></div>${admin?`<div class="technique-card-actions"><button onclick="event.stopPropagation();openTechniqueEditor(${jsArg(item.id)})">✎</button>${item.locked?'':`<button onclick="event.stopPropagation();deleteTechnique(${jsArg(item.id)})">🗑</button>`}</div>`:'<div class="exercise-row-arrow">›</div>'}</div>`).join('');}
 function openTechniqueDetail(id){const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);if(!item)return;document.getElementById('technique-detail-title').textContent=item.name;document.getElementById('technique-detail-body').innerHTML=`<div class="technique-detail-code">${esc(item.code)}</div><div class="technique-detail-text">${esc(item.description||'O treinador ainda não cadastrou a explicação desta técnica.')}</div>`;const video=document.getElementById('technique-detail-video-btn');video.style.display=item.videoUrl?'block':'none';video.onclick=()=>{closeModal('modal-technique-detail');if(MODE==='cloud')openCatalogVideo(item.videoUrl,item.name);else showToast('Conecte-se à internet para assistir ao vídeo.',true);};openModal('modal-technique-detail');}
-function openTechniqueEditor(id=''){if(CURRENT_USER?.role!=='trainer')return;EDIT_TECHNIQUE_ID=id;const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);document.getElementById('technique-editor-title').textContent=item?'Editar técnica':'Nova técnica';document.getElementById('input-technique-code').value=item?.code||'';document.getElementById('input-technique-name').value=item?.name||'';document.getElementById('input-technique-description').value=item?.description||'';document.getElementById('input-technique-video').value=item?.videoUrl||'';openModal('modal-technique-editor');}
+function openTechniqueEditor(id=''){if(CURRENT_USER?.role!=='trainer')return;captureCatalogEditor('modal-technique-editor','techniques');EDIT_TECHNIQUE_ID=id;const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);document.getElementById('technique-editor-title').textContent=item?'Editar técnica':'Nova técnica';document.getElementById('input-technique-code').value=item?.code||'';document.getElementById('input-technique-name').value=item?.name||'';document.getElementById('input-technique-description').value=item?.description||'';document.getElementById('input-technique-video').value=item?.videoUrl||'';openModal('modal-technique-editor');}
 
 function normalizeExerciseTechniqueIds(value){if(!Array.isArray(value))return[];const out=[];for(const id of value){const clean=String(id||'').slice(0,100);if(clean&&!out.includes(clean))out.push(clean);}return out;}
 function workoutContainingExercise(exercise){const sources=[VIEW_STUDENT_WORKOUT,getW(CUR_WORKOUT),...(VIEW_STUDENT?.workouts||[]),...(CLOUD_WORKOUTS||[]),...(LOCAL_DB.workouts||[])];return sources.find(workout=>(workout?.exercises||[]).some(item=>item.id===exercise?.id))||null;}
@@ -9031,6 +9079,7 @@ let CARDIO_CONTEXT={targetUid:'',trainer:false,local:false,source:'workout'};
 let CURRENT_CARDIO_ITEM_ID='';
 let EDIT_CARDIO_KIND='main';
 let EDIT_CARDIO_ITEM_ID='';
+let CARDIO_EDITOR_CONTEXT=null;
 let CARDIO_TIMER_INTERVAL=0;
 const CARDIO_TIMER_MEMORY=new Map();
 
@@ -9046,7 +9095,7 @@ function normalizeCardioDocument(value){
   const substitutions=(Array.isArray(raw.substitutions)?raw.substitutions:Array.isArray(raw.alternatives)?raw.alternatives:[]).map(normalizeCardioItem).filter(item=>item.type).slice(0,20).sort((a,b)=>a.order-b.order||a.type.localeCompare(b.type,'pt-BR')).map((item,index)=>({...item,order:index}));
   return{main:main&&main.type?main:null,substitutions};
 }
-function cardioCanEdit(){return CARDIO_CONTEXT.trainer||(CARDIO_CONTEXT.local&&canSelfManagePlan());}
+function cardioCanEdit(){return (CARDIO_CONTEXT.trainer&&CURRENT_USER?.role==='trainer'&&VIEW_STUDENT?.uid===CARDIO_CONTEXT.targetUid)||(CARDIO_CONTEXT.local&&canSelfManagePlan());}
 function cardioOwnerKey(){return String(CARDIO_CONTEXT.targetUid||CURRENT_USER?.uid||INACTIVE_UID||LOCAL_OWNER_UID||LOCAL_GUEST_OWNER||'local').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,150);}
 function cardioAllItems(){return [CARDIO_DOCUMENT.main,...CARDIO_DOCUMENT.substitutions].filter(Boolean);}
 function cardioItemById(id){return cardioAllItems().find(item=>String(item.id)===String(id))||null;}
@@ -9064,17 +9113,27 @@ function readCardioTimer(item){
 function writeCardioTimer(item,state){if(!item||!state)return;const key=cardioTimerStorageKey(item.id),safe={durationSeconds:item.durationMinutes*60,remainingSeconds:Math.max(0,Math.min(item.durationMinutes*60,Math.trunc(Number(state.remainingSeconds)||0))),running:state.running===true,endAt:Number(state.endAt)||0,completedAt:Number(state.completedAt)||0};CARDIO_TIMER_MEMORY.set(key,safe);try{localStorage.setItem(key,JSON.stringify(safe));}catch(error){}return safe;}
 function clearCardioTimer(itemId){const key=cardioTimerStorageKey(itemId);CARDIO_TIMER_MEMORY.delete(key);try{localStorage.removeItem(key);}catch(error){}}
 function formatCardioClock(seconds){const safe=Math.max(0,Math.trunc(Number(seconds)||0)),hours=Math.floor(safe/3600),minutes=Math.floor((safe%3600)/60),secs=safe%60;return hours?`${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`:`${String(minutes).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;}
-async function loadCardioDocument(targetUid=''){
-  if(CARDIO_CONTEXT.local){return normalizeCardioDocument(LOCAL_DB.cardioPlan||{});}
+async function loadCardioDocument(targetUid='',context=CARDIO_CONTEXT){
+  if(context.local){return normalizeCardioDocument(LOCAL_DB.cardioPlan||{});}
   const uidTarget=targetUid||CURRENT_USER?.uid;if(!uidTarget)return normalizeCardioDocument({});
-  try{const doc=await cloudGet(db.collection('mealPlans').doc(uidTarget),'prescrição de cardio'),data=normalizeCardioDocument(doc.exists?doc.data().cardioPlan:{});if(CURRENT_USER?.role==='student'&&CURRENT_USER.uid===uidTarget){try{ensureLocalOwner(uidTarget);LOCAL_DB={...LOCAL_DB,cardioPlan:data};storageSet(localKeyFor(),JSON.stringify(LOCAL_DB));}catch(error){}}return data;}catch(error){console.warn('loadCardioDocument',error);if(CURRENT_USER?.uid===uidTarget&&LOCAL_DB?.cardioPlan)return normalizeCardioDocument(LOCAL_DB.cardioPlan);return normalizeCardioDocument({});}
+  try{const doc=await cloudGet(db.collection('mealPlans').doc(uidTarget),'prescrição de cardio'),data=normalizeCardioDocument(doc.exists?doc.data().cardioPlan:{});if(CURRENT_USER?.role==='student'&&CURRENT_USER.uid===uidTarget){try{ensureLocalOwner(uidTarget);LOCAL_DB={...LOCAL_DB,cardioPlan:data};storageSet(localKeyFor(),JSON.stringify(LOCAL_DB));}catch(error){}}return data;}catch(error){console.warn('loadCardioDocument',error);if(CURRENT_USER?.uid===uidTarget&&LOCAL_DB?.cardioPlan)return normalizeCardioDocument(LOCAL_DB.cardioPlan);return null;}
 }
-async function persistCardioDocument(){
-  CARDIO_DOCUMENT=normalizeCardioDocument(CARDIO_DOCUMENT);
-  if(CARDIO_CONTEXT.local){LOCAL_DB.cardioPlan=JSON.parse(JSON.stringify(CARDIO_DOCUMENT));if(!localSave())throw new Error('Falha ao salvar o cardio neste aparelho.');return;}
-  if(!CARDIO_CONTEXT.trainer||CURRENT_USER?.role!=='trainer')throw new Error('Somente o treinador pode alterar a prescrição de cardio.');
-  if(!CARDIO_CONTEXT.targetUid)throw new Error('Aluno não identificado.');
-  await cloudWrite(db.collection('mealPlans').doc(CARDIO_CONTEXT.targetUid).set({cardioPlan:CARDIO_DOCUMENT,cardioUpdatedBy:CURRENT_USER.uid,cardioUpdatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),'salvar prescrição de cardio');
+function captureCardioContext(){return {cardio:CARDIO_CONTEXT,owner:cardioOwnerKey(),userUid:CURRENT_USER?.uid,role:CURRENT_USER?.role};}
+async function persistCardioMutation(context,mutate){
+  if(!cardioDeleteContextCurrent(context))throw new Error('O aluno ou a sessão mudou. Abra o cardio novamente.');
+  if(context.cardio.local){
+    const before=LOCAL_DB.cardioPlan,next=mutate(cardioWithoutItem(before||CARDIO_DOCUMENT,'substitution',''));
+    LOCAL_DB.cardioPlan=JSON.parse(JSON.stringify(next));
+    if(!localSave()){LOCAL_DB.cardioPlan=before;throw new Error('Falha ao salvar o cardio neste aparelho.');}return next;
+  }
+  const ref=db.collection('mealPlans').doc(context.cardio.targetUid);
+  return cloudWrite(db.runTransaction(async transaction=>{
+    if(!cardioDeleteContextCurrent(context))throw new Error('O aluno ou a sessão mudou.');
+    const snapshot=await transaction.get(ref);
+    if(!cardioDeleteContextCurrent(context))throw new Error('O aluno ou a sessão mudou.');
+    const next=mutate(cardioWithoutItem(snapshot.exists?snapshot.data().cardioPlan:{},'substitution',''));
+    transaction.set(ref,{cardioPlan:next,cardioUpdatedBy:context.userUid,cardioUpdatedAt:firebase.firestore.FieldValue.serverTimestamp()},{mergeFields:['cardioPlan','cardioUpdatedBy','cardioUpdatedAt']});return next;
+  }),'salvar prescrição de cardio');
 }
 function cardioItemCard(item,isMain,trainer){
   const selected=String(CURRENT_CARDIO_ITEM_ID)===String(item.id),index=CARDIO_DOCUMENT.substitutions.findIndex(entry=>entry.id===item.id);
@@ -9094,7 +9153,14 @@ function renderCardioScreen(){
   const selected=cardioItemById(CURRENT_CARDIO_ITEM_ID);host.innerHTML=intro+mainBlock+subsBlock+cardioTimerMarkup(selected);updateCardioTimerDisplay();
 }
 async function openCardioModule(source='workout',trainerMode=false){
-  if(trainerMode&&!VIEW_STUDENT)return;const navigation=beginAsyncNavigation(),targetUid=trainerMode?VIEW_STUDENT.uid:(MODE==='cloud'?CURRENT_USER?.uid:'');CARDIO_CONTEXT={targetUid:targetUid||'',trainer:trainerMode,local:MODE==='local'&&!trainerMode,source:source==='diet'?'diet':'workout'};CARDIO_DOCUMENT=await loadCardioDocument(targetUid);if(!isNavigationCurrent(navigation))return;if(trainerMode&&VIEW_STUDENT?.uid!==targetUid)return;const note=document.getElementById('cardio-readonly-note');if(note)note.style.display=cardioCanEdit()?'none':'block';renderCardioScreen();showScreen(trainerMode?'screen-ts-cardio':'screen-cardio',navigation);ensureCardioTimerTicker();
+  if(trainerMode&&(!VIEW_STUDENT||CURRENT_USER?.role!=='trainer'))return false;
+  const navigation=beginAsyncNavigation(),owner=CURRENT_USER?.uid,role=CURRENT_USER?.role,mode=MODE,targetUid=trainerMode?VIEW_STUDENT.uid:(MODE==='cloud'?owner:'');
+  const context={targetUid:targetUid||'',trainer:trainerMode,local:MODE==='local'&&!trainerMode,source:source==='diet'?'diet':'workout'},loaded=await loadCardioDocument(targetUid,context);
+  if(!isNavigationCurrent(navigation)||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!==role||MODE!==mode||(trainerMode&&VIEW_STUDENT?.uid!==targetUid))return false;
+  if(!loaded){showToast('Não foi possível carregar o cardio. Tente abrir novamente quando a conexão voltar.',true);return false;}
+  if(CARDIO_CONTEXT.targetUid!==context.targetUid||CARDIO_CONTEXT.local!==context.local)CURRENT_CARDIO_ITEM_ID='';
+  CARDIO_CONTEXT=context;CARDIO_DOCUMENT=loaded;CARDIO_EDITOR_CONTEXT=null;
+  const note=document.getElementById('cardio-readonly-note');if(note)note.style.display=cardioCanEdit()?'none':'block';renderCardioScreen();showScreen(trainerMode?'screen-ts-cardio':'screen-cardio',navigation);ensureCardioTimerTicker();return true;
 }
 function openCardioFromWorkout(trainerMode=false){return openCardioModule('workout',trainerMode);}
 function openCardioFromDiet(trainerMode=false){return openCardioModule('diet',trainerMode);}
@@ -9110,12 +9176,36 @@ function ensureCardioTimerTicker(){if(CARDIO_TIMER_INTERVAL)return;CARDIO_TIMER_
 function startCardioTimer(){const item=currentCardioTimerItem();if(!item)return;let state=readCardioTimer(item);if(state.remainingSeconds<=0)state.remainingSeconds=state.durationSeconds;state.running=true;state.endAt=Date.now()+state.remainingSeconds*1000;state.completedAt=0;writeCardioTimer(item,state);ensureCardioTimerTicker();updateCardioTimerDisplay();}
 function pauseCardioTimer(){const item=currentCardioTimerItem();if(!item)return;let state=readCardioTimer(item);state.running=false;state.endAt=0;writeCardioTimer(item,state);updateCardioTimerDisplay();}
 function resetCardioTimer(){const item=currentCardioTimerItem();if(!item)return;writeCardioTimer(item,{durationSeconds:item.durationMinutes*60,remainingSeconds:item.durationMinutes*60,running:false,endAt:0,completedAt:0});updateCardioTimerDisplay();}
-function openAddCardioMain(){if(!cardioCanEdit())return;EDIT_CARDIO_KIND='main';EDIT_CARDIO_ITEM_ID='';document.getElementById('modal-cardio-title').textContent='Prescrever cardio principal';document.getElementById('input-cardio-type').value='';document.getElementById('input-cardio-duration').value='30';document.getElementById('input-cardio-frequency').value='3';document.getElementById('input-cardio-notes').value='';document.getElementById('btn-delete-cardio-item').style.display='none';openModal('modal-cardio-item');focusEditorField('input-cardio-type',250);}
-function openAddCardioSubstitution(){if(!cardioCanEdit())return;if(CARDIO_DOCUMENT.substitutions.length>=20){alert('Limite seguro de 20 substituições de cardio atingido.');return;}EDIT_CARDIO_KIND='substitution';EDIT_CARDIO_ITEM_ID='';document.getElementById('modal-cardio-title').textContent='Nova substituição de cardio';document.getElementById('input-cardio-type').value='';document.getElementById('input-cardio-duration').value=String(CARDIO_DOCUMENT.main?.durationMinutes||30);document.getElementById('input-cardio-frequency').value=String(CARDIO_DOCUMENT.main?.daysPerWeek||3);document.getElementById('input-cardio-notes').value='';document.getElementById('btn-delete-cardio-item').style.display='none';openModal('modal-cardio-item');focusEditorField('input-cardio-type',250);}
-function openEditCardioItem(kind,id){if(!cardioCanEdit())return;const item=kind==='main'?CARDIO_DOCUMENT.main:CARDIO_DOCUMENT.substitutions.find(entry=>entry.id===id);if(!item)return;EDIT_CARDIO_KIND=kind==='main'?'main':'substitution';EDIT_CARDIO_ITEM_ID=item.id;document.getElementById('modal-cardio-title').textContent=EDIT_CARDIO_KIND==='main'?'Editar cardio principal':'Editar substituição de cardio';document.getElementById('input-cardio-type').value=item.type;document.getElementById('input-cardio-duration').value=String(item.durationMinutes);document.getElementById('input-cardio-frequency').value=String(item.daysPerWeek);document.getElementById('input-cardio-notes').value=item.notes;document.getElementById('btn-delete-cardio-item').style.display='block';openModal('modal-cardio-item');}
+function openAddCardioMain(){if(!cardioCanEdit())return;EDIT_CARDIO_KIND='main';EDIT_CARDIO_ITEM_ID='';CARDIO_EDITOR_CONTEXT={...captureCardioContext(),item:null};document.getElementById('modal-cardio-title').textContent='Prescrever cardio principal';document.getElementById('input-cardio-type').value='';document.getElementById('input-cardio-duration').value='30';document.getElementById('input-cardio-frequency').value='3';document.getElementById('input-cardio-notes').value='';document.getElementById('btn-delete-cardio-item').style.display='none';openModal('modal-cardio-item');focusEditorField('input-cardio-type',250);}
+function openAddCardioSubstitution(){if(!cardioCanEdit())return;if(CARDIO_DOCUMENT.substitutions.length>=20){alert('Limite seguro de 20 substituições de cardio atingido.');return;}EDIT_CARDIO_KIND='substitution';EDIT_CARDIO_ITEM_ID='';CARDIO_EDITOR_CONTEXT={...captureCardioContext(),item:null};document.getElementById('modal-cardio-title').textContent='Nova substituição de cardio';document.getElementById('input-cardio-type').value='';document.getElementById('input-cardio-duration').value=String(CARDIO_DOCUMENT.main?.durationMinutes||30);document.getElementById('input-cardio-frequency').value=String(CARDIO_DOCUMENT.main?.daysPerWeek||3);document.getElementById('input-cardio-notes').value='';document.getElementById('btn-delete-cardio-item').style.display='none';openModal('modal-cardio-item');focusEditorField('input-cardio-type',250);}
+function openEditCardioItem(kind,id){if(!cardioCanEdit())return;const item=kind==='main'?CARDIO_DOCUMENT.main:CARDIO_DOCUMENT.substitutions.find(entry=>entry.id===id);if(!item)return;CARDIO_EDITOR_CONTEXT={...captureCardioContext(),item:normalizeCardioItem(item)};EDIT_CARDIO_KIND=kind==='main'?'main':'substitution';EDIT_CARDIO_ITEM_ID=item.id;document.getElementById('modal-cardio-title').textContent=EDIT_CARDIO_KIND==='main'?'Editar cardio principal':'Editar substituição de cardio';document.getElementById('input-cardio-type').value=item.type;document.getElementById('input-cardio-duration').value=String(item.durationMinutes);document.getElementById('input-cardio-frequency').value=String(item.daysPerWeek);document.getElementById('input-cardio-notes').value=item.notes;document.getElementById('btn-delete-cardio-item').style.display='block';openModal('modal-cardio-item');}
 async function saveCardioItem(){
-  if(!cardioCanEdit()||!beginAction('cardio-mutation','modal-cardio-item'))return;const type=document.getElementById('input-cardio-type').value.normalize('NFKC').trim(),durationMinutes=Math.trunc(Number(document.getElementById('input-cardio-duration').value)),daysPerWeek=Math.trunc(Number(document.getElementById('input-cardio-frequency').value)),notes=document.getElementById('input-cardio-notes').value.normalize('NFKC').trim();if(!type){alert('Informe o tipo de cardio.');endAction('cardio-mutation','modal-cardio-item');return;}if(!Number.isInteger(durationMinutes)||durationMinutes<1||durationMinutes>600){alert('Informe um tempo entre 1 e 600 minutos.');endAction('cardio-mutation','modal-cardio-item');return;}if(!Number.isInteger(daysPerWeek)||daysPerWeek<1||daysPerWeek>7){alert('Informe uma frequência entre 1 e 7 dias por semana.');endAction('cardio-mutation','modal-cardio-item');return;}const before=JSON.stringify(CARDIO_DOCUMENT);
-  try{let item;if(EDIT_CARDIO_KIND==='main'){const old=CARDIO_DOCUMENT.main;item=normalizeCardioItem({id:old?.id||EDIT_CARDIO_ITEM_ID||uid(),type,durationMinutes,daysPerWeek,notes,order:0});CARDIO_DOCUMENT.main=item;}else{const index=CARDIO_DOCUMENT.substitutions.findIndex(entry=>entry.id===EDIT_CARDIO_ITEM_ID);item=normalizeCardioItem({id:index>=0?CARDIO_DOCUMENT.substitutions[index].id:uid(),type,durationMinutes,daysPerWeek,notes,order:index>=0?CARDIO_DOCUMENT.substitutions[index].order:CARDIO_DOCUMENT.substitutions.length});if(index>=0)CARDIO_DOCUMENT.substitutions[index]=item;else CARDIO_DOCUMENT.substitutions.push(item);}clearCardioTimer(item.id);CURRENT_CARDIO_ITEM_ID=item.id;await persistCardioDocument();closeModal('modal-cardio-item');renderCardioScreen();showToast('✓ Prescrição de cardio salva');}catch(error){CARDIO_DOCUMENT=normalizeCardioDocument(JSON.parse(before));alert(cloudWriteError(error,'salvar o cardio'));}finally{endAction('cardio-mutation','modal-cardio-item');}
+  const context=CARDIO_EDITOR_CONTEXT;
+  if(!context||!cardioDeleteContextCurrent(context)||!beginAction('cardio-mutation','modal-cardio-item'))return false;
+  try{
+    const type=document.getElementById('input-cardio-type').value.normalize('NFKC').trim(),durationMinutes=Math.trunc(Number(document.getElementById('input-cardio-duration').value)),daysPerWeek=Math.trunc(Number(document.getElementById('input-cardio-frequency').value)),notes=document.getElementById('input-cardio-notes').value.normalize('NFKC').trim();
+    if(!type)throw new Error('Informe o tipo de cardio.');
+    if(!Number.isInteger(durationMinutes)||durationMinutes<1||durationMinutes>600)throw new Error('Informe um tempo entre 1 e 600 minutos.');
+    if(!Number.isInteger(daysPerWeek)||daysPerWeek<1||daysPerWeek>7)throw new Error('Informe uma frequência entre 1 e 7 dias por semana.');
+    const kind=EDIT_CARDIO_KIND,base=context.item,id=EDIT_CARDIO_ITEM_ID||(EDIT_CARDIO_ITEM_ID=uid());
+    const item=normalizeCardioItem({id,type,durationMinutes,daysPerWeek,notes,order:base?.order||0});
+    const saved=await persistCardioMutation(context,next=>{
+      const current=kind==='main'?next.main:next.substitutions.find(entry=>entry.id===id);
+      const same=(a,b)=>JSON.stringify(a?normalizeCardioItem({...a,order:0}):null)===JSON.stringify(b?normalizeCardioItem({...b,order:0}):null);
+      if(!same(current,base)&&!same(current,item))throw new Error('Este cardio mudou em outro acesso. Copie sua edição e abra o cardio novamente.');
+      if(kind==='main')next.main={...current,...item};
+      else if(current)next.substitutions=next.substitutions.map(entry=>entry.id===id?{...entry,...item,order:entry.order}:entry);
+      else{if(next.substitutions.length>=20)throw new Error('Limite seguro de 20 substituições de cardio atingido.');next.substitutions.push({...item,order:next.substitutions.length});}
+      return next;
+    });
+    if(!cardioDeleteContextCurrent(context))return true;
+    CARDIO_DOCUMENT=normalizeCardioDocument(saved);CURRENT_CARDIO_ITEM_ID=id;
+    // Preserve a running timer when only instructions/frequency changed.
+    if(base&&base.durationMinutes!==durationMinutes)clearCardioTimer(id);
+    if(CARDIO_EDITOR_CONTEXT===context&&EDIT_CARDIO_ITEM_ID===id)closeModal('modal-cardio-item');
+    renderCardioScreen();showToast('✓ Prescrição de cardio salva');return true;
+  }catch(error){if(cardioDeleteContextCurrent(context))alert(cloudWriteError(error,'salvar o cardio'));return false;}
+  finally{endAction('cardio-mutation','modal-cardio-item');}
 }
 function cardioDeleteContextCurrent(context){
   return CARDIO_CONTEXT===context.cardio&&cardioOwnerKey()===context.owner&&CURRENT_USER?.uid===context.userUid&&CURRENT_USER?.role===context.role&&cardioCanEdit()&&(!context.cardio.trainer||(CURRENT_USER?.role==='trainer'&&VIEW_STUDENT?.uid===context.cardio.targetUid));
@@ -9176,16 +9266,18 @@ async function deleteCardioItemConfirmed(context,kind,id){
 
 async function moveCardioSubstitution(id,delta){
   if(!cardioCanEdit()||!beginAction('cardio-mutation'))return false;
-  const context={cardio:CARDIO_CONTEXT,owner:cardioOwnerKey(),userUid:CURRENT_USER?.uid,role:CURRENT_USER?.role},before=JSON.stringify(CARDIO_DOCUMENT),localBefore=LOCAL_DB.cardioPlan;
+  const context=captureCardioContext(),step=Number(delta),items=CARDIO_DOCUMENT.substitutions,index=items.findIndex(item=>item.id===id),neighbor=items[index+step]?.id;
   try{
-    if(!cardioDeleteContextCurrent(context))return false;
-    const items=CARDIO_DOCUMENT.substitutions,index=items.findIndex(item=>item.id===id),target=index+Number(delta);
-    if(index<0||target<0||target>=items.length)return false;
-    [items[index],items[target]]=[items[target],items[index]];items.forEach((item,i)=>item.order=i);
-    await persistCardioDocument();
-    if(cardioDeleteContextCurrent(context))renderCardioScreen();return true;
+    if(!cardioDeleteContextCurrent(context)||![-1,1].includes(step)||index<0||!neighbor)return false;
+    const saved=await persistCardioMutation(context,next=>{
+      const list=next.substitutions,from=list.findIndex(item=>item.id===id),to=list.findIndex(item=>item.id===neighbor);
+      if(from<0||to<0)throw new Error('A lista de cardios mudou. Abra a tela novamente.');
+      if(Math.sign(to-from)===step){const [item]=list.splice(from,1),anchor=list.findIndex(entry=>entry.id===neighbor);list.splice(anchor+(step>0?1:0),0,item);}
+      list.forEach((item,i)=>item.order=i);return next;
+    });
+    if(cardioDeleteContextCurrent(context)){CARDIO_DOCUMENT=normalizeCardioDocument(saved);renderCardioScreen();}return true;
   }catch(error){
-    if(cardioDeleteContextCurrent(context)){CARDIO_DOCUMENT=normalizeCardioDocument(JSON.parse(before));if(context.cardio.local)LOCAL_DB.cardioPlan=localBefore;renderCardioScreen();showToast(cloudWriteError(error,'alterar a ordem dos cardios'),true);}return false;
+    if(cardioDeleteContextCurrent(context))showToast(cloudWriteError(error,'alterar a ordem dos cardios'),true);return false;
   }finally{endAction('cardio-mutation');}
 }
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateCardioTimerDisplay();},{passive:true});

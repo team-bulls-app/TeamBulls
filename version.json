@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110602,
-  "revision": "action-audit-1",
+  "build": 2026110604,
+  "revision": "deep-action-audit-2",
   "publishedAt": "2026-11-06T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Correções nas fotos e comparações, confirmação de salvamento das bibliotecas e reordenação do cardio."
+  "message": "Correções de troca de aluno e gravação do cardio, conflitos de bibliotecas e segurança das confirmações de pagamentos e comprovantes."
 }

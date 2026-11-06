@@ -100,7 +100,7 @@ has(registration,"source.includes('getIdTokenResult(true)')",'Diagnóstico de in
 const hub=read('modules/trainer-inbox-payments-v10_10_12.js');
 has(hub,"CURRENT_USER?.role==='trainer'",'Central/Pagamentos não possui gate de treinador.');
 has(hub,"CURRENT_USER?.role==='student'",'Notificação de relatório não possui gate de aluno.');
-has(hub,"paymentReceipts/${cleanId(trainerUid)}/${cleanId(studentId)}/${cleanId(paymentId)}",'Comprovante não usa namespace por treinador/aluno/pagamento.');
+has(hub,"paymentReceipts/${cleanId(trainerUid)}/${cleanId(studentId)}/${fileId}",'Comprovante não usa namespace por treinador/aluno/pagamento.');
 lacks(hub,'localStorage.setItem','Módulo financeiro não deve persistir valores/comprovantes no localStorage.');
 
 const stretch=read('modules/remove-stretch-planilha-v10_10_9.js');
@@ -111,7 +111,7 @@ has(config,'security-hardening-v10_10_9.js?v=10.10.10-security8','Loader não in
 has(config,'legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','Loader não inclui o reconciliador legacy-links6 com URL nova.');
 has(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration2','Loader não inclui a revisão passiva/cache-safe do cadastro.');
 lacks(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration1','Loader ainda referencia a revisão antiga do cadastro.');
-has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
+has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments4','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
 has(read('firebase/firestore_28_compacto.rules'),'function paymentDurationValid(data)','Rules não validam a duração permitida para os planos.');
 has(read('firebase/firestore_28_compacto.rules'),"type == 'custom' && months is int && months >= 1 && months <= 60",'Rules não limitam o plano ajustável a 1–60 meses inteiros.');
 
