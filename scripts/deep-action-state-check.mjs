@@ -103,4 +103,23 @@ for(const action of ['openInstructions','openTechniques']){
  const h=harness(),gate=defer();h.c.loadGeneralInstructions=()=>gate.promise;h.c.loadTechniqueCatalog=()=>gate.promise;
  const opening=h.c[action]();h.c.NAVIGATION_SEQ++;gate.resolve();await opening;assert.equal(h.renders.length,0,'Late catalog navigation must not reopen a screen the user left');
 }
+// The installed guidance module replaces the automatic prompt, so test its real
+// wrapper as well as the core opening functions above.
+const guidance=process.argv.includes('--baseline')?execFileSync('git',['show',`${baseline}:modules/student-guidance-v10_10_9-v2.js`],{encoding:'utf8'}):fs.readFileSync('modules/student-guidance-v10_10_9-v2.js','utf8');
+function promptHarness(){
+ const h=harness();h.c.CURRENT_USER={uid:'student-a',role:'student'};h.c.GENERAL_INSTRUCTIONS={revision:1};h.c.ACK_PREFIX='fixture-ack-';h.c.STATIC_REVISION='fixture';h.c.forcedPromptToken='';h.c.LOCAL_OWNER_UID='';h.c.LOCAL_GUEST_OWNER='';
+ h.c.document.getElementById=()=>({classList:{contains:()=>false}});
+ vm.runInContext(guidance.slice(guidance.indexOf('  function instructionIdentity('),guidance.indexOf('  function stretchPageHtml(')),h.c);h.c.patchInstructionPrompt();return h;
+}
+for(const change of ['navigation','session']){
+ const h=promptHarness(),gate=defer();h.c.loadGeneralInstructions=()=>gate.promise;const pending=h.c.maybePromptInitialInstructions();
+ if(change==='navigation'){h.c.NAVIGATION_SEQ++;h.c.activeScreenId=()=> 'screen-meals';}else h.c.CURRENT_USER={uid:'student-b',role:'student'};
+ gate.resolve();await pending;assert.equal(h.renders.length,0,'Installed prompt must not interrupt a new screen/session');assert.equal(h.c.INSTRUCTIONS_PROMPT_RUNNING,false);
+}
+{
+ const h=promptHarness(),first=defer(),second=defer();let reads=0;h.c.loadGeneralInstructions=()=>++reads===1?first.promise:second.promise;
+ const pending=h.c.maybePromptInitialInstructions();first.resolve();await new Promise(r=>setImmediate(r));h.c.NAVIGATION_SEQ++;second.resolve();await pending;
+ assert.equal(h.renders.length,0);assert.equal(h.c.forcedPromptToken,'','Canceled opening must not permanently suppress the prompt');
+ h.c.loadGeneralInstructions=async()=>{};assert.equal(await h.c.maybePromptInitialInstructions(),true);assert(h.renders.includes('screen-instructions'),'Prompt must work after returning to home');
+}
 console.log('PASS deep actions: stale cardio reads/saves, local/cloud failure and timer preservation, stable creation IDs, concurrent cardio edits/order, catalog conflicts/idempotency, initialization and delayed navigation.');

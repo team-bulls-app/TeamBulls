@@ -26,8 +26,8 @@ assert(syntax.status===0,`JavaScript inválido em ${modulePath}: ${syntax.stderr
 assert(publicVersion==='10.10.9','A versão pública mudou durante a revisão de orientações.');
 
 // Loader e ordem de camadas.
-const guidanceLoader='./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance2';
-has(config,guidanceLoader,'Loader não inclui student-guidance guidance2.');
+const guidanceLoader='./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance3';
+has(config,guidanceLoader,'Loader não inclui student-guidance guidance3.');
 assert((config.match(/student-guidance-v10_10_9-v2\.js/g)||[]).length===1,'Student guidance deve ser carregado uma única vez.');
 assert(config.indexOf('diet-delete-fix-v10_10_9.js')<config.indexOf('student-guidance-v10_10_9-v2.js'),'Student guidance precisa executar depois da correção de dieta.');
 assert(config.indexOf('student-guidance-v10_10_9-v2.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Estabilidade de modais deve permanecer por último.');
@@ -57,13 +57,18 @@ has(guidance,"event.key==='Escape'",'Viewer de alongamentos perdeu fechamento po
 has(guidance,"event.key==='ArrowLeft'",'Viewer de alongamentos perdeu seta esquerda.');
 has(guidance,"event.key==='ArrowRight'",'Viewer de alongamentos perdeu seta direita.');
 
+has(guidance,"const VERSION='10.10.9-guidance3'",'Camada ativa de orientações não está na revisão de navegação segura.');
+has(guidance,"NAVIGATION_SEQ!==navigation",'Aviso automático perdeu validação de navegação.');
+has(guidance,"instructionIdentity()!==uid",'Aviso automático perdeu validação de aluno.');
+has(guidance,"result===false&&token&&forcedPromptToken===token",'Abertura cancelada pode bloquear o aviso permanentemente.');
+has(read('update_v10_10_9.js'),guidanceLoader,'Atualizador não aquece a camada ativa de orientações.');
 // Confirmação: token por aluno + revisão, lock concorrente e liberação após leitura vazia/falha.
 has(guidance,"const ACK_PREFIX='team_bulls_instruction_ack_v2_'",'Chave de confirmação v2 ausente.');
 has(guidance,"String(GENERAL_INSTRUCTIONS?.revision||1)+'|'+STATIC_REVISION",'Token de confirmação não combina revisão dinâmica e estática.');
 has(guidance,'markInstructionAcknowledged();forcedPromptToken=\'\';return base.apply(this,arguments);','Confirmação não é persistida antes de voltar ao fluxo base/Home.');
 has(guidance,"typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined'&&INSTRUCTIONS_PROMPT_RUNNING",'Prompt não respeita o lock concorrente do núcleo.');
 has(guidance,"INSTRUCTIONS_PROMPT_RUNNING=true",'Prompt não ativa o lock durante a leitura.');
-has(guidance,"if(!visibleInstructionCount?.()||instructionAcknowledged()){forcedPromptToken='';return;}",'Leitura vazia/confirmada pode deixar token preso.');
+has(guidance,"if(!visibleInstructionCount?.()||instructionAcknowledged()){forcedPromptToken='';return false;}",'Leitura vazia/confirmada pode deixar token preso.');
 has(guidance,"finally{if(typeof INSTRUCTIONS_PROMPT_RUNNING!=='undefined')INSTRUCTIONS_PROMPT_RUNNING=false;}",'Lock do prompt não é liberado em finally.');
 const promptStart=guidance.indexOf("if(typeof maybePromptInitialInstructions==='function'");
 const promptEnd=guidance.indexOf("if(typeof acknowledgeInstructions==='function'",promptStart);
