@@ -73,14 +73,14 @@ has(gerBridge,"closest('#tb-save-series-only')",'Salvar somente séries pode sug
 const workflowIndex=config.indexOf('workflow-controls-v10_10_10.js?v=10.10.10-workflow1');
 const lockIndex=config.indexOf('prescription-lock-bridge-v10_10_10.js?v=10.10.10-lockbridge1');
 const gerLockIndex=config.indexOf('ger-lock-bridge-v10_10_10.js?v=10.10.10-gerlock1');
-const reportIndex=config.indexOf('report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos1');
+const reportIndex=config.indexOf('report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2');
 const auditIndex=config.indexOf('usability-audit-v10_10_10.js?v=10.10.10-audit1');
 const modalIndex=config.indexOf('modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1');
 assert(workflowIndex>=0&&lockIndex>workflowIndex&&gerLockIndex>lockIndex&&reportIndex>gerLockIndex&&auditIndex>reportIndex&&modalIndex>auditIndex,'Ordem dos hotfixes de tranca/relatório/auditoria está incorreta.');
 
 for(const [name,source] of [['sw.js',sw],['sw_47.js',sw47]]){
   assert(/const CACHE_HOTFIX='[^']+'/.test(source),`${name} não possui revisão explícita do shell.`);
-  has(source,"./modules/report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos1",`${name} não prepara fotos rápidas de relatório.`);
+  has(source,"./modules/report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2",`${name} não prepara fotos rápidas de relatório.`);
   has(source,"./modules/usability-audit-v10_10_10.js?v=10.10.10-audit1",`${name} não prepara auditoria de usabilidade.`);
 }
 

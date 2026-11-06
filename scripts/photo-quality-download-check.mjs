@@ -20,7 +20,7 @@ assert(storagePath==='firebase/storage_6.rules','firebase.json não aponta para 
 assert(fs.existsSync(path.join(root,storagePath)),`Regras Storage ativas ausentes: ${storagePath}`);
 const rules=fs.existsSync(path.join(root,storagePath))?read(storagePath):'';
 
-has(source,"const VERSION='10.10.9-photoquality2'",'Revisão móvel photoquality2 não está ativa.');
+has(source,"const VERSION='10.10.9-photoquality3'",'Revisão móvel photoquality2 não está ativa.');
 has(source,"const ORIGINAL_KIND='progressPhotoOriginals'",'Arquivo original não é preservado em caminho separado.');
 has(source,'MAX_ORIGINAL_BYTES=25*1024*1024','Limite de original de 25 MiB ausente.');
 has(source,'buildProgressPhotoVariants.__tbOriginalArchive','Captura da foto fonte antes da otimização ausente.');
@@ -44,7 +44,7 @@ has(conversion,'preparedJpegInputs.delete(file);return baseDecode(prepared);','E
 has(conversion,"await withReportPreview(()=>base(slot,syntheticEvent(selected[slot])))",'Seleção em lote de seis fotos não ativa a preparação antecipada de JPG.');
 has(conversion,"return withReportPreview(()=>base.apply(context,args))",'Seleção individual de foto não ativa a preparação antecipada de JPG.');
 
-has(config,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2",'Loader não inclui a revisão móvel de qualidade/download.');
+has(config,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3",'Loader não inclui a revisão móvel de qualidade/download.');
 has(config,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4",'Loader não inclui o runtime mutável de conversão/preparo de fotos.');
 has(rules,'match /progressPhotoOriginals/{uid}/{photoId}','Regras do Storage não cobrem originais.');
 has(rules,"request.resource.contentType.matches('image/(jpeg|png|webp|gif|avif|heic|heif)')",'Tipos de imagem originais permitidos estão incorretos.');

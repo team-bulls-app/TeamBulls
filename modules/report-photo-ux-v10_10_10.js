@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_REPORT_PHOTO_UX_V101010__)return;
   window.__TEAM_BULLS_REPORT_PHOTO_UX_V101010__=true;
 
-  const VERSION='10.10.10-reportphotos1';
+  const VERSION='10.10.10-reportphotos2';
   const MAX_RECORD_CACHE=180;
   const recordCache=new Map();
   let photoViewRequest=0;
@@ -154,16 +154,14 @@
       const download=document.getElementById('btn-download-photo');if(download)download.style.display='none';
       const deleteButton=document.getElementById('btn-delete-photo');if(deleteButton)deleteButton.style.display=(readonly||p.checkinId||p.reportId||p.questionnaireId)?'none':'block';
       if(!document.getElementById('modal-photo-view')?.classList.contains('open'))openModal('modal-photo-view');
+      let fullReady=false;const context=capturePhotoReadContext(p),result=base.apply(this,arguments),viewerRequest=PHOTO_VIEW_REQUEST;
       Promise.resolve(typeof resolvePhotoSource==='function'?resolvePhotoSource(p,{full:false}):'').then(src=>{
-        if(request===photoViewRequest&&String(CUR_PHOTO_ID)===String(pid)&&document.getElementById('modal-photo-view')?.classList.contains('open')&&src&&img)img.src=src;
+        if(!fullReady&&request===photoViewRequest&&viewerRequest===PHOTO_VIEW_REQUEST&&photoReadContextCurrent(context)&&String(CUR_PHOTO_ID)===String(pid)&&document.getElementById('modal-photo-view')?.classList.contains('open')&&src&&img)img.src=src;
       }).catch(()=>{});
-      try{return await base.apply(this,arguments);}
+      try{const opened=await result;fullReady=opened===true;return opened;}
       finally{
         if(request===photoViewRequest&&img)img.classList.remove('tb-photo-view-loading');
-        else if(request!==photoViewRequest){
-          const currentId=String(CUR_PHOTO_ID||''),current=typeof PHOTOS_CACHE!=='undefined'&&Array.isArray(PHOTOS_CACHE)?PHOTOS_CACHE.find(item=>String(item.id)===currentId):null;
-          if(current&&img){const latest=photoViewRequest;Promise.resolve(resolvePhotoSource(current,{full:false})).then(src=>{if(latest===photoViewRequest&&src&&document.getElementById('modal-photo-view')?.classList.contains('open')){img.src=src;img.classList.remove('tb-photo-view-loading');const staleDownload=document.getElementById('btn-download-photo');if(staleDownload)staleDownload.style.display='none';}}).catch(()=>{});}
-        }
+
       }
     };
     wrapped.__tbReportPhotoUx=true;wrapped.__tbBase=base;openPhotoView=wrapped;

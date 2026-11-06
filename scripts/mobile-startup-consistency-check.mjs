@@ -40,7 +40,7 @@ has(config,'const loadedModules=new Set(),failedModules=new Set()','Loader não 
 has(config,'const healFailedModules=async()=>','Loader não possui autorreparo.');
 has(config,"window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();})",'Ao recuperar conexão, o loader deve retentar módulos falhos e reavaliar o contexto atual.');
 has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3','Loader não entrega a Central/Pagamentos atual.');
-has(config,'photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2','Loader não entrega a correção móvel de fotos.');
+has(config,'photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','Loader não entrega a correção móvel de fotos.');
 has(config,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Loader não entrega o fallback HEIC/HEIF atual.');
 assert(config.indexOf('heic-report-conversion-v10_10_12.js')>config.indexOf('photo-quality-download-v10_10_9.js'),'Conversor HEIC precisa carregar após a camada de qualidade de fotos.');
 has(updater,'function compareRelease(info)','Atualizador não compara versão + build.');
@@ -52,7 +52,7 @@ has(updater,'heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','Atualizad
 for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2",`${name} regrediu a integridade do cadastro.`);
   has(text,"./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments3",`${name} não prepara a Central/Pagamentos.`);
-  has(text,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality2",`${name} não prepara a correção móvel de fotos.`);
+  has(text,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3",`${name} não prepara a correção móvel de fotos.`);
   has(text,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4",`${name} não prepara o módulo HEIC atual.`);
   has(text,"./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4",`${name} não prepara o worker HEIC same-origin atual.`);
   has(text,"'/modules/heic-report-conversion-v10_10_12.js'",`${name} não serve o conversor HEIC como mutável/network-first.`);
@@ -63,7 +63,7 @@ for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"if(relativePath==='/version.json')",`${name} deixou de tratar version.json como mutável.`);
   has(text,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1",`${name} não prepara o workspace do treinador para uso offline.`);
 }
-has(photo,"const VERSION='10.10.9-photoquality2'",'Revisão móvel de fotos não está ativa.');
+has(photo,"const VERSION='10.10.9-photoquality3'",'Revisão móvel de fotos não está ativa.');
 has(photo,"createImageBitmap(file,{imageOrientation:'from-image'})",'Decoder móvel perdeu a primeira tentativa orientada.');
 has(photo,'createImageBitmap(file);','Decoder móvel perdeu o fallback Android sem opções.');
 has(photo,'releaseLegacyReportPreviewSurfaces()','Envio não libera previews pesados antes da compressão.');

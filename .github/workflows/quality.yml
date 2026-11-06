@@ -29,6 +29,8 @@ jobs:
           node scripts/cardio-delete-browser-check.mjs
           node scripts/runtime-stability-behavior-check.mjs
           node scripts/runtime-idle-browser-check.mjs
+          node scripts/action-outcomes-check.mjs
+          node scripts/action-outcomes-browser-check.mjs
           node scripts/quality-check.mjs
           node testes/testar_login_consultoria_mobile.js
           node scripts/login-mobile-glass-browser-check.mjs
