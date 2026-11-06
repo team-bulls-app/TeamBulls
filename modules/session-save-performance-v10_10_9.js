@@ -506,7 +506,10 @@
       const startedAt=Date.now();let synced=0;
       for(const entry of readDeletions(uidValue).entries.filter(item=>item.pending)){
         if(!networkReady()||CURRENT_USER?.uid!==uidValue)break;
-        try{if(await syncDeletion(entry))synced++;}catch(error){markSyncFailure(uidValue,entry.id,error);}
+        try{if(await syncDeletion(entry))synced++;}catch(error){
+          markSyncFailure(uidValue,entry.id,error);
+          if(!networkReady()||/timeout|unavailable|unauthenticated|deadline-exceeded/.test(String(error?.code||'')))break;
+        }
       }
       const queue=filterDeleted(readQueue(uidValue),uidValue);
       if(!queue.length){const pending=pendingCount(uidValue);recordSyncAttempt(uidValue,startedAt,Date.now()-startedAt,synced,pending);return pending===0;}

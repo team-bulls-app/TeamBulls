@@ -324,6 +324,11 @@ await check('permissão negada em documento existente não vira confirmação fa
   assert.equal(a.remote.has('saved'),true);assert.equal(a.api.pendingDeletes(),1);assert.equal(a.api.diagnostics().failed,1);assert.equal(a.api.diagnostics().lastError,'permission');
   opts.deleteFailure=null;assert.equal(await a.api.flush(),true);assert.equal(a.remote.has('saved'),false);assert.equal(a.api.pendingDeletes(),0);
 });
+await check('falha de conexão encerra passagem de exclusões sem aguardar timeout por cada registro',async()=>{
+  const opts={online:false},a=app(opts);await a.ready();seedSaved(a,'one');seedSaved(a,'two');await a.context.performDeleteSession('one');await a.context.performDeleteSession('two');
+  a.context.navigator.onLine=true;opts.deleteFailure=Object.assign(new Error('unavailable'),{code:'unavailable'});assert.equal(await a.api.flush(),false);assert.equal(a.calls.filter(([type])=>type==='delete').length,1,'One transport failure must stop the pass');assert.equal(a.api.pendingDeletes(),2);
+  opts.deleteFailure=null;assert.equal(await a.api.flush(),true);assert.equal(a.remote.size,0);
+});
 await check('aluno registrado offline exclui remotamente após reconectar',async()=>{
   const a=app({mode:'local',offlineRegistered:true,online:false});await a.ready();seedSaved(a);assert.equal(await a.context.performDeleteSession('saved'),true);assert.equal(a.api.pendingDeletes(),1);
   a.context.MODE='cloud';a.context.navigator.onLine=true;await a.api.flush();assert.equal(a.remote.has('saved'),false);
