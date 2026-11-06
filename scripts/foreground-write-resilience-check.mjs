@@ -11,8 +11,8 @@ const source=fs.readFileSync(modulePath,'utf8');
 const loader=fs.readFileSync(loaderPath,'utf8');
 new vm.Script(source,{filename:modulePath});
 
-has(source,"const VERSION='10.10.50-foregroundwrite2'",'Runtime de foreground está na revisão errada.');
-has(loader,'foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite2','Loader cloud do aluno não entrega a proteção de foreground.');
+has(source,"const VERSION='10.10.50-foregroundwrite3'",'Runtime de foreground está na revisão errada.');
+has(loader,'foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3','Loader cloud do aluno não entrega a proteção de foreground.');
 has(source,"document.addEventListener('visibilitychange'",'Runtime não detecta retorno do background.');
 has(source,"ref.get({source:'server'})",'Reconciliação de refeição não confirma o estado final com o servidor.');
 lacks(source,'db.enableNetwork(','Retomada não deve forçar uma transição de rede contra listeners ativos.');
@@ -26,7 +26,7 @@ lacks(source,'MutationObserver','Proteção de foreground não deve observar a �
 lacks(source,"alert('Erro ao atualizar",'Novo fluxo de refeição não pode usar alert bloqueante.');
 has(source,"desiredDone?ref.set({studentUid:uid,mealId:mid,date}):ref.delete()",'Refeição não usa write determinístico depois do gate.');
 has(source,"const actual=await reconcileMeal(ref,mid,uid,date)",'Resultado incerto da refeição não é reconciliado com o servidor.');
-has(source,"if(pendingWrites.has(writeKey))",'Duplo toque durante write incerto não está protegido.');
+has(source,"if(pendingWrites.has(scopedKey(writeKey)))",'Duplo toque durante write incerto não está protegido.');
 
 /* Execução simulada: após retorno online, a factory aguarda a transição local,
    sem enableNetwork() nem leitura de sondagem no Firestore. */
@@ -56,7 +56,7 @@ win.window=win;
 Object.assign(win,{TeamBullsForegroundWriteResilience:null});
 vm.runInNewContext(source,context,{filename:modulePath});
 const api=context.window.TeamBullsForegroundWriteResilience;
-assert(api?.version==='10.10.50-foregroundwrite2','Runtime não expõe API versionada.');
+assert(api?.version==='10.10.50-foregroundwrite3','Runtime não expõe API versionada.');
 listeners['window:online']();
 const gated=api.write('simulated',()=>{writeStarts++;return Promise.resolve('ok');},{forceProbe:true,timeoutMs:500});
 await Promise.resolve();await Promise.resolve();

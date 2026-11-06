@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_DIET_LIVE_DEFICIT_1__)return;
   window.__TEAM_BULLS_DIET_LIVE_DEFICIT_1__=true;
 
-  const VERSION='10.10.13-deficit1';
+  const VERSION='10.10.13-deficit2';
   let frame=0;
   let observer=null;
   const n=value=>{const parsed=Number(String(value??'').replace(',','.'));return Number.isFinite(parsed)?parsed:0;};
@@ -42,17 +42,17 @@
     const activePlan=plan(),activeVariant=variant(activePlan),{get,target}=energy(activePlan,activeVariant),total=totalWithDraft(),mode=state(total.kcal,get);let badge=row.querySelector('.tb-live-deficit-badge');
     if(!badge){badge=document.createElement('span');badge.className='tb-live-deficit-badge';row.appendChild(badge);}
     badge.dataset.state=mode;
-    const variantName=String(activeVariant?.name||'Divisão atual');
-    if(!(get>0)){badge.innerHTML=`<b>GET NÃO INFORMADO</b><small>${variantName} · preencha o GET da dieta para acompanhar o déficit</small>`;return true;}
+    const variantName=String(activeVariant?.name||'Divisão atual').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    if(!(get>0)){const html=`<b>GET NÃO INFORMADO</b><small>${variantName} · preencha o GET da dieta para acompanhar o déficit</small>`;if(badge.innerHTML!==html)badge.innerHTML=html;return true;}
     const delta=get-total.kcal,label=mode==='surplus'?'SUPERÁVIT':mode==='maintenance'?'MANUTENÇÃO':'DÉFICIT',amount=mode==='maintenance'?'0 kcal':`${fmt(delta)} kcal`,pct=get>0?Math.abs(delta)/get*100:0;
     const targetText=target>0?` · meta VET ${Math.round(target).toLocaleString('pt-BR')} kcal`:'';
-    badge.innerHTML=`<b>${label} ${amount}</b><small>GET ${Math.round(get).toLocaleString('pt-BR')} kcal · ${variantName}${targetText} · ${pct.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</small>`;return true;
+    const html=`<b>${label} ${amount}</b><small>GET ${Math.round(get).toLocaleString('pt-BR')} kcal · ${variantName}${targetText} · ${pct.toLocaleString('pt-BR',{maximumFractionDigits:1})}%</small>`;if(badge.innerHTML!==html)badge.innerHTML=html;return true;
   }
-  function schedule(){if(frame)cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{frame=0;render();});}
+  function schedule(){if(document.hidden||frame)return;frame=requestAnimationFrame(()=>{frame=0;render();});}
   function styles(){if(document.getElementById('tb-live-deficit-style'))return;const style=document.createElement('style');style.id='tb-live-deficit-style';style.textContent=`
     .tb-workspace-total-row{flex-wrap:wrap}.tb-live-deficit-badge{display:flex;flex:0 1 245px;min-width:190px;flex-direction:column;align-items:flex-end;margin-left:auto;padding:7px 9px;border:1px solid rgba(255,255,255,.09);border-radius:9px;background:#0d0d0d;text-align:right}.tb-live-deficit-badge b{font:900 13px 'Barlow Condensed',sans-serif;letter-spacing:.45px;color:#d7d0ca}.tb-live-deficit-badge small{margin-top:3px!important;max-width:245px!important;color:#817872!important;font:600 7px/1.35 'DM Mono',monospace!important}.tb-live-deficit-badge[data-state="deficit"]{border-color:rgba(34,197,94,.32);background:rgba(34,197,94,.055)}.tb-live-deficit-badge[data-state="deficit"] b{color:#7ddd9e}.tb-live-deficit-badge[data-state="surplus"]{border-color:rgba(225,29,72,.38);background:rgba(225,29,72,.055)}.tb-live-deficit-badge[data-state="surplus"] b{color:#ff718b}.tb-live-deficit-badge[data-state="maintenance"] b{color:#e4c36d}@media(max-width:720px){.tb-live-deficit-badge{flex-basis:100%;align-items:flex-start;margin-left:0;text-align:left}.tb-live-deficit-badge small{max-width:none!important}}
   `;document.head.appendChild(style);}
-  function install(){styles();document.addEventListener('input',event=>{if(event.target?.id==='input-meal-items'||event.target?.closest?.('#tb-diet-calc-body'))schedule();},true);document.addEventListener('change',event=>{if(event.target?.id==='input-meal-items'||event.target?.closest?.('#tb-diet-calc-body'))schedule();},true);if(!observer&&document.body){observer=new MutationObserver(mutations=>{if(mutations.some(m=>m.target?.closest?.('#tb-trainer-diet-workspace-summary,#tb-meal-portion-body')||[...(m.addedNodes||[])].some(node=>node?.nodeType===1&&node.querySelector?.('#tb-trainer-diet-workspace-summary'))))schedule();});observer.observe(document.body,{childList:true,subtree:true});}schedule();}
+  function install(){styles();document.addEventListener('visibilitychange',()=>{if(!document.hidden)schedule();},{passive:true});document.addEventListener('input',event=>{if(event.target?.id==='input-meal-items'||event.target?.closest?.('#tb-diet-calc-body'))schedule();},true);document.addEventListener('change',event=>{if(event.target?.id==='input-meal-items'||event.target?.closest?.('#tb-diet-calc-body'))schedule();},true);if(!observer&&document.body){observer=new MutationObserver(mutations=>{if(mutations.some(m=>m.target?.closest?.('#tb-trainer-diet-workspace-summary,#tb-meal-portion-body')||[...(m.addedNodes||[])].some(node=>node?.nodeType===1&&node.querySelector?.('#tb-trainer-diet-workspace-summary'))))schedule();});observer.observe(document.body,{childList:true,subtree:true});}schedule();}
   window.TeamBullsDietLiveDeficit=Object.freeze({version:VERSION,refresh:schedule,calculate:()=>{const activePlan=plan(),activeVariant=variant(activePlan),total=totalWithDraft(),e=energy(activePlan,activeVariant);return{...total,...e,balanceKcal:e.get-total.kcal,variantId:String(activeVariant?.id||''),variantName:String(activeVariant?.name||'')}}});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();window.addEventListener('pageshow',schedule,{passive:true});window.addEventListener('team-bulls-runtime-ready',schedule);
 })();

@@ -31,7 +31,7 @@ has(portions,'get presets(){return presetSnapshot();}','Presets públicos devem 
 has(portions,'const PRESETS=[...BASE_PRESETS,...LEGACY_ALIASES]','Fonte canônica não separa base, aliases e personalizados.');
 lacks(portions,"group:'tomate',label:'120g Tomate'",'Tomate ainda está sendo usado como item canônico/visível.');
 
-has(custom,"const VERSION='10.10.13-customfood4'",'Sincronização dos alimentos personalizados não está na revisão estrutural.');
+has(custom,"const VERSION='10.10.13-customfood5'",'Sincronização dos alimentos personalizados não está na revisão estrutural.');
 has(custom,"db.collection(COLLECTION).doc(uid)",'Catálogo persistido do treinador não é carregado.');
 has(custom,"typeof api?.setCustomItems!=='function'",'Sincronização não usa o registro canônico da tabela.');
 has(custom,'api.setCustomItems(cached)','Alimentos personalizados não são entregues ao registro canônico.');
@@ -42,7 +42,7 @@ lacks(custom,'ensureMutablePortionApi','Correção antiga por substituição sup
 has(calories,'function analyze(text)','Analisador de kcal/macros foi removido.');
 has(calories,'Math.round(protein*4+carbs*4+fat*9)','Regra energética 4/4/9 foi alterada.');
 has(workspace,'dietTotalWithDraft()','Workspace não inclui a refeição em edição no total ao vivo.');
-has(deficit,"const VERSION='10.10.13-deficit1'",'Módulo de déficit ao vivo ausente.');
+has(deficit,"const VERSION='10.10.13-deficit2'",'Módulo de déficit ao vivo ausente.');
 has(deficit,'balanceKcal:e.get-total.kcal','Déficit não é calculado como GET menos kcal da divisão ativa.');
 has(deficit,"mode==='surplus'?'SUPERÁVIT'",'Interface não diferencia déficit e superávit.');
 has(deficit,'currentDietVariant','Déficit não acompanha a divisão ativa da dieta.');

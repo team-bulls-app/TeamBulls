@@ -3,14 +3,15 @@
   if(window.__TEAM_BULLS_CUSTOM_FOOD_CALORIE_BRIDGE_2__)return;
   window.__TEAM_BULLS_CUSTOM_FOOD_CALORIE_BRIDGE_2__=true;
 
-  const VERSION='10.10.13-customfood4';
+  const VERSION='10.10.13-customfood5';
   const COLLECTION='trainerSupplementCatalog';
   const FIELD='dietPortionItems';
   const PDF_MODULE='./modules/pdf-export-v10_10_12.js?v=10.10.12-pdf1';
-  const DEFICIT_MODULE='./modules/diet-live-deficit-v10_10_13.js?v=10.10.13-deficit1';
+  const DEFICIT_MODULE='./modules/diet-live-deficit-v10_10_13.js?v=10.10.13-deficit2';
   let cached=[];
   let cachedTrainer='';
   let loading=null;
+  let failedUid='',failedAt=0;
   let observer=null;
   let syncFrame=0;
   let pdfLoading=null;
@@ -38,14 +39,18 @@
   }
   async function load(force=false){
     const user=trainer();if(!user||typeof db==='undefined'||!db)return 0;const uid=String(user.uid);
-    if(!force&&cachedTrainer===uid&&cached.length)return apply();if(loading)return loading;
-    loading=(async()=>{
+    if(cachedTrainer&&cachedTrainer!==uid){cached=[];cachedTrainer='';apply([]);}
+    if(!force&&cachedTrainer===uid)return apply();
+    if(!force&&failedUid===uid&&Date.now()-failedAt<10000)return 0;
+    if(loading?.uid===uid)return loading.promise;
+    const entry={uid,promise:null};loading=entry;
+    entry.promise=(async()=>{
       try{
         const ref=db.collection(COLLECTION).doc(uid),snap=typeof cloudGet==='function'?await cloudGet(ref,'alimentos personalizados da dieta'):await ref.get();
-        if(!trainer()||String(CURRENT_USER.uid)!==uid)return 0;cached=normalize(snap.exists?snap.data()?.[FIELD]:[]);cachedTrainer=uid;return apply();
-      }catch(error){console.warn('[Team Bulls] Não foi possível carregar alimentos personalizados para kcal/macros',error);return apply();}
-      finally{loading=null;}
-    })();return loading;
+        if(!trainer()||String(CURRENT_USER.uid)!==uid)return 0;cached=normalize(snap.exists?snap.data()?.[FIELD]:[]);cachedTrainer=uid;failedUid='';failedAt=0;return apply();
+      }catch(error){console.warn('[Team Bulls] Não foi possível carregar alimentos personalizados para kcal/macros',error);if(!trainer()||String(CURRENT_USER.uid)!==uid)return 0;failedUid=uid;failedAt=Date.now();return apply();}
+      finally{if(loading===entry)loading=null;}
+    })();return entry.promise;
   }
   function tableItems(){
     const rows=[...document.querySelectorAll('[data-custom-food-list] .tb-custom-table tbody tr')];if(!rows.length)return null;

@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_1010502__)return;
   window.__TEAM_BULLS_FOREGROUND_WRITE_RESILIENCE_1010502__=true;
 
-  const VERSION='10.10.50-foregroundwrite2';
+  const VERSION='10.10.50-foregroundwrite3';
   const BACKGROUND_TRIGGER_MS=1200;
   const RESUME_WINDOW_MS=15000;
   const READY_CACHE_MS=6000;
@@ -18,6 +18,7 @@
   let baseToggleMealDone=null;
   let mealPatched=false;
   const pendingWrites=new Map();
+  const scopedKey=key=>currentUid()+'|'+String(key||'');
 
   const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
   const cloudMode=()=>{try{return typeof MODE!=='undefined'&&MODE==='cloud'&&typeof db!=='undefined'&&!!db;}catch(error){return false;}};
@@ -58,12 +59,16 @@
   }
 
   async function write(key,factory,options={}){
-    const id=String(key||options.label||'write');
+    const uid=currentUid(),id=scopedKey(key||options.label||'write');
     const existing=pendingWrites.get(id);if(existing)return{status:'pending',promise:existing.promise,existing:true};
     if(typeof factory!=='function')throw new TypeError('A gravação segura exige uma função para iniciar o write somente após a retomada.');
-    await awaitReady({force:options.forceProbe===true});
     const label=String(options.label||'gravação');
-    const writePromise=Promise.resolve().then(factory);
+    // Reserve the logical operation before yielding to the resume gate.
+    const writePromise=Promise.resolve().then(async()=>{
+      await awaitReady({force:options.forceProbe===true});
+      if(currentUid()!==uid)throw makeError('team-bulls/session-changed','A sessão mudou antes do envio.');
+      return Promise.resolve().then(factory);
+    });
     const entry={promise:writePromise,startedAt:Date.now(),label};pendingWrites.set(id,entry);
     writePromise.then(()=>{if(pendingWrites.get(id)===entry)pendingWrites.delete(id);},()=>{if(pendingWrites.get(id)===entry)pendingWrites.delete(id);});
     try{
@@ -107,7 +112,7 @@
         const ref=db.collection('mealCompletions').doc(compId);
         const currentlyDone=MEAL_COMPLETIONS_TODAY.has(mid);
         const desiredDone=!currentlyDone;
-        if(pendingWrites.has(writeKey)){notify('Esta refeição ainda está sincronizando.');return;}
+        if(pendingWrites.has(scopedKey(writeKey))){notify('Esta refeição ainda está sincronizando.');return;}
         const result=await write(writeKey,()=>desiredDone?ref.set({studentUid:uid,mealId:mid,date}):ref.delete(),{label:'atualizar refeição'});
         if(result.status==='committed'){
           applyMealState(mid,desiredDone,uid,date);return;
@@ -149,7 +154,7 @@
     version:VERSION,
     awaitReady,
     write,
-    isPending:key=>pendingWrites.has(String(key||'')),
+    isPending:key=>pendingWrites.has(scopedKey(key)),
     state:()=>({hiddenAt,resumedAt,readyAt,settling:!!settlePromise,pendingWrites:pendingWrites.size,mealPatched})
   });
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
