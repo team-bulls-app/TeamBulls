@@ -125,7 +125,13 @@ try{
     console.log(`PASS ${endpoint}: deleted URL blocks update; restored bridge delivers current app without reinstall${historicalWorkers.has(endpoint)?' (original historical worker)':''}`);
   }
 }finally{
+  if(socket?.readyState===1)try{await command('Browser.close');}catch{}
   socket?.close();chrome.kill();await new Promise(resolve=>server.close(resolve));
-  // Only the temporary profile created by this test, never the user's browser profile.
-  await sleep(250);fs.rmSync(profile,{recursive:true,force:true,maxRetries:8,retryDelay:200});
+  // Wait for Chrome to release Windows handles; delete only this test's temp profile.
+  assert.equal(path.resolve(path.dirname(profile)),path.resolve(os.tmpdir()));
+  assert(path.basename(profile).startsWith('tb-update-browser-'));
+  for(let attempt=0;attempt<10;attempt++){
+    try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:2,retryDelay:100});break;}
+    catch(error){if(attempt===9)throw error;await sleep(250);}
+  }
 }

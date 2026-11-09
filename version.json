@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110605,
-  "revision": "student-session-delete-1",
-  "publishedAt": "2026-11-06T00:00:00Z",
+  "build": 2026110902,
+  "revision": "student-administration-order-1",
+  "publishedAt": "2026-11-09T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Exclusão durável de registros de séries, inclusive offline, com sincronização após reconectar e proteção contra retorno de cópias antigas."
+  "message": "Ordenação de exercícios, técnicas e alunos; nome cadastrado separado do apelido; arquivamento, restauração e exclusão definitiva protegida por serviço autenticado."
 }

@@ -44,7 +44,7 @@ if(heicRecovery){
   assert(sw.includes("'/modules/heic-libheif-worker-v10_10_12.js'"),'Resgate HEIC exige worker network-first.');
 }
 
-assert(update.includes("STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.22-studenthome7'"),'Atualizador não conhece o perfil estabilizado.');
+assert(update.includes("STUDENT_HOME_MODULE='./modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome8'"),'Atualizador não conhece o perfil estabilizado.');
 assert(update.includes("STUDENT_HOME_LAYOUT_MODULE='./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'"),'Atualizador não conhece a Home otimizada.');
 assert(update.includes('loadStudentHomeModules'),'Home não é preservada pelo caminho opcional pós-boot.');
 assert(update.includes('STUDENT_HOME_MODULE,STUDENT_HOME_LAYOUT_MODULE'),'Módulos da Home não estão no refresh crítico.');
@@ -59,12 +59,12 @@ assert(update.includes('if(!techniqueCompositionRelevant())return;loadTechniqueC
 assert(update.includes('if(!studentHomeRelevant())return;loadStudentHomeModules()'),'Agendamento da Home não evita trabalho redundante fora do contexto.');
 
 assert(config.includes('const studentPriorityModules=['),'Loader não possui prioridade de runtime para a Home do aluno.');
-assert(config.includes("'./modules/student-home-profile-v10_10_12.js?v=10.10.22-studenthome7'"),'Perfil estabilizado não é prioridade do runtime.');
+assert(config.includes("'./modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome8'"),'Perfil estabilizado não é prioridade do runtime.');
 assert(config.includes("'./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4'"),'Layout otimizado não é prioridade do runtime.');
 assert(!config.includes("'./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1'"),'Ponte legada voltou a executar no loader atual.');
 assert(config.includes('deferredComplete=false,completedRole='),'Loader não registra conclusão por papel.');
 assert(config.includes('const trainerOnlyModules=new Set(['),'Loader não separa módulos exclusivos do treinador.');
-for(const trainerModule of ['trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1','trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments4'])assert(config.includes(trainerModule),`Módulo de treinador ausente do gate conservador: ${trainerModule}`);
+for(const trainerModule of ['trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1','trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments5'])assert(config.includes(trainerModule),`Módulo de treinador ausente do gate conservador: ${trainerModule}`);
 assert(config.includes('const studentExcludedModules=new Set(['),'Loader não possui o gate específico de aluno cloud.');
 const cloudStudentExcluded=[
   'ger-bulk-v10_10_9.js?v=10.10.9-ger1',
@@ -92,9 +92,9 @@ assert(config.includes("screen!=='screen-loading'&&screen!=='screen-auth'"),'Fil
 assert(config.includes('await yieldUi();'),'Fila diferida não devolve o thread principal entre módulos.');
 assert(config.includes("version:'10.10.61-startup12'")&&config.includes("context:'role-aware-low-contention'"),'Loader não expõe a revisão de baixa contenção por contexto.');
 
-assert(sw.includes("./modules/student-home-profile-v10_10_12.js?v=10.10.22-studenthome7"),'Perfil estabilizado não está no shell PWA.');
+assert(sw.includes("./modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome8"),'Perfil estabilizado não está no shell PWA.');
 assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home4"),'Home otimizada não está no shell PWA.');
-assert(sw.includes("./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability5"),'Usabilidade estabilizada não está no shell PWA.');
+assert(sw.includes("./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability7"),'Usabilidade estabilizada não está no shell PWA.');
 assert(sw.includes("./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1"),'Ponte antiga deve permanecer disponível apenas para instalações legadas.');
 assert(sw.includes("'/modules/usability-checkup-v10_10_9.js','/modules/student-home-profile-v10_10_12.js','/modules/student-home-layout-v10_10_15.js','/modules/student-home-layout-runtime-v10_10_16.js'"),'Camadas mutáveis do aluno não estão em network-first.');
 assert(!boot.includes('student-survivor-home-v10_10_14'),'Loader antigo da PR #76 reapareceu no boot crítico.');
@@ -142,7 +142,7 @@ for(const [collection,orderField] of [['feedback','createdAt'],['weeklyCheckins'
   assert(fields.some(field=>field.fieldPath===orderField&&field.order==='DESCENDING'),`Índice ${collection} não ordena ${orderField} desc.`);
 }
 
-assert(profile.includes("const VERSION='10.10.45-studenthome7'"),'Perfil do aluno não está na revisão de edição segura de nome/foto.');
+assert(profile.includes("const VERSION='10.10.45-studenthome8'"),'Perfil do aluno não está na revisão de edição segura de nome/foto.');
 assert(profile.includes('body.student-desktop .student-desktop-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a sidebar antiga.');
 assert(profile.includes('#screen-home.tb-home-v2 .quick-nav{display:none!important}'),'Perfil prioritário não possui fail-safe para a grade antiga.');
 assert(profile.includes('data-tb-profile-logout="1"'),'Perfil não cria o logout diretamente.');
@@ -152,7 +152,7 @@ assert(profile.includes('loadNotifications({includeProtocol:false})'),'Badge ain
 assert(profile.includes('if(badgeRefreshPromise)return badgeRefreshPromise;'),'Consultas concorrentes do badge não são coalescidas.');
 assert(profile.includes("activeScreen()==='screen-home'"),'Polling do badge não é restrito à Home ativa.');
 
-assert(usability.includes("const VERSION='10.10.21-usability5'"),'Usabilidade não está na revisão estabilizada.');
+assert(usability.includes("const VERSION='10.10.21-usability7'"),'Usabilidade não está na revisão estabilizada.');
 assert(!usability.includes('profileMenuObserver'),'Observer global do menu de perfil voltou ao runtime.');
 assert(!usability.includes('subtree:true'),'Usabilidade voltou a observar toda a árvore do DOM.');
 assert(usability.includes("window.addEventListener('team-bulls-student-runtime-ready',ensureStudentProfileLogout)"),'Fallback do logout não acompanha o evento relevante do aluno.');

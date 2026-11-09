@@ -18,6 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install pinned function dependencies for local SDK smoke
+        run: npm ci --prefix functions --ignore-scripts --no-audit --no-fund
       - name: Run Team Bulls regression checks
         run: |
           node --test scripts/chrome-readiness.test.mjs
@@ -87,6 +89,13 @@ jobs:
           node scripts/trainer-payment-save-lifecycle-check.mjs
           node scripts/inbox-card-opening-check.mjs
           node scripts/workout-rename-save-check.mjs
+          node scripts/protocol-cycle-search-check.mjs
+          node scripts/catalog-order-check.mjs
+          node scripts/student-administration-service-check.mjs
+          node scripts/student-administration-security-check.mjs
+          node scripts/student-administration-sdk-check.mjs
+          node scripts/student-administration-browser-check.mjs
+          node scripts/protocol-cycle-search-browser-check.mjs
           node scripts/bc-technique-target-check.mjs
           node scripts/trainer-legacy-report-visibility-check.mjs
           node scripts/session-recovery-home-dates-check.mjs

@@ -22,3 +22,5 @@ exports.notifyNewFeedback=onDocumentCreated({document:'feedback/{feedbackId}',re
     await Promise.all(result.responses.map((response,index)=>response.success||!invalidToken(response.error?.code)?null:part[index].ref.delete()));
   }
 });
+
+Object.assign(exports,require('./student-administration-trigger'));

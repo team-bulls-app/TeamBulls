@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SECURITY_HARDENING_V101010__)return;
   window.__TEAM_BULLS_SECURITY_HARDENING_V101010__=true;
 
-  const VERSION='10.10.10-security8';
+  const VERSION='10.10.10-security9';
   const SAFE_COLORS=new Set(['#e11d48','#3b82f6','#22c55e','#a855f7','#ec4899','#14b8a6','#f59e0b','#ef4444','#64748b']);
   const DEFAULT_COLOR='#e11d48';
   const authorizedStudents=new Set();
@@ -105,6 +105,7 @@
         const students=snap.docs.map(d=>({...d.data(),uid:d.id})).filter(student=>student.role==='student'&&String(student.trainerId||'')===trainerUid);
         if(loadSeq!==TRAINER_LIST_LOAD_SEQ||CURRENT_USER?.role!=='trainer'||String(CURRENT_USER.uid)!==trainerUid)return;
         authorizedStudents.clear();students.forEach(student=>authorizedStudents.add(String(student.uid)));
+        if(window.TeamBullsStudentAdministration?.renderRoster){await window.TeamBullsStudentAdministration.renderRoster(students);renderLinkHealth(`${students.length} aluno(s) encontrados no cadastro.`);return;}
         students.sort((a,b)=>normalizedName(a.name).localeCompare(normalizedName(b.name),'pt-BR')||a.uid.localeCompare(b.uid));
         const active=students.filter(s=>s.status==='active').length,inactive=students.filter(s=>s.status==='inactive').length;
         const stats=document.getElementById('trainer-stats');if(stats)stats.innerHTML=

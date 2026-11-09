@@ -1213,6 +1213,8 @@ function sanitizeCachedProfile(value,uid=''){
   const role=value.role==='trainer'?'trainer':'student';
   const status=value.status==='inactive'?'inactive':'active';
   const safe={uid:String(uid||value.uid||''),name:String(value.name||'').slice(0,100),email:String(value.email||'').slice(0,320),role,status,cachedAt:Date.now()};
+  if(typeof value.registeredName==='string')safe.registeredName=value.registeredName.slice(0,100);
+  if(typeof value.nickname==='string')safe.nickname=value.nickname.slice(0,100);
   return safe.uid?safe:null;
 }
 function cacheUserProfile(profile){const safe=sanitizeCachedProfile(profile,profile?.uid);if(safe)storageSet(PROFILE_CACHE_PREFIX+safe.uid,JSON.stringify(safe));}
@@ -3123,6 +3125,7 @@ let EDIT_FOOD_CAT_ID=null,EDIT_FOOD_ITEM_ID=null,EDIT_FOOD_MISC_ID=null;
 let EXERCISE_OPTIONS={groups:[]};
 let SUBSTITUTION_RENDER_SEQ=0,VARIANT_LOAD_SEQ=0;
 let EXERCISE_OPTIONS_LOAD_PROMISE=null,EXERCISE_OPTIONS_LOADED_AT=0;
+let EXERCISE_OPTIONS_CONTEXT=null;
 let EXERCISE_OPTIONS_FROM='home'; // 'home' | 'trainer' — para onde voltar
 let EDIT_EXOPT_GROUP_ID=null,EDIT_EXOPT_ITEM_ID=null;
 let SELECTED_EXERCISE_CATALOG=null;
@@ -3721,11 +3724,36 @@ async function persistExerciseOptions(){
   await cloudWrite(db.collection('exerciseOptions').doc('main').set(EXERCISE_OPTIONS),'salvar substituições');
   EXERCISE_OPTIONS_LOADED_AT=Date.now();cacheExerciseCatalog();return true;
 }
+function exerciseOptionsSearchText(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');}
+function exerciseOptionsActiveItems(){
+  let workouts=[];
+  if(CURRENT_USER?.role==='trainer'){
+    if(EXERCISE_OPTIONS_CONTEXT?.trainerUid!==CURRENT_USER.uid||EXERCISE_OPTIONS_CONTEXT?.studentUid!==VIEW_STUDENT?.uid)return new Set();
+    workouts=VIEW_STUDENT.workouts||[];
+  }else workouts=getWorkouts()||[];
+  const workout=workouts.find(item=>String(item.id)===String(activeWorkoutId(workouts))),matches=new Set();
+  for(const exercise of workout?.exercises||[]){
+    for(const group of EXERCISE_OPTIONS.groups){
+      if(exercise.catalogGroupId&&String(exercise.catalogGroupId)!==String(group.id))continue;
+      for(const item of group.items||[]){
+        const match=exercise.catalogItemId?String(exercise.catalogItemId)===String(item.id):normalizedName(exercise.name)===normalizedName(item.name);
+        if(match)matches.add(JSON.stringify([String(group.id),String(item.id)]));
+      }
+    }
+  }
+  return matches;
+}
+function clearExerciseOptionsSearch(){const input=document.getElementById('exercise-options-search');if(input){input.value='';input.focus();}renderExerciseOptions();}
 async function openExerciseOptions(){
-  EXERCISE_OPTIONS_FROM=(CURRENT_USER?.role==='trainer')?'trainer':'home';
+  const trainer=CURRENT_USER?.role==='trainer',screen=document.querySelector('.screen.active')?.id||'';
+  EXERCISE_OPTIONS_CONTEXT=trainer&&(screen==='screen-trainer-student'||screen.startsWith('screen-ts-'))&&VIEW_STUDENT?.uid?{trainerUid:CURRENT_USER.uid,studentUid:VIEW_STUDENT.uid}:null;
+  EXERCISE_OPTIONS_FROM=trainer?'trainer':'home';
+  const owner=CURRENT_USER?.uid,context=EXERCISE_OPTIONS_CONTEXT;
+  const input=document.getElementById('exercise-options-search');if(input)input.value='';
   showScreen('screen-exercise-options');
   document.getElementById('exercise-options-content').innerHTML='<div class="empty-state"><div class="empty-hint">Carregando...</div></div>';
   await loadExerciseOptions();
+  if(CURRENT_USER?.uid!==owner||EXERCISE_OPTIONS_CONTEXT!==context||!document.getElementById('screen-exercise-options')?.classList.contains('active'))return;
   renderExerciseOptions();
 }
 function goBackFromExerciseOptions(){
@@ -3734,6 +3762,11 @@ function goBackFromExerciseOptions(){
 function renderExerciseOptions(){
   const canEdit=CURRENT_USER?.role==='trainer';
   const wrap=document.getElementById('exercise-options-content');
+  if(!wrap)return;
+  const query=exerciseOptionsSearchText(document.getElementById('exercise-options-search')?.value),active=exerciseOptionsActiveItems();
+  const groups=EXERCISE_OPTIONS.groups.map((group,index)=>({group,index,items:(group.items||[]).filter(item=>!query||exerciseOptionsSearchText(group.name).includes(query)||exerciseOptionsSearchText(item.name).includes(query))})).filter(row=>row.items.length||!query);
+  const results=document.getElementById('exercise-options-search-results');if(results)results.textContent=query?`${groups.reduce((n,row)=>n+row.items.length,0)} exercícios encontrados em ${groups.length} grupos`:'Pesquise pelo exercício ou pelo grupo.';
+  const clear=document.getElementById('exercise-options-search-clear');if(clear)clear.hidden=!query;
   if(!EXERCISE_OPTIONS.groups.length){
     wrap.innerHTML=`<div class="empty-state"><div class="empty-icon">🔄</div><div class="empty-label">Nenhum grupo cadastrado</div><div class="empty-hint">${canEdit?'Toque em + NOVO GRUPO para adicionar':'Seu treinador ainda não cadastrou as substituições de exercícios'}</div></div>`;
     return;
@@ -3742,16 +3775,19 @@ function renderExerciseOptions(){
   let html=`<div class="options-intro">
     <div class="options-intro-title">Opções de exercícios</div>
     <div class="options-intro-subtitle">${exerciseCount} exercícios organizados em ${EXERCISE_OPTIONS.groups.length} grupos, na ordem da lista de montagem de treino.</div>
+    ${active.size?'<p class="exercise-options-legend">Em <strong>negrito</strong>: exercícios prescritos no treino ativo. Use o mesmo grupo para encontrar as substituições.</p>':''}
   </div><div class="section-header"><span class="section-label">catálogo por grupo de exercício</span></div>`;
   if(canEdit) html+=`<button class="food-add-btn" onclick="openAddExerciseGroup()">+ NOVO GRUPO</button>`;
-  html+=EXERCISE_OPTIONS.groups.map((gr,index)=>{
+  if(!groups.length)html+='<div class="empty-state"><div class="empty-label">Nenhum exercício encontrado</div><button class="btn-add-set" onclick="clearExerciseOptionsSearch()">LIMPAR PESQUISA</button></div>';
+  html+=groups.map(({group:gr,index,items:visibleItems})=>{
     const videoAllowed=canUseCatalogVideos()||canEdit;
-    const items=gr.items.map(it=>`<div class="food-item-row">
-        <span class="food-item-name">${esc(it.name)}</span>
-        <div class="food-item-actions">${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Editar ${esc(it.name)}" aria-label="Editar ${esc(it.name)}">✏️</button><button class="btn-icon ghost exercise-option-delete" style="width:28px;height:28px;font-size:12px" onclick="deleteExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Excluir ${esc(it.name)}" aria-label="Excluir ${esc(it.name)}">🗑</button>`:''}</div>
-      </div>`).join('');
+    const groupActive=(gr.items||[]).some(it=>active.has(JSON.stringify([String(gr.id),String(it.id)])));
+    const items=visibleItems.map(it=>{const itemIndex=gr.items.findIndex(item=>item.id===it.id),prescribed=active.has(JSON.stringify([String(gr.id),String(it.id)]));return `<div class="food-item-row${prescribed?' exercise-option-prescribed':''}">
+        <span class="food-item-name">${prescribed?`<strong>${esc(it.name)}</strong><span class="exercise-option-active-label">NO TREINO ATIVO</span>`:esc(it.name)}</span>
+        <div class="food-item-actions">${canEdit?`<button class="btn-icon ghost exercise-option-move" onclick="moveExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)},-1)" title="Mover ${esc(it.name)} para cima" aria-label="Mover ${esc(it.name)} para cima" ${itemIndex===0?'disabled':''}>↑</button><button class="btn-icon ghost exercise-option-move" onclick="moveExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)},1)" title="Mover ${esc(it.name)} para baixo" aria-label="Mover ${esc(it.name)} para baixo" ${itemIndex===gr.items.length-1?'disabled':''}>↓</button>`:''}${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Editar ${esc(it.name)}" aria-label="Editar ${esc(it.name)}">✏️</button><button class="btn-icon ghost exercise-option-delete" style="width:28px;height:28px;font-size:12px" onclick="deleteExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Excluir ${esc(it.name)}" aria-label="Excluir ${esc(it.name)}">🗑</button>`:''}</div>
+      </div>`;}).join('');
     const controls=canEdit?`<div class="exercise-group-actions"><button class="btn-icon ghost" onclick="event.stopPropagation();moveExerciseGroup(${jsArg(gr.id)},-1)" title="Mover ${esc(gr.name)} para cima" aria-label="Mover ${esc(gr.name)} para cima" ${index===0?'disabled':''}>↑</button><button class="btn-icon ghost" onclick="event.stopPropagation();moveExerciseGroup(${jsArg(gr.id)},1)" title="Mover ${esc(gr.name)} para baixo" aria-label="Mover ${esc(gr.name)} para baixo" ${index===EXERCISE_OPTIONS.groups.length-1?'disabled':''}>↓</button><button class="btn-icon ghost" onclick="event.stopPropagation();openEditExerciseGroup(${jsArg(gr.id)})" title="Editar grupo ${esc(gr.name)}" aria-label="Editar grupo ${esc(gr.name)}">✏️</button><button class="btn-icon ghost exercise-group-delete" onclick="event.stopPropagation();deleteExerciseGroup(${jsArg(gr.id)})" title="Excluir grupo ${esc(gr.name)}" aria-label="Excluir grupo ${esc(gr.name)}">🗑</button><button class="btn-icon ghost" onclick="event.stopPropagation();openAddExOptItem(${jsArg(gr.id)})" title="Adicionar exercício a ${esc(gr.name)}" aria-label="Adicionar exercício a ${esc(gr.name)}">+</button></div>`:'';
-    return `<div class="food-cat-block">
+    return `<div class="food-cat-block${groupActive?' exercise-group-prescribed':''}">
       <div class="food-cat-title">
         <span class="exercise-group-name"${canEdit?` style="cursor:pointer" onclick="openEditExerciseGroup(${jsArg(gr.id)})"`:''}>${esc(gr.name)}</span>
         ${controls}
@@ -3762,18 +3798,24 @@ function renderExerciseOptions(){
   }).join('');
   wrap.innerHTML=html;
 }
-function moveExerciseGroup(groupId,direction){
-  const id=String(groupId||''),step=Number(direction);
-  if(!id||![-1,1].includes(step))return false;
-  const index=EXERCISE_OPTIONS.groups.findIndex(group=>String(group.id)===id),next=index+step;
-  if(index<0||next<0||next>=EXERCISE_OPTIONS.groups.length)return false;
-  const key='move-exercise-groups';if(!beginAction(key))return false;
-  const snapshot=JSON.stringify(EXERCISE_OPTIONS);
+async function commitExerciseCatalogOrder(groupId,itemId,direction){
+  const step=Number(direction),owner=CURRENT_USER?.uid;
+  if(CURRENT_USER?.role!=='trainer'||MODE!=='cloud'||![-1,1].includes(step))return false;
+  const key='exercise-catalog-order';if(!beginAction(key))return false;
   try{
-    [EXERCISE_OPTIONS.groups[index],EXERCISE_OPTIONS.groups[next]]=[EXERCISE_OPTIONS.groups[next],EXERCISE_OPTIONS.groups[index]];
-    return persistExerciseOptions().then(()=>{renderExerciseOptions();return true;}).catch(error=>{EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível reordenar os grupos: '+error.message);return false;}).finally(()=>endAction(key));
-  }catch(error){EXERCISE_OPTIONS=JSON.parse(snapshot);endAction(key);alert('Não foi possível reordenar os grupos: '+error.message);return false;}
+    const expected=mergeExerciseCatalogWithDefaults(EXERCISE_OPTIONS),draft=JSON.parse(JSON.stringify(expected));
+    const items=itemId?(draft.groups.find(group=>group.id===groupId)?.items||[]):draft.groups;
+    const id=itemId||groupId,index=items.findIndex(item=>item.id===id),next=index+step;
+    if(index<0||next<0||next>=items.length)return false;
+    [items[index],items[next]]=[items[next],items[index]];
+    await persistSharedCatalog('exerciseOptions',expected,draft,mergeExerciseCatalogWithDefaults,owner);
+    if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
+    EXERCISE_OPTIONS=draft;EXERCISE_OPTIONS_LOADED_AT=Date.now();cacheExerciseCatalog();renderExerciseOptions();return true;
+  }catch(error){if(CURRENT_USER?.uid===owner)alert('Não foi possível alterar a ordem: '+error.message);return false;}
+  finally{endAction(key);}
 }
+function moveExerciseGroup(groupId,direction){return commitExerciseCatalogOrder(String(groupId||''),'',direction);}
+function moveExerciseOptionItem(groupId,itemId,direction){return commitExerciseCatalogOrder(String(groupId||''),String(itemId||''),direction);}
 // Grupo (ex: "Supino Reto")
 function openAddExerciseGroup(){
   EDIT_EXOPT_GROUP_ID=null;
@@ -4639,6 +4681,7 @@ function openModal(id){
   if(id==='modal-workout')setWorkoutSaveStatus('');
 }
 function closeModal(id){
+  if(id==='modal-student-administration'){const password=document.getElementById('tb-student-admin-password');if(password)password.value='';}
   if(id==='modal-training-recommendations')TRAINING_RECOMMENDATIONS_CONTEXT=null;
   const modal=document.getElementById(id);if(!modal)return;
   if(id==='modal-catalog-video'){const body=document.getElementById('catalog-video-body');if(body)body.innerHTML='';}
@@ -4686,7 +4729,9 @@ async function saveWorkout(){
   if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){setWorkoutSaveStatus('Confira as datas do ciclo: a atualização deve ser no início ou depois.',true);return;}
   const editingWorkoutId=EDIT_W,modalTarget=MODAL_TARGET,studentUid=modalTarget==='student'?VIEW_STUDENT?.uid:null,color=SEL_COLOR;
   const targetWorkouts=MODAL_TARGET==='student'?(VIEW_STUDENT?.workouts||[]):getWorkouts();
-  if(targetWorkouts.some(w=>w.id!==EDIT_W&&normalizedName(w.name)===normalizedName(name))){
+  const saveWorkoutId=editingWorkoutId||(modalTarget==='student'?(WORKOUT_CREATE_ID||(WORKOUT_CREATE_ID=uid())):'');
+  let confirmedWorkouts=targetWorkouts;
+  if(targetWorkouts.some(w=>w.id!==(saveWorkoutId||EDIT_W)&&normalizedName(w.name)===normalizedName(name))){
     setWorkoutSaveStatus('Já existe um treino com esse nome.',true);
     return;
   }
@@ -4696,9 +4741,10 @@ async function saveWorkout(){
     if(MODE==='cloud'){
       const targetUid=MODAL_TARGET==='student'?VIEW_STUDENT?.uid:CURRENT_USER?.uid;
       const serverWorkouts=await cloudGet(db.collection('workouts').where('userId','==',targetUid),'treinos existentes');
+      confirmedWorkouts=serverWorkouts.docs.map(doc=>({...doc.data(),id:doc.id}));
       if(MODAL_TARGET!==modalTarget||EDIT_W!==editingWorkoutId||(modalTarget==='student'&&VIEW_STUDENT?.uid!==studentUid))throw new Error('O aluno ou o treino aberto mudou. Abra o treino novamente e tente salvar.');
       if(editingWorkoutId&&!serverWorkouts.docs.some(doc=>doc.id===editingWorkoutId))throw new Error('Este treino não pertence ao aluno aberto ou não está mais disponível. Atualize a lista.');
-      if(serverWorkouts.docs.some(d=>d.id!==EDIT_W&&normalizedName(d.data().name)===normalizedName(name))){
+      if(serverWorkouts.docs.some(d=>d.id!==(saveWorkoutId||EDIT_W)&&normalizedName(d.data().name)===normalizedName(name))){
         setWorkoutSaveStatus('Esse nome já foi salvo em outro treino. Atualize a lista antes de tentar novamente.',true);
         if(MODAL_TARGET==='student')await renderTrainerStudent(VIEW_STUDENT);else await loadCloudHome();
         return;
@@ -4707,18 +4753,13 @@ async function saveWorkout(){
     // Treinador montando o treino do aluno
     if(MODAL_TARGET==='student'){
       if(!VIEW_STUDENT)return;
+      await v109PersistWorkoutCycle(studentUid,saveWorkoutId,{name,color,startDate,updateDate},{create:!editingWorkoutId,workouts:confirmedWorkouts});
+      if(VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId||MODAL_TARGET!==modalTarget)return;
       if(EDIT_W){
-        await cloudWrite(db.collection('workouts').doc(EDIT_W).update({name,color,startDate,updateDate}),'editar treino');
         if(VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId)return;
         const edited=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
         if(edited)Object.assign(edited,{name,color,startDate,updateDate});
         if(VIEW_STUDENT_WORKOUT?.id===editingWorkoutId)Object.assign(VIEW_STUDENT_WORKOUT,{name,color,startDate,updateDate});
-      }else{
-        const docId=WORKOUT_CREATE_ID||(WORKOUT_CREATE_ID=stableEntityId('w',VIEW_STUDENT.uid,normalizedName(name)));
-        const existing=normalizeWorkoutCollection(VIEW_STUDENT.workouts||[]),batch=db.batch();
-        existing.forEach((workout,index)=>batch.update(db.collection('workouts').doc(workout.id),{order:index+1,isActive:false}));
-        batch.set(db.collection('workouts').doc(docId),{userId:VIEW_STUDENT.uid,name,color:SEL_COLOR,startDate,updateDate,days:[],order:0,isActive:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
-        await cloudWrite(batch.commit(),'salvar alterações');
       }
       WORKOUT_CREATE_ID=null;
       if(editingWorkoutId){
@@ -5585,13 +5626,15 @@ async function persistTrainerExerciseOrder(ids){
   finally{endAction(key);}
 }
 
-async function persistWorkoutOrder(workouts,actionKey='workout-order'){
+async function persistWorkoutOrder(workouts,actionKey='workout-order',activateId=''){
   if(!VIEW_STUDENT||CURRENT_USER?.role!=='trainer')return false;
-  const normalized=normalizeWorkoutCollection(workouts);
+  const normalized=normalizeWorkoutCollection(workouts),studentUid=VIEW_STUDENT.uid,trainerUid=CURRENT_USER.uid;
   if(!beginAction(actionKey))return false;
   try{
-    const batch=db.batch();normalized.forEach((workout,index)=>batch.update(db.collection('workouts').doc(workout.id),{order:index,isActive:workout.isActive===true}));
-    await cloudWrite(batch.commit(),'salvar alterações');VIEW_STUDENT.workouts=normalized;await renderTrainerStudent(VIEW_STUDENT);return true;
+    if(activateId)await v109PersistWorkoutCycle(studentUid,activateId,{}, {activate:true,workouts:normalized});
+    else{const batch=db.batch();normalized.forEach((workout,index)=>batch.update(db.collection('workouts').doc(workout.id),{order:index}));await cloudWrite(batch.commit(),'salvar ordem dos treinos');}
+    if(VIEW_STUDENT?.uid!==studentUid||CURRENT_USER?.uid!==trainerUid)return true;
+    VIEW_STUDENT.workouts=normalized;await renderTrainerStudent(VIEW_STUDENT);return true;
   }catch(error){alert('Não foi possível atualizar a ordem dos treinos: '+error.message);return false;}
   finally{endAction(actionKey);}
 }
@@ -5606,7 +5649,7 @@ async function activateTrainerWorkout(wid){
   const workouts=normalizeWorkoutCollection(VIEW_STUDENT?.workouts||[]),index=workouts.findIndex(workout=>workout.id===wid);if(index<0)return;
   const [target]=workouts.splice(index,1);workouts.unshift(target);
   workouts.forEach((workout,position)=>{workout.order=position;workout.isActive=workout.id===wid;});
-  if(await persistWorkoutOrder(workouts,'activate-workout-'+wid))showToast('✓ Treino ativo atualizado');
+  if(await persistWorkoutOrder(workouts,'activate-workout-'+wid,wid))showToast('✓ Treino ativo atualizado');
 }
 async function moveTrainerExercise(eid,direction){
   const workout=VIEW_STUDENT_WORKOUT,exercise=workout?.exercises?.find(item=>item.id===eid);if(!workout||!exercise||CURRENT_USER?.role!=='trainer')return;
@@ -6298,7 +6341,7 @@ function catalogPreserveFields(raw,next){
     const old=(Array.isArray(previous)?previous:[]).find(entry=>String(entry.id)===item.id)||{};
     return {...old,...item,...(item.items?{items:nodes(item.items,old.items)}:{})};
   });
-  return {...next,...(next.folders?{folders:nodes(next.folders,raw?.folders)}:{items:nodes(next.items,raw?.items)})};
+  return {...next,...(next.groups?{groups:nodes(next.groups,raw?.groups)}:next.folders?{folders:nodes(next.folders,raw?.folders)}:{items:nodes(next.items,raw?.items)})};
 }
 async function initializeSharedCatalog(collection,fallback,normalize){
   if(CURRENT_USER?.role!=='trainer')return fallback;
@@ -6418,6 +6461,13 @@ async function saveTechnique(){
     const item=draft.items.find(i=>i.id===EDIT_TECHNIQUE_ID);if(item)Object.assign(item,{code,name,description,videoUrl});else draft.items.push({id:EDIT_TECHNIQUE_ID||(EDIT_TECHNIQUE_ID=uid()),code,name,description,videoUrl,locked:false,order:draft.items.length});
   },'modal-technique-editor','✓ Técnica salva');
 }
+async function moveTechnique(id,direction){
+  const step=Number(direction);if(![-1,1].includes(step))return false;
+  return commitCatalogAction('techniques',draft=>{
+    const index=draft.items.findIndex(item=>item.id===id),next=index+step;if(index<0||next<0||next>=draft.items.length)return false;
+    [draft.items[index],draft.items[next]]=[draft.items[next],draft.items[index]];draft.items.forEach((item,order)=>item.order=order);
+  });
+}
 function deleteTechnique(id){
   if(CURRENT_USER?.role!=='trainer')return;const item=TECHNIQUE_CATALOG.items.find(i=>i.id===id);if(!item||item.locked)return;
   showConfirm('Excluir técnica','Excluir esta técnica personalizada? Exercícios antigos manterão o identificador, mas ela deixará de aparecer na biblioteca.',()=>commitCatalogAction('techniques',draft=>{const item=draft.items.find(i=>i.id===id);if(!item||item.locked)return false;draft.items=draft.items.filter(i=>i.id!==id);}));
@@ -6433,7 +6483,7 @@ async function openTechniques(){
   renderTechniques();showScreen('screen-techniques',navigation);return true;
 }
 function closeTechniquesScreen(){if(CURRENT_USER?.role==='trainer')goTrainer();else goHome();}
-function renderTechniques(){const admin=CURRENT_USER?.role==='trainer';document.getElementById('techniques-add-btn').style.display=admin?'flex':'none';document.getElementById('techniques-list').innerHTML=TECHNIQUE_CATALOG.items.map(item=>`<div class="technique-card" onclick="openTechniqueDetail(${jsArg(item.id)})"><div class="technique-code">${esc(item.code)}</div><div class="technique-card-main"><div class="technique-card-name">${esc(item.name)}</div><div class="technique-card-summary">${esc(item.description||'Explicação a ser cadastrada pelo treinador.')}</div></div>${admin?`<div class="technique-card-actions"><button onclick="event.stopPropagation();openTechniqueEditor(${jsArg(item.id)})">✎</button>${item.locked?'':`<button onclick="event.stopPropagation();deleteTechnique(${jsArg(item.id)})">🗑</button>`}</div>`:'<div class="exercise-row-arrow">›</div>'}</div>`).join('');}
+function renderTechniques(){const admin=CURRENT_USER?.role==='trainer';document.getElementById('techniques-add-btn').style.display=admin?'flex':'none';document.getElementById('techniques-list').innerHTML=TECHNIQUE_CATALOG.items.map((item,index)=>`<div class="technique-card" onclick="openTechniqueDetail(${jsArg(item.id)})"><div class="technique-code">${esc(item.code)}</div><div class="technique-card-main"><div class="technique-card-name">${esc(item.name)}</div><div class="technique-card-summary">${esc(item.description||'Explicação a ser cadastrada pelo treinador.')}</div></div>${admin?`<div class="technique-card-actions"><button onclick="event.stopPropagation();moveTechnique(${jsArg(item.id)},-1)" title="Mover ${esc(item.name)} para cima" aria-label="Mover ${esc(item.name)} para cima" ${index===0?'disabled':''}>↑</button><button onclick="event.stopPropagation();moveTechnique(${jsArg(item.id)},1)" title="Mover ${esc(item.name)} para baixo" aria-label="Mover ${esc(item.name)} para baixo" ${index===TECHNIQUE_CATALOG.items.length-1?'disabled':''}>↓</button><button onclick="event.stopPropagation();openTechniqueEditor(${jsArg(item.id)})">✎</button>${item.locked?'':`<button onclick="event.stopPropagation();deleteTechnique(${jsArg(item.id)})">🗑</button>`}</div>`:'<div class="exercise-row-arrow">›</div>'}</div>`).join('');}
 function openTechniqueDetail(id){const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);if(!item)return;document.getElementById('technique-detail-title').textContent=item.name;document.getElementById('technique-detail-body').innerHTML=`<div class="technique-detail-code">${esc(item.code)}</div><div class="technique-detail-text">${esc(item.description||'O treinador ainda não cadastrou a explicação desta técnica.')}</div>`;const video=document.getElementById('technique-detail-video-btn');video.style.display=item.videoUrl?'block':'none';video.onclick=()=>{closeModal('modal-technique-detail');if(MODE==='cloud')openCatalogVideo(item.videoUrl,item.name);else showToast('Conecte-se à internet para assistir ao vídeo.',true);};openModal('modal-technique-detail');}
 function openTechniqueEditor(id=''){if(CURRENT_USER?.role!=='trainer')return;captureCatalogEditor('modal-technique-editor','techniques');EDIT_TECHNIQUE_ID=id;const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);document.getElementById('technique-editor-title').textContent=item?'Editar técnica':'Nova técnica';document.getElementById('input-technique-code').value=item?.code||'';document.getElementById('input-technique-name').value=item?.name||'';document.getElementById('input-technique-description').value=item?.description||'';document.getElementById('input-technique-video').value=item?.videoUrl||'';openModal('modal-technique-editor');}
 
@@ -8897,65 +8947,148 @@ function v109ProtocolState(schedule,date=today()){
   const nextDueDate=addDaysIso(schedule.startDate,nextCycle*intervalDays),daysUntil=v104DateDiffDays(date,nextDueDate),weekNumber=rawDays<0?0:Math.floor(days/7)+1;
   return{intervalWeeks,intervalDays,elapsedCycle,lastCompletedCycle,pendingCycle,pending:pendingCycle>0,nextCycle,nextDueDate,daysUntil,weekNumber};
 }
-async function v109ResolveProtocolDefaultStart(studentUid){
-  const candidates=[];
-  for(const workout of VIEW_STUDENT?.workouts||[])if(workout?.isActive===true&&validIsoDate(workout.startDate))candidates.push(workout.startDate);
-  if(validIsoDate(TRAINER_CHECKIN_SCHEDULE?.cycleStartDate))candidates.push(TRAINER_CHECKIN_SCHEDULE.cycleStartDate);
-  try{const doc=await cloudGet(db.collection('mealPlans').doc(studentUid),'data inicial da dieta');if(doc.exists){for(const plan of doc.data()?.plans||[])if(plan?.isActive===true&&validIsoDate(plan.startDate))candidates.push(plan.startDate);}}catch(error){console.warn('Data inicial da dieta indisponível',error);}
-  return candidates.sort()[0]||today();
+function v109CyclePayload(previous,studentUid,workout,trainerUid,intervalWeeks){
+  const restart=!previous||previous.startDate!==workout.startDate||!!previous.sourceWorkoutId&&previous.sourceWorkoutId!==workout.id;
+  return{studentId:studentUid,trainerId:trainerUid,sourceWorkoutId:workout.id,startDate:workout.startDate,
+    intervalWeeks:intervalWeeks??Math.max(1,Math.min(52,Math.trunc(Number(previous?.intervalWeeks)||4))),
+    lastCompletedCycle:restart?0:Math.max(0,Math.trunc(Number(previous.lastCompletedCycle)||0)),
+    lastCompletedDate:restart?'':String(previous.lastCompletedDate||''),
+    ...(restart?{lastCompletedAt:null}:{}),updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+}
+async function v109PersistWorkoutCycle(studentUid,workoutId,changes={},options={}){
+  const trainerUid=CURRENT_USER?.uid,known=options.workouts||VIEW_STUDENT?.workouts||[];
+  const sameAccount=()=>MODE==='cloud'&&CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===trainerUid&&auth?.currentUser?.uid===trainerUid;
+  if(!studentUid||!sameAccount())throw new Error('Entre como treinador para atualizar o protocolo.');
+  return cloudWrite(db.runTransaction(async transaction=>{
+    const scheduleRef=db.collection('protocolReviewSchedules').doc(studentUid),scheduleDoc=await transaction.get(scheduleRef),previous=scheduleDoc.exists?scheduleDoc.data():null;
+    // Rules 28 reject reads of a missing workout. For a new draft only read
+    // IDs returned by the owner-scoped preflight, plus the schedule's current
+    // source (re-read on transaction retries). Never read a missing draft ID.
+    const ids=[...new Set([...known.map(w=>w.id),options.create?null:workoutId].filter(Boolean))];
+    if(previous?.sourceWorkoutId&&!ids.includes(previous.sourceWorkoutId)){
+      // A previous source may have been deleted. An owner-scoped query can
+      // distinguish absence without a forbidden GET of a missing workout.
+      const source=await cloudGet(db.collection('workouts').where('userId','==',studentUid).where(firebase.firestore.FieldPath.documentId(),'==',previous.sourceWorkoutId),'treino de referência do ciclo');
+      if(source.docs.some(doc=>doc.id===previous.sourceWorkoutId))ids.push(previous.sourceWorkoutId);
+    }
+    const rows=[];for(const id of ids){const ref=db.collection('workouts').doc(id),doc=await transaction.get(ref);if(doc.exists){const data=doc.data();if(data.userId!==studentUid)throw new Error('O treino não pertence ao aluno aberto.');rows.push({...data,id,ref});}}
+    if(!sameAccount())throw new Error('A conta mudou. Entre novamente antes de salvar.');
+    const current=rows.find(row=>row.id===workoutId);
+    if(workoutId&&!options.create&&!current)throw new Error('O treino não está mais disponível. Atualize a lista.');
+    let active=rows.find(row=>row.id===activeWorkoutId(rows));
+    if(options.create||options.activate)active={...current,...changes,id:workoutId};
+    else if(current&&active?.id===current.id)active={...active,...changes};
+    const ref=workoutId?db.collection('workouts').doc(workoutId):null;
+    if(options.create&&!current)transaction.set(ref,{userId:studentUid,...changes,days:[],order:0,isActive:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+    else if(ref&&Object.keys(changes).length)transaction.update(ref,changes);
+    if(options.create||options.activate){
+      let order=1;for(const row of orderedWorkouts(rows)){if(row.id!==workoutId)transaction.update(row.ref,{order:order++,isActive:false});}
+      if(current)transaction.update(ref,{order:0,isActive:true});
+    }
+    if(!active||!validIsoDate(active.startDate)){
+      if(options.intervalWeeks!==undefined)throw new Error('Defina o início no treino ativo antes de salvar o ciclo.');
+      return previous;
+    }
+    const payload=v109CyclePayload(previous,studentUid,active,trainerUid,options.intervalWeeks);
+    if(!previous||['studentId','trainerId','sourceWorkoutId','startDate','intervalWeeks','lastCompletedCycle','lastCompletedDate'].some(key=>payload[key]!==previous[key]))transaction.set(scheduleRef,payload,{merge:true});
+    return{...previous,...payload,_exists:true};
+  }),'salvar treino e ciclo administrativo');
 }
 async function loadProtocolReviewSchedule(studentUid,force=false){
   if(!studentUid||MODE!=='cloud'||!db)return null;
   if(!force&&V109_PROTOCOL_REVIEW_STUDENT===studentUid)return V109_PROTOCOL_REVIEW_SCHEDULE;
+  const owner=CURRENT_USER?.uid,role=CURRENT_USER?.role;
   try{
     const doc=await cloudGet(db.collection('protocolReviewSchedules').doc(studentUid),'ciclo de atualização completa');
-    if(doc.exists){V109_PROTOCOL_REVIEW_SCHEDULE={studentId:studentUid,trainerId:CURRENT_USER?.role==='trainer'?CURRENT_USER.uid:CURRENT_USER?.trainerId||'',intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',...doc.data(),_exists:true};}
-    else if(CURRENT_USER?.role==='trainer'){V109_PROTOCOL_REVIEW_SCHEDULE={studentId:studentUid,trainerId:CURRENT_USER.uid,startDate:await v109ResolveProtocolDefaultStart(studentUid),intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',_exists:false};}
-    else V109_PROTOCOL_REVIEW_SCHEDULE=null;
-    V109_PROTOCOL_REVIEW_STUDENT=studentUid;return V109_PROTOCOL_REVIEW_SCHEDULE;
+    if(CURRENT_USER?.uid!==owner||role==='trainer'&&VIEW_STUDENT?.uid!==studentUid)return null;
+    let schedule=doc.exists?{intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',...doc.data(),_exists:true}:null;
+    if(role==='trainer'){
+      const workouts=VIEW_STUDENT?.workouts||[],active=workouts.find(w=>w.id===activeWorkoutId(workouts));
+      if(validIsoDate(active?.startDate)&&(!schedule||schedule.sourceWorkoutId!==active.id||schedule.startDate!==active.startDate)){
+        schedule=await v109PersistWorkoutCycle(studentUid,'',{}, {workouts});
+      }
+    }
+    if(CURRENT_USER?.uid!==owner||role==='trainer'&&VIEW_STUDENT?.uid!==studentUid)return null;
+    V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=studentUid;return schedule;
   }catch(error){console.warn('Cronograma de atualização indisponível',error);return null;}
 }
 function renderTrainerProtocolReview(schedule){
   const state=v109ProtocolState(schedule),badge=document.getElementById('trainer-protocol-review-state'),help=document.getElementById('trainer-protocol-review-help'),next=document.getElementById('trainer-protocol-review-next'),complete=document.getElementById('trainer-protocol-review-complete');if(!badge||!help||!next)return;
-  const startInput=document.getElementById('trainer-protocol-start-date'),intervalInput=document.getElementById('trainer-protocol-interval-weeks');if(startInput)startInput.value=validIsoDate(schedule?.startDate)?schedule.startDate:today();if(intervalInput)intervalInput.value=String(Math.max(1,Number(schedule?.intervalWeeks)||4));
-  if(!state){badge.textContent='NÃO CONFIGURADO';badge.className='quest-status pending';help.textContent='Confirme a data exata de início e o intervalo. O padrão é uma atualização completa a cada 4 semanas.';next.textContent='Próxima atualização completa: —';if(complete)complete.disabled=true;return;}
+  const startInput=document.getElementById('trainer-protocol-start-date'),intervalInput=document.getElementById('trainer-protocol-interval-weeks');if(startInput){startInput.value=validIsoDate(schedule?.startDate)?schedule.startDate:'';startInput.readOnly=true;}if(intervalInput)intervalInput.value=String(Math.max(1,Number(schedule?.intervalWeeks)||4));
+  if(!state){badge.textContent='NÃO CONFIGURADO';badge.className='quest-status pending';help.textContent='Defina a data de início no treino ativo. O ciclo será calculado automaticamente, a cada 4 semanas por padrão.';next.textContent='Próxima atualização completa: —';if(complete)complete.disabled=true;return;}
   badge.textContent=state.pending?'ATUALIZAÇÃO PENDENTE':'EM DIA';badge.className='quest-status '+(state.pending?'pending':'answered');help.textContent=`${state.weekNumber?`Semana ${state.weekNumber} do ciclo`:'O protocolo ainda não começou'} · atualização completa a cada ${state.intervalWeeks} semanas. Ajustes semanais não reiniciam a contagem.`;
   next.innerHTML=state.pending?`Atualização completa nº ${state.pendingCycle} pendente desde <b>${esc(fmt(state.nextDueDate))}</b>.`:`Próxima atualização completa: <b>${esc(fmt(state.nextDueDate))}</b>.`;if(complete)complete.disabled=!state.pending;
 }
 async function loadTrainerProtocolReview(studentUid){
-  const schedule=await loadProtocolReviewSchedule(studentUid,true);if(VIEW_STUDENT?.uid!==studentUid)return;renderTrainerProtocolReview(schedule);
+  const trainerUid=CURRENT_USER?.uid;
+  const schedule=await loadProtocolReviewSchedule(studentUid,true);if(VIEW_STUDENT?.uid!==studentUid||CURRENT_USER?.uid!==trainerUid)return;renderTrainerProtocolReview(schedule);if(schedule)await v109PrepareMonthlyReview(studentUid,trainerUid);
+  if(VIEW_STUDENT?.uid!==studentUid||CURRENT_USER?.uid!==trainerUid)return;
   const note=document.getElementById('trainer-cycle-link-note');if(note)note.innerHTML='Os relatórios semanais permanecem independentes. Ajustes pontuais de treino ou dieta <b>não reiniciam</b> o ciclo da atualização completa.';
 }
 async function v109SyncActiveProtocolDates(studentUid,startDate,nextDueDate){
-  const activeWorkouts=(VIEW_STUDENT?.workouts||[]).filter(workout=>workout?.isActive===true),workoutRefs=[];
-  const mealRef=db.collection('mealPlans').doc(studentUid),mealDoc=await cloudGet(mealRef,'datas da dieta').catch(()=>null),mealData=mealDoc?.exists?mealDoc.data():null;
-  const plans=Array.isArray(mealData?.plans)?mealData.plans.map(plan=>plan?.isActive===true?{...plan,startDate,updateDate:nextDueDate}:plan):null;
-  if(!activeWorkouts.length&&!plans)return;
-  const batch=db.batch();for(const workout of activeWorkouts){const ref=db.collection('workouts').doc(workout.id);batch.update(ref,{startDate,updateDate:nextDueDate});workoutRefs.push(workout);}if(plans)batch.update(mealRef,{plans,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-  await cloudWrite(batch.commit(),'alinhar as datas dos protocolos');for(const workout of workoutRefs){workout.startDate=startDate;workout.updateDate=nextDueDate;}if(plans&&DIET_CONTEXT?.targetUid===studentUid)DIET_DOCUMENT=normalizeDietDocument({...mealData,plans});
+  // O ciclo administrativo tem sua própria próxima revisão. As datas das
+  // prescrições de treino e dieta continuam sendo as informadas pelo treinador.
+  if(VIEW_STUDENT?.uid===studentUid&&V109_PROTOCOL_REVIEW_SCHEDULE?.startDate===startDate)renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);
 }
 async function v109SyncProtocolMetadataToWeeklySchedule(studentUid,startDate,nextDueDate){
-  try{const ref=db.collection('checkinSchedules').doc(studentUid),doc=await cloudGet(ref,'agenda semanal');if(!doc.exists)return;await cloudWrite(ref.update({cycleStartDate:startDate,cycleUpdateDate:nextDueDate,cycleSource:'protocol-review',updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'registrar referência do ciclo');}catch(error){console.warn('Referência do ciclo não sincronizada na agenda semanal',error);}
+  const trainerUid=CURRENT_USER?.uid;if(CURRENT_USER?.role!=='trainer')return;
+  try{
+    await cloudWrite(db.runTransaction(async transaction=>{
+      const cycle=await transaction.get(db.collection('protocolReviewSchedules').doc(studentUid));
+      const schedule=cycle.exists?{...cycle.data(),_exists:true}:null;
+      if(!schedule||schedule.startDate!==startDate||v109ProtocolState(schedule)?.nextDueDate!==nextDueDate)return;
+      const ref=db.collection('checkinSchedules').doc(studentUid),doc=await transaction.get(ref);
+      if(!doc.exists||CURRENT_USER?.uid!==trainerUid||CURRENT_USER?.role!=='trainer')return;
+      transaction.update(ref,{cycleStartDate:startDate,cycleUpdateDate:nextDueDate,cycleSource:'protocol-review',updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    }),'registrar referência do ciclo');
+  }catch(error){console.warn('Referência do ciclo não sincronizada na agenda semanal',error);}
 }
 /* Ajustes pontuais de treino/dieta não alteram a agenda semanal nem o ciclo completo. */
 v104SyncCycleSchedule=async function(){return null;};
 async function saveProtocolReviewSchedule(){
-  const studentUid=VIEW_STUDENT?.uid;if(!studentUid||CURRENT_USER?.role!=='trainer')return;const startDate=document.getElementById('trainer-protocol-start-date').value,intervalWeeks=Math.trunc(Number(document.getElementById('trainer-protocol-interval-weeks').value));
-  if(!validIsoDate(startDate)){alert('Escolha uma data de início válida.');return;}if(!Number.isInteger(intervalWeeks)||intervalWeeks<1||intervalWeeks>52){alert('Escolha um intervalo entre 1 e 52 semanas.');return;}if(!beginAction('save-protocol-review-schedule'))return;
+  const studentUid=VIEW_STUDENT?.uid,trainerUid=CURRENT_USER?.uid;if(!studentUid||CURRENT_USER?.role!=='trainer')return;
+  const intervalWeeks=Number(document.getElementById('trainer-protocol-interval-weeks').value);
+  if(!Number.isInteger(intervalWeeks)||intervalWeeks<1||intervalWeeks>52){alert('Escolha um intervalo entre 1 e 52 semanas.');return;}
+  if(!beginAction('save-protocol-review-schedule'))return;
   try{
-    await ensureReportCycleRuntime();
-    const previous=await loadProtocolReviewSchedule(studentUid,true)||{},lastDate=validIsoDate(previous.lastCompletedDate)?previous.lastCompletedDate:'';
-    const lastCompletedCycle=lastDate?Math.max(0,Math.floor(Math.max(0,v104DateDiffDays(startDate,lastDate))/(intervalWeeks*7))):0;
-    const payload={studentId:studentUid,trainerId:CURRENT_USER.uid,startDate,intervalWeeks,lastCompletedCycle,lastCompletedDate:lastDate,updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-    await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).set(payload,{merge:true}),'salvar ciclo de atualização');V109_PROTOCOL_REVIEW_SCHEDULE={...previous,...payload,_exists:true};V109_PROTOCOL_REVIEW_STUDENT=studentUid;
-    await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);
-    const state=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,startDate,state.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,startDate,state.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Ciclo de atualização completa salvo');loadTrainerProtocolReviewAlerts().catch(()=>{});
+    const schedule=await v109PersistWorkoutCycle(studentUid,'',{}, {workouts:VIEW_STUDENT.workouts,intervalWeeks});
+    if(CURRENT_USER?.uid!==trainerUid||VIEW_STUDENT?.uid!==studentUid)return;
+    V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=studentUid;
+    renderTrainerProtocolReview(schedule);showToast('✓ Ciclo calculado a partir do início do treino ativo');
+    await v109PrepareMonthlyReview(studentUid,trainerUid);
+    loadTrainerProtocolReviewAlerts().catch(()=>{});
   }catch(error){alert(cloudWriteError(error,'salvar o ciclo de atualização'));}finally{endAction('save-protocol-review-schedule');}
 }
+async function v109PrepareMonthlyReview(studentUid,trainerUid=CURRENT_USER?.uid){
+  try{await ensureReportCycleRuntime();if(CURRENT_USER?.uid!==trainerUid||CURRENT_USER?.role!=='trainer')return;await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);}
+  catch(error){console.warn('Ciclo salvo; solicitação mensal aguardando nova tentativa.',error);if(CURRENT_USER?.uid===trainerUid&&VIEW_STUDENT?.uid===studentUid)showToast('Ciclo salvo. O relatório mensal será preparado ao reconectar.',true);}
+}
+async function v109CompleteProtocolReview(studentUid,expected){
+  const trainerUid=CURRENT_USER?.uid;
+  const sameAccount=()=>MODE==='cloud'&&CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===trainerUid&&auth?.currentUser?.uid===trainerUid;
+  if(!sameAccount())throw new Error('Entre como treinador para concluir a atualização.');
+  return cloudWrite(db.runTransaction(async transaction=>{
+    const ref=db.collection('protocolReviewSchedules').doc(studentUid),doc=await transaction.get(ref);
+    if(!doc.exists||!sameAccount())throw new Error('O ciclo ou a conta mudou. Atualize a tela.');
+    const schedule={...doc.data(),_exists:true},keys=['sourceWorkoutId','startDate','intervalWeeks','lastCompletedCycle','lastCompletedDate'];
+    const value=(row,key)=>String(row?.[key]??(key==='intervalWeeks'?4:key==='lastCompletedCycle'?0:''));
+    if(keys.some(key=>value(schedule,key)!==value(expected,key)))throw new Error('O protocolo mudou desde que esta tela foi aberta. Confira o novo ciclo antes de concluir.');
+    const state=v109ProtocolState(schedule);if(!state?.pending)throw new Error('Esta atualização já foi concluída ou ainda não venceu.');
+    const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    transaction.update(ref,payload);return{...schedule,...payload};
+  }),'concluir atualização completa');
+}
 function markProtocolReviewCompleted(){
-  const studentUid=VIEW_STUDENT?.uid,state=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);if(!studentUid||CURRENT_USER?.role!=='trainer'||!state)return;if(!state.pending){showToast('A próxima atualização completa ainda não venceu.',true);return;}
+  const studentUid=VIEW_STUDENT?.uid,expected=V109_PROTOCOL_REVIEW_SCHEDULE,trainerUid=CURRENT_USER?.uid,state=v109ProtocolState(expected);if(!studentUid||CURRENT_USER?.role!=='trainer'||!state)return;if(!state.pending){showToast('A próxima atualização completa ainda não venceu.',true);return;}
   showConfirm('Confirmar atualização completa',`Marcar a atualização completa nº ${state.pendingCycle} de treino e dieta como realizada? Use esta confirmação apenas após a revisão detalhada dos protocolos; ajustes semanais não entram aqui.`,async()=>{
-    if(!beginAction('complete-protocol-review'))return;try{await ensureReportCycleRuntime();const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:CURRENT_USER.uid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};await cloudWrite(db.collection('protocolReviewSchedules').doc(studentUid).update(payload),'concluir atualização completa');V109_PROTOCOL_REVIEW_SCHEDULE={...V109_PROTOCOL_REVIEW_SCHEDULE,...payload,_exists:true};await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);const nextState=v109ProtocolState(V109_PROTOCOL_REVIEW_SCHEDULE);await v109SyncActiveProtocolDates(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);await v109SyncProtocolMetadataToWeeklySchedule(studentUid,V109_PROTOCOL_REVIEW_SCHEDULE.startDate,nextState.nextDueDate);renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);showToast('✓ Atualização completa registrada');loadTrainerProtocolReviewAlerts().catch(()=>{});}catch(error){alert(cloudWriteError(error,'registrar a atualização completa'));}finally{endAction('complete-protocol-review');}
+    if(!beginAction('complete-protocol-review'))return;
+    try{
+      await ensureReportCycleRuntime();const schedule=await v109CompleteProtocolReview(studentUid,expected);
+      if(CURRENT_USER?.uid!==trainerUid||VIEW_STUDENT?.uid!==studentUid)return;
+      V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=studentUid;
+      renderTrainerProtocolReview(schedule);showToast('✓ Atualização completa registrada');
+      await v109PrepareMonthlyReview(studentUid,trainerUid);loadTrainerProtocolReviewAlerts().catch(()=>{});
+    }catch(error){alert(cloudWriteError(error,'registrar a atualização completa'));}finally{endAction('complete-protocol-review');}
   });
 }
 async function loadStudentProtocolReview(){

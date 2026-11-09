@@ -5,7 +5,7 @@
   window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101046__=true;
   window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101037__=true;
 
-  const VERSION='10.10.46-feedback2';
+  const VERSION='10.10.46-feedback3';
   const SCREEN_ID='screen-trainer-feedback-archive';
   const DETAIL_ID='modal-trainer-feedback-detail';
   const ENTRY_ID='tb-trainer-feedback-archive-entry';
@@ -92,7 +92,7 @@
       const studentsRef=db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500);
       const studentsSnap=await readOnce(studentsRef,'alunos vinculados para feedbacks',6000);
       if(serial!==loadSerial||trainerUid()!==uid)return false;
-      const students=(studentsSnap.docs||[]).map(doc=>({...doc.data(),uid:doc.id})).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid);
+      const students=(studentsSnap.docs||[]).map(doc=>{const row={...doc.data(),uid:doc.id};return window.TeamBullsStudentAdministration?.identity(row)||row;}).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid);
       studentsById=new Map(students.map(item=>[String(item.uid),item]));
       const groups=await mapWithLimit(students,CONCURRENCY,async student=>{
         try{

@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__)return;
   window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__=true;
 
-  const VERSION='10.10.45-studenthome7';
+  const VERSION='10.10.45-studenthome8';
   const PROFILE_PREFIX='studentProfiles';
   const NICK_MAX=24;
   const BADGE_REFRESH_TTL=120000;
@@ -18,6 +18,7 @@
   let noticeActionBusy=false;
   let openCenterRefreshPromise=null;
   let pendingNameSyncPromise=null;
+  let nicknameWriteChain=Promise.resolve();
   let studentHeaderRenderToken=0;
 
   const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -30,7 +31,8 @@
   function studentDisplayName(user=student(),profileName=''){
     const auth=authUser();
     const pending=readPendingStudentName(uidOf(user));
-    const saved=usableStudentName(pending)||usableStudentName(user?.name)||usableStudentName(profileName)||usableStudentName(user?.displayName)||usableStudentName(auth?.displayName);
+    const preferred=typeof user?.nickname==='string'?(usableStudentName(user.nickname)||usableStudentName(user.registeredName)||usableStudentName(user.name)):(usableStudentName(profileName)||usableStudentName(user?.name));
+    const saved=usableStudentName(pending)||preferred||usableStudentName(user?.displayName)||usableStudentName(auth?.displayName);
     if(saved)return saved;
     const local=String(user?.email||auth?.email||'').split('@')[0].replace(/[._+-]+/g,' ').replace(/\s+/g,' ').trim();
     if(local&&/[\p{L}]{2}/u.test(local)&&local.length<=100)return local.replace(/(^|\s)\p{L}/gu,letter=>letter.toLocaleUpperCase('pt-BR'));
@@ -41,9 +43,10 @@
   function writePendingStudentName(uid,name){try{localStorage.setItem(pendingNameKey(uid),name);return true;}catch(error){return false;}}
   function clearPendingStudentName(uid){try{localStorage.removeItem(pendingNameKey(uid));}catch(error){}}
   function isTemporaryConnectionError(error){const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();return navigator.onLine===false||code.includes('unavailable')||code.includes('deadline-exceeded')||code.includes('network')||code.includes('timeout')||message.includes('offline')||message.includes('network')||message.includes('failed to fetch')||message.includes('connection');}
-  function updateStudentNameLocally(uid,name){
+  function updateStudentNameLocally(uid,name,profile={}){
     if(CURRENT_USER?.role!=='student'||uidOf(CURRENT_USER)!==uid)return;
-    CURRENT_USER={...CURRENT_USER,name};
+    const pending=readPendingStudentName(uid);if(pending!==null&&pending!==name)return;
+    CURRENT_USER={...CURRENT_USER,...profile,nickname:name};
     if(typeof cacheUserProfile==='function')cacheUserProfile(CURRENT_USER);
     if(typeof updateOfflineCredentialProfile==='function')updateOfflineCredentialProfile(CURRENT_USER);
     const chip=document.getElementById('user-chip-name');if(chip)chip.textContent=name;
@@ -117,15 +120,15 @@
   }
 
   async function writeNickname(uid,nickname){
-    await ensureProfileIdentity(uid);
-    const root=await storageRoot();
-    if(!root)throw new Error('Não foi possível carregar o armazenamento do perfil agora. Tente novamente em instantes.');
-    const ref=profileRef(root,uid);if(!ref)throw new Error('Perfil do aluno indisponível.');
-    const body=JSON.stringify({nickname:cleanNickname(nickname)});
-    try{await ref.put(new Blob([body],{type:'application/json'}),{contentType:'application/json',cacheControl:'no-store'});}
-    catch(error){throw profileError(error,'alterar o nome de exibição');}
-    profileCache.delete(uid);
-    return readProfile(uid,{fresh:true});
+    const actor=CURRENT_USER?.uid;
+    nicknameWriteChain=nicknameWriteChain.catch(()=>{}).then(async()=>{
+      if(CURRENT_USER?.uid!==actor)throw new Error('A sessão mudou. Abra o perfil novamente.');
+      const api=window.TeamBullsStudentAdministration;if(!api?.request)throw new Error('O perfil ainda está carregando. Tente novamente.');
+      const result=await api.request('nickname',{studentUid:uid,nickname});
+      profileCache.delete(uid);if(CURRENT_USER?.role==='student'&&studentUid()===uid)updateStudentNameLocally(uid,result.nickname||result.registeredName,result);
+      if(CURRENT_USER?.role==='trainer'&&VIEW_STUDENT?.uid===uid)Object.assign(VIEW_STUDENT,api.identity(result));
+      return{nickname:result.nickname};
+    });return nicknameWriteChain;
   }
 
   async function decodeAvatarFile(file){
@@ -266,7 +269,7 @@
   function logout(){closeProfileMenu();if(typeof confirmLogout==='function'){confirmLogout();return;}if(typeof handleChipTap==='function'){handleChipTap();return;}alert('Não foi possível abrir a saída da conta. Atualize o aplicativo e tente novamente.');}
   function openNameEditor(){
     closeProfileMenu();ensureNameEditor();const editor=document.getElementById('tb-profile-editor'),input=document.getElementById('tb-profile-editor-name'),status=document.getElementById('tb-profile-editor-status');
-    if(!editor||!input)return;input.value=usableStudentName(readPendingStudentName(studentUid()))||usableStudentName(student()?.name)||usableStudentName(profileCache.get(studentUid())?.nickname)||usableStudentName(authUser()?.displayName)||'';if(status)status.textContent='';editor.hidden=false;document.body.classList.add('tb-profile-editor-open');requestAnimationFrame(()=>{input.focus();input.select();});
+    if(!editor||!input)return;input.value=studentDisplayName(student(),profileCache.get(studentUid())?.nickname);if(status)status.textContent='';editor.hidden=false;document.body.classList.add('tb-profile-editor-open');requestAnimationFrame(()=>{input.focus();input.select();});
   }
   function closeNameEditor(){const editor=document.getElementById('tb-profile-editor');if(!editor)return;editor.hidden=true;document.body.classList.remove('tb-profile-editor-open');document.getElementById('tb-avatar-button')?.focus();}
   async function saveStudentName(uid,name){
@@ -274,10 +277,10 @@
     if(MODE!=='cloud'||ACCESS_MODE!=='cloud-active'||!db){if(!writePendingStudentName(uid,name))throw new Error('Não foi possível guardar a alteração neste aparelho. Verifique o espaço disponível.');updateStudentNameLocally(uid,name);return{pending:true,requiresLogin:true};}
     if(!navigator.onLine){if(!writePendingStudentName(uid,name))throw new Error('Não foi possível guardar a alteração neste aparelho. Verifique o espaço disponível.');updateStudentNameLocally(uid,name);return{pending:true};}
     await ensureProfileIdentity(uid);
+    writePendingStudentName(uid,name);
     try{
-      const task=db.collection('users').doc(uid).update({name});
-      if(typeof cloudWrite==='function')await cloudWrite(task,'salvar nome do aluno');else await task;
-      clearPendingStudentName(uid);updateStudentNameLocally(uid,name);profileCache.delete(uid);await refreshStudentHeader(true);return{pending:false};
+      await writeNickname(uid,name);
+      if(readPendingStudentName(uid)===name)clearPendingStudentName(uid);updateStudentNameLocally(uid,name);profileCache.delete(uid);await refreshStudentHeader(true);return{pending:false};
     }catch(error){
       if(isTemporaryConnectionError(error)&&writePendingStudentName(uid,name)){updateStudentNameLocally(uid,name);return{pending:true};}
       if(typeof cloudWriteError==='function')throw new Error(cloudWriteError(error,'salvar o nome do aluno'));
@@ -297,7 +300,7 @@
     if(pendingNameSyncPromise)return pendingNameSyncPromise;
     const uid=studentUid(),name=uid?readPendingStudentName(uid):null;if(!uid||name===null||!name||!db||MODE!=='cloud'||ACCESS_MODE!=='cloud-active'||!navigator.onLine)return Promise.resolve(false);
     pendingNameSyncPromise=(async()=>{
-      try{await ensureProfileIdentity(uid);const task=db.collection('users').doc(uid).update({name});if(typeof cloudWrite==='function')await cloudWrite(task,'sincronizar nome do aluno');else await task;clearPendingStudentName(uid);updateStudentNameLocally(uid,name);profileCache.delete(uid);await refreshStudentHeader(true);showToast?.('✓ Nome do perfil sincronizado');return true;}
+      try{await saveStudentName(uid,name);return true;}
       catch(error){console.warn('[Team Bulls] nome do perfil ainda não sincronizado',error?.code||error?.message||error);return false;}
     })().finally(()=>{pendingNameSyncPromise=null;});
     return pendingNameSyncPromise;
@@ -520,11 +523,11 @@
     const uid=uidOf(studentRecord)||uidOf(VIEW_STUDENT);if(!uid)return;
     const screen=document.getElementById('screen-trainer-student'),header=screen?.querySelector('.header');if(!screen||!header)return;
     let card=screen.querySelector('.tb-trainer-profile-card');if(!card){card=document.createElement('div');card.className='tb-trainer-profile-card';header.insertAdjacentElement('afterend',card);}
-    const profile=await readProfile(uid),registered=String(studentRecord?.name||VIEW_STUDENT?.name||'Aluno'),secondary=profile.nickname||registered;
-    card.innerHTML=`${profile.avatarUrl?`<img src="${esc(profile.avatarUrl)}" alt="Foto do aluno">`:`<div class="tb-trainer-profile-avatar">${esc((registered[0]||'A').toUpperCase())}</div>`}<div class="tb-trainer-profile-copy"><strong>${esc(registered)}</strong><span>${esc(secondary)}</span></div><div class="tb-trainer-profile-actions">${profile.avatarUrl?`<button type="button" onclick="TeamBullsStudentHome.moderatePhoto('${esc(uid)}')">REMOVER FOTO</button>`:''}${profile.nickname?`<button type="button" onclick="TeamBullsStudentHome.moderateNickname('${esc(uid)}')">REMOVER APELIDO</button>`:''}</div>`;
+    const actor=CURRENT_USER?.uid,profile=await readProfile(uid);if(CURRENT_USER?.role!=='trainer'||CURRENT_USER.uid!==actor||VIEW_STUDENT?.uid!==uid)return;const raw=window.TeamBullsStudentAdministration?.getStudent(uid)||studentRecord||VIEW_STUDENT,display=window.TeamBullsStudentAdministration?.identity({...raw,nickname:typeof raw?.nickname==='string'?raw.nickname:profile.nickname}),registered=display?.name||String(raw?.name||'Aluno'),secondary=display?.nickname?'Nome cadastrado: '+display.registeredName:'Nome cadastrado';
+    card.innerHTML=`${profile.avatarUrl?`<img src="${esc(profile.avatarUrl)}" alt="Foto do aluno">`:`<div class="tb-trainer-profile-avatar">${esc((registered[0]||'A').toUpperCase())}</div>`}<div class="tb-trainer-profile-copy"><strong>${esc(registered)}</strong><span>${esc(secondary)}</span></div><div class="tb-trainer-profile-actions">${profile.avatarUrl?`<button type="button" onclick="TeamBullsStudentHome.moderatePhoto('${esc(uid)}')">REMOVER FOTO</button>`:''}${(display?.nickname||(!display&&profile.nickname))?`<button type="button" onclick="TeamBullsStudentHome.moderateNickname('${esc(uid)}')">REMOVER APELIDO</button>`:''}</div>`;
   }
   async function moderatePhoto(uid){if(CURRENT_USER?.role!=='trainer'||!confirm('Remover a foto de perfil deste aluno?'))return;try{await removeAvatar(uid);await trainerProfileCard(VIEW_STUDENT);showToast?.('✓ Foto removida pelo treinador');}catch(error){alert('Não foi possível remover a foto.');}}
-  async function moderateNickname(uid){if(CURRENT_USER?.role!=='trainer'||!confirm('Remover o apelido deste aluno e voltar ao nome de cadastro?'))return;try{await writeNickname(uid,'');await trainerProfileCard(VIEW_STUDENT);showToast?.('✓ Apelido removido pelo treinador');}catch(error){alert('Não foi possível remover o apelido.');}}
+  async function moderateNickname(uid){if(CURRENT_USER?.role!=='trainer'||!confirm('Remover o apelido deste aluno e voltar ao nome de cadastro?'))return;try{await writeNickname(uid,'');await window.TeamBullsStudentAdministration?.refresh();if(VIEW_STUDENT?.uid===uid)await renderTrainerStudent(VIEW_STUDENT);showToast?.('✓ Apelido removido pelo treinador');}catch(error){alert('Não foi possível remover o apelido.');}}
 
   function wrapUi(){
     if(typeof renderHome==='function'&&!renderHome.__tbStudentHomeProfile){

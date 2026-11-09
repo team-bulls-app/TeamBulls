@@ -6,7 +6,7 @@
   window.__TEAM_BULLS_TRAINER_SENT_REPORTS_101046__=true;
   window.__TEAM_BULLS_TRAINER_SENT_REPORTS_101033__=true;
 
-  const VERSION='10.10.52-sentreports4';
+  const VERSION='10.10.52-sentreports5';
   const SCREEN_ID='screen-trainer-sent-reports';
   const ENTRY_ID='tb-trainer-sent-reports-entry';
   const STYLE_ID='tb-trainer-sent-reports-style-v3';
@@ -34,7 +34,7 @@
     const map=new Map();
     try{
       const snap=await readOnce(db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500),'nomes dos alunos',6000);
-      (snap.docs||[]).forEach(doc=>map.set(String(doc.id),{...doc.data(),uid:doc.id}));
+      (snap.docs||[]).forEach(doc=>map.set(String(doc.id),(window.TeamBullsStudentAdministration?.identity({...doc.data(),uid:doc.id})||{...doc.data(),uid:doc.id})));
     }catch(error){console.warn('[Team Bulls] nomes vinculados indisponíveis; relatórios continuam carregando.',error?.code||error?.message||error);}
     runtimeStudents().forEach(row=>{if(row.uid&&!map.has(row.uid))map.set(row.uid,row);});
     studentsById=map;return map;
