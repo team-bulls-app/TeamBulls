@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="10.10.9" name="team-bulls-version"/>
-<meta content="2026110605" name="team-bulls-build"/>
+<meta content="2026110901" name="team-bulls-build"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
@@ -27,7 +27,7 @@
 <!-- Firebase é carregado sob demanda após a interface ficar disponível. -->
 <script src="viewport_v10_10_9.js?v=10.10.9&device=local-access1"></script>
 <script src="boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1"></script>
-<link as="style" href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1" rel="preload"/><link href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1" rel="stylesheet"/><link as="script" href="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1" rel="preload"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(max-width: 899px), (pointer: coarse)" rel="preload" type="image/png"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(min-width: 900px) and (hover: hover) and (pointer: fine)" rel="preload" type="image/png"/>
+<link as="style" href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1" rel="preload"/><link href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1" rel="stylesheet"/><link as="script" href="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1" rel="preload"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(max-width: 899px), (pointer: coarse)" rel="preload" type="image/png"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(min-width: 900px) and (hover: hover) and (pointer: fine)" rel="preload" type="image/png"/>
 <link crossorigin="anonymous" href="https://www.gstatic.com" rel="preconnect"/><link crossorigin="anonymous" href="https://firestore.googleapis.com" rel="preconnect"/><link crossorigin="anonymous" href="https://firebasestorage.googleapis.com" rel="preconnect"/></head>
 <body>
 <div id="portrait-lock-overlay" aria-hidden="true" inert>
@@ -563,11 +563,12 @@
 <div class="trainer-checkin-schedule protocol-review-card" id="trainer-protocol-review-card">
 <div class="trainer-checkin-head"><div><span>ATUALIZAÇÃO COMPLETA</span><strong>Treino e dieta — ciclo administrativo</strong></div><span class="quest-status pending" id="trainer-protocol-review-state">CARREGANDO</span></div>
 <div class="trainer-checkin-grid protocol-review-grid">
-<label class="form-group"><span class="form-label">Início exato do protocolo</span><input class="form-input" id="trainer-protocol-start-date" type="date"/></label>
+<label class="form-group"><span class="form-label">Início exato do protocolo</span><input class="form-input" id="trainer-protocol-start-date" type="date" readonly aria-describedby="trainer-protocol-start-help"/></label>
 <label class="form-group"><span class="form-label">Revisão completa a cada</span><div class="protocol-week-input"><input class="form-input" id="trainer-protocol-interval-weeks" type="number" min="1" max="52" step="1" value="4" inputmode="numeric"/><span>semanas</span></div></label>
 </div>
 <div class="trainer-checkin-actions protocol-review-actions"><button class="btn-primary" onclick="saveProtocolReviewSchedule()">SALVAR CICLO</button><button class="btn-add-set" id="trainer-protocol-review-complete" onclick="markProtocolReviewCompleted()">MARCAR ATUALIZAÇÃO COMPLETA</button><button class="btn-add-set" onclick="openFeedbackModal('protocol_update')">FEEDBACK EXTENSO DA ATUALIZAÇÃO</button></div>
 <div class="plan-help" id="trainer-protocol-review-help">O padrão é 4 semanas. Ajustes semanais em treino ou dieta não reiniciam esta contagem.</div>
+<div class="plan-help" id="trainer-protocol-start-help">O início vem do treino ativo. Para alterar a data, edite o início da prescrição do treino. A revisão administrativa não altera as datas previstas das prescrições.</div>
 <div class="cycle-link-note" id="trainer-protocol-review-next">Próxima atualização completa: —</div>
 </div>
 <div class="section-header"><span class="section-label">Protocolos do aluno</span><span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--text-muted)">prescrição do treinador</span></div>
@@ -725,6 +726,11 @@
 <button class="btn-icon" onclick="goBackFromExerciseOptions()">←</button>
 <div class="header-title">Opções de exercícios</div>
 </div>
+<div class="content exercise-options-search-panel">
+<label class="form-label" for="exercise-options-search">BUSCAR EXERCÍCIO OU GRUPO</label>
+<div class="exercise-options-search-row"><input class="form-input" id="exercise-options-search" type="search" placeholder="Ex.: agachamento, extensão de joelho..." autocomplete="off" oninput="renderExerciseOptions()" aria-controls="exercise-options-content"/><button class="btn-add-set" id="exercise-options-search-clear" onclick="clearExerciseOptionsSearch()" hidden>LIMPAR</button></div>
+<div class="plan-help" id="exercise-options-search-results" role="status" aria-live="polite">Pesquise pelo exercício ou pelo grupo.</div>
+</div>
 <div class="content" id="exercise-options-content" style="padding-top:12px"></div>
 </div>
 <!-- TRAINER VIEWING STUDENT PHOTOS -->
@@ -820,7 +826,7 @@
 </div>
 <div class="settings-card app-update-settings-card">
 <h3>Atualizações do aplicativo</h3>
-<div class="setting-row"><div class="setting-label">Versão instalada<span class="setting-value" id="tb-installed-release">v10.10.9 · revisão 2026110605</span></div></div>
+<div class="setting-row"><div class="setting-label">Versão instalada<span class="setting-value" id="tb-installed-release">v10.10.9 · revisão 2026110901</span></div></div>
 <button class="btn-add-set full" type="button" onclick="window.TeamBullsUpdater?.manualCheck ? window.TeamBullsUpdater.manualCheck() : location.assign('./recuperar.html')">VERIFICAR ATUALIZAÇÃO</button>
 <p><a href="./recuperar.html">Corrigir aplicativo desatualizado</a></p>
 <div class="pdf-note">Quando uma versão nova estiver disponível, o Team Bulls exibirá o botão “Atualizar agora”. Login, instalação e dados locais são preservados.</div>
@@ -1486,9 +1492,9 @@
 </div>
 </div>
 </div>
-<script defer src="config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1"></script>
-<script defer src="update_v10_10_9.js?v=10.10.9&b=2026110605"></script>
-<script defer src="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1"></script>
+<script defer src="config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1&protocol=activecycle1"></script>
+<script defer src="update_v10_10_9.js?v=10.10.9&b=2026110901"></script>
+<script defer src="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1"></script>
 <script defer src="modules/student-training-calendar-v10_10_70.js?v=10.10.70-explicit-cycle-calendar2"></script>
 <script defer src="modules/student-feedback-device-notices-v10_10_62.js?v=10.10.62-device-notices2"></script>
 <script defer src="modules/support-diagnostics-v10_10_9.js?v=10.10.9-diagnostics4"></script>

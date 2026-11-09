@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import {fn,cycleFunctions,orderingFunctions} from './protocol-cycle-search-check.mjs';
 
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
 const operations=fs.readFileSync('modules/v107-core.js','utf8');
@@ -48,14 +49,18 @@ async function runTrainerRename({writeFails=false}={}){
     today:()=> '2026-09-24',addDaysIso:()=> '2026-10-22',validIsoDate:value=>/^\d{4}-\d{2}-\d{2}$/.test(value),
     normalizedName:value=>String(value||'').trim().toLowerCase(),beginAction:()=>true,endAction:()=>{},
     setWorkoutSaveStatus:(message,error)=>{status.textContent=message;status.style.color=error?'red':'';},
-    db:{collection:collection=>({where:()=>({}),doc:id=>({update:async changes=>{updates.push({collection,id,changes});if(writeFails)throw new Error('Servidor indisponível');Object.assign(persisted,changes);}})})},
+    auth:{currentUser:{uid:'trainer-1'}},firebase:{firestore:{FieldValue:{serverTimestamp:()=>123}}},
+    db:{collection:collection=>({where:()=>({}),doc:id=>({collection,id})}),runTransaction:async task=>{
+      const staged=[];const result=await task({get:async ref=>({exists:true,data:()=>ref.collection==='workouts'?{...persisted,userId:'student-1',isActive:true}:{sourceWorkoutId:'w1',studentId:'student-1',trainerId:'trainer-1',startDate:original.startDate,intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:''}}),update:(ref,changes)=>staged.push({...ref,changes}),set:()=>{throw new Error('Rename must preserve existing cycle');}});
+      updates.push(...staged);if(writeFails)throw new Error('Servidor indisponível');for(const row of staged)Object.assign(persisted,row.changes);return result;
+    }},
     cloudGet:async()=>({docs:[{id:'w1',data:()=>({name:currentName})}]}),cloudWrite:promise=>promise,
     closeModal:()=>{modal.open=false;},showToast:()=>{},
     renderTrainerStudent:async()=>{if(!writeFails){context.VIEW_STUDENT.workouts=[{...original,name:currentName}];title.textContent=currentName;}},
     console:{error:()=>{}}
   };
   vm.createContext(context);
-  vm.runInContext(saveSource+'\nthis.runSave=saveWorkout;',context);
+  vm.runInContext([...orderingFunctions,...cycleFunctions.slice(0,2)].map(fn).join('\n')+'\n'+saveSource+'\nthis.runSave=saveWorkout;',context);
   await context.runSave();
   assert.equal(updates.length,1,'Editar deve escrever um documento existente uma só vez.');
   assert.equal(updates[0].collection,'workouts');

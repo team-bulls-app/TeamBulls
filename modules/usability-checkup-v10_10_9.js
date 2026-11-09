@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__)return;
   window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__=true;
 
-  const VERSION='10.10.21-usability5';
+  const VERSION='10.10.21-usability6';
   const scrollByHistoryKey=new Map();
   let scrollFrame=0;
   let profileLogoutHooks=false;
@@ -245,8 +245,8 @@
 
 /* Carrega a agenda administrativa apenas no perfil do treinador. */
 (()=>{
-  const SRC='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer1';
-  const EXPECTED_VERSION='10.10.41-updateorganizer1';
+  const SRC='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer2';
+  const EXPECTED_VERSION='10.10.41-updateorganizer2';
   let loading=null;
   const trainerContext=()=>{try{return CURRENT_USER?.role==='trainer'&&MODE==='cloud';}catch(error){return document.body?.classList.contains('trainer-desktop')===true;}};
   const ready=()=>window.TeamBullsTrainerUpdateOrganizer?.version===EXPECTED_VERSION;

@@ -3168,3 +3168,26 @@ html[data-theme="light"] #modal-training-recommendations :is(button,input,textar
 html[data-theme="light"] .training-recommendations{border-left-color:#a51e20}html[data-theme="light"] .training-recommendations :is(.archive-file-kicker,.training-frequency>strong,p>strong){color:#635244}
 
 html[data-theme="light"] .training-recommendations .btn-add-set{color:#302820;background:#fff;border-color:#8b7e6d}
+
+/* Pesquisa e identificação das substituições do protocolo ativo. */
+.exercise-options-search-panel{padding-top:12px;padding-bottom:0;}
+.exercise-options-search-row{display:flex;align-items:center;gap:8px;}
+.exercise-options-search-row .form-input{flex:1;min-width:0;font-size:16px;}
+.exercise-options-search-row button{flex:0 0 auto;width:auto;margin:0;padding:10px;white-space:nowrap;}
+.exercise-options-search-row [hidden]{display:none;}
+.exercise-options-legend{font-size:13px;line-height:1.5;color:var(--text);margin:10px 0 0;}
+.exercise-option-prescribed .food-item-name strong{font-weight:800;color:var(--text);}
+.exercise-option-active-label{display:block;font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);margin-top:3px;letter-spacing:.03em;}
+.exercise-group-prescribed{border-inline-start:3px solid var(--accent);}
+.exercise-group-prescribed .exercise-group-name{font-weight:800;}
+#exercise-options-content .food-item-name{min-width:0;overflow-wrap:anywhere;}
+#trainer-protocol-start-date[readonly]{cursor:default;opacity:1;}
+#exercise-options-search-results{font-size:12px;line-height:1.4;margin-top:8px;}
+.exercise-group-prescribed{padding-inline-start:10px;}
+html[data-theme="light"] #screen-exercise-options .exercise-options-search-panel,
+html[data-theme="light"] #exercise-options-content .food-cat-block{
+  --bg:var(--tb-light-panel);--surface:var(--tb-light-panel-raised);
+  --text:var(--tb-light-panel-ink);--text-dim:var(--tb-light-panel-muted);--text-muted:var(--tb-light-panel-subtle);
+  --border:var(--tb-light-panel-border);--border-l:var(--tb-light-panel-border-strong);--accent:var(--tb-light-brand-on-panel);
+  background:var(--tb-light-panel);color:var(--tb-light-panel-ink);padding:12px;
+}

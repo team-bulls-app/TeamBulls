@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_UPDATE_ORGANIZER_101041__)return;
   window.__TEAM_BULLS_TRAINER_UPDATE_ORGANIZER_101041__=true;
 
-  const VERSION='10.10.41-updateorganizer1';
+  const VERSION='10.10.41-updateorganizer2';
   const SCREEN_ID='screen-trainer-update-organizer';
   const ENTRY_ID='tb-trainer-update-organizer-entry';
   const STYLE_ID='tb-trainer-update-organizer-style';
@@ -227,12 +227,13 @@
     const cycle=Math.max(1,Math.trunc(Number(state.pendingCycle||item.cycle)||1)),title='Concluir atualização mensal',message=`Marcar a atualização completa mensal nº ${cycle} de ${item.studentName} como realizada? Esta ação avança o ciclo oficial de treino e dieta.`;
     const run=async()=>{
       const key='organizer-monthly-'+item.studentId+'-'+cycle;if(typeof beginAction==='function'&&!beginAction(key))return;
+      const owner=trainerUid();
       try{
         await ensureReportCycleRuntime();
-        const payload={lastCompletedCycle:cycle,lastCompletedDate:todayIso(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:trainerUid(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
-        await cloudWrite(db.collection('protocolReviewSchedules').doc(item.studentId).update(payload),'concluir atualização mensal na agenda');
-        await window.TeamBullsMonthlyReports.ensureForStudent(item.studentId);
-        const nextSchedule={...schedule,...payload,lastCompletedAt:null,updatedAt:null,_exists:true},nextState=monthlyState(nextSchedule);
+        if(typeof v109CompleteProtocolReview!=='function')throw new Error('Atualize o aplicativo antes de concluir o novo ciclo.');
+        const nextSchedule=await v109CompleteProtocolReview(item.studentId,schedule),nextState=monthlyState(nextSchedule);
+        await v109PrepareMonthlyReview(item.studentId);
+        if(trainerUid()!==owner)return;
         if(nextState&&typeof v109SyncActiveProtocolDates==='function')await v109SyncActiveProtocolDates(item.studentId,schedule.startDate,nextState.nextDueDate);
         if(nextState&&typeof v109SyncProtocolMetadataToWeeklySchedule==='function')await v109SyncProtocolMetadataToWeeklySchedule(item.studentId,schedule.startDate,nextState.nextDueDate);
         if(typeof loadTrainerProtocolReviewAlerts==='function')loadTrainerProtocolReviewAlerts().catch(()=>{});
