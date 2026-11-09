@@ -34,7 +34,8 @@ has(mod,"canvas.toBlob(resolve,'image/jpeg',quality)",'Avatar não é redimensio
 has(mod,'blob.size<=650*1024','Avatar excede o limite seguro antes do upload.');
 has(mod,'file.size>25*1024*1024','Upload de avatar perdeu limite de entrada.');
 has(mod,'id="tb-profile-editor-form"','Edição de nome não usa formulário acessível dentro do app.');
-has(mod,"db.collection('users').doc(uid).update({name})",'Nome do perfil não é salvo no cadastro canônico do aluno.');
+has(mod,"api.request('nickname',{studentUid:uid,nickname})",'Apelido deve usar o serviço autorizado sem substituir o nome cadastrado.');
+lacks(mod,"db.collection('users').doc(uid).update({name})",'Edição de apelido não pode sobrescrever o nome cadastrado.');
 has(mod,'team_bulls_pending_student_name_','Nome não é preservado para sincronização após falha de conexão.');
 has(mod,'syncPendingStudentName()','Nome pendente não é sincronizado quando o app retoma a conexão/runtime.');
 has(mod,"return'Aluno'",'Fallback de nome do perfil está ausente.');
@@ -73,7 +74,7 @@ has(storage,'trainerOwns(uid) || activeOwner(uid)','Perfil visual não está iso
 has(storage,'validOptimizedJpegUpload(800 * 1024)','Avatar não possui limite de armazenamento de 800 KB.');
 has(storage,"request.resource.contentType == 'application/json'",'Perfil JSON não valida Content-Type.');
 
-const asset='./modules/student-home-profile-v10_10_12.js?v=10.10.22-studenthome7';
+const asset='./modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome8';
 has(config,asset,'Loader não entrega o perfil/home estabilizado.');
 has(updater,asset,'Atualizador não aquece o perfil/home estabilizado.');
 has(sw,asset,'Service Worker não prepara o perfil/home estabilizado.');

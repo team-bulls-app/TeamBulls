@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110901,
-  "revision": "protocol-cycle-search-1",
+  "build": 2026110902,
+  "revision": "student-administration-order-1",
   "publishedAt": "2026-11-09T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Ciclo administrativo vinculado ao início do treino ativo, busca nas substituições e destaque dos exercícios prescritos."
+  "message": "Ordenação de exercícios, técnicas e alunos; nome cadastrado separado do apelido; arquivamento, restauração e exclusão definitiva protegida por serviço autenticado."
 }

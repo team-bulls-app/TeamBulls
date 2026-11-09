@@ -3181,7 +3181,31 @@ html[data-theme="light"] .training-recommendations .btn-add-set{color:#302820;ba
 .exercise-group-prescribed{border-inline-start:3px solid var(--accent);}
 .exercise-group-prescribed .exercise-group-name{font-weight:800;}
 #exercise-options-content .food-item-name{min-width:0;overflow-wrap:anywhere;}
+#exercise-options-content .food-item-actions{flex-wrap:wrap;justify-content:flex-end;max-width:52%;}
+#exercise-options-content .exercise-option-move{width:30px;min-width:30px;height:30px;padding:0;font-size:15px;}
+#exercise-options-content .exercise-option-move:disabled,.technique-card-actions button:disabled{opacity:.35;cursor:default;}
+.technique-card-actions{flex-shrink:0;flex-wrap:wrap;}
+@media(max-width:520px){.technique-card-actions{width:64px;}.technique-card-actions button{width:30px;min-width:30px;height:30px;}.technique-code{min-width:40px;width:40px;}}
 #trainer-protocol-start-date[readonly]{cursor:default;opacity:1;}
+#tb-roster-toolbar,#tb-student-link-health{grid-column:1/-1;min-width:0;}
+.tb-roster-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;}
+.tb-roster-toolbar>.btn-add-set{flex:1 1 160px;width:auto;margin:0;}
+.tb-roster-toolbar [aria-current="page"]{color:var(--text);border-color:var(--accent);}
+#screen-trainer .student-card.tb-managed-student{display:grid;grid-template-columns:44px minmax(0,1fr);align-items:center;gap:10px;}
+#screen-trainer .tb-managed-student .tb-roster-actions{display:flex;flex-wrap:wrap;justify-content:flex-start;grid-column:1/-1;min-width:0;width:100%;gap:6px;}
+#screen-trainer .tb-managed-student .student-name{white-space:normal;overflow:visible;overflow-wrap:anywhere;line-height:1.3;}
+.tb-roster-actions button,.tb-roster-pending button{min-height:34px;background:var(--surface);border:1px solid var(--border-l);color:var(--text);padding:6px 9px;cursor:pointer;font:700 11px 'Barlow Condensed',sans-serif;}
+.tb-roster-actions .tb-roster-danger{border-color:var(--accent);}
+.tb-roster-actions button:disabled{opacity:.4;cursor:default;}
+.tb-roster-pending{flex-wrap:wrap;}
+#tb-student-profile-actions{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+#tb-student-profile-actions button{flex:1 1 190px;width:auto;margin:0;}
+#modal-student-administration [hidden]{display:none!important;}
+#modal-student-administration .form-input{font-size:16px;}
+html[data-theme="light"] #tb-roster-toolbar{--text:#302820;--text-muted:#625448;--border-l:#8d7d6d;--accent:#a51e20;}
+html[data-theme="light"] #tb-roster-toolbar>.btn-add-set,
+html[data-theme="light"] #tb-student-profile-actions>.btn-add-set{background:#fff;color:#302820;border-color:#8d7d6d;}
+html[data-theme="light"] #tb-roster-toolbar>[aria-current="page"]{border-color:#a51e20;color:#a51e20;}
 #exercise-options-search-results{font-size:12px;line-height:1.4;margin-top:8px;}
 .exercise-group-prescribed{padding-inline-start:10px;}
 html[data-theme="light"] #screen-exercise-options .exercise-options-search-panel,

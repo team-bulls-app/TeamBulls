@@ -200,7 +200,7 @@
         stage='invite-auth-check';btn.textContent='REVALIDANDO CONVITE...';setRegistrationDiagnostic(stage);
         trainerId=await validateInviteSnapshot(await cloudGet(inviteRef,'revalidar convite autenticado'));
       }
-      userData={name:name.slice(0,100),email:tokenEmail,role:'student',status:'active',trainerId,inviteId,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+      userData={name:name.slice(0,100),registeredName:name.slice(0,100),email:tokenEmail,role:'student',status:'active',trainerId,inviteId,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
 
       stage='transaction';btn.textContent='CRIANDO PERFIL...';setRegistrationDiagnostic(stage);
       try{

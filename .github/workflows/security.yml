@@ -20,6 +20,8 @@ jobs:
       - name: Security regression checks
         run: |
           node scripts/security-check.mjs
+          node scripts/student-administration-service-check.mjs
+          node scripts/student-administration-security-check.mjs
           node scripts/student-food-choices-check.mjs
           node scripts/feedback-notice-cancellation-check.mjs
           node scripts/cloudflare-feedback-push-check.mjs
@@ -29,3 +31,4 @@ jobs:
           node scripts/report-submit-contract-check.mjs
           node scripts/weekly-report-integrity-check.mjs
           node scripts/production-audit-check.mjs
+          npm audit --prefix functions --omit=dev --audit-level=moderate

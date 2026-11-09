@@ -103,7 +103,7 @@ await checkDiagnostics(false);
 
 assert.match(profile,/id="tb-device-notice-disable"/,'A Central do aluno deve oferecer controle por aparelho.');
 assert.match(index,/id="tb-copy-diagnostics"/,'Configurações devem expor o resumo técnico local.');
-assert.match(config,/student-home-profile-v10_10_12\.js\?v=10\.10\.22-studenthome7/);
+assert.match(config,/student-home-profile-v10_10_12\.js\?v=10\.10\.45-studenthome8/);
 assert.match(updater,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics4/);
 assert.match(sw,/support-diagnostics-v10_10_9\.js\?v=10\.10\.9-diagnostics4/);
 assert.equal(sw,sw47,'Os service workers publicados devem permanecer idênticos.');

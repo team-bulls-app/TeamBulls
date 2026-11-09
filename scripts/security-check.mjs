@@ -107,11 +107,11 @@ const stretch=read('modules/remove-stretch-planilha-v10_10_9.js');
 lacks(stretch,'new MutationObserver','Remoção de alongamento voltou a observar toda a árvore DOM permanentemente.');
 
 const config=read('config_v10_7.js');
-has(config,'security-hardening-v10_10_9.js?v=10.10.10-security8','Loader não inclui o hardening security8 com URL nova.');
+has(config,'security-hardening-v10_10_9.js?v=10.10.10-security9','Loader não inclui o hardening security9 com URL nova.');
 has(config,'legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','Loader não inclui o reconciliador legacy-links6 com URL nova.');
 has(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration2','Loader não inclui a revisão passiva/cache-safe do cadastro.');
 lacks(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration1','Loader ainda referencia a revisão antiga do cadastro.');
-has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments4','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
+has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments5','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
 has(read('firebase/firestore_28_compacto.rules'),'function paymentDurationValid(data)','Rules não validam a duração permitida para os planos.');
 has(read('firebase/firestore_28_compacto.rules'),"type == 'custom' && months is int && months >= 1 && months <= 60",'Rules não limitam o plano ajustável a 1–60 meses inteiros.');
 

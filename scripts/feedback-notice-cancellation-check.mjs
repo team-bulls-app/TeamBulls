@@ -34,6 +34,7 @@ const context={exports:{},Object,Promise,console,require:name=>{
   if(name==='firebase-admin/app')return{initializeApp:()=>{}};
   if(name==='firebase-admin/firestore')return{getFirestore:()=>database};
   if(name==='firebase-admin/messaging')return{getMessaging:()=>({sendEachForMulticast:async payload=>{sent.push(payload);return{responses:[{success:true},{success:false,error:{code:'messaging/registration-token-not-registered'}}]};}})};
+  if(name==='./student-administration-trigger')return{}; // Callable has its own SDK/security tests.
   throw new Error('Unexpected module '+name);
 }};
 vm.runInNewContext(read('functions/index.js'),context,{filename:'functions/index.js'});

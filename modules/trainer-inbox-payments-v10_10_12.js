@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__)return;
   window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__=true;
 
-  const VERSION='10.10.12-inboxpayments4';
+  const VERSION='10.10.12-inboxpayments5';
   const ACTIVITY_INDEX_VERSION=1;
   const PAYMENT_MAX_FILE=15*1024*1024;
   const ACTIVITY_LIMIT=200;
@@ -108,7 +108,7 @@
     if(!trainer())return[];if(students.length&&!force)return students;
     try{
       const snap=await cloudGet(db.collection('users').where('role','==','student').where('trainerId','==',CURRENT_USER.uid),'alunos da central');
-      students=snap.docs.map(doc=>({...doc.data(),uid:doc.id})).sort((a,b)=>(a.status==='inactive')-(b.status==='inactive')||String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
+      students=snap.docs.map(doc=>{const row={...doc.data(),uid:doc.id};return window.TeamBullsStudentAdministration?.identity(row)||row;}).sort((a,b)=>(a.status==='inactive')-(b.status==='inactive')||String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
       studentMap.clear();students.forEach(item=>studentMap.set(item.uid,item));return students;
     }catch(error){console.warn('Alunos da central indisponíveis',error);return students;}
   }

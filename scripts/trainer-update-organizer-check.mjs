@@ -23,9 +23,9 @@ const usability=fs.existsSync(usabilityPath)?read(usabilityPath):'';
 const feedback=fs.existsSync(feedbackPath)?read(feedbackPath):'';
 const rules=fs.existsSync(rulesPath)?read(rulesPath):'';
 const worker=fs.existsSync(workerPath)?read(workerPath):'';
-const src='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer2';
+const src='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer3';
 
-assert(source.includes("const VERSION='10.10.41-updateorganizer2'"),'Agenda não possui revisão própria.');
+assert(source.includes("const VERSION='10.10.41-updateorganizer3'"),'Agenda não possui revisão própria.');
 assert(source.includes("SCREEN_ID='screen-trainer-update-organizer'"),'Tela dedicada de organização está ausente.');
 assert(source.includes("ENTRY_ID='tb-trainer-update-organizer-entry'"),'Atalho da agenda no perfil do treinador está ausente.');
 assert(source.includes('Organização de atualizações — próximas datas'),'Atalho não comunica a finalidade da agenda.');
@@ -62,7 +62,7 @@ assert(!source.includes('MutationObserver'),'Agenda não deve adicionar observer
 assert(!source.includes('onSnapshot'),'Agenda não deve manter listeners globais apenas para organização.');
 
 assert(usability.includes(src),'Camada network-first não carrega a agenda do treinador.');
-assert(usability.includes("EXPECTED_VERSION='10.10.41-updateorganizer2'"),'Loader não exige a revisão correta da agenda.');
+assert(usability.includes("EXPECTED_VERSION='10.10.41-updateorganizer3'"),'Loader não exige a revisão correta da agenda.');
 assert(usability.includes("CURRENT_USER?.role==='trainer'&&MODE==='cloud'"),'Loader não restringe download/instalação ao treinador cloud.');
 assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Ponte de carregamento deixou de ser mutável/network-first no Service Worker.');
 assert(worker.includes("'/modules/trainer-update-organizer-v10_10_41.js'"),'Agenda corrigida precisa ser network-first para não ficar presa no cache antigo.');

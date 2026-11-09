@@ -1213,6 +1213,8 @@ function sanitizeCachedProfile(value,uid=''){
   const role=value.role==='trainer'?'trainer':'student';
   const status=value.status==='inactive'?'inactive':'active';
   const safe={uid:String(uid||value.uid||''),name:String(value.name||'').slice(0,100),email:String(value.email||'').slice(0,320),role,status,cachedAt:Date.now()};
+  if(typeof value.registeredName==='string')safe.registeredName=value.registeredName.slice(0,100);
+  if(typeof value.nickname==='string')safe.nickname=value.nickname.slice(0,100);
   return safe.uid?safe:null;
 }
 function cacheUserProfile(profile){const safe=sanitizeCachedProfile(profile,profile?.uid);if(safe)storageSet(PROFILE_CACHE_PREFIX+safe.uid,JSON.stringify(safe));}
@@ -3780,9 +3782,9 @@ function renderExerciseOptions(){
   html+=groups.map(({group:gr,index,items:visibleItems})=>{
     const videoAllowed=canUseCatalogVideos()||canEdit;
     const groupActive=(gr.items||[]).some(it=>active.has(JSON.stringify([String(gr.id),String(it.id)])));
-    const items=visibleItems.map(it=>{const prescribed=active.has(JSON.stringify([String(gr.id),String(it.id)]));return `<div class="food-item-row${prescribed?' exercise-option-prescribed':''}">
+    const items=visibleItems.map(it=>{const itemIndex=gr.items.findIndex(item=>item.id===it.id),prescribed=active.has(JSON.stringify([String(gr.id),String(it.id)]));return `<div class="food-item-row${prescribed?' exercise-option-prescribed':''}">
         <span class="food-item-name">${prescribed?`<strong>${esc(it.name)}</strong><span class="exercise-option-active-label">NO TREINO ATIVO</span>`:esc(it.name)}</span>
-        <div class="food-item-actions">${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Editar ${esc(it.name)}" aria-label="Editar ${esc(it.name)}">✏️</button><button class="btn-icon ghost exercise-option-delete" style="width:28px;height:28px;font-size:12px" onclick="deleteExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Excluir ${esc(it.name)}" aria-label="Excluir ${esc(it.name)}">🗑</button>`:''}</div>
+        <div class="food-item-actions">${canEdit?`<button class="btn-icon ghost exercise-option-move" onclick="moveExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)},-1)" title="Mover ${esc(it.name)} para cima" aria-label="Mover ${esc(it.name)} para cima" ${itemIndex===0?'disabled':''}>↑</button><button class="btn-icon ghost exercise-option-move" onclick="moveExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)},1)" title="Mover ${esc(it.name)} para baixo" aria-label="Mover ${esc(it.name)} para baixo" ${itemIndex===gr.items.length-1?'disabled':''}>↓</button>`:''}${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Editar ${esc(it.name)}" aria-label="Editar ${esc(it.name)}">✏️</button><button class="btn-icon ghost exercise-option-delete" style="width:28px;height:28px;font-size:12px" onclick="deleteExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Excluir ${esc(it.name)}" aria-label="Excluir ${esc(it.name)}">🗑</button>`:''}</div>
       </div>`;}).join('');
     const controls=canEdit?`<div class="exercise-group-actions"><button class="btn-icon ghost" onclick="event.stopPropagation();moveExerciseGroup(${jsArg(gr.id)},-1)" title="Mover ${esc(gr.name)} para cima" aria-label="Mover ${esc(gr.name)} para cima" ${index===0?'disabled':''}>↑</button><button class="btn-icon ghost" onclick="event.stopPropagation();moveExerciseGroup(${jsArg(gr.id)},1)" title="Mover ${esc(gr.name)} para baixo" aria-label="Mover ${esc(gr.name)} para baixo" ${index===EXERCISE_OPTIONS.groups.length-1?'disabled':''}>↓</button><button class="btn-icon ghost" onclick="event.stopPropagation();openEditExerciseGroup(${jsArg(gr.id)})" title="Editar grupo ${esc(gr.name)}" aria-label="Editar grupo ${esc(gr.name)}">✏️</button><button class="btn-icon ghost exercise-group-delete" onclick="event.stopPropagation();deleteExerciseGroup(${jsArg(gr.id)})" title="Excluir grupo ${esc(gr.name)}" aria-label="Excluir grupo ${esc(gr.name)}">🗑</button><button class="btn-icon ghost" onclick="event.stopPropagation();openAddExOptItem(${jsArg(gr.id)})" title="Adicionar exercício a ${esc(gr.name)}" aria-label="Adicionar exercício a ${esc(gr.name)}">+</button></div>`:'';
     return `<div class="food-cat-block${groupActive?' exercise-group-prescribed':''}">
@@ -3796,18 +3798,24 @@ function renderExerciseOptions(){
   }).join('');
   wrap.innerHTML=html;
 }
-function moveExerciseGroup(groupId,direction){
-  const id=String(groupId||''),step=Number(direction);
-  if(!id||![-1,1].includes(step))return false;
-  const index=EXERCISE_OPTIONS.groups.findIndex(group=>String(group.id)===id),next=index+step;
-  if(index<0||next<0||next>=EXERCISE_OPTIONS.groups.length)return false;
-  const key='move-exercise-groups';if(!beginAction(key))return false;
-  const snapshot=JSON.stringify(EXERCISE_OPTIONS);
+async function commitExerciseCatalogOrder(groupId,itemId,direction){
+  const step=Number(direction),owner=CURRENT_USER?.uid;
+  if(CURRENT_USER?.role!=='trainer'||MODE!=='cloud'||![-1,1].includes(step))return false;
+  const key='exercise-catalog-order';if(!beginAction(key))return false;
   try{
-    [EXERCISE_OPTIONS.groups[index],EXERCISE_OPTIONS.groups[next]]=[EXERCISE_OPTIONS.groups[next],EXERCISE_OPTIONS.groups[index]];
-    return persistExerciseOptions().then(()=>{renderExerciseOptions();return true;}).catch(error=>{EXERCISE_OPTIONS=JSON.parse(snapshot);alert('Não foi possível reordenar os grupos: '+error.message);return false;}).finally(()=>endAction(key));
-  }catch(error){EXERCISE_OPTIONS=JSON.parse(snapshot);endAction(key);alert('Não foi possível reordenar os grupos: '+error.message);return false;}
+    const expected=mergeExerciseCatalogWithDefaults(EXERCISE_OPTIONS),draft=JSON.parse(JSON.stringify(expected));
+    const items=itemId?(draft.groups.find(group=>group.id===groupId)?.items||[]):draft.groups;
+    const id=itemId||groupId,index=items.findIndex(item=>item.id===id),next=index+step;
+    if(index<0||next<0||next>=items.length)return false;
+    [items[index],items[next]]=[items[next],items[index]];
+    await persistSharedCatalog('exerciseOptions',expected,draft,mergeExerciseCatalogWithDefaults,owner);
+    if(CURRENT_USER?.uid!==owner||CURRENT_USER?.role!=='trainer')return false;
+    EXERCISE_OPTIONS=draft;EXERCISE_OPTIONS_LOADED_AT=Date.now();cacheExerciseCatalog();renderExerciseOptions();return true;
+  }catch(error){if(CURRENT_USER?.uid===owner)alert('Não foi possível alterar a ordem: '+error.message);return false;}
+  finally{endAction(key);}
 }
+function moveExerciseGroup(groupId,direction){return commitExerciseCatalogOrder(String(groupId||''),'',direction);}
+function moveExerciseOptionItem(groupId,itemId,direction){return commitExerciseCatalogOrder(String(groupId||''),String(itemId||''),direction);}
 // Grupo (ex: "Supino Reto")
 function openAddExerciseGroup(){
   EDIT_EXOPT_GROUP_ID=null;
@@ -4673,6 +4681,7 @@ function openModal(id){
   if(id==='modal-workout')setWorkoutSaveStatus('');
 }
 function closeModal(id){
+  if(id==='modal-student-administration'){const password=document.getElementById('tb-student-admin-password');if(password)password.value='';}
   if(id==='modal-training-recommendations')TRAINING_RECOMMENDATIONS_CONTEXT=null;
   const modal=document.getElementById(id);if(!modal)return;
   if(id==='modal-catalog-video'){const body=document.getElementById('catalog-video-body');if(body)body.innerHTML='';}
@@ -6332,7 +6341,7 @@ function catalogPreserveFields(raw,next){
     const old=(Array.isArray(previous)?previous:[]).find(entry=>String(entry.id)===item.id)||{};
     return {...old,...item,...(item.items?{items:nodes(item.items,old.items)}:{})};
   });
-  return {...next,...(next.folders?{folders:nodes(next.folders,raw?.folders)}:{items:nodes(next.items,raw?.items)})};
+  return {...next,...(next.groups?{groups:nodes(next.groups,raw?.groups)}:next.folders?{folders:nodes(next.folders,raw?.folders)}:{items:nodes(next.items,raw?.items)})};
 }
 async function initializeSharedCatalog(collection,fallback,normalize){
   if(CURRENT_USER?.role!=='trainer')return fallback;
@@ -6452,6 +6461,13 @@ async function saveTechnique(){
     const item=draft.items.find(i=>i.id===EDIT_TECHNIQUE_ID);if(item)Object.assign(item,{code,name,description,videoUrl});else draft.items.push({id:EDIT_TECHNIQUE_ID||(EDIT_TECHNIQUE_ID=uid()),code,name,description,videoUrl,locked:false,order:draft.items.length});
   },'modal-technique-editor','✓ Técnica salva');
 }
+async function moveTechnique(id,direction){
+  const step=Number(direction);if(![-1,1].includes(step))return false;
+  return commitCatalogAction('techniques',draft=>{
+    const index=draft.items.findIndex(item=>item.id===id),next=index+step;if(index<0||next<0||next>=draft.items.length)return false;
+    [draft.items[index],draft.items[next]]=[draft.items[next],draft.items[index]];draft.items.forEach((item,order)=>item.order=order);
+  });
+}
 function deleteTechnique(id){
   if(CURRENT_USER?.role!=='trainer')return;const item=TECHNIQUE_CATALOG.items.find(i=>i.id===id);if(!item||item.locked)return;
   showConfirm('Excluir técnica','Excluir esta técnica personalizada? Exercícios antigos manterão o identificador, mas ela deixará de aparecer na biblioteca.',()=>commitCatalogAction('techniques',draft=>{const item=draft.items.find(i=>i.id===id);if(!item||item.locked)return false;draft.items=draft.items.filter(i=>i.id!==id);}));
@@ -6467,7 +6483,7 @@ async function openTechniques(){
   renderTechniques();showScreen('screen-techniques',navigation);return true;
 }
 function closeTechniquesScreen(){if(CURRENT_USER?.role==='trainer')goTrainer();else goHome();}
-function renderTechniques(){const admin=CURRENT_USER?.role==='trainer';document.getElementById('techniques-add-btn').style.display=admin?'flex':'none';document.getElementById('techniques-list').innerHTML=TECHNIQUE_CATALOG.items.map(item=>`<div class="technique-card" onclick="openTechniqueDetail(${jsArg(item.id)})"><div class="technique-code">${esc(item.code)}</div><div class="technique-card-main"><div class="technique-card-name">${esc(item.name)}</div><div class="technique-card-summary">${esc(item.description||'Explicação a ser cadastrada pelo treinador.')}</div></div>${admin?`<div class="technique-card-actions"><button onclick="event.stopPropagation();openTechniqueEditor(${jsArg(item.id)})">✎</button>${item.locked?'':`<button onclick="event.stopPropagation();deleteTechnique(${jsArg(item.id)})">🗑</button>`}</div>`:'<div class="exercise-row-arrow">›</div>'}</div>`).join('');}
+function renderTechniques(){const admin=CURRENT_USER?.role==='trainer';document.getElementById('techniques-add-btn').style.display=admin?'flex':'none';document.getElementById('techniques-list').innerHTML=TECHNIQUE_CATALOG.items.map((item,index)=>`<div class="technique-card" onclick="openTechniqueDetail(${jsArg(item.id)})"><div class="technique-code">${esc(item.code)}</div><div class="technique-card-main"><div class="technique-card-name">${esc(item.name)}</div><div class="technique-card-summary">${esc(item.description||'Explicação a ser cadastrada pelo treinador.')}</div></div>${admin?`<div class="technique-card-actions"><button onclick="event.stopPropagation();moveTechnique(${jsArg(item.id)},-1)" title="Mover ${esc(item.name)} para cima" aria-label="Mover ${esc(item.name)} para cima" ${index===0?'disabled':''}>↑</button><button onclick="event.stopPropagation();moveTechnique(${jsArg(item.id)},1)" title="Mover ${esc(item.name)} para baixo" aria-label="Mover ${esc(item.name)} para baixo" ${index===TECHNIQUE_CATALOG.items.length-1?'disabled':''}>↓</button><button onclick="event.stopPropagation();openTechniqueEditor(${jsArg(item.id)})">✎</button>${item.locked?'':`<button onclick="event.stopPropagation();deleteTechnique(${jsArg(item.id)})">🗑</button>`}</div>`:'<div class="exercise-row-arrow">›</div>'}</div>`).join('');}
 function openTechniqueDetail(id){const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);if(!item)return;document.getElementById('technique-detail-title').textContent=item.name;document.getElementById('technique-detail-body').innerHTML=`<div class="technique-detail-code">${esc(item.code)}</div><div class="technique-detail-text">${esc(item.description||'O treinador ainda não cadastrou a explicação desta técnica.')}</div>`;const video=document.getElementById('technique-detail-video-btn');video.style.display=item.videoUrl?'block':'none';video.onclick=()=>{closeModal('modal-technique-detail');if(MODE==='cloud')openCatalogVideo(item.videoUrl,item.name);else showToast('Conecte-se à internet para assistir ao vídeo.',true);};openModal('modal-technique-detail');}
 function openTechniqueEditor(id=''){if(CURRENT_USER?.role!=='trainer')return;captureCatalogEditor('modal-technique-editor','techniques');EDIT_TECHNIQUE_ID=id;const item=TECHNIQUE_CATALOG.items.find(entry=>entry.id===id);document.getElementById('technique-editor-title').textContent=item?'Editar técnica':'Nova técnica';document.getElementById('input-technique-code').value=item?.code||'';document.getElementById('input-technique-name').value=item?.name||'';document.getElementById('input-technique-description').value=item?.description||'';document.getElementById('input-technique-video').value=item?.videoUrl||'';openModal('modal-technique-editor');}
 

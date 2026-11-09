@@ -4,9 +4,9 @@
   if(window.__TEAM_BULLS_TRAINER_RUNTIME_RELIABILITY_101046__)return;
   window.__TEAM_BULLS_TRAINER_RUNTIME_RELIABILITY_101046__=true;
 
-  const VERSION='10.10.53-trainer3';
-  const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports4';
-  const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback2';
+  const VERSION='10.10.53-trainer4';
+  const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports5';
+  const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback3';
   const QUESTIONNAIRE_FEEDBACK_STYLE_ID='tb-trainer-questionnaire-feedback-shortcuts';
   const loads=new Map();
   let viewStudentBase=null;

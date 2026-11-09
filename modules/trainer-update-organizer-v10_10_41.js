@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_UPDATE_ORGANIZER_101041__)return;
   window.__TEAM_BULLS_TRAINER_UPDATE_ORGANIZER_101041__=true;
 
-  const VERSION='10.10.41-updateorganizer2';
+  const VERSION='10.10.41-updateorganizer3';
   const SCREEN_ID='screen-trainer-update-organizer';
   const ENTRY_ID='tb-trainer-update-organizer-entry';
   const STYLE_ID='tb-trainer-update-organizer-style';
@@ -172,7 +172,7 @@
     try{
       const studentSnap=await cloudGet(db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500),'alunos da agenda de atualizações');
       if(serial!==loadSerial||trainerUid()!==uid)return false;
-      students=(studentSnap.docs||[]).map(doc=>({...doc.data(),uid:doc.id})).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid);
+      students=(studentSnap.docs||[]).map(doc=>{const row={...doc.data(),uid:doc.id};return window.TeamBullsStudentAdministration?.identity(row)||row;}).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid);
       studentsById=new Map(students.map(item=>[String(item.uid),item]));
       const activeStudents=students.filter(item=>item.status!=='inactive');
       const scheduleDocs=await mapWithLimit(activeStudents,CONCURRENCY,async student=>{

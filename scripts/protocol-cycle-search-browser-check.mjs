@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {fn,cycleFunctions,catalogFunctions,orderingFunctions} from './protocol-cycle-search-check.mjs';
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
-const names=[...cycleFunctions,...catalogFunctions,...orderingFunctions,'renderTrainerProtocolReview','loadTrainerProtocolReview','saveProtocolReviewSchedule','openProtocolReviewInfo','showConfirm','v109SyncActiveProtocolDates','v109SyncProtocolMetadataToWeeklySchedule','saveWorkout','setWorkoutSaveStatus','saveWorkoutFromButton','beginAction','endAction','openModal','closeModal'];
+const catalogOrderFunctions=['normalizeExerciseCatalog','mergeExerciseCatalogWithDefaults','catalogPreserveFields','persistSharedCatalog','commitExerciseCatalogOrder','moveExerciseGroup','moveExerciseOptionItem','normalizeTechniqueItem','normalizeTechniqueCatalog','persistTechniqueCatalog','commitCatalogAction','renderTechniques','moveTechnique'];
+const names=[...catalogOrderFunctions,...cycleFunctions,...catalogFunctions,...orderingFunctions,'renderTrainerProtocolReview','loadTrainerProtocolReview','saveProtocolReviewSchedule','openProtocolReviewInfo','showConfirm','v109SyncActiveProtocolDates','v109SyncProtocolMetadataToWeeklySchedule','saveWorkout','setWorkoutSaveStatus','saveWorkoutFromButton','beginAction','endAction','openModal','closeModal'];
 const setup=`
 window.errors=[];window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));window.messages=[];const errorLog=console.error.bind(console);console.error=(...args)=>{messages.push(args.map(String).join(' '));errorLog(...args);};window.alert=m=>messages.push(String(m));
 let CURRENT_USER={uid:'t',role:'trainer'},auth={currentUser:{uid:'t'}},MODE='cloud',MODAL_TARGET='student',EDIT_W=null,WORKOUT_CREATE_ID=null,SEL_COLOR='#e11d48',VIEW_STUDENT_WORKOUT=null,TRAINING_RECOMMENDATIONS_CONTEXT=null,V109_PROTOCOL_REVIEW_STUDENT='',V109_PROTOCOL_REVIEW_SCHEDULE=null,EXERCISE_OPTIONS_CONTEXT=null;
@@ -20,6 +21,7 @@ function showScreen(id){document.querySelectorAll('.screen').forEach(e=>e.classL
 function renderTrainerStudent(){VIEW_STUDENT.workouts=Object.entries(remote).filter(([k])=>k.startsWith('workouts/')).map(([k,v])=>({...structuredClone(v),id:k.split('/')[1]}));return loadTrainerProtocolReview('s');}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}const jsArg=s=>esc(JSON.stringify(s));
 let EXERCISE_OPTIONS={groups:[{id:'g',name:'Extensão de joelho',items:[{id:'i',name:'Cadeira Extensora'},{id:'s',name:'Sissy squat'}]},{id:'other',name:'Peitoral',items:[{id:'p',name:'Supino reto'}]},{id:'last',name:'Outro grupo',items:[{id:'bad',name:'<img src=x onerror=alert(1)>'}]}]};
+const EXERCISE_CATALOG_VERSION=3,catalogDefaults=structuredClone(EXERCISE_OPTIONS),defaultExerciseOptions=()=>structuredClone(catalogDefaults),cacheExerciseCatalog=()=>{},cacheTechniqueCatalog=()=>{};let EXERCISE_OPTIONS_LOADED_AT=0,CATALOG_EDITOR_CONTEXTS={},EDIT_INSTRUCTION_FOLDER_ID='',EDIT_INSTRUCTION_ITEM_ID='',EDIT_TECHNIQUE_ID='';const DEFAULT_TECHNIQUE_DEFINITIONS=[{id:'standard',name:'Padrão',code:'P',description:'Preservar',locked:true,order:0}];let TECHNIQUE_CATALOG={revision:1,items:[...DEFAULT_TECHNIQUE_DEFINITIONS,{id:'custom',code:'C',name:'Personalizada',description:'Texto',order:1}]};
 ${names.map(fn).join('\n')}
 window.initFixture=async()=>{await loadTrainerProtocolReview('s');showScreen('screen-trainer-student');window.fixtureReady=true;};
 `;
@@ -99,7 +101,23 @@ try{
     await evaluate(`document.getElementById('exercise-options-search-clear').click();`);assert.equal(await evaluate(`document.querySelectorAll('#exercise-options-content .food-item-row').length`),4);assert.equal(await evaluate(`document.activeElement.id`),'exercise-options-search');
     await evaluate(`CURRENT_USER={uid:'t',role:'trainer'};EXERCISE_OPTIONS_CONTEXT={trainerUid:'t',studentUid:'s'};document.getElementById('exercise-options-search').value='Peitoral';renderExerciseOptions()`);
     assert.equal(await evaluate(`document.querySelectorAll('#exercise-options-content .exercise-group-actions button[title$="para cima"]')[0].disabled`),false,'Filtering must preserve original group index for ordering');
-    await evaluate(`CURRENT_USER={uid:'s',role:'student'};clearExerciseOptionsSearch();`);
+    // Real reorder buttons, filtered item indices, failure preservation and retry.
+    await evaluate(`remote['exerciseOptions/main']=structuredClone(EXERCISE_OPTIONS);document.getElementById('exercise-options-search').value='Sissy';renderExerciseOptions();document.querySelector('#exercise-options-content .exercise-option-move[title$="para cima"]').click();`);
+    for(let i=0;i<80;i++){if(await evaluate('!ACTION_LOCKS.size'))break;await sleep(20);}
+    assert.equal(await evaluate(`remote['exerciseOptions/main'].groups[0].items[0].id`),'s');assert.equal(await evaluate(`document.getElementById('exercise-options-search').value`),'Sissy');
+    await evaluate(`clearExerciseOptionsSearch();failWrites=true;document.querySelectorAll('#exercise-options-content .food-item-row')[1].querySelector('.exercise-option-move[title$="para cima"]').click()`);
+    for(let i=0;i<80;i++){if(await evaluate('!ACTION_LOCKS.size'))break;await sleep(20);}
+    assert.equal(await evaluate(`EXERCISE_OPTIONS.groups[0].items[0].id`),'s');
+    await evaluate(`failWrites=false;document.querySelectorAll('#exercise-options-content .food-item-row')[1].querySelector('.exercise-option-move[title$="para cima"]').click()`);
+    for(let i=0;i<80;i++){if(await evaluate('!ACTION_LOCKS.size'))break;await sleep(20);}
+    assert.equal(await evaluate(`EXERCISE_OPTIONS.groups[0].items[0].id`),'i');
+    await evaluate(`remote['trainingTechniques/main']=structuredClone(TECHNIQUE_CATALOG);showScreen('screen-techniques');renderTechniques();document.querySelectorAll('.technique-card')[1].querySelector('button[title$="para cima"]').click()`);
+    for(let i=0;i<80;i++){if(await evaluate('!ACTION_LOCKS.size'))break;await sleep(20);}
+    assert.equal(await evaluate(`remote['trainingTechniques/main'].items[0].id`),'custom');
+    assert(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),'Technique ordering controls overflow');
+    await evaluate(`CURRENT_USER={uid:'s',role:'student'};renderTechniques();`);assert.equal(await evaluate(`document.querySelectorAll('.technique-card-actions').length`),0);assert.equal(await evaluate(`moveTechnique('custom',1)`),false);
+    await evaluate(`showScreen('screen-exercise-options');clearExerciseOptionsSearch();`);
+
     assert.deepEqual(await evaluate('errors'),[]);if(screenshotDir)fs.writeFileSync(path.join(screenshotDir,`${theme}-${width}.png`),Buffer.from((await command('Page.captureScreenshot',{format:'png'})).data,'base64'));
     // Actual organizer module, monthly checkbox and confirmation handler.
     await evaluate(`(async()=>{CURRENT_USER={uid:'t',role:'trainer'};remote['protocolReviewSchedules/s']={...remote['protocolReviewSchedules/s'],sourceWorkoutId:'new',startDate:'2026-09-01',intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:''};TeamBullsTrainerUpdateOrganizer.open();})()`);
@@ -112,7 +130,7 @@ try{
     assert.equal(await evaluate(`remote['protocolReviewSchedules/s'].lastCompletedDate`),'2026-11-09');assert.equal(await evaluate(`remote['workouts/new'].updateDate`),'2027-01-04');assert.deepEqual(await evaluate('errors'),[]);results.push({theme,width});
 
   }
-  console.log(`PASS ${results.length} browser scenarios: real new-protocol save, exact start/read-only cycle, interval changes, accent search, live focus, canonical bold matches, clear/empty states, safe catalog text, original group order, commit-failure retries and protected monthly organizer confirmations at 320/390/768/1440 px in both themes.`);
+  console.log(`PASS ${results.length} browser scenarios: real new-protocol save, exact start/read-only cycle, interval changes, accent search, live focus, canonical bold matches, clear/empty states, safe catalog text, original group order, commit-failure retries and protected monthly organizer confirmations and real exercise/technique reorder clicks at 320/390/768/1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}chrome.kill();server.close();
   if(path.dirname(profile)===os.tmpdir()&&path.basename(profile).startsWith('tb-login-css-'))for(let i=0;i<8;i++){try{fs.rmSync(profile,{recursive:true,force:true});break;}catch{await sleep(150);}}

@@ -50,7 +50,7 @@ assert(config.indexOf('prescription-propagation-v10_10_9.js')<config.indexOf('wo
 assert(config.indexOf('workflow-controls-v10_10_10.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Workflow controls precisa executar antes da estabilidade final de modais.');
 for(const [name,text] of [['sw.js',sw],['sw_47.js',legacySw]]){
   has(text,'workflow-controls-v10_10_10.js?v=10.10.10-workflow1',`${name} não prepara workflow-controls offline.`);
-  has(text,'security-hardening-v10_10_9.js?v=10.10.10-security8',`${name} não prepara o hardening security8.`);
+  has(text,'security-hardening-v10_10_9.js?v=10.10.10-security9',`${name} não prepara o hardening security8.`);
   has(text,'legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6',`${name} não prepara o reconciliador legacy-links6 offline.`);
   assert(/const CACHE_HOTFIX='[^']+'/.test(text),`${name} não possui uma revisão de cache explícita.`);
 }

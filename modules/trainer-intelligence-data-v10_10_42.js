@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_INTELLIGENCE_DATA_101042__)return;
   window.__TEAM_BULLS_TRAINER_INTELLIGENCE_DATA_101042__=true;
 
-  const VERSION='10.10.66-inteldata3';
+  const VERSION='10.10.66-inteldata4';
   const TTL_MS=120000;
   const CONCURRENCY=5;
   let rosterCache={uid:'',at:0,items:[]};
@@ -44,7 +44,7 @@
     const uid=trainerUid();if(!uid)return[];
     if(!force&&rosterCache.uid===uid&&fresh(rosterCache))return clone(rosterCache.items);
     const snap=await getRef(db.collection('users').where('trainerId','==',uid).where('role','==','student').limit(500),'alunos para central inteligente');
-    const items=(snap.docs||[]).map(doc=>({...doc.data(),uid:doc.id})).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
+    const items=(snap.docs||[]).map(doc=>{const row={...doc.data(),uid:doc.id};return window.TeamBullsStudentAdministration?.identity(row)||row;}).filter(item=>item.role==='student'&&String(item.trainerId||'')===uid).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'pt-BR'));
     rosterCache={uid,at:now(),items};return clone(items);
   }
 
