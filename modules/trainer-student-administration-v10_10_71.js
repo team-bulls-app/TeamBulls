@@ -3,7 +3,7 @@
 (()=>{
   if(window.TeamBullsStudentAdministration)return;
   const VERSION='10.10.71-studentadmin1',records=new Map(),preferences=new Map(),pendingMoves=new Map();
-  let owner='',ownerRevision=null,generation=0,renderSequence=0,archived=false,editor=null;
+  let owner='',ownerRevision=null,generation=0,renderSequence=0,preferencesRevision=0,archived=false,editor=null;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const arg=value=>safe(JSON.stringify(String(value||'')));
   const clean=value=>String(value||'').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,100);
@@ -31,15 +31,21 @@
       if(!Object.prototype.hasOwnProperty.call(result,'result'))throw new Error('O servidor não confirmou a alteração.');return result.result;
     }catch(error){if(error.name==='AbortError')throw Object.assign(new Error(action==='delete'?'A exclusão ainda não foi confirmada. Consulte Alunos arquivados para acompanhar e retomar.':'A confirmação demorou. Tente novamente; a alteração pode já ter sido salva.'),{code:'unavailable'});throw error;}finally{clearTimeout(timer);}
   }
+  function updatePreferences(actor,patch){
+    const {promise,...previous}=preferences.get(actor)||{};
+    preferencesRevision++;const value={order:[],archivedIds:[],pendingDeletions:[],ready:false,...previous,...patch,at:Date.now()};preferences.set(actor,value);return value;
+  }
   async function loadPreferences(force=false){
     const uid=ensureOwner();if(!uid)return{order:[],archivedIds:[],pendingDeletions:[],ready:false};
     const cached=preferences.get(uid);if(cached?.promise)return cached.promise;if(!force&&cached?.at&&Date.now()-cached.at<30000)return cached;
-    const revision=generation;
+    const revision=generation,readRevision=preferencesRevision;
     const promise=request('preferences').then(result=>{
       if(ensureOwner()!==uid||revision!==generation)throw new Error('A sessão mudou.');
+      if(readRevision!==preferencesRevision)return{...preferences.get(uid),promise:undefined};
       const value={order:Array.isArray(result.order)?result.order:[],archivedIds:Array.isArray(result.archivedIds)?result.archivedIds:[],pendingDeletions:Array.isArray(result.pendingDeletions)?result.pendingDeletions:[],ready:true,at:Date.now()};
       preferences.set(uid,value);if(force)pendingMoves.clear();try{localStorage.setItem('team_bulls_roster_order_'+uid,JSON.stringify(value.order));localStorage.setItem('team_bulls_roster_archived_'+uid,JSON.stringify(value.archivedIds));}catch{}return value;
     }).catch(error=>{
+      if(ensureOwner()===uid&&revision===generation&&readRevision!==preferencesRevision)return{...preferences.get(uid),promise:undefined};
       let order=cached?.order||[];if(!order.length)try{const saved=JSON.parse(localStorage.getItem('team_bulls_roster_order_'+uid)||'[]');if(Array.isArray(saved))order=saved;}catch{}
       let archivedIds=cached?.archivedIds||[];if(!archivedIds.length)try{const saved=JSON.parse(localStorage.getItem('team_bulls_roster_archived_'+uid)||'[]');if(Array.isArray(saved))archivedIds=saved;}catch{}
       const value={order,archivedIds,pendingDeletions:cached?.pendingDeletions||[],ready:false,error:error.message,at:Date.now()};
@@ -66,7 +72,7 @@
     const disabled=settings.ready?'':'disabled';
     list.innerHTML=visible.map((raw,index)=>{const row=identity(raw),active=row.status==='active',initials=row.registeredName.split(/\s+/).map(n=>n[0]).slice(0,2).join('');return`<div class="student-card tb-managed-student" data-student-uid="${safe(row.uid)}" data-student-status="${active?'active':'inactive'}"><div class="student-avatar">${safe(initials)}</div><div class="student-info"><div class="archive-file-kicker">ARQUIVO ${typeof studentArchiveCode==='function'?safe(studentArchiveCode(row.uid)):''}</div><div class="student-name-row"><span class="tb-student-status-dot ${active?'active':'inactive'}" role="img" aria-label="${active?'Aluno ativo':'Aluno bloqueado'}"></span><div class="student-name" title="${safe(row.name)}">${safe(row.name)}</div></div><div class="student-meta" title="${safe(row.email)}">${safe(row.email||'')}</div></div><div class="student-actions tb-roster-actions">${archived?'':`<button type="button" onclick="TeamBullsStudentAdministration.move(${arg(row.uid)},-1)" aria-label="Mover ${safe(row.name)} para cima" ${index===0?'disabled':disabled}>↑</button><button type="button" onclick="TeamBullsStudentAdministration.move(${arg(row.uid)},1)" aria-label="Mover ${safe(row.name)} para baixo" ${index===visible.length-1?'disabled':disabled}>↓</button>`}<button class="btn-view-student" onclick="viewStudent(${arg(row.uid)},${arg(row.name)},${arg(row.email)},${arg(row.status)})">ABRIR</button>${archived?`<button type="button" onclick="TeamBullsStudentAdministration.restore(${arg(row.uid)})" ${disabled}>RESTAURAR ACESSO</button><button type="button" class="tb-roster-danger" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})" ${disabled}>EXCLUIR DEFINITIVAMENTE</button>`:`<button class="toggle-btn ${active?'deactivate':'activate'}" onclick="toggleStudent(${arg(row.uid)},${active})">${active?'PAUSAR':'ATIVAR'}</button><button type="button" class="tb-roster-danger" onclick="TeamBullsStudentAdministration.archive(${arg(row.uid)})" ${disabled}>REMOVER</button>`}</div></div>`;}).join('');
     if(archived)list.innerHTML+=settings.pendingDeletions.map(row=>`<div class="student-card tb-roster-pending"><div class="student-info"><strong>${safe(row.registeredName||'Aluno')}</strong><div class="plan-help">Exclusão definitiva ainda não confirmada. O acesso permanece bloqueado.</div></div><button type="button" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})">CONSULTAR / CONCLUIR EXCLUSÃO</button></div>`).join('');
-    if(empty)empty.style.display=visible.length||archived&&settings.pendingDeletions.length?'none':'block';
+    if(empty)empty.style.display=visible.length||archived&&settings.pendingDeletions.length?'none':'block';enhanceProfile();
   }
   async function refresh(){await loadPreferences(true);if(trainer())return renderTrainer();}
   function showArchived(value){if(!ensureOwner())return;archived=value;return renderRoster([...records.values()]);}
@@ -76,7 +82,7 @@
     const params=pendingMoves.get(uid)||{studentUid:uid,direction,requestId:typeof crypto.randomUUID==='function'?crypto.randomUUID():'move-'+Date.now()+'-'+Math.random().toString(36).slice(2)};
     if(params.direction!==direction){endAction(key);showToast('Repita o movimento anterior para confirmar a ordem antes de inverter.',true);return false;}
     pendingMoves.set(uid,params);
-    try{const result=await request('move',params);if(ensureOwner()!==actor)return false;pendingMoves.delete(uid);const previous=preferences.get(actor)||{};preferences.set(actor,{...previous,order:result.order,ready:true,at:Date.now()});try{localStorage.setItem('team_bulls_roster_order_'+actor,JSON.stringify(result.order));}catch{}await renderRoster([...records.values()]);return true;}
+    try{const result=await request('move',params);if(ensureOwner()!==actor)return false;pendingMoves.delete(uid);updatePreferences(actor,{order:result.order,ready:true});try{localStorage.setItem('team_bulls_roster_order_'+actor,JSON.stringify(result.order));}catch{}await renderRoster([...records.values()]);return true;}
     catch(error){if(ensureOwner()===actor)showToast(error.message,true);return false;}finally{endAction(key);}
   }
   function confirmLifecycle(uid,action){
@@ -84,7 +90,7 @@
     const label=identity(row).name,restore=action==='restore';
     showConfirm(restore?'Restaurar acesso do aluno':'Remover aluno da lista',restore?`Restaurar o acesso online de ${label} e voltar à lista principal?`:`Remover ${label} da lista principal e bloquear o acesso online? Treinos, dieta, registros e pagamentos serão preservados em Alunos arquivados.`,async()=>{
       if(ensureOwner()!==actor||generation!==revision)return false;const key='student-lifecycle';if(!beginAction(key))return false;
-      try{const updated=await request(action,{studentUid:uid});if(ensureOwner()!==actor)return false;const previous=preferences.get(actor)||{},ids=previous.archivedIds||[];preferences.set(actor,{...previous,archivedIds:restore?ids.filter(id=>id!==uid):[...new Set([...ids,uid])]});try{localStorage.setItem('team_bulls_roster_archived_'+actor,JSON.stringify(preferences.get(actor).archivedIds));}catch{}records.set(uid,{...row,...updated});if(VIEW_STUDENT?.uid===uid)Object.assign(VIEW_STUDENT,identity(updated));await renderRoster([...records.values()]);showToast(restore?'✓ Acesso restaurado':'✓ Perfil arquivado; histórico preservado');return true;}
+      try{const updated=await request(action,{studentUid:uid});if(ensureOwner()!==actor)return false;const previous=preferences.get(actor)||{},ids=previous.archivedIds||[];updatePreferences(actor,{archivedIds:restore?ids.filter(id=>id!==uid):[...new Set([...ids,uid])]});try{localStorage.setItem('team_bulls_roster_archived_'+actor,JSON.stringify(preferences.get(actor).archivedIds));}catch{}records.set(uid,{...row,...updated});if(VIEW_STUDENT?.uid===uid)Object.assign(VIEW_STUDENT,identity(updated));await renderRoster([...records.values()]);showToast(restore?'✓ Acesso restaurado':'✓ Perfil arquivado; histórico preservado');return true;}
       catch(error){if(ensureOwner()===actor)alert(error.message);return false;}finally{endAction(key);}
     });return true;
   }
@@ -124,6 +130,7 @@
       if(context.action==='delete'){
         records.delete(context.uid);if(VIEW_STUDENT?.uid===context.uid){VIEW_STUDENT=null;showScreen('screen-trainer');}
         if(typeof SESSION_ARCHIVE_MEMORY!=='undefined')SESSION_ARCHIVE_MEMORY.delete(context.uid);
+        const previous=preferences.get(context.actor)||{};updatePreferences(context.actor,{order:(previous.order||[]).filter(uid=>uid!==context.uid),archivedIds:(previous.archivedIds||[]).filter(uid=>uid!==context.uid),pendingDeletions:(previous.pendingDeletions||[]).filter(row=>row.uid!==context.uid)});
         await loadPreferences(true);closeEditor();await renderRoster([...records.values()]);showToast('✓ Perfil e dados na nuvem excluídos definitivamente');
       }else{
         records.set(context.uid,{...context.row,...result});if(VIEW_STUDENT?.uid===context.uid)Object.assign(VIEW_STUDENT,identity(result));closeEditor();await renderRoster([...records.values()]);if(VIEW_STUDENT?.uid===context.uid)await renderTrainerStudent(VIEW_STUDENT);showToast('✓ Nome cadastrado atualizado');
@@ -132,9 +139,9 @@
     finally{if(editor===context){const password=document.getElementById('tb-student-admin-password');if(password)password.value='';button.disabled=false;}endAction('student-admin-editor','modal-student-administration');}
   }
   function enhanceProfile(){
-    if(!ensureOwner()||!VIEW_STUDENT?.uid)return;const row=getStudent(VIEW_STUDENT.uid);if(!row)return;
+    const actor=ensureOwner();if(!actor||!VIEW_STUDENT?.uid)return;const row=getStudent(VIEW_STUDENT.uid);if(!row)return;const disabled=preferences.get(actor)?.ready?'':'disabled';
     const host=document.getElementById('ts-archive-card');if(!host)return;let actions=document.getElementById('tb-student-profile-actions');if(!actions){actions=document.createElement('div');actions.id='tb-student-profile-actions';host.after(actions);}
-    actions.innerHTML=`<button class="btn-add-set" onclick="TeamBullsStudentAdministration.openEditor('registeredName',${arg(row.uid)})">CORRIGIR NOME CADASTRADO</button><button class="btn-add-set" onclick="TeamBullsStudentAdministration.${row.isArchived?'restore':'archive'}(${arg(row.uid)})">${row.isArchived?'RESTAURAR ACESSO':'REMOVER DA LISTA E BLOQUEAR'}</button>${row.isArchived?`<button class="btn-add-set" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})">EXCLUIR DEFINITIVAMENTE</button>`:''}`;
+    actions.innerHTML=`<button class="btn-add-set" onclick="TeamBullsStudentAdministration.openEditor('registeredName',${arg(row.uid)})">CORRIGIR NOME CADASTRADO</button><button class="btn-add-set" onclick="TeamBullsStudentAdministration.${row.isArchived?'restore':'archive'}(${arg(row.uid)})" ${disabled}>${row.isArchived?'RESTAURAR ACESSO':'REMOVER DA LISTA E BLOQUEAR'}</button>${row.isArchived?`<button class="btn-add-set" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})" ${disabled}>EXCLUIR DEFINITIVAMENTE</button>`:''}${disabled?'<span class="plan-help">Aguarde a organização dos alunos ou volte à lista e tente novamente.</span>':''}`;
   }
   if(typeof viewStudent==='function'){const base=viewStudent;viewStudent=function(uid,name,email,status){const row=getStudent(uid);return base.call(this,uid,row?identity(row).name:name,email,status);};}
   if(typeof renderTrainerStudent==='function'){const base=renderTrainerStudent;renderTrainerStudent=async function(){const result=await base.apply(this,arguments);enhanceProfile();return result;};}
