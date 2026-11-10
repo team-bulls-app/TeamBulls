@@ -21,6 +21,7 @@ jobs:
         run: |
           node scripts/security-check.mjs
           node scripts/runtime-action-recovery-check.mjs
+          node scripts/session-variant-protocol-check.mjs
           node scripts/student-administration-service-check.mjs
           node scripts/student-administration-security-check.mjs
           node scripts/student-food-choices-check.mjs

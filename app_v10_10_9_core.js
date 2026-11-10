@@ -3631,14 +3631,17 @@ function cachedExerciseCatalog(){
     localStorage.setItem('team_bulls_exercise_catalog_cache',JSON.stringify(safe));return safe;
   }catch(e){return null;}
 }
-function findExerciseGroup(exercise){
-  const groups=EXERCISE_OPTIONS.groups||[];
-  return groups.find(g=>g.id===exercise?.catalogGroupId)||groups.find(g=>(g.items||[]).some(i=>normalizedName(i.name)===normalizedName(exercise?.name)))||null;
+function findExerciseGroup(exercise,catalog=EXERCISE_OPTIONS){
+  const groups=catalog?.groups||[],name=normalizedName(exercise?.name);
+  return groups.find(g=>g.id===exercise?.catalogGroupId)
+    ||groups.find(g=>(g.items||[]).some(i=>i.id===exercise?.catalogItemId))
+    ||groups.find(g=>name&&normalizedName(g.name)===name)
+    ||groups.find(g=>(g.items||[]).some(i=>name&&normalizedName(i.name)===name))||null;
 }
 function preferredVariantKey(exercise){return'team_bulls_variant_'+(LOCAL_OWNER_UID||CURRENT_USER?.uid||'guest')+'_'+exercise.id;}
 function getPreferredVariant(exercise,group){
   try{const id=localStorage.getItem(preferredVariantKey(exercise));const item=(group?.items||[]).find(x=>x.id===id);if(item)return item;}catch(e){}
-  return(group?.items||[]).find(x=>x.id===exercise?.catalogItemId)||(group?.items||[])[0]||null;
+  return(group?.items||[]).find(x=>x.id===exercise?.catalogItemId)||(group?.items||[]).find(x=>normalizedName(x.name)===normalizedName(exercise?.name))||null;
 }
 function chooseExerciseVariant(exerciseId,itemId){
   const exercise=getE(CUR_WORKOUT,exerciseId);if(!exercise)return;const group=findExerciseGroup(exercise);const item=(group?.items||[]).find(x=>x.id===itemId);if(!item)return;
@@ -3655,15 +3658,38 @@ async function renderExerciseSubstitutions(exercise,elId){
   el.innerHTML=`<div class="exercise-substitution-box"><div class="exercise-substitution-head"><div><div class="exercise-substitution-group">GRUPO // ${esc(group.name)}</div><div class="exercise-substitution-title">Substituições disponíveis</div></div></div>${group.items.map(item=>`<div class="sub-option-row"><span class="sub-option-name">${esc(item.name)}</span><button class="${preferred?.id===item.id?'selected':''}" onclick="chooseExerciseVariant(${jsArg(exercise.id)},${jsArg(item.id)})">${preferred?.id===item.id?'SELECIONADO':'USAR'}</button>${item.videoUrl?`<button class="${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(item.videoUrl)},${jsArg(item.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:'<span></span>'}</div>`).join('')}${group.note?`<div class="plan-help">${esc(group.note)}</div>`:''}</div>`;
 }
 async function populateVariantSelect(exercise,selectId,groupWrapId,selectedItemId='',selectedName=''){
-  const seq=++VARIANT_LOAD_SEQ,exerciseId=String(exercise?.id||'');
-  await loadExerciseOptions();
-  if(seq!==VARIANT_LOAD_SEQ||String(exercise?.id||'')!==exerciseId)return;
-  const group=findExerciseGroup(exercise),wrap=document.getElementById(groupWrapId),select=document.getElementById(selectId);if(!wrap||!select||!select.isConnected)return;
-  if(!group||!(group.items||[]).length){wrap.style.display='none';select.innerHTML='';return;}
-  const preferred=getPreferredVariant(exercise,group),selected=(group.items||[]).find(i=>i.id===selectedItemId)||(group.items||[]).find(i=>normalizedName(i.name)===normalizedName(selectedName))||preferred;
-  select.innerHTML=group.items.map(item=>`<option value="${esc(item.id)}"${selected?.id===item.id?' selected':''}>${esc(item.name)}</option>`).join('');wrap.style.display='block';
+  const seq=++VARIANT_LOAD_SEQ,exerciseId=String(exercise?.id||''),owner=String(CURRENT_USER?.uid||LOCAL_OWNER_UID||'guest');
+  const wrap=document.getElementById(groupWrapId),select=document.getElementById(selectId);if(!exercise||!wrap||!select?.isConnected)return false;
+  const edit=selectId==='edit-session-variant',sessionId=edit?EDIT_SESSION_ID:SESSION_CREATE_ID,wid=edit?EDIT_SESSION_WID:SESSION_WID;
+  const revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
+  const current=()=>seq===VARIANT_LOAD_SEQ&&select.isConnected&&owner===String(CURRENT_USER?.uid||LOCAL_OWNER_UID||'guest')&&(revision===null||AUTH_STATE_REVISION===revision)
+    &&(edit?EDIT_SESSION_ID===sessionId&&EDIT_SESSION_WID===wid&&String(EDIT_SESSION_EID)===exerciseId:SESSION_CREATE_ID===sessionId&&SESSION_WID===wid&&String(SESSION_EID)===exerciseId);
+  let choice=null,hasOptions=false;
+  const renderedChoice=()=>{const option=select.selectedOptions[0];return option?{id:option.dataset.performedId||'',name:option.dataset.performedName||exercise.name}:null;};
+  select.dataset.variantExerciseId=exerciseId;select.dataset.variantOwner=owner;
+  const render=(catalog,loading=false)=>{
+    if(!current())return false;
+    const group=findExerciseGroup(exercise,catalog),items=group?.items||[],preferred=getPreferredVariant(exercise,group);
+    const requested=choice||(hasOptions?renderedChoice():null)||(selectedItemId||selectedName?{id:selectedItemId,name:selectedName||exercise.name}:preferred?{id:preferred.id,name:preferred.name}:{id:'',name:exercise.name});
+    const match=requested.id?items.find(item=>item.id===requested.id):items.find(item=>normalizedName(item.name)===normalizedName(requested.name));
+    const historical=!match&&(requested.id||normalizedName(requested.name)!==normalizedName(exercise.name));
+    const option=(value,id,name,label=name)=>`<option value="${esc(value)}" data-performed-id="${esc(id)}" data-performed-name="${esc(name)}">${esc(label)}</option>`;
+    select.innerHTML=option('','',exercise.name,'Prescrito — '+exercise.name)+items.map(item=>option(item.id,item.id,item.name)).join('')+(historical?option('__recorded__',requested.id,requested.name,'Realizado — '+requested.name):'');
+    select.value=match?.id||(historical?'__recorded__':'');select.disabled=false;wrap.style.display='block';
+    hasOptions=items.length>0||!!historical;
+    const help=wrap.querySelector('.plan-help');if(help)help.textContent=items.length?'Escolha o exercício realizado. A prescrição e os registros anteriores serão preservados.':loading?'Carregando alternativas. Você pode registrar o exercício prescrito.':'Nenhuma alternativa vinculada a este exercício. Confirme a substituição com seu treinador.';
+    return true;
+  };
+  select.onchange=()=>{if(!current())return;choice=renderedChoice();const group=findExerciseGroup(exercise),item=(group?.items||[]).find(item=>item.id===select.value);if(item)try{localStorage.setItem(preferredVariantKey(exercise),item.id);}catch{}};
+  render(EXERCISE_OPTIONS.groups?.length?EXERCISE_OPTIONS:cachedExerciseCatalog(),true);
+  try{const catalog=await loadExerciseOptions();if(!current())return false;return render(catalog||EXERCISE_OPTIONS);}
+  catch(error){if(current())render(EXERCISE_OPTIONS);console.warn('Alternativas do registro indisponíveis',error);return false;}
 }
-function selectedVariantData(exercise,selectId){const group=findExerciseGroup(exercise),select=document.getElementById(selectId),item=(group?.items||[]).find(i=>i.id===select?.value);return item?{performedExerciseItemId:item.id,performedExerciseName:item.name}:{performedExerciseItemId:'',performedExerciseName:exercise?.name||''};}
+function selectedVariantData(exercise,selectId){
+  const select=document.getElementById(selectId),option=select?.selectedOptions?.[0],owner=String(CURRENT_USER?.uid||LOCAL_OWNER_UID||'guest');
+  if(option&&select.dataset.variantOwner===owner&&select.dataset.variantExerciseId===String(exercise?.id||''))return{performedExerciseItemId:option.dataset.performedId||'',performedExerciseName:option.dataset.performedName||exercise?.name||''};
+  return{performedExerciseItemId:'',performedExerciseName:exercise?.name||''};
+}
 function openCatalogVideo(url,title){
   if(!canUseCatalogVideos()&&CURRENT_USER?.role!=='trainer'){showToast('Vídeos disponíveis somente para alunos ativos online.',true);return;}
   const id=extractYouTubeId(url);if(!id){showToast('Use um link válido do YouTube.',true);return;}
@@ -4678,9 +4704,10 @@ async function deleteTsExercise(eid){
 function openModal(id){
   if(id==='modal-exercise'){const button=document.getElementById('tb-progress-edit-access');if(button)button.hidden=!(CURRENT_USER?.role==='trainer'&&MODAL_TARGET==='student'&&VIEW_STUDENT?.uid);}
   document.getElementById(id).classList.add('open');
-  if(id==='modal-workout')setWorkoutSaveStatus('');
+  if(id==='modal-workout'){document.getElementById(id).__tbWorkoutSaveToken=null;setWorkoutSaveStatus('');}
 }
 function closeModal(id){
+  if(id==='modal-session'||id==='modal-edit-session')VARIANT_LOAD_SEQ++;
   if(id==='modal-student-administration'){const password=document.getElementById('tb-student-admin-password');if(password)password.value='';}
   if(id==='modal-training-recommendations')TRAINING_RECOMMENDATIONS_CONTEXT=null;
   const modal=document.getElementById(id);if(!modal)return;
@@ -4736,13 +4763,18 @@ async function saveWorkout(){
     return;
   }
   if(!beginAction('save-workout','modal-workout')){setWorkoutSaveStatus('Aguarde o salvamento anterior terminar.',true);return;}
+  let actionReleased=false,committed=false;
+  const saveHost=document.getElementById('modal-workout'),saveToken={},saveActor=CURRENT_USER?.uid;
+  saveHost.__tbWorkoutSaveToken=saveToken;
+  const latestSave=()=>saveHost.__tbWorkoutSaveToken===saveToken&&CURRENT_USER?.uid===saveActor;
+  const releaseWorkoutAction=()=>{if(!actionReleased){actionReleased=true;endAction('save-workout','modal-workout');}};
   setWorkoutSaveStatus('Salvando o treino…');
   try{
     if(MODE==='cloud'){
       const targetUid=MODAL_TARGET==='student'?VIEW_STUDENT?.uid:CURRENT_USER?.uid;
       const serverWorkouts=await cloudGet(db.collection('workouts').where('userId','==',targetUid),'treinos existentes');
       confirmedWorkouts=serverWorkouts.docs.map(doc=>({...doc.data(),id:doc.id}));
-      if(MODAL_TARGET!==modalTarget||EDIT_W!==editingWorkoutId||(modalTarget==='student'&&VIEW_STUDENT?.uid!==studentUid))throw new Error('O aluno ou o treino aberto mudou. Abra o treino novamente e tente salvar.');
+      if(!latestSave()||MODAL_TARGET!==modalTarget||EDIT_W!==editingWorkoutId||(modalTarget==='student'&&VIEW_STUDENT?.uid!==studentUid))throw new Error('O aluno ou o treino aberto mudou. Abra o treino novamente e tente salvar.');
       if(editingWorkoutId&&!serverWorkouts.docs.some(doc=>doc.id===editingWorkoutId))throw new Error('Este treino não pertence ao aluno aberto ou não está mais disponível. Atualize a lista.');
       if(serverWorkouts.docs.some(d=>d.id!==(saveWorkoutId||EDIT_W)&&normalizedName(d.data().name)===normalizedName(name))){
         setWorkoutSaveStatus('Esse nome já foi salvo em outro treino. Atualize a lista antes de tentar novamente.',true);
@@ -4754,7 +4786,8 @@ async function saveWorkout(){
     if(MODAL_TARGET==='student'){
       if(!VIEW_STUDENT)return;
       await v109PersistWorkoutCycle(studentUid,saveWorkoutId,{name,color,startDate,updateDate},{create:!editingWorkoutId,workouts:confirmedWorkouts});
-      if(VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId||MODAL_TARGET!==modalTarget)return;
+      committed=true;
+      if(!latestSave()||VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId||MODAL_TARGET!==modalTarget)return true;
       if(EDIT_W){
         if(VIEW_STUDENT?.uid!==studentUid||EDIT_W!==editingWorkoutId)return;
         const edited=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
@@ -4769,17 +4802,20 @@ async function saveWorkout(){
       }
       closeModal('modal-workout');
       showToast('✓ Treino salvo');
+      // Reloading the student's other data must not keep a confirmed write
+      // locked. This release belongs only to this invocation, including finally.
+      releaseWorkoutAction();
       await renderTrainerStudent(VIEW_STUDENT);
       // A leitura de retorno pode vir do cache durante uma falha temporária.
       // Preserve na tela a alteração já confirmada pela escrita no servidor.
-      if(editingWorkoutId&&VIEW_STUDENT?.uid===studentUid){
+      if(latestSave()&&editingWorkoutId&&VIEW_STUDENT?.uid===studentUid){
         const refreshed=VIEW_STUDENT.workouts.find(workout=>workout.id===editingWorkoutId);
         if(refreshed)Object.assign(refreshed,{name,color,startDate,updateDate});
         const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
         const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
         if(card)card.style.setProperty('--wcard-color',color);
       }
-      return;
+      return true;
     }
     const __localSnapshot=JSON.stringify(LOCAL_DB);
       if(MODE==='local'){
@@ -4808,10 +4844,12 @@ async function saveWorkout(){
       closeModal('modal-workout');renderHome();
     }
   }catch(e){
+    if(committed){if(latestSave()&&VIEW_STUDENT?.uid===studentUid)showToast('Treino salvo. Reabra o perfil para atualizar os outros dados.',true);return true;}
+    if(!latestSave()||(modalTarget==='student'&&VIEW_STUDENT?.uid!==studentUid))return false;
     setWorkoutSaveStatus('Erro ao salvar treino: '+(e.code?e.code+' — ':'')+e.message,true);
     console.error(e);
   }finally{
-    endAction('save-workout','modal-workout');
+    releaseWorkoutAction();
   }
 }
 
@@ -5766,7 +5804,7 @@ function openEditSession(sid){
   const rx=resolveWeekPrescription(owner.exercise,sess.week||1);
   sess.sets.forEach((s,index) => { addEditSetRow(s.weight,s.reps,normalizePrescriptionSet(s)||rx.sets[index]||null); });
   renderSessionPrescriptionSummary(owner.exercise,sess.week||1,'edit-session-prescription-summary');
-  populateVariantSelect(owner.exercise,'edit-session-variant','edit-session-variant-group',sess.performedExerciseItemId,sess.performedExerciseName);
+  populateVariantSelect(owner.exercise,'edit-session-variant','edit-session-variant-group',sess.performedExerciseItemId,sess.performedExerciseName||sess.exerciseName||owner.exercise.name);
   renderEditOptionalTechniqueMode(owner.exercise,sess.performedTechniqueMode);
   openModal('modal-edit-session');
 }
@@ -8968,6 +9006,20 @@ async function v109PersistWorkoutCycle(studentUid,workoutId,changes={},options={
   const sameAccount=()=>MODE==='cloud'&&CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===trainerUid&&auth?.currentUser?.uid===trainerUid;
   if(!studentUid||!sameAccount())throw new Error('Entre como treinador para atualizar o protocolo.');
   return cloudWrite(db.runTransaction(async transaction=>{
+    let editedDoc=null;
+    if(workoutId&&!options.create&&!options.activate&&options.intervalWeeks===undefined){
+      editedDoc=await transaction.get(db.collection('workouts').doc(workoutId));
+      if(!editedDoc.exists)throw new Error('O treino não está mais disponível. Atualize a lista.');
+      const edited=editedDoc.data();
+      if(edited.userId!==studentUid)throw new Error('O treino não pertence ao aluno aberto.');
+      if(!sameAccount())throw new Error('A conta mudou. Entre novamente antes de salvar.');
+      // Metadata does not restart the administrative cycle. Do not read other
+      // protocols or the schedule just to rename/recolor an existing workout.
+      if((changes.startDate===undefined||changes.startDate===edited.startDate)&&Object.keys(changes).every(key=>['name','color','startDate','updateDate'].includes(key))){
+        if(Object.keys(changes).length)transaction.update(db.collection('workouts').doc(workoutId),changes);
+        return null;
+      }
+    }
     const scheduleRef=db.collection('protocolReviewSchedules').doc(studentUid),scheduleDoc=await transaction.get(scheduleRef),previous=scheduleDoc.exists?scheduleDoc.data():null;
     // Rules 28 reject reads of a missing workout. For a new draft only read
     // IDs returned by the owner-scoped preflight, plus the schedule's current
@@ -8979,7 +9031,7 @@ async function v109PersistWorkoutCycle(studentUid,workoutId,changes={},options={
       const source=await cloudGet(db.collection('workouts').where('userId','==',studentUid).where(firebase.firestore.FieldPath.documentId(),'==',previous.sourceWorkoutId),'treino de referência do ciclo');
       if(source.docs.some(doc=>doc.id===previous.sourceWorkoutId))ids.push(previous.sourceWorkoutId);
     }
-    const rows=[];for(const id of ids){const ref=db.collection('workouts').doc(id),doc=await transaction.get(ref);if(doc.exists){const data=doc.data();if(data.userId!==studentUid)throw new Error('O treino não pertence ao aluno aberto.');rows.push({...data,id,ref});}}
+    const rows=[];for(const id of ids){const ref=db.collection('workouts').doc(id),doc=id===workoutId&&editedDoc?editedDoc:await transaction.get(ref);if(doc.exists){const data=doc.data();if(data.userId!==studentUid)throw new Error('O treino não pertence ao aluno aberto.');rows.push({...data,id,ref});}}
     if(!sameAccount())throw new Error('A conta mudou. Entre novamente antes de salvar.');
     const current=rows.find(row=>row.id===workoutId);
     if(workoutId&&!options.create&&!current)throw new Error('O treino não está mais disponível. Atualize a lista.');
