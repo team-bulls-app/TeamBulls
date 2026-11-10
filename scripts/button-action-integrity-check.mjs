@@ -23,7 +23,7 @@ const mod=read(files.mod),config=read(files.config),index=read(files.index),core
 const syntax=spawnSync(process.execPath,['--check',files.mod],{encoding:'utf8'});
 assert(syntax.status===0,`Módulo de integridade inválido: ${String(syntax.stderr||'').trim()}`);
 
-has(mod,"const VERSION='10.10.38-buttonintegrity1'",'Revisão da camada de botões incorreta.');
+has(mod,"const VERSION='10.10.38-buttonintegrity2'",'Revisão da camada de botões incorreta.');
 has(mod,"document.addEventListener('click',onClick,true)",'Integridade precisa interceptar a ação antes do handler legado.');
 has(mod,'[data-hotbar="workout"]','Ação Treino da hotbar não está protegida.');
 has(mod,"#weekly-checkin-home-banner button",'Botão de relatório semanal da Home não está protegido.');
@@ -40,7 +40,7 @@ lacks(mod,'setInterval(','Integridade de botões não deve criar polling contín
 lacks(mod,'cloudWrite(','Integridade de botões não deve criar writes.');
 lacks(mod,"db.collection(",'Integridade de botões não deve criar leituras Firestore.');
 
-const moduleUrl='./modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity1';
+const moduleUrl='./modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity2';
 has(config,moduleUrl,'Loader não carrega a camada de integridade de botões.');
 const homeAt=config.indexOf('student-home-layout-v10_10_15.js');
 const integrityAt=config.indexOf('button-action-integrity-v10_10_38.js');

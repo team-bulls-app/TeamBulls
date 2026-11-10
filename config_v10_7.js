@@ -185,14 +185,14 @@ if('caches' in window){
   ];
   const studentPriorityModules=[
     './modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome8',
-    './modules/student-home-layout-v10_10_15.js?v=10.10.21-home4',
-    './modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity1',
+    './modules/student-home-layout-v10_10_15.js?v=10.10.21-home5',
+    './modules/button-action-integrity-v10_10_38.js?v=10.10.38-buttonintegrity2',
     './modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1',
     './modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf6',
     './modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession3',
     './modules/week-selection-fix-v10_10_9.js?v=10.10.9-weekselection1',
     './modules/session-integrity-v10_10_39.js?v=10.10.63-sessionintegrity2',
-    './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime4',
+    './modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime5',
     './modules/student-weekly-report-entry-v10_10_35.js?v=10.10.35-weeklyentry1',
     './modules/pdf-export-v10_10_12.js?v=10.10.12-pdf1&fix=student1',
     './modules/student-workout-library-v10_10_24.js?v=10.10.24-workoutlibrary1',
@@ -202,12 +202,12 @@ if('caches' in window){
     './modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay2'
   ];
   const modules=[
-    './modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply3','./modules/supply-options-label-v10_10_24.js?v=10.10.24-supplylabel1','./modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1','./modules/diet-scroll-fix-v10_10_9.js?v=10.10.9','./modules/modal-form-guard-v10_10_9.js?v=10.10.9','./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','./modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','./modules/global-performance-v10_10_9.js?v=10.10.9-perf2','./modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout1','./modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','./modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1','./modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','./modules/prescription-propagation-v10_10_9.js?v=10.10.9-propagation1','./modules/diet-delete-fix-v10_10_9.js?v=10.10.9-dietdelete1','./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance3','./modules/remove-stretch-planilha-v10_10_9.js?v=10.10.9-stretchremove2','./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2','./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability7','./modules/legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','./modules/workflow-controls-v10_10_10.js?v=10.10.10-workflow1','./modules/prescription-lock-bridge-v10_10_10.js?v=10.10.10-lockbridge1','./modules/ger-lock-bridge-v10_10_10.js?v=10.10.10-gerlock1','./modules/report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2','./modules/usability-audit-v10_10_10.js?v=10.10.10-audit1','./modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1','./modules/diet-calculation-math-v10_10_9.js?v=10.10.10-dietmath1','./modules/diet-calculation-evolution-v10_10_9.js?v=10.10.10-dietcalc1','./modules/diet-portion-presets-v10_10_9.js?v=10.10.10-portions1','./modules/diet-personalization-v10_10_11.js?v=10.10.11-dietpersonal1','./modules/diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2','./modules/training-integrity-v10_10_11.js?v=10.10.11-training1','./modules/report-schedule-consistency-v10_10_11.js?v=10.10.11-reportschedule1','./modules/weekly-report-access-v10_10_28.js?v=10.10.28-weeklyaccess1','./modules/trainer-overdue-report-status-v10_10_33.js?v=10.10.33-overduestatus1','./modules/cardio-finish-alert-v10_10_11.js?v=10.10.11-cardioalert1','./modules/release-coherence-v10_10_10.js?v=10.10.12-release6','./modules/custom-food-calorie-bridge-v10_10_12.js?v=10.10.13-customfood5','./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1','./modules/diet-copy-v10_10_28.js?v=10.10.28-dietcopy1','./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments5','./modules/trainer-sent-reports-v10_10_33.js?v=10.10.33-sentreports1','./modules/trainer-feedback-archive-v10_10_37.js?v=10.10.37-feedbackarchive1','./modules/trainer-billing-student-projection-v10_10_22.js?v=10.10.22-billingprojection2'
+    './modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply3','./modules/supply-options-label-v10_10_24.js?v=10.10.24-supplylabel1','./modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1','./modules/diet-scroll-fix-v10_10_9.js?v=10.10.9','./modules/modal-form-guard-v10_10_9.js?v=10.10.9','./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','./modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','./modules/global-performance-v10_10_9.js?v=10.10.9-perf2','./modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout1','./modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','./modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1','./modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','./modules/prescription-propagation-v10_10_9.js?v=10.10.9-propagation1','./modules/diet-delete-fix-v10_10_9.js?v=10.10.9-dietdelete1','./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance3','./modules/remove-stretch-planilha-v10_10_9.js?v=10.10.9-stretchremove2','./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2','./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability7','./modules/legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','./modules/workflow-controls-v10_10_10.js?v=10.10.10-workflow1','./modules/prescription-lock-bridge-v10_10_10.js?v=10.10.10-lockbridge1','./modules/ger-lock-bridge-v10_10_10.js?v=10.10.10-gerlock1','./modules/report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2','./modules/usability-audit-v10_10_10.js?v=10.10.10-audit1','./modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1','./modules/diet-calculation-math-v10_10_9.js?v=10.10.10-dietmath1','./modules/diet-calculation-evolution-v10_10_9.js?v=10.10.10-dietcalc1','./modules/diet-portion-presets-v10_10_9.js?v=10.10.10-portions1','./modules/diet-personalization-v10_10_11.js?v=10.10.11-dietpersonal1','./modules/diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2','./modules/training-integrity-v10_10_11.js?v=10.10.11-training1','./modules/report-schedule-consistency-v10_10_11.js?v=10.10.11-reportschedule1','./modules/weekly-report-access-v10_10_28.js?v=10.10.28-weeklyaccess1','./modules/trainer-overdue-report-status-v10_10_33.js?v=10.10.33-overduestatus1','./modules/cardio-finish-alert-v10_10_11.js?v=10.10.11-cardioalert1','./modules/release-coherence-v10_10_10.js?v=10.10.12-release6','./modules/custom-food-calorie-bridge-v10_10_12.js?v=10.10.13-customfood5','./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2','./modules/diet-copy-v10_10_28.js?v=10.10.28-dietcopy1','./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments5','./modules/trainer-sent-reports-v10_10_33.js?v=10.10.33-sentreports1','./modules/trainer-feedback-archive-v10_10_37.js?v=10.10.37-feedbackarchive1','./modules/trainer-billing-student-projection-v10_10_22.js?v=10.10.22-billingprojection2'
   ];
   const MODULE_ROOT='./modules/';
   const trainerOnlyModules=new Set([
     MODULE_ROOT+'trainer-workspace-v10_10_9.js?v=10.10.9-workspace3',
-    MODULE_ROOT+'trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1',
+    MODULE_ROOT+'trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2',
     MODULE_ROOT+'diet-copy-v10_10_28.js?v=10.10.28-dietcopy1',
     MODULE_ROOT+'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments5',
     MODULE_ROOT+'trainer-sent-reports-v10_10_33.js?v=10.10.33-sentreports1',
@@ -269,27 +269,45 @@ if('caches' in window){
     if(hadFailures&&typeof showToast==='function')showToast('✓ Recursos do aplicativo sincronizados');
   };
   const loadScriptOnce=(src,timeoutMs=3200)=>{if(loadedModules.has(src))return Promise.resolve(true);return new Promise(resolve=>{const script=document.createElement('script');let settled=false;const finish=(ok,reason='')=>{if(settled)return;settled=true;clearTimeout(timer);script.onload=null;script.onerror=null;if(ok){loadedModules.add(src);failedModules.delete(src);script.dataset.tbModuleReady='1';}else{failedModules.add(src);hadFailures=true;if(script.isConnected)script.remove();}if(reason)console.warn('[Team Bulls] Extensão temporariamente indisponível:',src,reason);emitRuntimeState('team-bulls-runtime-state');resolve(ok);};script.src=src;script.async=false;script.onload=()=>finish(true);script.onerror=()=>finish(false,'erro de carregamento');const timer=setTimeout(()=>finish(false,'tempo limite'),Math.max(1200,Number(timeoutMs)||3200));document.head.appendChild(script);});};
-  const loadScript=async(src,timeoutMs=3200)=>{
+  const moduleLoads=new Map();let healAttempts=0;
+  const visible=()=>document.visibilityState!=='hidden';
+  const loadScript=async(src,timeoutMs=3200,repair=false)=>{
     if(!roleAllowsModule(src))return true;
-    if(deferredPhase){const index=deferredEligible.indexOf(src);if(index>=0)preloadAhead(deferredEligible,index+1);}
     if(loadedModules.has(src))return true;
-    let ok=await loadScriptOnce(src,timeoutMs);
-    if(!ok&&navigator.onLine){await wait(250);ok=await loadScriptOnce(src,Math.max(6500,Number(timeoutMs)||3200));}
-    if(!ok)console.warn('[Team Bulls] Módulo colocado na fila de autorreparo:',src);
-    if(deferredPhase&&deferredEligible.includes(src)){
-      deferredBatchCount++;
-      if(deferredBatchCount%DEFERRED_YIELD_EVERY===0)await yieldUi();
-    }
-    return ok;
+    if(moduleLoads.has(src))return moduleLoads.get(src);
+    if(failedModules.has(src)&&!repair)return false;
+    const task=(async()=>{
+      if(deferredPhase){const index=deferredEligible.indexOf(src);if(index>=0)preloadAhead(deferredEligible,index+1);}
+      let ok=await loadScriptOnce(src,timeoutMs);
+      if(!ok&&navigator.onLine&&visible()){await wait(250);if(navigator.onLine&&visible())ok=await loadScriptOnce(src,Math.max(6500,Number(timeoutMs)||3200));}
+      if(!ok)console.warn('[Team Bulls] Módulo colocado na fila de autorreparo:',src);
+      if(deferredPhase&&deferredEligible.includes(src)){deferredBatchCount++;if(deferredBatchCount%DEFERRED_YIELD_EVERY===0)await yieldUi();}
+      return ok;
+    })();
+    moduleLoads.set(src,task);try{return await task;}finally{if(moduleLoads.get(src)===task)moduleLoads.delete(src);}
   };
-  const scheduleHeal=(delay=1800)=>{clearTimeout(healTimer);if(!activeFailures().length)return;healTimer=setTimeout(()=>healFailedModules(),Math.max(400,delay));};
-  const healFailedModules=async()=>{if(healing||navigator.onLine===false)return false;const pending=activeFailures();if(!pending.length){markReady();return true;}healing=true;preloadModules(pending.slice(0,PRELOAD_WINDOW));try{for(let index=0;index<pending.length;index++){await loadScript(pending[index],9000);if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();}}finally{healing=false;}if(activeFailures().length)scheduleHeal(5000);else markReady();return activeFailures().length===0;};
+  const scheduleHeal=(delay=1800)=>{
+    if(healTimer!==null||healAttempts>=3||!activeFailures().length||!visible()||navigator.onLine===false)return;
+    healTimer=setTimeout(()=>{healTimer=null;healFailedModules(false);},Math.max(400,delay)*2**healAttempts);
+  };
+  const healFailedModules=async(manual=true)=>{
+    if(healing||!visible()||navigator.onLine===false)return false;
+    const pending=activeFailures().filter(src=>sessionUiReady()||criticalModules.includes(src));
+    if(!pending.length){markReady();return true;}
+    if(manual){clearTimeout(healTimer);healTimer=null;healAttempts=0;}else if(healAttempts>=3)return false;
+    if(!manual)healAttempts++;healing=true;preloadModules(pending.slice(0,PRELOAD_WINDOW));
+    try{for(let index=0;index<pending.length;index++){if(!visible()||navigator.onLine===false)break;await loadScript(pending[index],9000,true);if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();}}
+    finally{healing=false;}
+    if(activeFailures().length)scheduleHeal(5000);else{healAttempts=0;markReady();}
+    return activeFailures().length===0;
+  };
   const loadStudentPriority=()=>{
     if(studentPriorityPromise)return studentPriorityPromise;
-    if(!studentHomeActive())return Promise.resolve(false);
+    if(!studentHomeActive()||!visible())return Promise.resolve(false);
     studentPriorityStarted=true;document.documentElement.dataset.teamBullsStudentRuntime='loading';preloadModules(studentPriorityModules.slice(0,PRELOAD_WINDOW));
     studentPriorityPromise=(async()=>{
       for(let index=0;index<studentPriorityModules.length;index++){
+        if(!visible()||!sessionUiReady()||runtimeRole()==='trainer')break;
         await loadScript(studentPriorityModules[index],6500);
         if((index+1)%STUDENT_YIELD_EVERY===0)await yieldUi();
       }
@@ -298,27 +316,27 @@ if('caches' in window){
       emitRuntimeState('team-bulls-student-runtime-ready');
       if(activeFailures().length)scheduleHeal(900);
       return !!window.TeamBullsStudentHomeLayout;
-    })();
+    })().finally(()=>{if(!studentPriorityModules.every(src=>loadedModules.has(src)))studentPriorityPromise=null;});
     return studentPriorityPromise;
   };
   const loadDeferred=async()=>{
-    if(deferredStarted||!sessionUiReady()||runtimeComplete())return;
+    if(deferredStarted||!sessionUiReady()||!visible()||runtimeComplete())return;
     deferredStarted=true;document.documentElement.dataset.teamBullsRuntime='loading';
     try{
       if(studentHomeActive()||studentPriorityPromise)await (studentPriorityPromise||loadStudentPriority());
-      if(!sessionUiReady())return;
+      if(!sessionUiReady()||!visible())return;
       deferredEligible=modules.filter(roleAllowsModule);deferredBatchCount=0;
       preloadAhead(deferredEligible,0);
       deferredPhase=true;
-      try{for(const src of modules)await loadScript(src);}finally{deferredPhase=false;deferredEligible=[];}
+      try{for(const src of modules){if(!sessionUiReady()||!visible())break;await loadScript(src);}}finally{deferredPhase=false;deferredEligible=[];}
       await yieldUi();
     }finally{deferredStarted=false;}
-    if(activeFailures().length){if(typeof showToast==='function')showToast('Conexão instável: alguns recursos continuam sendo finalizados automaticamente.',true);scheduleHeal(1200);}else markReady();
+    if(activeFailures().length){if(typeof showToast==='function')showToast('Conexão instável: alguns recursos continuam sendo finalizados automaticamente.',true);scheduleHeal(1200);}else{markReady();if(!runtimeComplete()&&visible()&&sessionUiReady())scheduleDeferred();}
   };
   const scheduleDeferred=()=>{
-    if(deferredScheduled||deferredStarted||!sessionUiReady()||runtimeComplete())return;
+    if(deferredScheduled||deferredStarted||!sessionUiReady()||!visible()||runtimeComplete())return;
     deferredScheduled=true;
-    const queue=()=>{deferredScheduled=false;if(!sessionUiReady()||runtimeComplete())return;loadDeferred();};
+    const queue=()=>{deferredScheduled=false;if(!sessionUiReady()||!visible()||runtimeComplete())return;loadDeferred();};
     requestAnimationFrame(()=>setTimeout(queue,240));
   };
   const contextChanged=()=>{
@@ -334,7 +352,7 @@ if('caches' in window){
   };
   const load=async()=>{if(requested)return;requested=true;for(const src of criticalModules)await loadScript(src,6500);installSessionGate();contextChanged();};
   preloadModules(criticalModules);
-  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.61-startup12',context:'role-aware-low-contention'});
-  window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.61-startup12',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
-  window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleHeal(700);});window.addEventListener('pageshow',()=>scheduleHeal(900));if(window.TeamBulls107)load();else window.addEventListener('team-bulls-v107-ready',load,{once:true});
+  window.TeamBullsRuntimePerformance=Object.freeze({version:'10.10.61-startup13',context:'role-aware-low-contention'});
+  window.TeamBullsRuntimeLoader=Object.freeze({version:'10.10.61-startup13',ready,state:runtimeDetail,retry:healFailedModules,student:loadStudentPriority});
+  window.addEventListener('online',()=>{healAttempts=0;scheduleHeal(500);contextChanged();});document.addEventListener('visibilitychange',()=>{if(visible()){healAttempts=0;scheduleHeal(700);}else{clearTimeout(healTimer);healTimer=null;}});window.addEventListener('pageshow',()=>{healAttempts=0;scheduleHeal(900);});if(window.TeamBulls107)load();else window.addEventListener('team-bulls-v107-ready',load,{once:true});
 })();

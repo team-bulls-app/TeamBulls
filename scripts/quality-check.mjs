@@ -69,7 +69,7 @@ assert(config.indexOf('desktop-performance-v10_10_9.js')<config.indexOf('ger-bul
 assert(config.indexOf('ger-bulk-v10_10_9.js')<config.indexOf('prescription-actions-layout-v10_10_9.js'),'Layout de ações precisa executar depois do GER.');
 assert(config.indexOf('prescription-actions-layout-v10_10_9.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Estabilidade de modais precisa executar por último nas camadas de UI.');
 has(config,"link.rel='preload';link.as='script';link.href=src",'Hotfixes não recebem preload de rede.');
-has(config,'for(const src of modules)await loadScript(src)','Execução determinística dos hotfixes foi removida.');
+has(config,'for(const src of modules){if(!sessionUiReady()||!visible())break;await loadScript(src);}','Execução determinística dos hotfixes foi removida.');
 lacks(config,"'./modules/photo-guide-v10_10_9.js?v=10.10.9',",'Guia de fotos voltou ao startup em vez de sob demanda.');
 
 const update=read('modules/app-update-v10_10_9.js');

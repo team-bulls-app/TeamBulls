@@ -6699,17 +6699,25 @@ async function loadDietDocument(targetUid=null){
     return{plans:[]};
   }
 }
+async function persistNormalizedDietDocument(document,contextValue){
+  const context={...contextValue};
+  if(context.local){
+    const previous=LOCAL_DB.mealPlan;LOCAL_DB.mealPlan=JSON.parse(JSON.stringify(document));
+    if(!localSave()){LOCAL_DB.mealPlan=previous;throw new Error('Falha ao salvar a dieta no aparelho.');}
+    return document;
+  }
+  if(!context.trainer)throw new Error('Somente o treinador pode editar a dieta.');
+  const targetUid=context.targetUid;
+  if(!targetUid)throw new Error('Aluno não identificado.');
+  await cloudWrite(db.collection('mealPlans').doc(targetUid).set({plans:document.plans,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),'salvar dieta e suplementos');
+  return document;
+}
+async function persistDietDocumentDraft(source,context){
+  return persistNormalizedDietDocument(normalizeDietDocument(source),context);
+}
 async function persistDietDocument(){
   DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);
-  if(DIET_CONTEXT.local){
-    LOCAL_DB.mealPlan=JSON.parse(JSON.stringify(DIET_DOCUMENT));
-    if(!localSave())throw new Error('Falha ao salvar a dieta no aparelho.');
-    return;
-  }
-  if(!DIET_CONTEXT.trainer)throw new Error('Somente o treinador pode editar a dieta.');
-  const targetUid=DIET_CONTEXT.targetUid;
-  if(!targetUid)throw new Error('Aluno não identificado.');
-  await cloudWrite(db.collection('mealPlans').doc(targetUid).set({plans:DIET_DOCUMENT.plans,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),'salvar dieta e suplementos');
+  return persistNormalizedDietDocument(DIET_DOCUMENT,DIET_CONTEXT);
 }
 function dietStatusBadge(plan){return`<span class="protocol-state-badge ${plan.isActive?'active':'inactive'}">${plan.isActive?'● DIETA ATIVA':'○ DESATIVADA'}</span>`;}
 function renderDietList(listId,emptyId,trainerMode){

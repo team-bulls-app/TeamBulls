@@ -42,16 +42,16 @@ if(yieldBlock){
   assert(!yieldBlock[1].includes('requestIdleCallback'),'Yield por módulo não pode esperar idle callback indefinidamente.');
 }
 
-assert(config.includes('for(const src of modules)await loadScript(src);'),'Execução dos módulos deve continuar estritamente sequencial.');
+assert(config.includes('for(const src of modules){if(!sessionUiReady()||!visible())break;await loadScript(src);}'),'Execução dos módulos deve continuar estritamente sequencial.');
 assert(config.includes('preloadAhead(deferredEligible,index+1);'),'Loader deve adiantar poucos downloads enquanto preserva a execução sequencial.');
 assert(config.includes('deferredBatchCount%DEFERRED_YIELD_EVERY===0'),'Módulos adiados devem usar a constante de lotes curtos para devolver tempo de pintura.');
 assert(config.includes('preloadModules(studentPriorityModules.slice(0,PRELOAD_WINDOW));'),'Runtime do aluno não pode pré-carregar todos os módulos prioritários de uma vez.');
 assert(!config.includes('preloadModules(studentPriorityModules);'),'Pré-carga irrestrita de todos os módulos prioritários não pode voltar.');
-assert(!config.includes("for(const src of modules)await loadScript(src).then(()=>yieldUi())"),'Loader antigo serial + idle após cada módulo não pode voltar.');
+assert(!config.includes("for(const src of modules){if(!sessionUiReady()||!visible())break;await loadScript(src);}.then(()=>yieldUi())"),'Loader antigo serial + idle após cada módulo não pode voltar.');
 assert(config.includes('requestAnimationFrame(()=>setTimeout(queue,240));'),'Carga pós-sessão deve respeitar a primeira pintura e evitar contenção imediata com a Home.');
 
 assert(config.includes("MODULE_ROOT+'diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2'"),'Exclusão de módulo pesado no runtime do aluno deve manter URL canônica.');
-assert(config.includes("version:'10.10.61-startup12'"),'Revisão do runtime de baixa contenção deve estar identificada.');
+assert(config.includes("version:'10.10.61-startup13'"),'Revisão do runtime de baixa contenção deve estar identificada.');
 
 // Entrada/login: Firebase deve começar a aquecer antes do toque e os wrappers
 // não podem declarar o servidor indisponível enquanto os SDKs ainda estão carregando.
