@@ -10,12 +10,13 @@
   window.__TEAM_BULLS_STUDENT_HOME_LAYOUT_10_10_17__=true;
   window.__TEAM_BULLS_STUDENT_HOME_LAYOUT_10_10_15__=true;
 
-  const VERSION='10.10.21-home4';
+  const VERSION='10.10.21-home5';
   const REFRESH_TTL=30000;
   const MAX_FEEDBACKS=5;
   const MAX_WEIGHT_POINTS=10;
   let refreshSequence=0;
   let lastRefreshAt=0;
+  let lastRefreshFailed=false,refreshTask=null,refreshTaskUid='';
   let lastRefreshUid='';
   let lastRenderedUid='';
   let hasRenderedContext=false;
@@ -226,7 +227,7 @@
 
   function ensureInsights(){
     const home=document.getElementById('screen-home'),stats=document.getElementById('home-stats');if(!home||!stats)return null;
-    home.classList.add('tb-home-v17-screen');
+    if(!home.classList.contains('tb-home-v17-screen'))home.classList.add('tb-home-v17-screen');
     ensureNextDateSlots();
     let host=document.getElementById('tb-v17-intelligence');
     if(host)return host;
@@ -254,8 +255,8 @@
         const schedule=await loadProtocolReviewSchedule(uid,true),state=v109ProtocolState(schedule);if(state?.nextDueDate)date=fmtDate(state.nextDueDate);pending=!!state?.pending;
       }
     }catch(error){console.warn('[Team Bulls] Data de protocolo indisponível',error);}
-    if(sequence!==refreshSequence)return;
-    slots.forEach((slot,index)=>{if(!slot)return;slot.dataset.state=pending?'pending':'scheduled';const label=slot.querySelector('span'),strong=slot.querySelector('strong');if(label)label.textContent=pending?'ATUALIZAÇÃO PENDENTE DESDE':index===0?'PRÓXIMA ATUALIZAÇÃO':'PRÓXIMO PROTOCOLO';if(strong)strong.textContent=date;});
+    if(sequence!==refreshSequence||studentUid()!==uid||!isStudentContext())return;
+    slots.forEach((slot,index)=>{if(!slot)return;const state=pending?'pending':'scheduled',text=pending?'ATUALIZAÇÃO PENDENTE DESDE':index===0?'PRÓXIMA ATUALIZAÇÃO':'PRÓXIMO PROTOCOLO';if(slot.dataset.state!==state)slot.dataset.state=state;const label=slot.querySelector('span'),strong=slot.querySelector('strong');if(label&&label.textContent!==text)label.textContent=text;if(strong&&strong.textContent!==date)strong.textContent=date;});
   }
 
   function orderedQueryNeedsFallback(error){
@@ -263,13 +264,17 @@
     return code.includes('failed-precondition')||code.includes('unimplemented')||code.includes('invalid-argument')||message.includes('index');
   }
 
+  function readHome(reference,label){
+    if(typeof cloudGet==='function')return cloudGet(reference,label);
+    let timer;return Promise.race([reference.get(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('A consulta da tela inicial demorou.'),{code:'deadline-exceeded'})),8000);})]).finally(()=>clearTimeout(timer));
+  }
   async function fetchFeedbacks(uid){
     if(!uid||!cloudReady())return null;
     const base=db.collection('feedback').where('studentId','==',uid);
     try{
       if(feedbackOrderedQueryState!=='unsupported'){
         try{
-          const snap=await base.orderBy('createdAt','desc').limit(MAX_FEEDBACKS).get();
+          const snap=await readHome(base.orderBy('createdAt','desc').limit(MAX_FEEDBACKS),'feedbacks da tela inicial');
           feedbackOrderedQueryState='supported';
           return snap.docs.map(doc=>({...doc.data(),id:doc.id}));
         }catch(error){
@@ -278,7 +283,7 @@
           console.info('[Team Bulls] Índice de feedback indisponível; usando leitura compatível.');
         }
       }
-      const snap=await base.get();
+      const snap=await readHome(base,'feedbacks da tela inicial');
       return snap.docs.map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>createdMillis(b.createdAt)-createdMillis(a.createdAt)||String(b.id).localeCompare(String(a.id))).slice(0,MAX_FEEDBACKS);
     }catch(error){console.warn('[Team Bulls] Feedbacks da home indisponíveis',error);return null;}
   }
@@ -338,7 +343,7 @@
     try{
       if(weightOrderedQueryState!=='unsupported'){
         try{
-          const snap=await base.orderBy('submittedDate','desc').limit(MAX_WEIGHT_POINTS).get();
+          const snap=await readHome(base.orderBy('submittedDate','desc').limit(MAX_WEIGHT_POINTS),'peso da tela inicial');
           weightOrderedQueryState='supported';
           return normalize(snap);
         }catch(error){
@@ -347,7 +352,7 @@
           console.info('[Team Bulls] Índice do histórico de peso indisponível; usando leitura compatível.');
         }
       }
-      return normalize(await base.get());
+      return normalize(await readHome(base,'peso da tela inicial'));
     }catch(error){console.warn('[Team Bulls] Histórico de peso indisponível',error);return null;}
   }
 
@@ -372,26 +377,31 @@
     ensureInsights();
     const uid=studentUid();
     if(!hasRenderedContext||uid!==lastRenderedUid){
-      hasRenderedContext=true;lastRenderedUid=uid;lastRefreshUid='';lastRefreshAt=0;
+      hasRenderedContext=true;lastRenderedUid=uid;lastRefreshUid='';lastRefreshAt=0;lastRefreshFailed=false;
       const resetSequence=++refreshSequence;renderFeedbacks([],resetSequence);renderWeight([],resetSequence);
     }
     if(!uid||!cloudReady())return true;
-    const now=Date.now();
-    if(!force&&uid===lastRefreshUid&&now-lastRefreshAt<REFRESH_TTL)return true;
+    if(document.hidden||navigator.onLine===false)return false;
+    if(refreshTask&&refreshTaskUid===uid)return refreshTask;
+    const now=Date.now(),ttl=lastRefreshFailed?10000:REFRESH_TTL;
+    if(!force&&uid===lastRefreshUid&&now-lastRefreshAt<ttl)return true;
     lastRefreshUid=uid;lastRefreshAt=now;const sequence=++refreshSequence;
-    const settled=await Promise.allSettled([
+    const current=()=>sequence===refreshSequence&&studentUid()===uid&&isStudentContext();
+    const task=Promise.allSettled([
       refreshProtocolDate(uid,sequence),
       fetchFeedbacks(uid).then(items=>{
+        if(!current())return false;
         if(items===null){renderLoadFailure('tb-v17-feedbacks','Não foi possível carregar os feedbacks agora. O conteúdo salvo continua disponível quando houver conexão.',sequence);return false;}
         renderFeedbacks(items,sequence);return true;
       }),
       fetchWeights(uid).then(items=>{
+        if(!current())return false;
         if(items===null){renderLoadFailure('tb-v17-weight','Não foi possível carregar o histórico de peso agora.',sequence);return false;}
         renderWeight(items,sequence);return true;
       })
-    ]);
-    if(settled.some(result=>result.status==='rejected'||result.value===false))lastRefreshAt=0;
-    return true;
+    ]).then(settled=>{if(current())lastRefreshFailed=settled.some(result=>result.status==='rejected'||result.value===false);return current();});
+    refreshTaskUid=uid;refreshTask=task;
+    try{return await task;}finally{if(refreshTask===task){refreshTask=null;refreshTaskUid='';}}
   }
 
   function sync(){
@@ -400,7 +410,7 @@
     document.documentElement.classList.toggle('tb-student-home-v17',active);
     const shell=document.getElementById('tb-v17-hotbar-shell');if(shell)shell.hidden=!active;
     if(!active)return;
-    const home=document.getElementById('screen-home');if(home)home.classList.add('tb-home-v17-screen');
+    const home=document.getElementById('screen-home');if(home&&!home.classList.contains('tb-home-v17-screen'))home.classList.add('tb-home-v17-screen');
     const key=hotbarKeyForScreen(activeScreen());if(key)setHotbarActive(key);else document.querySelectorAll('.tb-v17-hotbar button').forEach(button=>button.classList.remove('is-active'));
     if(activeScreen()==='screen-home')refreshHome(false);
   }
@@ -423,9 +433,9 @@
   window.addEventListener('team-bulls-v107-ready',scheduleSync);
   window.addEventListener('team-bulls-runtime-ready',scheduleSync);
   window.addEventListener('team-bulls-student-runtime-ready',scheduleSync);
-  window.addEventListener('online',()=>{lastRefreshAt=0;scheduleSync();});
-  window.addEventListener('pageshow',()=>{lastRefreshAt=0;scheduleSync();},{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){lastRefreshAt=0;scheduleSync();}});
+  window.addEventListener('online',()=>{lastRefreshAt=0;lastRefreshFailed=false;scheduleSync();});
+  window.addEventListener('pageshow',scheduleSync,{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')scheduleSync();});
 
   window.TeamBullsStudentHomeLayout=Object.freeze({version:VERSION,refresh:()=>refreshHome(true),syncHotbar:sync,isStudentContext,openSupplements:openStudentSupplements,patchSupplyOptionsHeader});
 })();

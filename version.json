@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026110902,
-  "revision": "student-administration-order-1",
-  "publishedAt": "2026-11-09T00:00:00Z",
+  "build": 2026111001,
+  "revision": "runtime-action-recovery-1",
+  "publishedAt": "2026-11-10T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Ordenação de exercícios, técnicas e alunos; nome cadastrado separado do apelido; arquivamento, restauração e exclusão definitiva protegida por serviço autenticado."
+  "message": "Redução de consultas repetidas, retomada de notificações, carregamento com tentativas limitadas e proteção ao salvar refeições."
 }

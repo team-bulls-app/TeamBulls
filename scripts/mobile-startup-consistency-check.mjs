@@ -37,8 +37,8 @@ lacks(boot,'loadEssentialStudentRuntime','Boot voltou a iniciar o runtime visual
 lacks(boot,'},1600);','Fallback antigo de 1,6 s reapareceu.');
 has(config,'startBootWatchdog.__tbMobileSessionRestore','Watchdog móvel não está reforçado.');
 has(config,'const loadedModules=new Set(),failedModules=new Set()','Loader não rastreia módulos temporariamente falhos.');
-has(config,'const healFailedModules=async()=>','Loader não possui autorreparo.');
-has(config,"window.addEventListener('online',()=>{scheduleHeal(500);contextChanged();})",'Ao recuperar conexão, o loader deve retentar módulos falhos e reavaliar o contexto atual.');
+has(config,'const healFailedModules=async(manual=true)=>','Loader não possui autorreparo.');
+has(config,"window.addEventListener('online',()=>{healAttempts=0;scheduleHeal(500);contextChanged();})",'Ao recuperar conexão, o loader deve retentar módulos falhos e reavaliar o contexto atual.');
 has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments5','Loader não entrega a Central/Pagamentos atual.');
 has(config,'photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','Loader não entrega a correção móvel de fotos.');
 has(config,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Loader não entrega o fallback HEIC/HEIF atual.');
@@ -61,7 +61,7 @@ for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"worker-src 'self' blob:",`${name} CSP bloqueia workers locais necessários ao app.`);
   has(text,"type:'TEAM_BULLS_SW_ACTIVATED',version:APP_VERSION,build:BUILD_REVISION",`${name} não anuncia o build ativado.`);
   has(text,"if(relativePath==='/version.json')",`${name} deixou de tratar version.json como mutável.`);
-  has(text,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1",`${name} não prepara o workspace do treinador para uso offline.`);
+  has(text,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2",`${name} não prepara o workspace do treinador para uso offline.`);
 }
 has(photo,"const VERSION='10.10.9-photoquality3'",'Revisão móvel de fotos não está ativa.');
 has(photo,"createImageBitmap(file,{imageOrientation:'from-image'})",'Decoder móvel perdeu a primeira tentativa orientada.');

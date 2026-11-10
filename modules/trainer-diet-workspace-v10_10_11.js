@@ -3,8 +3,9 @@
   if(window.__TEAM_BULLS_TRAINER_DIET_WORKSPACE_101011__)return;
   window.__TEAM_BULLS_TRAINER_DIET_WORKSPACE_101011__=true;
 
-  const VERSION='10.10.11-dietworkspace1';
+  const VERSION='10.10.11-dietworkspace2';
   let formSnapshot='';
+  let editorRevision=0;
   let navigating=false;
   let summaryFrame=0;
   let customObserver=null;
@@ -114,9 +115,14 @@
     if(!EDIT_MEAL_ID&&!hasDraft(state)&&!allowEmpty){toast('Adicione ao menos um alimento, horário ou observação antes de salvar.',true);return false;}
     if(EDIT_MEAL_ID&&!isDirty())return true;
     if(!EDIT_MEAL_ID&&!hasDraft(state))return true;
-    if(typeof beginAction==='function'&&!beginAction('workspace-save-meal','modal-meal'))return false;
-    const before=JSON.stringify(MEAL_PLAN_CACHE.meals),previousId=EDIT_MEAL_ID;
+    if(typeof beginAction==='function'&&!beginAction('workspace-save-meal','modal-meal')){toast('Uma refeição ainda está sendo salva. Aguarde a confirmação.',true);return false;}
+    const cache=MEAL_PLAN_CACHE,originalMeals=cache.meals,workingMeals=originalMeals.map(meal=>({...meal})),previousId=EDIT_MEAL_ID,context=MEAL_CTX,actor=CURRENT_USER?.uid,revision=editorRevision;
+    let plan=null,variant=null;try{plan=typeof currentDiet==='function'?currentDiet():null;variant=typeof currentDietVariant==='function'?currentDietVariant():null;}catch{}
+    const dietContext=typeof DIET_CONTEXT!=='undefined'?{...DIET_CONTEXT}:null;
+    let expectedId=previousId,expectedMeals=workingMeals,committed=false;
+    const current=()=>editable()&&CURRENT_USER?.uid===actor&&MEAL_CTX===context&&MEAL_PLAN_CACHE===cache&&cache.meals===expectedMeals&&editorRevision===revision&&EDIT_MEAL_ID===expectedId;
     try{
+      cache.meals=workingMeals;
       const mealsBefore=sortedMeals();
       const currentNumber=previousId?Math.max(1,mealsBefore.findIndex(x=>x.id===previousId)+1):MEAL_PLAN_CACHE.meals.length+1;
       const name='Refeição '+currentNumber;
@@ -125,11 +131,18 @@
         meal.time=state.time;meal.name=name;meal.items=state.items;meal.notes=state.notes;
       }else{
         const id=typeof uid==='function'?uid():'meal-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
-        MEAL_PLAN_CACHE.meals.push({id,time:state.time,name,items:state.items,notes:state.notes,doneDates:[]});EDIT_MEAL_ID=id;
+        cache.meals.push({id,time:state.time,name,items:state.items,notes:state.notes,doneDates:[]});EDIT_MEAL_ID=id;expectedId=id;
       }
-      await persistMealPlan();
+      if(typeof persistDietDocumentDraft!=='function')throw new Error('Atualize o aplicativo antes de salvar a refeição.');
+      const draft=normalizeDietDocument(DIET_DOCUMENT),nextPlan=draft.plans.find(item=>item.id===plan?.id),nextVariant=nextPlan?.variants?.find(item=>item.id===variant?.id);
+      if(!nextPlan||!nextVariant||!dietContext)throw new Error('Abra a dieta e a divisão antes de salvar a refeição.');
+      nextVariant.meals=workingMeals;nextPlan.meals=nextPlan.variants[0]?.meals||workingMeals;
+      const saved=await persistDietDocumentDraft(draft,dietContext);committed=true;
+      if(!current())return false;
+      DIET_DOCUMENT=saved;expectedMeals=saved.plans.find(item=>item.id===plan.id)?.variants?.find(item=>item.id===variant.id)?.meals||workingMeals;cache.meals=expectedMeals;
+      formSnapshot=stateKey(state);
       renderMealsList();
-      syncSnapshot();refreshSummary();
+      updateNavState();refreshSummary();
       const pos=currentPosition(),mealNumber=Math.max(1,pos.index+1);
       const title=document.getElementById('modal-meal-title');if(title)title.textContent='Editar refeição '+mealNumber;
       const hidden=document.getElementById('input-meal-name');if(hidden)hidden.value='Refeição '+mealNumber;
@@ -138,7 +151,9 @@
       if(notify)toast('✓ Refeição salva sem fechar o planejamento');
       return true;
     }catch(error){
-      MEAL_PLAN_CACHE.meals=JSON.parse(before);EDIT_MEAL_ID=previousId;
+      if(committed){if(current())toast('Refeição salva. Reabra o planejamento para atualizar a tela.',true);return true;}
+      const stillCurrent=current();if(cache.meals===workingMeals)cache.meals=originalMeals;
+      if(!stillCurrent)return false;EDIT_MEAL_ID=previousId;
       alert('Erro ao salvar plano alimentar: '+(typeof cloudWriteError==='function'?cloudWriteError(error,'salvar o plano alimentar'):error.message));
       return false;
     }finally{if(typeof endAction==='function')endAction('workspace-save-meal','modal-meal');}
@@ -243,7 +258,7 @@
     if(tool&&foods&&tool.parentElement!==foods)foods.appendChild(tool);
     const body=document.getElementById('tb-meal-portion-body');if(body)body.hidden=false;
     if(tool){const toggle=tool.querySelector('.tb-portion-toggle');if(toggle)toggle.textContent='TABELA ABERTA';}
-    if(body&&body.dataset.tbWorkspaceObserved!=='1'){
+    if(body&&(body.dataset.tbWorkspaceObserved!=='1'||!customObserver)){
       body.dataset.tbWorkspaceObserved='1';customObserver?.disconnect?.();customObserver=new MutationObserver(()=>refreshSummary());customObserver.observe(body,{childList:true,subtree:true,characterData:true});
     }
   }
@@ -259,13 +274,14 @@
   }
   function activate(){
     if(!editable())return;
-    ensureStructure();syncSidebar();relabelLegacySave();bindSwipe();syncSnapshot();refreshSummary();
+    ensureStructure();syncSidebar();relabelLegacySave();bindSwipe();refreshSummary();
     [50,180,600,1400].forEach(delay=>setTimeout(()=>{if(!editable())return;syncSidebar();relabelLegacySave();refreshSummary();},delay));
   }
 
   function installHooks(){
-    if(typeof openAddMealModal==='function'&&!openAddMealModal.__tbTrainerDietWorkspace){const base=openAddMealModal;const wrapped=function(){const result=base.apply(this,arguments);requestAnimationFrame(activate);return result;};wrapped.__tbTrainerDietWorkspace=true;openAddMealModal=wrapped;}
-    if(typeof openEditMealModal==='function'&&!openEditMealModal.__tbTrainerDietWorkspace){const base=openEditMealModal;const wrapped=function(){const result=base.apply(this,arguments);requestAnimationFrame(activate);return result;};wrapped.__tbTrainerDietWorkspace=true;openEditMealModal=wrapped;}
+    if(typeof closeModal==='function'&&!closeModal.__tbDietWorkspaceContext){const base=closeModal;const wrapped=function(id){if(id==='modal-meal'){editorRevision++;customObserver?.disconnect?.();customObserver=null;}return base.apply(this,arguments);};wrapped.__tbDietWorkspaceContext=true;closeModal=wrapped;}
+    if(typeof openAddMealModal==='function'&&!openAddMealModal.__tbTrainerDietWorkspace){const base=openAddMealModal;const wrapped=function(){const revision=++editorRevision,result=base.apply(this,arguments);syncSnapshot();requestAnimationFrame(()=>{if(editorRevision===revision)activate();});return result;};wrapped.__tbTrainerDietWorkspace=true;openAddMealModal=wrapped;}
+    if(typeof openEditMealModal==='function'&&!openEditMealModal.__tbTrainerDietWorkspace){const base=openEditMealModal;const wrapped=function(){const revision=++editorRevision,result=base.apply(this,arguments);syncSnapshot();requestAnimationFrame(()=>{if(editorRevision===revision)activate();});return result;};wrapped.__tbTrainerDietWorkspace=true;openEditMealModal=wrapped;}
     if(typeof confirmLogout==='function'&&!confirmLogout.__tbTrainerDietWorkspace){const base=confirmLogout;const wrapped=function(){customObserver?.disconnect?.();customObserver=null;document.getElementById('modal-meal')?.classList.remove('tb-trainer-diet-workspace');return base.apply(this,arguments);};wrapped.__tbTrainerDietWorkspace=true;confirmLogout=wrapped;}
   }
 

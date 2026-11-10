@@ -2,7 +2,7 @@
   'use strict';
   if(window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__)return;
   window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__=true;
-  const VERSION='10.10.32-studentrealtime4';
+  const VERSION='10.10.32-studentrealtime5';
   const MAX_DUE_TIMER_MS=2000000000;
   let activeUid='';
   let unsubs=[];
@@ -24,6 +24,37 @@
   const formatDate=value=>{try{return typeof fmt==='function'?fmt(value):String(value||'');}catch(error){return String(value||'');}};
   const validIso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
   const localMidnightMs=value=>{if(!validIso(value))return 0;const [y,m,d]=String(value).split('-').map(Number);const ms=new Date(y,m-1,d,0,0,0,0).getTime();return Number.isFinite(ms)?ms:0;};
+
+  const listeners=[],RETRY_DELAYS=[5000,10000,20000];
+  const fallbackAllowed=error=>/failed-precondition|unimplemented|invalid-argument/.test(String(error?.code||''));
+  const transientError=error=>/unavailable|deadline-exceeded|aborted|resource-exhausted|internal|network-request-failed/.test(String(error?.code||''));
+  function listen(key,uid,reference,next,fallback){
+    const slot={key,uid,unsubscribe:null,timer:0,attempts:0,serial:0,failed:true,terminal:false,handled:false,stopped:false};listeners.push(slot);
+    const current=serial=>!slot.stopped&&listeners.includes(slot)&&slot.serial===serial&&activeUid===uid&&isCurrent(uid);
+    const cancelTimer=()=>{clearTimeout(slot.timer);slot.timer=0;};
+    function connect(){
+      if(slot.stopped||slot.handled||slot.terminal||slot.unsubscribe||slot.timer||!isCurrent(uid)||document.hidden||navigator.onLine===false)return;
+      const serial=++slot.serial;slot.failed=false;let failedSynchronously=false;
+      const failed=error=>{
+        if(!current(serial)||slot.failed)return;failedSynchronously=true;slot.failed=true;
+        const release=slot.unsubscribe;slot.unsubscribe=null;try{release?.();}catch{}
+        console.warn('[Team Bulls] listener '+key+' indisponível',error?.code||error?.message||error);
+        if(fallback&&fallbackAllowed(error)){slot.handled=true;fallback(error);return;}
+        slot.terminal=!transientError(error);
+        if(slot.terminal||slot.attempts>=RETRY_DELAYS.length||document.hidden||navigator.onLine===false)return;
+        const delay=RETRY_DELAYS[slot.attempts++];slot.timer=setTimeout(()=>{slot.timer=0;connect();},delay);
+      };
+      try{
+        const release=reference.onSnapshot(snapshot=>{if(!current(serial)||slot.failed)return;if(snapshot.metadata?.fromCache!==true)slot.attempts=0;next(snapshot);},failed);
+        if(failedSynchronously||!current(serial)){try{release?.();}catch{}}else slot.unsubscribe=release;
+      }catch(error){failed(error);}
+    }
+    slot.resume=(reset=false)=>{if(!slot.failed||slot.handled)return;if(reset&&!slot.terminal){cancelTimer();slot.attempts=0;}if(slot.attempts<RETRY_DELAYS.length)connect();};
+    slot.pause=cancelTimer;
+    const stop=()=>{slot.stopped=true;slot.serial++;cancelTimer();const release=slot.unsubscribe;slot.unsubscribe=null;try{release?.();}catch{}const index=listeners.indexOf(slot);if(index>=0)listeners.splice(index,1);};
+    connect();return stop;
+  }
+  function resumeFailed(reset=false){for(const slot of [...listeners])slot.resume(reset);}
 
   function realtimeCount(){return Object.values(counts).reduce((sum,value)=>sum+Math.max(0,Number(value)||0),0);}
   function applyBadge(){
@@ -89,11 +120,11 @@
   function attachQuestionnaires(uid){
     let fallbackUnsub=null;
     const primary=db.collection('questionnaires').where('studentId','==',uid).where('answered','==',false);
-    const primaryUnsub=primary.onSnapshot(snapshot=>showQuestionnaireSnapshot(snapshot,uid),error=>{
+    const primaryUnsub=listen('questionnaires',uid,primary,snapshot=>showQuestionnaireSnapshot(snapshot,uid),error=>{
       console.warn('[Team Bulls] listener de relatórios pendentes indisponível, usando consulta compatível',error?.code||error?.message||error);
       if(fallbackUnsub||!isCurrent(uid))return;
       const fallback=db.collection('questionnaires').where('studentId','==',uid);
-      fallbackUnsub=fallback.onSnapshot(snapshot=>showQuestionnaireSnapshot(snapshot,uid),fallbackError=>console.warn('[Team Bulls] listener compatível de relatórios',fallbackError?.code||fallbackError?.message||fallbackError));
+      fallbackUnsub=listen('questionnaires-fallback',uid,fallback,snapshot=>showQuestionnaireSnapshot(snapshot,uid));
       unsubs.push(()=>{try{fallbackUnsub?.();}catch(e){}});
     });
     unsubs.push(primaryUnsub);
@@ -117,17 +148,14 @@
     updateBadge();scheduleDueBoundary();if(changed)refreshOpenCenter();
   }
   function attachWeekly(uid){
-    const scheduleUnsub=db.collection('checkinSchedules').doc(uid).onSnapshot(doc=>{
+    const scheduleUnsub=listen('weekly-schedule',uid,db.collection('checkinSchedules').doc(uid),doc=>{
       if(!isCurrent(uid))return;
       liveSchedule=doc.exists?{...doc.data(),studentId:uid}:null;scheduleReady=true;applyWeekly(uid);
-    },error=>console.warn('[Team Bulls] listener da programação semanal',error?.code||error?.message||error));
-    const checkinsUnsub=db.collection('weeklyCheckins').where('studentId','==',uid).onSnapshot(snapshot=>{
+    });
+    const checkinsUnsub=listen('weekly-checkins',uid,db.collection('weeklyCheckins').where('studentId','==',uid),snapshot=>{
       if(!isCurrent(uid))return;
       liveCheckins=snapshot.docs.map(doc=>({...doc.data(),id:doc.id})).sort((a,b)=>String(b.submittedDate||'').localeCompare(String(a.submittedDate||''))||String(b.id).localeCompare(String(a.id)));
       checkinsReady=true;applyWeekly(uid);
-    },error=>{
-      console.warn('[Team Bulls] listener do histórico semanal',error?.code||error?.message||error);
-      if(isCurrent(uid)&&typeof loadWeeklyCheckinState==='function')loadWeeklyCheckinState(true).catch(()=>{});
     });
     unsubs.push(scheduleUnsub,checkinsUnsub);
   }
@@ -155,9 +183,9 @@
     }catch(error){console.warn('[Team Bulls] atualização de protocolo em tempo real',error);}
   }
   function attachProtocol(uid){
-    const unsub=db.collection('protocolReviewSchedules').doc(uid).onSnapshot(doc=>{
+    const unsub=listen('protocol',uid,db.collection('protocolReviewSchedules').doc(uid),doc=>{
       const schedule=doc.exists?{...doc.data(),studentId:uid,_exists:true}:null;renderProtocol(schedule,uid);
-    },error=>console.warn('[Team Bulls] listener da atualização de protocolo',error?.code||error?.message||error));
+    });
     unsubs.push(unsub);
   }
 
@@ -176,11 +204,11 @@
   function attachFeedback(uid){
     let fallbackUnsub=null;
     const primary=db.collection('feedback').where('studentId','==',uid).where('read','==',false).limit(20);
-    const primaryUnsub=primary.onSnapshot(snapshot=>showFeedbackSnapshot(snapshot,uid),error=>{
+    const primaryUnsub=listen('feedback',uid,primary,snapshot=>showFeedbackSnapshot(snapshot,uid),error=>{
       console.warn('[Team Bulls] listener de feedback pendente indisponível, usando consulta compatível',error?.code||error?.message||error);
       if(fallbackUnsub||!isCurrent(uid))return;
       const fallback=db.collection('feedback').where('studentId','==',uid).limit(200);
-      fallbackUnsub=fallback.onSnapshot(snapshot=>showFeedbackSnapshot(snapshot,uid),fallbackError=>console.warn('[Team Bulls] listener compatível de feedback',fallbackError?.code||fallbackError?.message||fallbackError));
+      fallbackUnsub=listen('feedback-fallback',uid,fallback,snapshot=>showFeedbackSnapshot(snapshot,uid));
       unsubs.push(()=>{try{fallbackUnsub?.();}catch(e){}});
     });
     unsubs.push(primaryUnsub);
@@ -194,13 +222,13 @@
     counts.notifications=unread.length;lastNotificationSignature=signature;notificationPrimed=true;updateBadge();if(changed)refreshOpenCenter();
   }
   function attachNotifications(uid){
-    const unsub=db.collection('notifications').where('studentId','==',uid).limit(120).onSnapshot(snapshot=>showNotificationSnapshot(snapshot,uid),error=>console.warn('[Team Bulls] listener da central de notificações',error?.code||error?.message||error));
+    const unsub=listen('notifications',uid,db.collection('notifications').where('studentId','==',uid).limit(120),snapshot=>showNotificationSnapshot(snapshot,uid));
     unsubs.push(unsub);
   }
 
   function start(){
     const uid=currentUid();if(!uid)return false;
-    if(activeUid===uid&&unsubs.length){recomputeDueStates('resume');return true;}
+    if(activeUid===uid&&unsubs.length){resumeFailed();recomputeDueStates('resume');return true;}
     stopFirestore();activeUid=uid;
     try{attachQuestionnaires(uid);attachWeekly(uid);attachProtocol(uid);attachFeedback(uid);attachNotifications(uid);return true;}
     catch(error){console.warn('[Team Bulls] sincronização em tempo real não iniciada',error);stopFirestore();return false;}
@@ -224,9 +252,9 @@
   window.addEventListener('team-bulls-runtime-state',install);
   window.addEventListener('team-bulls-student-runtime-ready',install);
   window.addEventListener('team-bulls-intelligence-ready',install);
-  window.addEventListener('online',install,{passive:true});
-  window.addEventListener('pageshow',install,{passive:true});
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')install();});
+  window.addEventListener('online',()=>{resumeFailed(true);install();},{passive:true});
+  window.addEventListener('pageshow',()=>{resumeFailed(true);install();},{passive:true});
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){resumeFailed(true);install();}else listeners.forEach(slot=>slot.pause());});
 
-  window.TeamBullsStudentRequestRealtime=Object.freeze({version:VERSION,start,stop:stopFirestore,sync,recompute:recomputeDueStates,status:()=>({uid:activeUid,listeners:unsubs.length,cloud:studentCloud(),counts:{...counts},total:realtimeCount(),weeklyFutureDue,protocolFutureDue})});
+  window.TeamBullsStudentRequestRealtime=Object.freeze({version:VERSION,start,stop:stopFirestore,sync,recompute:recomputeDueStates,status:()=>({uid:activeUid,listeners:listeners.filter(slot=>!!slot.unsubscribe).length,failedListeners:listeners.filter(slot=>slot.failed).length,cloud:studentCloud(),counts:{...counts},total:realtimeCount(),weeklyFutureDue,protocolFutureDue})});
 })();

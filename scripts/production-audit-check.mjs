@@ -65,9 +65,9 @@ const moduleMatches=[...config.matchAll(/'\.\/modules\/([^']+\.js\?[^']+)'/g)].m
 const missingModules=[...new Set(moduleMatches)].filter(rel=>!exists(rel));
 assert(missingModules.length===0,'Loader referencia módulos inexistentes: '+missingModules.join(', '));
 assert(new Set(moduleMatches).size===moduleMatches.length,'Loader possui módulo duplicado.');
-has(config,'if(!ok&&navigator.onLine)','Loader não tenta novamente após falha temporária de módulo opcional.');
+has(config,'if(!ok&&navigator.onLine&&visible())','Loader não tenta novamente após falha temporária de módulo opcional.');
 has(config,'ok=await loadScriptOnce(src,Math.max(6500,Number(timeoutMs)||3200))','Nova tentativa de módulo não possui janela maior para rede lenta.');
-has(config,'for(const src of modules)await loadScript(src)','Loader perdeu a execução sequencial determinística.');
+has(config,'for(const src of modules){if(!sessionUiReady()||!visible())break;await loadScript(src);}','Loader perdeu a execução sequencial determinística.');
 const portions=config.indexOf('diet-portion-presets-v10_10_9.js');
 const release=config.indexOf('release-coherence-v10_10_10.js');
 const trainerHub=config.indexOf('trainer-inbox-payments-v10_10_12.js');

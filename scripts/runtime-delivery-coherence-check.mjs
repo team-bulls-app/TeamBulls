@@ -32,14 +32,14 @@ assert(updater.includes(`const CURRENT_BUILD=${build};`),'Atualizador divergiu d
 assert(sw.includes(`const BUILD_REVISION=${build};`)&&sw47.includes(`const BUILD_REVISION=${build};`),'Service Workers divergem do build publicado.');
 assert(sw===sw47,'sw.js e sw_47.js divergiram.');
 
-const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1';
+const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1';
 const recoveredModalRef='modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4';
 const foregroundRecoveryRef='modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3';
 assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'))||[]).length>=2,'HTML precisa pré-carregar e executar a revisão nova do runtime Firestore.');
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='student-administration-order-1','A revisão publicada não identifica o ciclo do treino ativo e a busca de substituições.');
+assert(version.revision==='runtime-action-recovery-1','A revisão publicada não identifica a recuperação de runtime e ações.');
 const cycleUsabilityRef='./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability7';
 assert(config.includes(cycleUsabilityRef)&&sw.includes(cycleUsabilityRef)&&updater.includes(cycleUsabilityRef)&&usability.includes("const VERSION='10.10.21-usability7'"),'A ponte do ciclo precisa ser entregue na mesma revisão pelo loader, atualizador e cache.');
 assert(usability.includes('trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer3')&&usability.includes("const EXPECTED_VERSION='10.10.41-updateorganizer3'"),'A agenda precisa exigir a revisão que protege a conclusão de protocolos antigos.');

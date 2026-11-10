@@ -18,7 +18,7 @@ for(const modulePath of ['modules/student-request-realtime-v10_10_32.js',submitP
   assert(syntax.status===0,`Módulo possui JavaScript inválido (${modulePath}): ${String(syntax.stderr||'').trim()}`);
 }
 
-const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime4';
+const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime5';
 assert(config.includes(`'${moduleUrl}'`),'Loader prioritário do aluno não inclui a sincronização realtime atual.');
 const priority=config.match(/const studentPriorityModules=\[([\s\S]*?)\n  \];/)?.[1]||'';
 assert(priority.includes(moduleUrl),'Sincronização realtime precisa estar no runtime prioritário do aluno.');
@@ -27,11 +27,11 @@ assert(priority.indexOf('student-home-profile-v10_10_12.js')<priority.indexOf('s
 assert(realtime.includes("ACCESS_MODE==='cloud-active'"),'Listener não está limitado à sessão cloud ativa do aluno.');
 assert(realtime.includes("CURRENT_USER?.status!=='inactive'"),'Aluno inativo não pode manter listeners realtime.');
 assert(realtime.includes("db.collection('questionnaires').where('studentId','==',uid).where('answered','==',false)"),'Relatórios personalizados pendentes não possuem listener realtime.');
-assert(realtime.includes("db.collection('checkinSchedules').doc(uid).onSnapshot"),'Programação/solicitação semanal não possui listener realtime.');
-assert(realtime.includes("db.collection('weeklyCheckins').where('studentId','==',uid).onSnapshot"),'Histórico semanal não acompanha conclusões para recalcular a pendência.');
-assert(realtime.includes("db.collection('protocolReviewSchedules').doc(uid).onSnapshot"),'Atualização completa de protocolo não possui listener realtime.');
+assert(realtime.includes("listen('weekly-schedule',uid,db.collection('checkinSchedules').doc(uid),"),'Programação/solicitação semanal não possui listener realtime.');
+assert(realtime.includes("listen('weekly-checkins',uid,db.collection('weeklyCheckins').where('studentId','==',uid),"),'Histórico semanal não acompanha conclusões para recalcular a pendência.');
+assert(realtime.includes("listen('protocol',uid,db.collection('protocolReviewSchedules').doc(uid),"),'Atualização completa de protocolo não possui listener realtime.');
 assert(realtime.includes("db.collection('feedback').where('studentId','==',uid).where('read','==',false)"),'Feedback do treinador não possui listener realtime.');
-assert(realtime.includes("db.collection('notifications').where('studentId','==',uid).limit(120).onSnapshot"),'Central de notificações não possui listener realtime.');
+assert(realtime.includes("listen('notifications',uid,db.collection('notifications').where('studentId','==',uid).limit(120),"),'Central de notificações não possui listener realtime.');
 assert(realtime.includes("liveSchedule?.enabled===false?null"),'Relatório semanal desativado por plano pode reaparecer pela camada realtime.');
 assert(realtime.includes('WEEKLY_CHECKIN_REQUEST=request'),'Estado semanal oficial não é sincronizado com o snapshot.');
 assert(realtime.includes("V109_PROTOCOL_REVIEW_SCHEDULE=schedule"),'Estado oficial do ciclo de protocolo não é atualizado com o snapshot.');
@@ -44,7 +44,7 @@ assert(realtime.includes('localMidnightMs'),'Vencimentos não são ancorados na 
 assert(realtime.includes("weeklyFutureDue=request&&!request.pending"),'Relatório semanal futuro não agenda a própria virada para pendente.');
 assert(realtime.includes("protocolFutureDue=state&&!state.pending"),'Atualização de protocolo futura não agenda a própria virada para pendente.');
 assert(realtime.includes("recomputeDueStates('timer')"),'Passagem automática da data não recalcula relatório/protocolo sem write no Firestore.');
-assert(realtime.includes("if(activeUid===uid&&unsubs.length){recomputeDueStates('resume')"),'Retorno do background não recalcula vencimentos que passaram com o PWA suspenso.');
+assert(realtime.includes("if(activeUid===uid&&unsubs.length){resumeFailed();recomputeDueStates('resume')"),'Retorno do background não recalcula vencimentos que passaram com o PWA suspenso.');
 assert(realtime.includes('clearTimeout(dueTimer)'),'Timer de vencimento não é desmontado/reprogramado com segurança.');
 assert(realtime.includes('TeamBullsStudentHomeFastProtocolDate?.sync?.()'),'Data rápida da Home não é atualizada quando o vencimento passa localmente.');
 assert(realtime.includes('unsubs.splice(0).forEach'),'Listeners Firestore não são desmontados ao trocar/sair da conta.');

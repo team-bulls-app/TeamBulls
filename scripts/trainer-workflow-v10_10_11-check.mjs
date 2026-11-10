@@ -31,8 +31,8 @@ has(cardio,'alreadyAlerted(key)','Alarme pode repetir indefinidamente para o mes
 has(cardio,'return{...state,completedAt:Date.now()}','Alerta configurável não suprime a duplicação do aviso legado.');
 lacks(cardio,'setInterval(','Alerta não deve criar um segundo ticker de cardio.');
 for(const file of files){has(config,'./'+file+'?v=',`Loader não inclui ${file}.`);has(sw,'./'+file+'?v=',`Service Worker não prepara ${file} para uso offline.`);has(bridge,'./'+file+'?v=',`Ponte legada não prepara ${file} para uso offline.`);}
-has(sw,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1",'Service Worker deixou de preparar o workspace da dieta.');
-has(bridge,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace1",'Ponte legada deixou de preparar o workspace da dieta.');
+has(sw,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2",'Service Worker deixou de preparar o workspace da dieta.');
+has(bridge,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2",'Ponte legada deixou de preparar o workspace da dieta.');
 const order=['diet-portion-presets-v10_10_9.js','diet-personalization-v10_10_11.js','diet-live-calories-v10_10_11.js','training-integrity-v10_10_11.js','report-schedule-consistency-v10_10_11.js','cardio-finish-alert-v10_10_11.js','release-coherence-v10_10_10.js','trainer-diet-workspace-v10_10_11.js'];
 for(let i=1;i<order.length;i++)if(config.indexOf(order[i-1])<0||config.indexOf(order[i])<=config.indexOf(order[i-1]))fail.push('Ordem do loader incorreta: '+order[i-1]+' → '+order[i]);
 if(fail.length){console.error('FALHA — trainer workflow 10.10.11\n- '+fail.join('\n- '));process.exit(1);}console.log('APROVADO — tabela personalizável, macros automáticos, GER, trava total, instruções individuais, agendas, alerta do cardio e workspace contínuo do treinador validados.');
