@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111001,
-  "revision": "runtime-action-recovery-1",
+  "build": 2026111002,
+  "revision": "session-variant-protocol-1",
   "publishedAt": "2026-11-10T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Redução de consultas repetidas, retomada de notificações, carregamento com tentativas limitadas e proteção ao salvar refeições."
+  "message": "Troca de exercício no registro de carga e correção do salvamento de protocolos."
 }

@@ -40,7 +40,7 @@ async function runTrainerRename({writeFails=false}={}){
   const persisted={...original};
   const title={textContent:currentName},card={dataset:{workoutId:'w1'},style:{setProperty(){}},querySelector:()=>title};
   const modal={open:true},status={textContent:'',style:{color:''}};
-  const fields={'input-workout-name':{value:newName},'input-workout-start-date':{value:original.startDate},'input-workout-update-date':{value:original.updateDate},'workout-save-status':status};
+  const fields={'modal-workout':modal,'input-workout-name':{value:newName},'input-workout-start-date':{value:original.startDate},'input-workout-update-date':{value:original.updateDate},'workout-save-status':status};
   const updates=[];
   const context={
     document:{getElementById:id=>fields[id]||null,querySelectorAll:selector=>selector==='#ts-workout-list .workout-card'?[card]:[]},

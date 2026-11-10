@@ -7,7 +7,7 @@ const names=['filterDeletedSessions','mergeHistorySessions','sessionsFromWorkout
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const setup=`
 window.errors=[];window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));window.messages=[];window.alert=m=>messages.push(String(m));
-let CURRENT_USER={uid:'student-a',role:'student'},MODE='cloud',LOCAL_OWNER_UID='student-a',INACTIVE_UID='',LOCAL_DB={},NAVIGATION_SEQ=1,CUR_WORKOUT='w',CUR_EX='e',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',EDIT_SET_COUNT=0,SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',LAST_SESSION_WEEK=1,TRAINING_RECOMMENDATIONS_CONTEXT=null;
+let CURRENT_USER={uid:'student-a',role:'student'},MODE='cloud',LOCAL_OWNER_UID='student-a',INACTIVE_UID='',LOCAL_DB={},NAVIGATION_SEQ=1,CUR_WORKOUT='w',CUR_EX='e',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',EDIT_SET_COUNT=0,SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',LAST_SESSION_WEEK=1,VARIANT_LOAD_SEQ=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
 const ACTION_LOCKS=new Set(),SESSION_ARCHIVE_MEMORY=new Map();let HISTORY_BY_NAME={};window.simOnline=false;window.failStorage=false;window.failLocalOnly=false;Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>simOnline});
 const session=id=>({id,userId:'student-a',workoutId:'w',exerciseId:'e',exerciseName:'Supino',date:'2026-11-06',week:1,sets:[{weight:80,reps:8}],createdAt:{ms:123}});
 const seeds=['trash','last','keep'].map(session);let tree=[{id:'w',name:'Treino',userId:'student-a',exercises:[{id:'e',name:'Supino',sessions:structuredClone(seeds)}]}];

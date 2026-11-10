@@ -30,6 +30,8 @@ jobs:
           node scripts/cardio-delete-check.mjs
           node scripts/cardio-delete-browser-check.mjs
           node scripts/runtime-action-recovery-check.mjs
+          node scripts/session-variant-protocol-check.mjs
+          node scripts/session-variant-protocol-browser-check.mjs
           node scripts/runtime-home-recovery-browser-check.mjs
           node scripts/runtime-stability-behavior-check.mjs
           node scripts/runtime-idle-browser-check.mjs
