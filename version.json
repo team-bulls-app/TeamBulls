@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111101,
-  "revision": "mobile-session-reflow-1",
+  "build": 2026111102,
+  "revision": "mobile-proportions-1",
   "publishedAt": "2026-11-11T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Registro de carga e tela do exercício ajustados para celulares estreitos e texto ampliado."
+  "message": "Início, treino e exercício se adaptam ao tamanho da tela e à fonte escolhida no celular."
 }
