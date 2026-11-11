@@ -89,16 +89,19 @@ await test('Contexto explícito da Central exige aluno, documento, tela e papel 
     assert.equal(f.opened.length,0,invalid);assert.equal(f.errors.length,1,invalid);
   }
 });
-await test('Helper compartilhado preserva argumentos de pagamento e comprovante',async()=>{
-  const f=fixture(hub,false),calls=[],person='student-"quoted',receipt='paymentReceipts/a/arquivo "teste".jpg';
+await test('Botões da lista preservam os IDs de pagamento, inclusive no histórico',async()=>{
+  const f=fixture(hub,false),calls=[],person='student-"quoted',oldId='pay-"quoted',receipt='paymentReceipts/a/arquivo "teste".jpg';
   Object.assign(f.context,{students:[{uid:'student-new',name:'Novo'},{uid:person,name:'Teste'}],paymentSearch:'',
-    paymentRecords:[{id:'pay-new',studentId:person,validFrom:'2026-09-20',nextDueDate:'2026-12-20',receiptPath:receipt},{id:'pay-old',studentId:person,validFrom:'2026-06-20',receiptPath:receipt}],
+    paymentRecords:[{id:'pay-new',studentId:person,validFrom:'2026-09-20',nextDueDate:'2026-12-20',receiptPath:receipt},{id:oldId,studentId:person,validFrom:'2026-06-20'}],
+    receiptJobs:new Map(),
     paymentStatus:()=>({kind:'ok',label:'EM DIA'}),formatMoney:()=> 'R$ 100',planLabel:()=> 'Trimestral'});
-  f.context.TeamBullsTrainerHub={openPaymentEditor:(...args)=>calls.push(['editor',...args]),openReceipt:(...args)=>calls.push(['receipt',...args])};
+  f.context.TeamBullsTrainerHub={openPaymentEditor:(...args)=>calls.push(['editor',...args]),openPaymentDetails:(...args)=>calls.push(['details',...args])};
   vm.runInContext(between(hub,'  function latestPaymentMap(){','  function startPaymentListener(){'),f.context);
   vm.runInContext('renderPayments()',f.context);
   for(const action of handlers(f.context.document.getElementById('tb-payment-list').innerHTML))vm.runInContext(action,f.context);
   assert.ok(calls.some(call=>call[0]==='editor'&&call[1]===person&&call[2]==='pay-new'));
-  assert.ok(calls.some(call=>call[0]==='receipt'&&call[1]===receipt));assert.ok(calls.some(call=>call[1]==='student-new'));
+  assert.ok(calls.some(call=>call[0]==='details'&&call[1]==='pay-new'));
+  assert.ok(calls.some(call=>call[0]==='details'&&call[1]===oldId),'O histórico permite consultar pagamentos sem comprovante.');
+  assert.ok(calls.some(call=>call[1]==='student-new'));
 });
 if(failures.length)process.exitCode=1;
