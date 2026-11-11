@@ -13,7 +13,12 @@ const runtimeRows=['addSetRow','addEditSetRow'].map(name=>{
 assert(renderPrescription && runtimeRows.every(Boolean), 'Expected the delivered workout and session renderers');
 const homeRuntime=fs.readFileSync('modules/student-home-layout-v10_10_15.js','utf8');
 const homeCss=homeRuntime.match(/style\.textContent=`([\s\S]*?)`;/)?.[1];
-assert(homeCss, 'Expected the delivered student navigation CSS');
+const profileRuntime=fs.readFileSync('modules/student-home-profile-v10_10_12.js','utf8');
+const profileCss=profileRuntime.match(/style\.textContent=`([\s\S]*?)`;/)?.[1];
+const profileHeader=profileRuntime.match(/^  function ensureHomeHeader\(\)\{[\s\S]+?^  \}/m)?.[0];
+const calendarRuntime=fs.readFileSync('modules/student-training-calendar-v10_10_70.js','utf8');
+const summaryCss=calendarRuntime.split('\n').find(line=>line.trimStart().startsWith('.home-daily-summary{'));
+assert(homeCss && profileCss && profileHeader && summaryCss, 'Expected the delivered navigation, student header and summary');
 const baseline=process.argv.indexOf('--baseline');
 const stylesheet=baseline<0?fs.readFileSync('styles_v10_10_9.css'):spawnSync('git',['show',process.argv[baseline+1]+':styles_v10_10_9.css']).stdout;
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
@@ -48,10 +53,15 @@ ${names.map(source).join('\n')}
 const addEditSetRowV101=addEditSetRow;
 ${runtimeRows.join('\n')}
 ${renderPrescription}
+${profileHeader}
+function showLayoutScreen(id){
+  document.querySelectorAll('.screen.active').forEach(screen=>screen.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('app').scrollTop=0;
+}
 window.openExerciseLayout=()=>{
   document.documentElement.classList.add('tb-student-home-v17');
-  document.querySelectorAll('.screen.active').forEach(screen=>screen.classList.remove('active'));
-  document.getElementById('screen-exercise').classList.add('active');
+  showLayoutScreen('screen-exercise');
   document.getElementById('btn-del-exercise').hidden=true;
   document.getElementById('exercise-screen-title').textContent='Remada apoiada na máquina com pegada neutra'.toUpperCase();
   renderExercisePrescription(exercise,'exercise-prescription-card',2,false,false);
@@ -67,6 +77,19 @@ window.openExerciseLayout=()=>{
   }
   shell.appendChild(nav);
   document.body.appendChild(shell);
+  ensureHomeHeader();
+  const home=document.getElementById('screen-home');
+  home.classList.add('tb-home-v17-screen');
+  document.getElementById('tb-profile-name').textContent='Aluno com nome extenso';
+  document.getElementById('tb-home-notice-count').textContent='99';
+  document.getElementById('hero-eyebrow').textContent='// sistema online · protocolo ativo';
+  document.getElementById('home-stats').innerHTML=['Protocolos de treino','Protocolos de dieta'].map((label,i)=>
+    '<div class="stat-cell"><span class="num">'+(i+2)+'</span><span class="lbl">'+label+'</span><span class="tb-v17-next">Atualização pendente desde <strong>20/10/2026</strong></span></div>').join('');
+  document.getElementById('home-stats').insertAdjacentHTML('afterend','<section id="home-daily-summary" class="home-daily-summary"><div class="home-daily-summary-head"><strong>Resumo de hoje</strong><span>11/11/2026</span></div><div class="home-daily-summary-grid"><div class="home-daily-summary-item"><strong>0</strong><span>Sessões registradas</span></div><div class="home-daily-summary-item"><strong>0/4</strong><span>Refeições concluídas</span></div></div></section>');
+  const title='Protocolo de treino com um nome longo para a largura disponível';
+  document.getElementById('workout-screen-title').textContent=title;
+  document.getElementById('student-protocol-summary').innerHTML='<div class="protocol-summary-title">'+title+'</div><div class="protocol-summary-meta">5 pastas · 39 exercícios · 106 registros</div><div class="protocol-cycle-strip"><span>Semana atual <b>8/8</b></span><span>02/11/2026–08/11/2026</span><span>Atualização <b>12/10/2026</b></span></div>';
+  document.getElementById('day-folder-list').innerHTML='<div class="day-folder-card"><div class="day-folder-icon">DIA</div><div class="day-folder-info"><div class="day-folder-name">Superior completo com nome de pasta longo</div><div class="day-folder-meta">8 exercícios · 64 semanas prescritas · Último: 03/11/2026</div></div><div class="exercise-row-arrow">›</div></div>';
   prepareFontScaleRules();
 };
 
@@ -74,7 +97,7 @@ window.openProtocol=()=>{CURRENT_USER={uid:'t',role:'trainer'};VIEW_STUDENT={uid
 const baseSave=saveWorkout;saveWorkout=function(){return window.saveCompletion=baseSave();};window.fixtureReady=true;
 `;
 const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script></body>');
-const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end(homeCss);if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
+const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end([profileCss,homeCss,summaryCss].join('\n'));if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : ['google-chrome','chromium','chromium-browser'].map(name => spawnSync('which',[name],{encoding:'utf8'}).stdout?.trim()).find(Boolean));
@@ -107,6 +130,28 @@ async function evaluate(expression) {
   assert(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));
   return result.result.value;
 }
+async function assertPhoneScreens(width,scale){
+  await evaluate(`document.documentElement.style.setProperty('--font-scale',${scale});void 0`);
+  for(const id of ['screen-home','screen-workout','screen-exercise']){
+    await evaluate(`showLayoutScreen(${JSON.stringify(id)});void 0`);
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    const layout=await evaluate(`(()=>{
+      const app=document.getElementById('app');
+      const screen=document.getElementById(${JSON.stringify(id)});
+      const heading=screen.querySelector('.header-title');
+      const nav=document.querySelector('.tb-v17-hotbar-shell');
+      const selectors=['.header-title','.home-hero-title','.stat-cell','.home-daily-summary-item','.protocol-summary-title','.protocol-cycle-strip','.day-folder-name','.prescription-range','.ger-pill'];
+      const clipped=[...screen.querySelectorAll(selectors.join(','))].filter(el=>el.getClientRects().length&&el.scrollWidth-el.clientWidth>1).map(el=>el.className);
+      return {clipped,overflow:app.scrollWidth-app.clientWidth,navOverlap:app.getBoundingClientRect().bottom-nav.getBoundingClientRect().top,
+        headingFont:parseFloat(getComputedStyle(heading).fontSize)};
+    })()`);
+    const context=`${id} at ${width}px with ${scale*100}% text`;
+    assert.deepEqual(layout.clipped,[],context);
+    assert(layout.overflow<=1&&layout.navOverlap<=1,`${context}: ${JSON.stringify(layout)}`);
+    assert(layout.headingFont>=(scale===1?16:21),`Heading should honor the text preference in ${context}: ${JSON.stringify(layout)}`);
+  }
+}
+
 async function assertSessionReflow(modalId,width,scale){
   await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
   const geometry=await evaluate(`(()=>{
@@ -135,12 +180,32 @@ async function assertSessionReflow(modalId,width,scale){
 try{
  socket=new WebSocket(await waitForChromePage(chrome,profile,{stderr:()=>stderr}));await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject;});socket.onmessage=event=>{const m=JSON.parse(event.data),t=pending.get(m.id);if(!t)return;pending.delete(m.id);m.error?t.reject(new Error(JSON.stringify(m.error))):t.resolve(m.result);};
  await command('Page.enable');await command('Network.enable');await command('Network.setBlockedURLs',{urls:['https://*']});let passed=0;
- for(const theme of ['dark','light'])for(const width of [256,320,360,390,430,768,1440]){
+ for(const theme of ['dark','light'])for(const width of [256,320,360,390,430,520,768,1440]){
   await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<800});const previous=await evaluate('performance.timeOrigin');await command('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/?theme=${theme}&width=${width}`});
   for(let i=0;i<120;i++){if(await evaluate(`performance.timeOrigin!==${previous}&&!!window.fixtureReady&&!!window.TeamBullsSessionPerformance`))break;await sleep(25);}
-  await evaluate(`localStorage.clear();document.documentElement.dataset.theme=${JSON.stringify(theme)};TeamBullsSessionPerformance.ready()`);
+  await evaluate(`localStorage.clear();document.documentElement.dataset.theme=${JSON.stringify(theme)};document.body.dataset.ambience='0';TeamBullsSessionPerformance.ready()`);
   await evaluate('openExerciseLayout()');
   await sleep(250);
+  if(width<=520){
+    await assertPhoneScreens(width,1);
+    await assertPhoneScreens(width,1.35);
+    if(theme==='dark'&&width===390){
+      const headingFont="parseFloat(getComputedStyle(document.querySelector('#screen-home .header-title')).fontSize)";
+      const before=await evaluate(headingFont);
+      const timeOrigin=await evaluate('performance.timeOrigin');
+      await command('Emulation.setDeviceMetricsOverride',{width:256,height:900,deviceScaleFactor:1,mobile:true});
+      await assertPhoneScreens(256,1.35);
+      assert(await evaluate(headingFont)<before,'Phone heading should respond to less space');
+      assert.equal(await evaluate('performance.timeOrigin'),timeOrigin,'Phone proportions should adjust without reloading');
+      await command('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:5});
+      await command('Emulation.setDeviceMetricsOverride',{width:740,height:360,deviceScaleFactor:1,mobile:true});
+      assert(await evaluate("matchMedia('(pointer: coarse)').matches"),'Landscape case must use touch input');
+      await assertPhoneScreens(740,1.35);
+      await command('Emulation.setTouchEmulationEnabled',{enabled:false});
+      await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:true});
+    }
+    await evaluate("document.documentElement.style.removeProperty('--font-scale');void 0");
+  }
   let navGeometry;
   if(width<=520){
     navGeometry=await evaluate(`(()=>{
@@ -200,7 +265,7 @@ try{
   await evaluate(`olderRefresh();olderCompletion`);assert.equal(await evaluate(`VIEW_STUDENT.workouts[0].name`),'Nome final','An older reload cannot reapply its previous confirmed name after a newer save');
   assert.deepEqual(await evaluate('errors'),[]);passed++;
  }
- console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, and immediate unlock after confirmation and mobile form reflow at 256–1440 px in both themes.`);
+ console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, and immediate unlock after confirmation and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

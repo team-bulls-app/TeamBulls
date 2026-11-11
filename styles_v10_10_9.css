@@ -3013,28 +3013,187 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
   .header::before{top:calc(5px + var(--safe-top,0px))}
 }
 
-@media(max-width:520px){
-  #screen-home.tb-home-v2 .header{
-    min-height:calc(clamp(76px,25vw,92px) + var(--safe-top,0px))!important;
-    padding:calc(8px + var(--safe-top,0px)) max(12px,calc(12px + var(--safe-right,0px))) 8px max(12px,calc(12px + var(--safe-left,0px)))!important;
-    gap:clamp(6px,2vw,9px)!important;
+/* Shared phone proportions use the available width and the chosen text size. */
+@media (max-width:520px), (max-width:899px) and (pointer:coarse) {
+  :root {
+    --mobile-inline-padding: clamp(9px, 3.3vw, 16px);
+    --header-control-size: 44px;
+    --phone-heading: clamp(16px, 4.6vw, 22px);
+    --phone-card-title: clamp(16px, 5.35vw, 24px);
+    --phone-meta: clamp(9px, 2.3vw, 11px);
+    --phone-gap: clamp(6px, 2.2vw, 11px);
+    --phone-nav-control: clamp(44px, min(12.8vw, 11dvh), 56px);
+    --phone-nav-height: calc(var(--phone-nav-control) + 20px + var(--safe-bottom, 0px));
   }
-  #screen-home.tb-home-v2 .header::before{top:calc(5px + var(--safe-top,0px))!important}
-  #screen-home.tb-home-v2 .header-title{
-    min-width:0;
-    flex:1 1 auto;
-    font-size:clamp(18px,5.2vw,22px)!important;
-    letter-spacing:clamp(.2px,.3vw,.9px)!important;
-  }
-  #screen-home.tb-home-v2 .tb-home-actions{min-width:0;flex:0 1 auto;gap:clamp(5px,2vw,8px)!important}
-  #screen-home.tb-home-v2 .tb-profile-head{min-width:0!important;flex:0 1 auto}
-  #screen-home.tb-home-v2 .tb-avatar-button{width:clamp(40px,12.5vw,50px)!important;height:clamp(40px,12.5vw,50px)!important;flex:0 0 auto}
-  #screen-home.tb-home-v2 .tb-profile-name{max-width:clamp(62px,22vw,90px)!important;font-size:clamp(8px,2.5vw,10px)!important}
-  #screen-home.tb-home-v2 .tb-notice-button{width:clamp(40px,12vw,44px)!important;height:clamp(40px,12vw,44px)!important;flex:0 0 auto}
-  #screen-home.tb-home-v2 .home-hero{padding-top:clamp(18px,6vw,26px)}
-  #screen-home.tb-home-v2 .home-hero-title{font-size:clamp(34px,10.8vw,50px)}
-  #screen-home.tb-home-v2 #home-stats .stat-cell .lbl{font-size:clamp(8px,2.6vw,10px);line-height:1.35;letter-spacing:clamp(.1px,.14vw,.5px)}
 
+  #app .header-title {
+    font-size: calc(var(--phone-heading) * var(--font-scale, 1));
+    letter-spacing: .035em;
+    line-height: 1.15;
+  }
+
+  :is(#screen-workout, #screen-day, #screen-exercise) .header-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  #screen-home.tb-home-v2 .header {
+    min-height: calc(clamp(65px, min(23.6vw, 18dvh), 100px) + var(--safe-top, 0px)) !important;
+    padding: calc(8px + var(--safe-top, 0px)) calc(var(--mobile-inline-padding) + var(--safe-right, 0px)) 8px calc(var(--mobile-inline-padding) + var(--safe-left, 0px)) !important;
+    gap: var(--phone-gap) !important;
+  }
+
+  #app #screen-home.tb-home-v2 .header-title {
+    min-width: 0;
+    flex: 1 1 auto;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: calc(var(--phone-heading) * var(--font-scale, 1));
+  }
+
+  #screen-home.tb-home-v2 .tb-home-actions {
+    gap: var(--phone-gap);
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  #screen-home.tb-home-v2 .tb-profile-head { min-width: 0; }
+
+  #screen-home.tb-home-v2 .tb-avatar-button {
+    width: clamp(44px, 12.5vw, 52px);
+    height: clamp(44px, 12.5vw, 52px);
+  }
+
+  #screen-home.tb-home-v2 .tb-notice-button {
+    width: var(--header-control-size);
+    height: var(--header-control-size);
+  }
+
+  #screen-home.tb-home-v2 .tb-profile-name {
+    max-width: clamp(48px, 19vw, 90px);
+    font-size: calc(var(--phone-meta) * var(--font-scale, 1));
+  }
+
+  #screen-home.tb-home-v2 .home-hero {
+    padding-block: clamp(16px, 6vw, 27px) clamp(12px, 4vw, 20px);
+  }
+
+  #screen-home.tb-home-v2 .home-hero-title {
+    font-size: calc(clamp(30px, 10.7vw, 50px) * var(--font-scale, 1));
+    overflow-wrap: anywhere;
+  }
+
+  #app #screen-home.tb-home-v17-screen #home-stats > .stat-cell {
+    min-width: 0;
+    min-height: clamp(84px, 30vw, 124px) !important;
+    padding-inline: var(--phone-gap);
+  }
+
+  #screen-home.tb-home-v2 #home-stats .lbl,
+  #screen-home .tb-v17-next,
+  #screen-home :is(.home-daily-summary-foot, .home-daily-summary-item span) {
+    font-size: calc(var(--phone-meta) * var(--font-scale, 1));
+    line-height: 1.35;
+    letter-spacing: .02em;
+    overflow-wrap: anywhere;
+  }
+
+  #screen-home #home-daily-summary {
+    margin-inline: calc(var(--mobile-inline-padding) + max(var(--safe-left, 0px), var(--safe-right, 0px)));
+    padding: calc(var(--phone-gap) + 3px);
+  }
+
+  #screen-home .home-daily-summary-head {
+    flex-wrap: wrap;
+    gap: 4px var(--phone-gap);
+  }
+
+  #screen-home .home-daily-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--phone-gap);
+  }
+
+  #screen-home .tb-v17-intelligence {
+    padding-inline: calc(var(--mobile-inline-padding) + max(var(--safe-left, 0px), var(--safe-right, 0px)));
+  }
+
+  #screen-home .tb-v17-section-head {
+    flex-wrap: wrap;
+    gap: 4px var(--phone-gap);
+  }
+
+  #screen-home .tb-v17-feedback-copy strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  :is(#screen-workout, #screen-day) .protocol-summary,
+  #screen-exercise .prescription-card {
+    padding: calc(var(--phone-gap) + 4px);
+  }
+
+  :is(#screen-workout, #screen-day) :is(.protocol-summary-title, .day-folder-name),
+  #screen-exercise .prescription-title {
+    font-size: calc(var(--phone-card-title) * var(--font-scale, 1));
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  :is(#screen-workout, #screen-day) :is(.protocol-summary-meta, .protocol-cycle-strip, .day-folder-meta) {
+    font-size: calc(var(--phone-meta) * var(--font-scale, 1));
+    overflow-wrap: anywhere;
+    letter-spacing: .02em;
+  }
+
+  #screen-workout .protocol-cycle-strip > span { min-width: 0; }
+
+  #screen-workout .day-folder-card {
+    min-height: clamp(66px, 22vw, 98px);
+    padding: calc(var(--phone-gap) + 3px);
+    gap: var(--phone-gap);
+  }
+
+  #screen-workout .day-folder-icon {
+    width: clamp(30px, 10.8vw, 46px);
+    flex-basis: clamp(30px, 10.8vw, 46px);
+  }
+
+  #screen-workout .context-section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--phone-gap);
+  }
+
+  #screen-workout .context-section-tabs button {
+    min-height: 44px;
+    padding-inline: 4px;
+    letter-spacing: .04em;
+    overflow-wrap: anywhere;
+  }
+
+  html.tb-student-home-v17 #app {
+    max-height: calc(var(--app-height, 100dvh) - var(--phone-nav-height));
+    padding-bottom: 0;
+  }
+
+  html.tb-student-home-v17 #app .screen.active {
+    padding-bottom: var(--mobile-inline-padding);
+  }
+
+  html.tb-student-home-v17 .tb-v17-hotbar-shell {
+    height: var(--phone-nav-height);
+    padding-top: 4px;
+  }
+
+  html.tb-student-home-v17 .tb-v17-hotbar { padding-block: 3px !important; }
+
+  html.tb-student-home-v17 .tb-v17-hotbar button {
+    height: var(--phone-nav-control);
+    padding-block: 2px;
+  }
+}
+
+@media(max-width:520px){
   #screen-diet-detail .header .tb-supply-options-header-btn,
   #screen-ts-diet-detail .header .tb-supply-options-header-btn{
     min-width:44px;
@@ -3204,14 +3363,6 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
     overflow-wrap: anywhere;
   }
 
-  #screen-exercise .header-title {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    font-size: calc(clamp(15px, 4.4vw, 20px) * var(--font-scale, 1));
-    line-height: 1.15;
-    letter-spacing: .025em;
-  }
-
   #screen-exercise :is(.prescription-card-head, .chart-header) {
     flex-wrap: wrap;
     gap: 6px 10px;
@@ -3254,32 +3405,6 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
     min-height: 44px;
     white-space: normal;
     overflow-wrap: anywhere;
-  }
-
-  /* Keep the exercise scroller above the fixed student navigation. */
-  html.tb-student-home-v17:has(#screen-exercise.active) {
-    --exercise-nav-height: calc(64px + var(--safe-bottom, 0px));
-  }
-
-  html.tb-student-home-v17:has(#screen-exercise.active) #app {
-    max-height: calc(var(--app-height, 100dvh) - var(--exercise-nav-height));
-    padding-bottom: 0;
-  }
-
-  html.tb-student-home-v17 #screen-exercise.active { padding-bottom: 16px; }
-
-  html.tb-student-home-v17:has(#screen-exercise.active) .tb-v17-hotbar-shell {
-    height: var(--exercise-nav-height);
-    padding-top: 4px;
-  }
-
-  html.tb-student-home-v17:has(#screen-exercise.active) .tb-v17-hotbar {
-    padding-block: 3px !important;
-  }
-
-  html.tb-student-home-v17:has(#screen-exercise.active) .tb-v17-hotbar button {
-    height: 44px;
-    padding-block: 2px;
   }
 }
 
