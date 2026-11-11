@@ -1,8 +1,21 @@
 // Real modal markup, delivered chooser/controllers and durable session module.
 // All accounts/data are synthetic; external requests are blocked.
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
-import {source,variantFunctions} from './session-variant-protocol-check.mjs';
-const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload','hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId'];
+import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
+const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload','hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
+const renderPrescription=core.match(/^renderExercisePrescription=function\(exercise,elId,week,canEdit,trainerMode\)\{\r?\n[\s\S]+?^\};/m)?.[0];
+const runtimeRows=['addSetRow','addEditSetRow'].map(name=>{
+  const start=core.indexOf(name+'=function(');
+  if(start<0)return '';
+  const first=core.slice(start).split('\n')[0].trimEnd();
+  return first.endsWith('};')?first:core.slice(start,core.indexOf('\n};',start)+3);
+});
+assert(renderPrescription && runtimeRows.every(Boolean), 'Expected the delivered workout and session renderers');
+const homeRuntime=fs.readFileSync('modules/student-home-layout-v10_10_15.js','utf8');
+const homeCss=homeRuntime.match(/style\.textContent=`([\s\S]*?)`;/)?.[1];
+assert(homeCss, 'Expected the delivered student navigation CSS');
+const baseline=process.argv.indexOf('--baseline');
+const stylesheet=baseline<0?fs.readFileSync('styles_v10_10_9.css'):spawnSync('git',['show',process.argv[baseline+1]+':styles_v10_10_9.css']).stdout;
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const setup=`
 let CURRENT_USER={uid:'s',role:'student'},MODE='cloud',LOCAL_OWNER_UID='',INACTIVE_UID='',LOCAL_DB={},AUTH_STATE_REVISION=1;
@@ -18,20 +31,50 @@ const auth={currentUser:{uid:'t'}},firebase={firestore:{FieldValue:{serverTimest
 window.remote={'workouts/w':{userId:'s',name:'Treino antigo',color:'#e11d48',startDate:'2026-08-29',updateDate:'2026-10-24',isActive:false},'protocolReviewSchedules/s':{studentId:'s',trainerId:'t',sourceWorkoutId:'active',startDate:'2026-10-01',intervalWeeks:4,lastCompletedCycle:2,lastCompletedDate:'2026-10-29'}};
 function ref(collection,id){return{key:collection+'/'+id,collection,id};}const db={collection:collection=>({where:()=>({get:async()=>({docs:Object.entries(remote).filter(([k,v])=>k.startsWith(collection+'/')&&v.userId==='s').map(([k,v])=>({id:k.split('/')[1],data:()=>structuredClone(v)}))})}),doc:id=>ref(collection,id)}),runTransaction:async run=>{const staged=[];const result=await run({get:async r=>{reads.push(r.key);if(r.collection==='protocolReviewSchedules')throw new Error('schedule unavailable');return{exists:!!remote[r.key],data:()=>structuredClone(remote[r.key])};},update:(r,p)=>staged.push({key:r.key,p:structuredClone(p)}),set:(r,p)=>staged.push({key:r.key,p:structuredClone(p)})});if(holdWrite)await new Promise(r=>releaseWrite=r);if(failWrites)throw new Error('simulated write failure');for(const row of staged){remote[row.key]={...remote[row.key],...row.p};writes.push(row);}return result;}};
 const cloudWrite=p=>p,cloudGet=r=>r.get(),showToast=m=>messages.push(m),today=()=> '2026-11-10',draftId=()=> 'new-session-'+(++count),uid=draftId,validIsoDate=s=>/^\\d{4}-\\d{2}-\\d{2}$/.test(s||''),addDaysIso=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
-const storageGet=k=>localStorage.getItem(k),storageSet=(k,v)=>{localStorage.setItem(k,v);return true;},withTimeout=p=>p,runWhenIdle=fn=>setTimeout(fn,0),saveSessionArchive=()=>{},syncSessionToHistory=()=>{},saveCloudBackup=()=>{},renderExercise=()=>{},sessionSyncBadge=()=>'',exerciseUsesResistedTime=()=>false;
+const storageGet=k=>localStorage.getItem(k),storageSet=(k,v)=>{localStorage.setItem(k,v);return true;},withTimeout=p=>p,runWhenIdle=fn=>setTimeout(fn,0),saveSessionArchive=()=>{},syncSessionToHistory=()=>{},saveCloudBackup=()=>{},renderExercise=()=>{},sessionSyncBadge=()=>'',exerciseUsesResistedTime=()=>useResistedTime;
+let useResistedTime=false,FONT_SCALE_RULES_PREPARED=false;
 function saveSession(){throw new Error('The registered-student durable save module must handle this click');}window.TeamBulls107={flushPendingMutationSync:async()=>{}};
-const normalizePrescriptionSet=s=>s?.targetMin?s:null,prescribedRangeLabel=()=> '8–12',formatGerLevel=()=> '2',renderGerMeter=()=>'',resolveWeekPrescription=()=>({sets:[{targetMin:8,targetMax:12,ger:2}]}),prescriptionCompactSummary=e=>({rx:resolveWeekPrescription(),reps:'8–12',ger:'2'});
+const normalizePrescriptionSet=s=>s?.targetMin?s:null,prescribedRangeLabel=()=> '8–12',resolveWeekPrescription=()=>({sets:[{targetMin:8,targetMax:12,ger:2}]}),prescriptionCompactSummary=e=>({rx:resolveWeekPrescription(),reps:'8–12',ger:'2'});
+const effectivePrescriptionSets=(_exercise,sets)=>sets,exerciseResultUnit=()=> 'reps';
+const weekTechniqueSummary=()=> '<span>UNL</span>',techniqueItemsForExercise=()=>[{code:'UNL'}];
+const exerciseHasOptionalTechnique=()=>false,exerciseTimerPresets=()=>[60,90,120,150,180];
+function renderExercisePrescription(){}
 const renderOptionalTechniqueMode=()=>{},renderEditOptionalTechniqueMode=()=>{},selectedPerformedTechniqueMode=()=>'',resetRestTimer=()=>{},focusEditorField=()=>{};
 const findSessionOwner=id=>({exercise,session:exercise.sessions.find(s=>s.id===id),workout:tree[0]});
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const cachedExerciseCatalog=()=>({groups:[group]});async function loadExerciseOptions(){if(slowCatalog)await new Promise(r=>releaseCatalog=r);return EXERCISE_OPTIONS;}
 async function renderTrainerStudent(){refreshed++;if(holdRefresh)await new Promise(r=>window.releaseRefresh=r);if(failRefresh)throw new Error('refresh unavailable');}
 ${names.map(source).join('\n')}
+const addEditSetRowV101=addEditSetRow;
+${runtimeRows.join('\n')}
+${renderPrescription}
+window.openExerciseLayout=()=>{
+  document.documentElement.classList.add('tb-student-home-v17');
+  document.querySelectorAll('.screen.active').forEach(screen=>screen.classList.remove('active'));
+  document.getElementById('screen-exercise').classList.add('active');
+  document.getElementById('btn-del-exercise').hidden=true;
+  document.getElementById('exercise-screen-title').textContent='Remada apoiada na máquina com pegada neutra'.toUpperCase();
+  renderExercisePrescription(exercise,'exercise-prescription-card',2,false,false);
+  const shell=document.createElement('div');
+  shell.className='tb-v17-hotbar-shell';
+  const nav=document.createElement('nav');
+  nav.className='tb-v17-hotbar';
+  for(const key of ['home','workout','diet','instructions','payments','options','reports']){
+    const button=document.createElement('button');
+    button.dataset.hotbar=key;
+    button.innerHTML='<svg></svg><span>'+key+'</span>';
+    nav.appendChild(button);
+  }
+  shell.appendChild(nav);
+  document.body.appendChild(shell);
+  prepareFontScaleRules();
+};
+
 window.openProtocol=()=>{CURRENT_USER={uid:'t',role:'trainer'};VIEW_STUDENT={uid:'s',name:'Aluno de teste',workouts:tree};openEditWorkoutTs('w');document.getElementById('input-workout-start-date').value='2026-08-29';document.getElementById('input-workout-update-date').value='2026-10-24';};
 const baseSave=saveWorkout;saveWorkout=function(){return window.saveCompletion=baseSave();};window.fixtureReady=true;
 `;
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script></body>');
-const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(fs.readFileSync('styles_v10_10_9.css'));if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script></body>');
+const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end(homeCss);if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : ['google-chrome','chromium','chromium-browser'].map(name => spawnSync('which',[name],{encoding:'utf8'}).stdout?.trim()).find(Boolean));
@@ -64,14 +107,68 @@ async function evaluate(expression) {
   assert(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));
   return result.result.value;
 }
+async function assertSessionReflow(modalId,width,scale){
+  await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+  const geometry=await evaluate(`(()=>{
+    const sheet=document.getElementById(${JSON.stringify(modalId)}).querySelector('.modal-sheet');
+    const bounds=sheet.getBoundingClientRect();
+    const fields=[...sheet.querySelectorAll('.performed-set-row input, .performed-set-row label, .form-input, .backoff-suggestion, .rest-timer, .rest-timer-presets button, .btn-primary')];
+    const clipped=fields.filter(node=>{
+      if(!node.getClientRects().length)return false;
+      const rect=node.getBoundingClientRect();
+      return rect.left<bounds.left+1 || rect.right>bounds.right-1;
+    }).map(node=>node.id||node.className);
+    sheet.scrollLeft=100;
+    const save=sheet.querySelector('.btn-primary');
+    sheet.scrollTop=sheet.scrollHeight;
+    const saveRect=save.getBoundingClientRect();
+    return {clipped,extraWidth:sheet.scrollWidth-sheet.clientWidth,scrollLeft:sheet.scrollLeft,
+      saveVisible:saveRect.top>=bounds.top && saveRect.bottom<=bounds.bottom+1,
+      fieldFont:parseFloat(getComputedStyle(sheet.querySelector('[data-f="w"]')).fontSize)};
+  })()`);
+  const context=`${modalId}, ${width}px, ${scale*100}% font`;
+  assert.deepEqual(geometry.clipped,[],context);
+  assert(geometry.extraWidth<=1 && geometry.scrollLeft===0,`Horizontal scroll in ${context}`);
+  assert(geometry.saveVisible,`Save button is unreachable in ${context}`);
+  assert(geometry.fieldFont>=(scale===1?16:21),`Numeric fields must remain readable in ${context}, got ${geometry.fieldFont}px`);
+}
 try{
  socket=new WebSocket(await waitForChromePage(chrome,profile,{stderr:()=>stderr}));await new Promise((resolve,reject)=>{socket.onopen=resolve;socket.onerror=reject;});socket.onmessage=event=>{const m=JSON.parse(event.data),t=pending.get(m.id);if(!t)return;pending.delete(m.id);m.error?t.reject(new Error(JSON.stringify(m.error))):t.resolve(m.result);};
  await command('Page.enable');await command('Network.enable');await command('Network.setBlockedURLs',{urls:['https://*']});let passed=0;
- for(const theme of ['dark','light'])for(const width of [320,390,430,768,1440]){
+ for(const theme of ['dark','light'])for(const width of [256,320,360,390,430,768,1440]){
   await command('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<800});const previous=await evaluate('performance.timeOrigin');await command('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/?theme=${theme}&width=${width}`});
   for(let i=0;i<120;i++){if(await evaluate(`performance.timeOrigin!==${previous}&&!!window.fixtureReady&&!!window.TeamBullsSessionPerformance`))break;await sleep(25);}
   await evaluate(`localStorage.clear();document.documentElement.dataset.theme=${JSON.stringify(theme)};TeamBullsSessionPerformance.ready()`);
+  await evaluate('openExerciseLayout()');
+  await sleep(250);
+  let navGeometry;
+  if(width<=520){
+    navGeometry=await evaluate(`(()=>{
+      const app=document.getElementById('app');
+      const nav=document.querySelector('.tb-v17-hotbar-shell');
+      const button=document.querySelector('#screen-exercise .prescription-actions .btn-primary');
+      app.scrollTop=button.offsetTop-140;
+      const rect=button.getBoundingClientRect();
+      return {appBottom:app.getBoundingClientRect().bottom,navTop:nav.getBoundingClientRect().top,
+        buttonBottom:rect.bottom,buttonHeight:rect.height};
+    })()`);
+  }
   await evaluate(`slowCatalog=true;openLogSessionModal();document.querySelector('#sets-editor [data-f="w"]').value='82.5';document.querySelector('#sets-editor [data-f="r"]').value='10';void 0`);
+  if(width<=520){
+    await evaluate('renderRestTimerPresetsForExercise(exercise);addSetRow(66,8,{targetMin:8,targetMax:12,ger:3,backoff:true});void 0');
+    for(const scale of [1,1.35]){
+      await evaluate(`document.documentElement.style.setProperty('--font-scale',${scale});void 0`);
+      await assertSessionReflow('modal-session',width,scale);
+    }
+    assert(navGeometry.appBottom<=navGeometry.navTop+1,`Navigation overlaps the exercise scroller at ${width}px: ${JSON.stringify(navGeometry)}`);
+    assert(navGeometry.buttonBottom<=navGeometry.navTop+1 && navGeometry.buttonHeight>=44,'Register result must fit above the navigation');
+    if(width===360){
+      await evaluate(`document.documentElement.classList.add('virtual-keyboard-open');document.documentElement.style.setProperty('--app-height','380px');void 0`);
+      await assertSessionReflow('modal-session',width,1.35);
+      await evaluate(`document.documentElement.classList.remove('virtual-keyboard-open');document.documentElement.style.removeProperty('--app-height');void 0`);
+    }
+    await evaluate(`document.querySelector('#sets-editor .backoff-row').remove();document.documentElement.style.removeProperty('--font-scale');void 0`);
+  }
   assert.equal(await evaluate(`getComputedStyle(document.getElementById('session-variant-group')).display`),'block','Cached alternatives must be visible before the delayed network response');
   assert.deepEqual(await evaluate(`[...document.getElementById('input-session-variant').options].map(o=>o.value)`),['','dumbbell','barbell']);
   await evaluate(`(()=>{const s=document.getElementById('input-session-variant');s.value='barbell';s.dispatchEvent(new Event('change',{bubbles:true}));releaseCatalog();})()`);await sleep(30);
@@ -82,6 +179,12 @@ try{
   const saved=await evaluate(`TeamBullsSessionPerformance.sessions().find(s=>s.performedExerciseItemId==='barbell')`);assert(saved,'Real durable session save must contain the chosen alternative');assert.equal(saved.performedExerciseName,'Supino reto com barra');assert.deepEqual(saved.sets.map(s=>({weight:s.weight,reps:s.reps})),[{weight:82.5,reps:10}]);assert.equal(saved.exerciseId,'e');assert.equal(saved.exerciseName,'Supino Reto');assert.equal(saved.week,2);
   assert.equal(await evaluate('JSON.stringify(exercise.sessions.find(s=>s.id==="old"))'),await evaluate('JSON.stringify(JSON.parse(originalHistory)[0])'));
   await evaluate(`slowCatalog=false;openEditSession('old')`);await sleep(25);assert.equal(await evaluate(`selectedVariantData(exercise,'edit-session-variant').performedExerciseName`),'Supino autorizado antigo','Editing notes must retain a variation removed from the catalog');assert.equal(await evaluate(`selectedVariantData(exercise,'edit-session-variant').performedExerciseItemId`),'removed');
+  if(width<=520){
+    await evaluate(`useResistedTime=true;addEditSetRow(62.5,20,{targetMin:15,targetMax:30,ger:4});document.documentElement.style.setProperty('--font-scale',1.35);void 0`);
+    await assertSessionReflow('modal-edit-session',width,1.35);
+    assert.equal(await evaluate("document.querySelector('#edit-sets-editor .performed-set-row:last-child .performed-field-result').textContent.trim()"),'Tempo');
+    await evaluate(`useResistedTime=false;document.documentElement.style.removeProperty('--font-scale');void 0`);
+  }
   await evaluate(`closeModal('modal-edit-session');slowCatalog=true;openLogSessionModal();EXERCISE_OPTIONS={groups:[{...group,items:group.items.filter(i=>i.id!=='barbell')}]};releaseCatalog();void 0`);await sleep(25);assert.equal(await evaluate(`selectedVariantData(exercise,'input-session-variant').performedExerciseItemId`),'barbell','A late catalog deletion must not silently replace the displayed remembered choice');
   await evaluate(`closeModal('modal-session');EXERCISE_OPTIONS={groups:[group]};slowCatalog=true;openLogSessionModal();closeModal('modal-session');CURRENT_USER={uid:'other',role:'student'};releaseCatalog();void 0`);await sleep(25);assert.equal(await evaluate(`document.getElementById('modal-session').classList.contains('open')`),false);
   await evaluate(`slowCatalog=false;openProtocol();document.getElementById('input-workout-name').value='Treino revisado';holdRefresh=true;document.querySelector('#modal-workout [onclick="saveWorkoutFromButton()"]').click();void 0`);
@@ -97,7 +200,7 @@ try{
   await evaluate(`olderRefresh();olderCompletion`);assert.equal(await evaluate(`VIEW_STUDENT.workouts[0].name`),'Nome final','An older reload cannot reapply its previous confirmed name after a newer save');
   assert.deepEqual(await evaluate('errors'),[]);passed++;
  }
- console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, and immediate unlock after confirmation at 320–1440 px in both themes.`);
+ console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, and immediate unlock after confirmation and mobile form reflow at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();
