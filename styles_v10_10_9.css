@@ -204,10 +204,8 @@
     .ger-definition span{font-size:13px;color:var(--text-dim);line-height:1.4;}
     .ger-warning{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fcd34d;border-radius:8px;padding:9px 11px;font-size:11px;line-height:1.45;margin-top:10px;}
 
-    @media(max-width:390px){
-      .performed-cols-header,.performed-set-row{grid-template-columns:18px 57px 44px minmax(48px,1fr) minmax(42px,.8fr) 24px;gap:4px;}
-      .performed-target{font-size:9px}.performed-ger{font-size:8px}.set-edit-input{font-size:13px;}
-    }
+    .performed-field{min-width:0;}
+    .performed-field-label{display:none;}
 
     /* CHART */
     .chart-container{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:14px;}
@@ -3107,6 +3105,182 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
 @media(max-width:350px){
   .tb-v17-hotbar-shell{width:calc(100vw - var(--safe-left,0px) - var(--safe-right,0px))!important;padding-left:calc(4px + var(--safe-left,0px))!important;padding-right:calc(4px + var(--safe-right,0px))!important}
   .tb-v17-hotbar{gap:0!important;padding:3px!important}
+}
+
+@media (max-width:520px) {
+  :is(#modal-session, #modal-edit-session) .modal-sheet {
+    min-width: 0;
+    padding-inline: clamp(10px, 3vw, 16px);
+    overflow-x: hidden;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  :is(#modal-session, #modal-edit-session) .form-input,
+  :is(#modal-session, #modal-edit-session) .set-edit-input {
+    min-width: 0;
+    max-width: 100%;
+    min-height: 44px;
+    font-size: max(16px, calc(16px * var(--font-scale, 1)));
+    line-height: 1.25;
+  }
+
+  :is(#modal-session, #modal-edit-session) select.form-input {
+    appearance: auto;
+  }
+
+  :is(#modal-session, #modal-edit-session) .plan-help {
+    margin: 6px 0 0;
+    font-size: calc(11px * var(--font-scale, 1));
+  }
+
+  :is(#modal-session, #modal-edit-session) .performed-cols-header {
+    display: none;
+  }
+
+  :is(#modal-session, #modal-edit-session) .performed-set-row {
+    grid-template-columns: minmax(2ch, auto) minmax(0, 1fr) minmax(0, 1fr) 44px;
+    grid-template-areas:
+      "number target ger remove"
+      "weight weight result result";
+    gap: 6px;
+    padding: 8px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  .performed-set-row > .set-edit-num { grid-area: number; }
+  .performed-set-row > .performed-target { grid-area: target; }
+  .performed-set-row > .performed-ger { grid-area: ger; }
+  .performed-field-weight { grid-area: weight; }
+  .performed-field-result { grid-area: result; }
+  .performed-set-row > .btn-rm-set {
+    grid-area: remove;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .performed-set-row > :is(.performed-target, .performed-ger) {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    min-width: 0;
+    gap: 3px;
+    overflow-wrap: anywhere;
+    font-size: calc(11px * var(--font-scale, 1));
+  }
+
+  .performed-set-row .ger-meter { max-width: 100%; }
+  .performed-set-row > .backoff-suggestion { grid-column: 1 / -1; }
+
+  .performed-field {
+    display: grid;
+    gap: 4px;
+  }
+
+  .performed-field-label {
+    display: block;
+    color: var(--text-dim);
+    font: 600 calc(11px * var(--font-scale, 1))/1.25 'DM Mono', monospace;
+  }
+
+  #modal-session .rest-timer-head {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  #modal-session .rest-timer-label { flex: 1 1 105px; }
+  #modal-session .rest-timer-presets {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 76px), 1fr)) !important;
+  }
+  #modal-session .rest-timer-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :is(#modal-session, #modal-edit-session) :is(.btn-primary, .btn-ghost, .btn-add-set),
+  #modal-session :is(.rest-timer-presets button, .rest-timer-btn) {
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  #screen-exercise .header-title {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    font-size: calc(clamp(15px, 4.4vw, 20px) * var(--font-scale, 1));
+    line-height: 1.15;
+    letter-spacing: .025em;
+  }
+
+  #screen-exercise :is(.prescription-card-head, .chart-header) {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+
+  #screen-exercise .prescription-card-head > div:first-child {
+    flex: 1 1 130px;
+    min-width: 0;
+  }
+
+  #screen-exercise .week-stepper button {
+    width: 44px;
+    height: 44px;
+  }
+
+  #screen-exercise .prescription-set-row {
+    grid-template-columns: minmax(2ch, auto) minmax(0, 1fr) minmax(0, max-content);
+    gap: 6px;
+  }
+
+  #screen-exercise :is(.prescription-range, .sub-option-name) {
+    overflow-wrap: anywhere;
+  }
+
+  #screen-exercise .ger-pill {
+    flex-wrap: wrap;
+    gap: 3px;
+    white-space: normal;
+  }
+
+  #screen-exercise .sub-option-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  #screen-exercise .prescription-actions {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 124px), 1fr));
+  }
+
+  #screen-exercise .prescription-actions button {
+    min-height: 44px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Keep the exercise scroller above the fixed student navigation. */
+  html.tb-student-home-v17:has(#screen-exercise.active) {
+    --exercise-nav-height: calc(64px + var(--safe-bottom, 0px));
+  }
+
+  html.tb-student-home-v17:has(#screen-exercise.active) #app {
+    max-height: calc(var(--app-height, 100dvh) - var(--exercise-nav-height));
+    padding-bottom: 0;
+  }
+
+  html.tb-student-home-v17 #screen-exercise.active { padding-bottom: 16px; }
+
+  html.tb-student-home-v17:has(#screen-exercise.active) .tb-v17-hotbar-shell {
+    height: var(--exercise-nav-height);
+    padding-top: 4px;
+  }
+
+  html.tb-student-home-v17:has(#screen-exercise.active) .tb-v17-hotbar {
+    padding-block: 3px !important;
+  }
+
+  html.tb-student-home-v17:has(#screen-exercise.active) .tb-v17-hotbar button {
+    height: 44px;
+    padding-block: 2px;
+  }
 }
 
 #modal-exercise .catalog-picker-field{display:grid;min-width:0;gap:5px}

@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111002,
-  "revision": "session-variant-protocol-1",
-  "publishedAt": "2026-11-10T00:00:00Z",
+  "build": 2026111101,
+  "revision": "mobile-session-reflow-1",
+  "publishedAt": "2026-11-11T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Troca de exercício no registro de carga e correção do salvamento de protocolos."
+  "message": "Registro de carga e tela do exercício ajustados para celulares estreitos e texto ampliado."
 }

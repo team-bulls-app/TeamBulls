@@ -5298,8 +5298,8 @@ function addSetRow(weight='',reps='',prescription=null){
   row.innerHTML=`<span class="set-edit-num">${SET_COUNT}</span>
     <span class="performed-target">${target?esc(prescribedRangeLabel(target))+' reps':'extra'}</span>
     <span class="performed-ger">${target?formatGerLevel(target.ger)+renderGerMeter(target.ger):'—'}</span>
-    <input class="set-edit-input" type="number" placeholder="kg" min="0" step="0.5" data-f="w" value="${esc(weight)}" aria-label="Carga realizada">
-    <input class="set-edit-input" type="number" placeholder="reps" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="Repetições realizadas">
+    <label class="performed-field performed-field-weight"><span class="performed-field-label">Carga</span><input class="set-edit-input" type="number" placeholder="kg" min="0" step="0.5" data-f="w" value="${esc(weight)}" aria-label="Carga realizada"></label>
+    <label class="performed-field performed-field-result"><span class="performed-field-label">Reps</span><input class="set-edit-input" type="number" placeholder="reps" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="Repetições realizadas"></label>
     <button class="btn-rm-set" onclick="removeSet(this)">✕</button>`;
   el.appendChild(row);
 }
@@ -5819,8 +5819,8 @@ function addEditSetRow(weight='',reps='',prescription=null){
   row.innerHTML=`<span class="set-edit-num">${EDIT_SET_COUNT}</span>
     <span class="performed-target">${target?esc(prescribedRangeLabel(target))+' reps':'extra'}</span>
     <span class="performed-ger">${target?formatGerLevel(target.ger)+renderGerMeter(target.ger):'—'}</span>
-    <input class="set-edit-input" type="number" placeholder="kg" min="0" step="0.5" data-f="w" value="${esc(weight)}" aria-label="Carga realizada">
-    <input class="set-edit-input" type="number" placeholder="reps" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="Repetições realizadas">
+    <label class="performed-field performed-field-weight"><span class="performed-field-label">Carga</span><input class="set-edit-input" type="number" placeholder="kg" min="0" step="0.5" data-f="w" value="${esc(weight)}" aria-label="Carga realizada"></label>
+    <label class="performed-field performed-field-result"><span class="performed-field-label">Reps</span><input class="set-edit-input" type="number" placeholder="reps" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="Repetições realizadas"></label>
     <button class="btn-rm-set" onclick="removeEditSet(this)">✕</button>`;
   el.appendChild(row);
 }
@@ -6598,7 +6598,43 @@ collectPrescriptionRows=function(){const rows=[...document.querySelectorAll('#pr
 renderSessionPrescriptionSummary=function(exercise,week,elId){const el=document.getElementById(elId);if(!el)return;const summary=prescriptionCompactSummary(exercise,week),partner=findSupersetPartner(exercise);el.innerHTML=summary.rx.sets.length?`<strong>Semana ${week}:</strong> ${esc(summary.reps)} · ${esc(summary.ger)}.${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''}${exerciseHasOptionalTechnique(exercise,'mp')?' <b>Myo Reps opcional: ${esc(summary.reps)} em MP OU ${esc(summary.reps)} em séries normais.</b>':''} Preencha somente o que você conseguiu realizar.`:`<strong>Semana ${week}:</strong> sem prescrição cadastrada. O registro continuará disponível, mas confirme a orientação com o treinador.`;};
 populateSessionEditorForWeek=function(week){const exercise=getE(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos'))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise);};
 function renumberPerformedSetRows(){const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')];rows.forEach((row,index)=>{const num=row.querySelector('.set-edit-num');if(num)num.innerHTML=`${index+1}${row.dataset.backoff==='1'?'<span class="backoff-label">BOS</span>':''}`;});SET_COUNT=rows.length;}
-addSetRow=function(weight='',reps='',prescription=null){if(SET_COUNT>=30){alert('Limite de 30 séries por sessão.');return;}const exercise=getE(SESSION_WID,SESSION_EID),target=normalizePrescriptionSet(prescription),backoff=prescription?.backoff===true,time=exerciseUsesResistedTime(exercise),unit=time?'seg':'reps',el=document.getElementById('sets-editor'),row=document.createElement('div');row.className='performed-set-row'+(backoff?' backoff-row':'');if(target){row.dataset.targetMin=target.targetMin;row.dataset.targetMax=target.targetMax;row.dataset.ger=target.ger;}if(backoff)row.dataset.backoff='1';row.innerHTML=`<span class="set-edit-num"></span><span class="performed-target">${target?esc(prescribedRangeLabel(target))+' '+unit:'extra'}${backoff?'<span class="backoff-label">-20% carga</span>':''}</span><span class="performed-ger">${target?formatGerLevel(target.ger)+renderGerMeter(target.ger):'—'}</span><input class="set-edit-input" type="number" placeholder="kg" min="0" step="0.5" data-f="w" value="${esc(weight)}" aria-label="Carga realizada"><input class="set-edit-input" type="number" placeholder="${time?'seg':'reps'}" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="${time?'Tempo resistido em segundos':'Repetições realizadas'}"><button class="btn-rm-set" ${backoff?'disabled':''} onclick="removeSet(this)">✕</button>${backoff?'<div class="backoff-suggestion">Sugestão de carga: preencha as séries convencionais.</div>':''}`;row.querySelector('[data-f="w"]').addEventListener('input',updateBackoffLoadSuggestion);const existingBackoff=el.querySelector('.performed-set-row[data-backoff="1"]');if(!backoff&&existingBackoff)el.insertBefore(row,existingBackoff);else el.appendChild(row);renumberPerformedSetRows();updateBackoffLoadSuggestion();};
+addSetRow=function(weight='',reps='',prescription=null){
+  if(SET_COUNT>=30){alert('Limite de 30 séries por sessão.');return;}
+  const exercise=getE(SESSION_WID,SESSION_EID);
+  const target=normalizePrescriptionSet(prescription);
+  const backoff=prescription?.backoff===true;
+  const time=exerciseUsesResistedTime(exercise);
+  const unit=time?'seg':'reps';
+  const editor=document.getElementById('sets-editor');
+  const row=document.createElement('div');
+  row.className='performed-set-row'+(backoff?' backoff-row':'');
+  if(target){
+    row.dataset.targetMin=target.targetMin;
+    row.dataset.targetMax=target.targetMax;
+    row.dataset.ger=target.ger;
+  }
+  if(backoff)row.dataset.backoff='1';
+  row.innerHTML=`
+    <span class="set-edit-num"></span>
+    <span class="performed-target">${target?esc(prescribedRangeLabel(target))+' '+unit:'extra'}${backoff?'<span class="backoff-label">-20% carga</span>':''}</span>
+    <span class="performed-ger">${target?formatGerLevel(target.ger)+renderGerMeter(target.ger):'—'}</span>
+    <label class="performed-field performed-field-weight">
+      <span class="performed-field-label">Carga</span>
+      <input class="set-edit-input" type="number" placeholder="kg" min="0" step="0.5" data-f="w" value="${esc(weight)}" aria-label="Carga realizada">
+    </label>
+    <label class="performed-field performed-field-result">
+      <span class="performed-field-label">${time?'Tempo':'Reps'}</span>
+      <input class="set-edit-input" type="number" placeholder="${unit}" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="${time?'Tempo resistido em segundos':'Repetições realizadas'}">
+    </label>
+    <button class="btn-rm-set" ${backoff?'disabled':''} onclick="removeSet(this)">✕</button>
+    ${backoff?'<div class="backoff-suggestion">Sugestão de carga: preencha as séries convencionais.</div>':''}`;
+  row.querySelector('[data-f="w"]').addEventListener('input',updateBackoffLoadSuggestion);
+  const existingBackoff=editor.querySelector('.performed-set-row[data-backoff="1"]');
+  if(!backoff&&existingBackoff)editor.insertBefore(row,existingBackoff);
+  else editor.appendChild(row);
+  renumberPerformedSetRows();
+  updateBackoffLoadSuggestion();
+};
 removeSet=function(btn){const row=btn?.closest('.performed-set-row');if(!row||row.dataset.backoff==='1')return;row.remove();renumberPerformedSetRows();updateBackoffLoadSuggestion();};
 function updateBackoffLoadSuggestion(){const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')],normal=rows.filter(row=>row.dataset.backoff!=='1'),last=[...normal].reverse().map(row=>parseFloat(row.querySelector('[data-f="w"]').value)).find(value=>Number.isFinite(value)&&value>0),backoff=rows.find(row=>row.dataset.backoff==='1');if(!backoff)return;const label=backoff.querySelector('.backoff-suggestion');if(!label)return;if(!last){label.textContent='Sugestão de carga: preencha as séries convencionais.';return;}const suggestion=Math.round(last*.8*2)/2;label.textContent=`Sugestão aproximada: ${suggestion.toLocaleString('pt-BR')} kg (-20% sobre ${last.toLocaleString('pt-BR')} kg). Ajuste ao peso disponível.`;}
 const openLogSessionModalV101=openLogSessionModal;
@@ -6611,7 +6647,32 @@ const openEditSessionV101=openEditSession;
 openEditSession=function(sid){const result=openEditSessionV101.apply(this,arguments);const exercise=getE(EDIT_SESSION_WID,EDIT_SESSION_EID),label=document.getElementById('edit-session-result-label');if(label)label.textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';document.querySelectorAll('#edit-sets-editor .performed-set-row').forEach((row,index)=>{const session=findSessionOwner(sid)?.session,set=session?.sets?.[index];if(set?.backoff){row.dataset.backoff='1';row.classList.add('backoff-row');const target=row.querySelector('.performed-target');if(target)target.innerHTML+='<span class="backoff-label">-20% carga</span>';}});return result;};
 const addEditSetRowV101=addEditSetRow;
 function renumberEditSetRows(){document.querySelectorAll('#edit-sets-editor .performed-set-row').forEach((row,index)=>{const num=row.querySelector('.set-edit-num');if(num)num.innerHTML=`${index+1}${row.dataset.backoff==='1'?'<span class="backoff-label">BOS</span>':''}`;});EDIT_SET_COUNT=document.querySelectorAll('#edit-sets-editor .performed-set-row').length;}
-addEditSetRow=function(weight='',reps='',prescription=null){const before=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')],result=addEditSetRowV101.apply(this,arguments),rows=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')],row=rows.find(item=>!before.includes(item))||rows[rows.length-1],exercise=getE(EDIT_SESSION_WID,EDIT_SESSION_EID),backoff=prescription?.backoff===true;if(row&&exerciseUsesResistedTime(exercise)){row.querySelector('.performed-target').innerHTML=(normalizePrescriptionSet(prescription)?esc(prescribedRangeLabel(normalizePrescriptionSet(prescription)))+' seg':'extra');const input=row.querySelector('[data-f="r"]');input.placeholder='seg';input.setAttribute('aria-label','Tempo resistido em segundos');}if(row&&backoff){row.dataset.backoff='1';row.classList.add('backoff-row');const target=row.querySelector('.performed-target');if(target&&!target.querySelector('.backoff-label'))target.innerHTML+='<span class="backoff-label">-20% carga</span>';}const existingBackoff=document.querySelector('#edit-sets-editor .performed-set-row[data-backoff="1"]');if(row&&!backoff&&existingBackoff&&row!==existingBackoff)existingBackoff.parentNode.insertBefore(row,existingBackoff);renumberEditSetRows();return result;};
+addEditSetRow=function(weight='',reps='',prescription=null){
+  const before=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')];
+  const result=addEditSetRowV101.apply(this,arguments);
+  const rows=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')];
+  const row=rows.find(item=>!before.includes(item))||rows[rows.length-1];
+  const exercise=getE(EDIT_SESSION_WID,EDIT_SESSION_EID);
+  const backoff=prescription?.backoff===true;
+  if(row&&exerciseUsesResistedTime(exercise)){
+    const target=normalizePrescriptionSet(prescription);
+    row.querySelector('.performed-target').innerHTML=target?esc(prescribedRangeLabel(target))+' seg':'extra';
+    const input=row.querySelector('[data-f="r"]');
+    input.placeholder='seg';
+    input.setAttribute('aria-label','Tempo resistido em segundos');
+    row.querySelector('.performed-field-result .performed-field-label').textContent='Tempo';
+  }
+  if(row&&backoff){
+    row.dataset.backoff='1';
+    row.classList.add('backoff-row');
+    const target=row.querySelector('.performed-target');
+    if(target&&!target.querySelector('.backoff-label'))target.innerHTML+='<span class="backoff-label">-20% carga</span>';
+  }
+  const existingBackoff=document.querySelector('#edit-sets-editor .performed-set-row[data-backoff="1"]');
+  if(row&&!backoff&&existingBackoff&&row!==existingBackoff)existingBackoff.parentNode.insertBefore(row,existingBackoff);
+  renumberEditSetRows();
+  return result;
+};
 
 onEditSessionWeekChange=function(){const week=Number(document.getElementById('edit-session-week').value)||1,exercise=getE(EDIT_SESSION_WID||CUR_WORKOUT,EDIT_SESSION_EID||CUR_EX);if(!exercise)return;const actual=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')].map(row=>({weight:row.querySelector('[data-f="w"]').value,reps:row.querySelector('[data-f="r"]').value,backoff:row.dataset.backoff==='1'})),rx=resolveWeekPrescription(exercise,week),targets=effectivePrescriptionSets(exercise,rx.sets);EDIT_SET_COUNT=0;document.getElementById('edit-sets-editor').innerHTML='';const count=Math.max(actual.length,targets.length);for(let index=0;index<count;index++){const source=actual[index]||{},target=targets[index]||null;addEditSetRow(source.weight||'',source.reps||'',target);const row=document.querySelector('#edit-sets-editor .performed-set-row:last-child');if(row&&(target?.backoff||source.backoff)){row.dataset.backoff='1';row.classList.add('backoff-row');}}const label=document.getElementById('edit-session-result-label');if(label)label.textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'edit-session-prescription-summary');};
 

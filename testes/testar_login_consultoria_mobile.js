@@ -13,7 +13,7 @@ const bridge = read('sw_47.js');
 const updater = read('update_v10_10_9.js');
 const version = JSON.parse(read('version.json'));
 const imagePath = path.join(root, 'team-bulls-desktop-login-stone-v2.png');
-const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1';
+const cssUrl = 'styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1';
 const desktopImage = 'team-bulls-desktop-login-stone-v2.png';
 assert.ok(fs.statSync(path.join(root,desktopImage)).size > 30_000, 'A arte desktop deve existir.');
 assert.ok(css.includes(desktopImage) && html.includes(desktopImage), 'CSS e preload precisam entregar a nova arte desktop.');
