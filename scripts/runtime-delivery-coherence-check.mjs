@@ -47,7 +47,7 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='workout-cycle-dates-1','Release precisa identificar o novo calendario de treinos.');
+assert(version.revision==='mixed-food-portions-1','Release precisa identificar a escolha de alimentos diversos.');
 const cycleUsabilityRef='./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability8';
 assert(config.includes(cycleUsabilityRef)&&sw.includes(cycleUsabilityRef)&&updater.includes(cycleUsabilityRef)&&usability.includes("const VERSION='10.10.21-usability8'"),'A ponte do ciclo precisa ser entregue na mesma revisão pelo loader, atualizador e cache.');
 assert(usability.includes('trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer4')&&usability.includes("const EXPECTED_VERSION='10.10.41-updateorganizer4'"),'A agenda precisa exigir a revisão que protege a conclusão de protocolos antigos.');

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
 
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
 const source=fs.readFileSync('modules/student-food-choices-v10_10_64.js','utf8');
@@ -157,10 +158,80 @@ export async function checkFoodChoices(){
   vm.runInNewContext(core.slice(core.indexOf('async function fetchCompletionsToday('),core.indexOf('function isMealDoneToday(')),completionContext);
   assert.deepEqual([...await completionContext.fetchCompletionsToday('student-a')],['done']);
   assert.ok(fs.readFileSync('modules/v107-operations.js','utf8').includes("filter(item=>item.recordType!=='food_choice')"));
-  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices7';
+  const src='student-food-choices-v10_10_64.js?v=10.10.64-foodchoices8';
   for(const file of ['config_v10_7.js','sw.js','sw_47.js','update_v10_10_9.js'])assert.ok(fs.readFileSync(file,'utf8').includes(src),file);
   assert.ok(!source.includes('setInterval('));assert.ok(!source.includes("collection('mealPlans')"));
   console.log('APROVADO — escolhas por porção: tabela real, botões, quantidades, reabertura, offline, erro, confirmação tardia, isolamento e conclusão independente.');
 }
 
-if(import.meta.url===new URL(process.argv[1],'file:').href)await checkFoodChoices();
+export async function checkMixedFoodChoices(){
+  const app=foodApp(),mixedCtx=app.ctx(0,{lineKey:'misc'});
+  const {api,context,meal,list}=app;
+  const food=(name)=>api.foods({mixed:true}).find(item=>item.name.startsWith(name));
+  assert.equal(api.foods({mixed:true}).length,context.FOOD_OPTIONS.misc.length,'Every existing catalog note must be recognized');
+  const milk=food('Leite desnatado'),salmon=food('Salmão'),powder=food('Leite em pó');
+  assert.deepEqual(clone(milk.macros),{prot:500,carb:500});
+  assert.deepEqual(clone(salmon.macros),{prot:1000,gord:1000});
+  context.FOOD_OPTIONS.misc.push(
+    {id:'custom',name:'Alimento do treinador',note:'Equivale a 1/2 porção de proteína + 0,25 porção de carboidrato.'},
+    {id:'ambiguous',name:'Composição desconhecida',note:'Subtrair 1 porção de proteína e ajustar a gordura.'}
+  );
+  assert.deepEqual(clone(food('Alimento do treinador').macros),{prot:500,carb:250});
+  assert.equal(food('Composição desconhecida'),undefined);
+  await app.ready();
+  assert.match(list.innerHTML,new RegExp('value="'+salmon.id+'" [^>]*disabled[^>]*>[^<]*falta gordura'));
+  await assert.rejects(api.save(mixedCtx,[{foodId:salmon.id,portions:1}]),/todos os macros/);
+  await assert.rejects(api.save(mixedCtx,[{foodId:milk.id,portions:2},{foodId:powder.id,portions:2}]),/todos os macros/);
+  assert.equal(app.writes.length,0,'Missing or insufficient macro must block saving');
+
+  const protein=app.ctx(0),carbs=app.ctx(1);
+  const rice=api.foods({group:'carb',count:1}).find(item=>/^arroz/i.test(item.name));
+  const chicken=app.chicken(),fish=app.fish();
+  await api.save(protein,[{foodId:chicken.id,portions:1},{foodId:fish.id,portions:1}]);
+  await api.save(carbs,rice.id);
+  const originalPrescription=meal.items;
+  assert.equal(await api.save(mixedCtx,[{foodId:milk.id,portions:1}]),true);
+  assert.match(list.innerHTML,/restam 1,5/);
+  assert.match(list.innerHTML,/37,5 g \+ 45 g/);
+  assert.match(list.innerHTML,/250 ml/);
+  assert.match(list.innerHTML,/Desconto em porções: 0,5 de proteína · 0,5 de carboidrato/);
+  assert.equal(meal.items,originalPrescription);
+  assert.equal(context.MEAL_COMPLETIONS_TODAY.size,0);
+  const record=()=>[...app.remote.values()].find(item=>item.lineKey==='misc');
+  assert.deepEqual(record().selections,[{foodId:milk.id,portions:1}]);
+  assert.equal(await api.save(carbs,[{foodId:rice.id,portions:1}]),true,'Regular choice must use the available amount');
+  await assert.rejects(api.save(carbs,[{foodId:rice.id,portions:1.5}]),/exatamente 1/);
+  const reopened=foodApp({remote:app.remote});await reopened.ready();
+  assert.match(reopened.list.innerHTML,/37,5 g \+ 45 g/,'A second device must see the same remaining quantities');
+  await api.save(mixedCtx,[]);
+  assert.deepEqual(record().selections,[]);
+  assert.match(list.innerHTML,/50 g \+ 60 g/,'Removing the mixed food restores the existing selections');
+  assert.doesNotMatch(list.innerHTML,/restam 1,5/);
+  await reopened.api.refresh(true);
+  assert.match(reopened.list.innerHTML,/50 g \+ 60 g/);
+
+  const capped=foodApp({offline:true});capped.meal.items='0,25 porção de carboidrato\n1 porção de proteína';await capped.ready();
+  const ctx=capped.ctx(0,{lineKey:'misc'}),milkId=milk.id;
+  const select={value:milkId},button={disabled:true,textContent:''},quantity={textContent:''};
+  const node={dataset:{tbFoodRow:JSON.stringify(Object.values(ctx))},querySelector:selector=>selector.includes('quantity')?quantity:selector.includes('save')?button:null};
+  select.closest=selector=>selector.includes('select')?select:selector.includes('row')?node:null;
+  button.closest=selector=>selector.includes('save')?button:selector.includes('row')?node:null;
+  capped.emit('change',{target:select});
+  assert.equal(quantity.textContent,'125 ml','Selecting the food caps its amount at the limiting macro');
+  assert.equal(button.disabled,false);
+  capped.emit('click',{target:button,preventDefault(){}});await settle();
+  assert.match(capped.list.innerHTML,/carboidrato · coberta pelos alimentos diversos/);
+  assert.match(capped.list.innerHTML,/proteína · restam 0,75/);
+  capped.meal.items='1 porção de proteína';capped.context.renderMealsList();
+  assert.match(capped.list.innerHTML,/descontos foram suspensos/,'Changing the prescription invalidates an incompatible prior choice');
+  assert.doesNotMatch(capped.list.innerHTML,/restam/);
+  const recovered=foodApp({local:capped.local,remote:capped.remote});
+  recovered.meal.items='0,25 porção de carboidrato\n1 porção de proteína';await recovered.ready();
+  assert.equal([...recovered.remote.values()][0].selections[0].portions,.5,'The offline mixed selection syncs on reopening');
+  console.log('APROVADO — alimentos diversos: equivalências legadas, macros obrigatórios, saldo conjunto, ajuste automático, remoção, reabertura e sincronização offline.');
+}
+
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
+  await checkFoodChoices();
+  await checkMixedFoodChoices();
+}

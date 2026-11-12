@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111201,
-  "revision": "workout-cycle-dates-1",
+  "build": 2026111202,
+  "revision": "mixed-food-portions-1",
   "publishedAt": "2026-11-12T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Início editável no treino ativo, atualização do treino em 8 semanas e revisão mensal com intervalo ajustável."
+  "message": "Alimentos diversos podem ser escolhidos na refeição com desconto automático das porções previstas."
 }

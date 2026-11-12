@@ -198,7 +198,7 @@ if('caches' in window){
     './modules/student-workout-library-v10_10_24.js?v=10.10.24-workoutlibrary1',
     './modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact2',
     './modules/student-diet-layout-v10_10_24.js?v=10.10.24-dietlayout1',
-    './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices7',
+    './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices8',
     './modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay2'
   ];
   const modules=[
