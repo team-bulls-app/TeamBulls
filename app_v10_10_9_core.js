@@ -9163,7 +9163,7 @@ async function loadProtocolReviewSchedule(studentUid,force=false){
   try{
     const doc=await cloudGet(db.collection('protocolReviewSchedules').doc(studentUid),'ciclo de atualização completa');
     if(CURRENT_USER?.uid!==owner||role==='trainer'&&VIEW_STUDENT?.uid!==studentUid)return null;
-    let schedule=doc.exists?{intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',...doc.data(),_exists:true}:null;
+    let schedule=doc.exists?{studentId:studentUid,intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',...doc.data(),_exists:true}:null;
     if(role==='trainer'){
       const workouts=VIEW_STUDENT?.workouts||[],active=workouts.find(w=>w.id===activeWorkoutId(workouts));
       if(validIsoDate(active?.startDate)&&(!schedule||schedule.sourceWorkoutId!==active.id||schedule.startDate!==active.startDate)){
@@ -9174,9 +9174,16 @@ async function loadProtocolReviewSchedule(studentUid,force=false){
     V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=studentUid;return schedule;
   }catch(error){console.warn('Cronograma de atualização indisponível',error);return null;}
 }
-function renderTrainerProtocolReview(schedule){
+function trainerActiveWorkout(){
   const workouts=VIEW_STUDENT?.workouts||[],active=workouts.find(workout=>workout.id===activeWorkoutId(workouts));
-  const state=active&&schedule&&schedule.startDate===active.startDate&&schedule.sourceWorkoutId===active.id?v109ProtocolState(schedule):null;
+  return active;
+}
+function trainerActiveProtocolState(schedule,active=trainerActiveWorkout()){
+  if(!active||!schedule||schedule.studentId!==VIEW_STUDENT?.uid||schedule.startDate!==active.startDate||schedule.sourceWorkoutId!==active.id)return null;
+  return v109ProtocolState(schedule);
+}
+function renderTrainerProtocolReview(schedule){
+  const active=trainerActiveWorkout(),state=trainerActiveProtocolState(schedule,active);
   const badge=document.getElementById('trainer-protocol-review-state'),help=document.getElementById('trainer-protocol-review-help'),next=document.getElementById('trainer-protocol-review-next'),complete=document.getElementById('trainer-protocol-review-complete');
   if(!badge||!help||!next)return;
   const startInput=document.getElementById('trainer-protocol-start-date'),intervalInput=document.getElementById('trainer-protocol-interval-weeks');
