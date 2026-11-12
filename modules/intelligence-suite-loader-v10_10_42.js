@@ -1,7 +1,7 @@
 /* Team Bulls v10.10.57 — carregador isolado da suíte de inteligência, progresso e relatórios. */
 'use strict';
 (()=>{
-  const VERSION='10.10.58-intelsuite11';
+  const VERSION='10.10.58-intelsuite12';
   const registeredVersion=String(window.TeamBullsIntelligenceSuiteLoader?.version||'');
   const revision=value=>Number(/-intelsuite(\d+)$/.exec(String(value||''))?.[1]||0);
   if(registeredVersion===VERSION||revision(registeredVersion)>revision(VERSION))return;
@@ -10,7 +10,7 @@
   window.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__=VERSION;
   const specs={
     trainer:[
-      ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
+      ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly2',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly2'],
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite3'],
       ['./modules/trainer-report-link-recovery-v10_10_51.js?v=10.10.51-reportlink1',()=>window.TeamBullsTrainerReportLinkRecovery?.version==='10.10.51-reportlink1'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity7',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity7'],
@@ -22,7 +22,7 @@
       ['./modules/trainer-student-insights-v10_10_42.js?v=10.10.66-studentinsights4',()=>window.TeamBullsTrainerStudentInsights?.version==='10.10.66-studentinsights4']
     ],
     student:[
-      ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly1',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly1'],
+      ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly2',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly2'],
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite3'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge2'],
       ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate7',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate7'],

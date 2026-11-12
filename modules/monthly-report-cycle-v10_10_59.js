@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsMonthlyReports)return;
-  const VERSION='10.10.59-monthly1';
+  const VERSION='10.10.59-monthly2';
   const schedules=new Map();
   let syncPromise=null,syncTrainer='',syncedTrainer='',syncedAt=0;
   const iso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
@@ -14,10 +14,12 @@
 
   function cycle(schedule){
     if(!schedule||!iso(schedule.startDate)||!schedule.studentId||!schedule.trainerId)return null;
-    const weeks=Math.max(1,Math.min(52,Math.trunc(Number(schedule.intervalWeeks)||4)));
-    const anchor=iso(schedule.lastCompletedDate)?schedule.lastCompletedDate:schedule.startDate;
-    const steps=iso(schedule.lastCompletedDate)?1:Math.max(1,Math.trunc(Number(schedule.lastCompletedCycle)||0)+1);
-    const dueDate=addDaysIso(anchor,weeks*7*steps);
+    const state=v109ProtocolState(schedule);
+    if(!state)return null;
+    const {intervalWeeks:weeks,nextDueDate:dueDate}=state;
+    // Preserve the identity of an existing request when its due date stays the same.
+    const completed=schedule.lastCompletedDate;
+    const anchor=iso(completed)&&addDaysIso(completed,weeks*7)===dueDate?completed:schedule.startDate;
     const key=JSON.stringify([schedule.trainerId,schedule.studentId,schedule.startDate,weeks,anchor,dueDate]);
     return{key,dueDate,id:stableEntityId('monthly-report',key)};
   }

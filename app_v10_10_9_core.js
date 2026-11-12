@@ -4750,10 +4750,10 @@ function openEditWorkoutTs(id){if(!VIEW_STUDENT)return;const w=VIEW_STUDENT.work
 
 async function saveWorkout(){
   const name=document.getElementById('input-workout-name').value.trim();
-  const startDate=document.getElementById('input-workout-start-date')?.value||today();
-  const updateDate=document.getElementById('input-workout-update-date')?.value||addDaysIso(startDate,28);
+  const startDate=document.getElementById('input-workout-start-date')?.value;
+  const updateDate=workoutUpdateDate({startDate});
   if(!name){setWorkoutSaveStatus('Digite o nome do treino.',true);return;}
-  if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){setWorkoutSaveStatus('Confira as datas do ciclo: a atualização deve ser no início ou depois.',true);return;}
+  if(!updateDate){setWorkoutSaveStatus('Informe a data de início da prescrição.',true);return;}
   const editingWorkoutId=EDIT_W,modalTarget=MODAL_TARGET,studentUid=modalTarget==='student'?VIEW_STUDENT?.uid:null,color=SEL_COLOR;
   const targetWorkouts=MODAL_TARGET==='student'?(VIEW_STUDENT?.workouts||[]):getWorkouts();
   const saveWorkoutId=editingWorkoutId||(modalTarget==='student'?(WORKOUT_CREATE_ID||(WORKOUT_CREATE_ID=uid())):'');
@@ -4799,6 +4799,7 @@ async function saveWorkout(){
         const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
         const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
         if(card)card.style.setProperty('--wcard-color',color);
+        const dates=card?.querySelector('.workout-card-cycle');if(dates)dates.textContent=v104CycleMeta({startDate,updateDate});
       }
       closeModal('modal-workout');
       showToast('✓ Treino salvo');
@@ -4814,6 +4815,8 @@ async function saveWorkout(){
         const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===editingWorkoutId);
         const title=card?.querySelector('.workout-card-name');if(title)title.textContent=name;
         if(card)card.style.setProperty('--wcard-color',color);
+        const dates=card?.querySelector('.workout-card-cycle');if(dates)dates.textContent=v104CycleMeta({startDate,updateDate});
+        if(V109_PROTOCOL_REVIEW_SCHEDULE?.sourceWorkoutId===editingWorkoutId&&V109_PROTOCOL_REVIEW_SCHEDULE.startDate===startDate)renderTrainerProtocolReview(V109_PROTOCOL_REVIEW_SCHEDULE);
       }
       return true;
     }
@@ -5567,7 +5570,7 @@ async function renderTrainerStudent(s){
       const wid=jsArg(w.id),isActive=String(w.id)===currentActiveId;
       const orderControls=`<div class="workout-order-controls"><button class="order-btn" ${index===0?'disabled':''} onclick="event.stopPropagation();moveTrainerWorkout(${wid},-1)" title="Mover protocolo para cima">↑</button><button class="order-btn" ${index===workouts.length-1?'disabled':''} onclick="event.stopPropagation();moveTrainerWorkout(${wid},1)" title="Mover protocolo para baixo">↓</button></div>`;
       return`<div class="workout-card ${isActive?'is-active':'is-inactive'}" data-workout-id="${esc(w.id)}" style="--wcard-color:${w.color}" onclick="openTsWorkout(${wid})">
-        <div class="workout-card-info"><div class="protocol-state-badge ${isActive?'active':'inactive'}">${isActive?'● TREINO ATIVO':'○ DESATIVADO'}</div><div class="workout-card-name">${esc(w.name)}</div><div class="workout-card-meta">${meta} · ${esc(v104CycleMeta(w))} · ${w.exercises.length} exerc.${isActive?' · plano atual':' · aluno mantém acesso'}</div></div>
+        <div class="workout-card-info"><div class="protocol-state-badge ${isActive?'active':'inactive'}">${isActive?'● TREINO ATIVO':'○ DESATIVADO'}</div><div class="workout-card-name">${esc(w.name)}</div><div class="workout-card-meta">${meta} · <span class="workout-card-cycle">${esc(v104CycleMeta(w))}</span> · ${w.exercises.length} exerc.${isActive?' · plano atual':' · aluno mantém acesso'}</div></div>
         <div class="workout-card-actions">
           ${orderControls}
           ${isActive?'':`<button class="activate-workout-btn" onclick="event.stopPropagation();activateTrainerWorkout(${wid})" title="Definir como treino atual">ATIVAR</button>`}
@@ -7149,15 +7152,27 @@ function v104CycleRange(start,week){
   return`${fmt(from)}–${fmt(to)}`;
 }
 function v104CycleMeta(item){
-  const start=v104DateOr(item?.startDate,''),update=v104DateOr(item?.updateDate,'');
+  const start=v104DateOr(item?.startDate,''),update=workoutUpdateDate(item);
   if(!start&&!update)return'Ciclo sem datas definidas';
   const week=start?v104CycleWeek(start,today()):1;
   return`${start?'Sem. '+week+' · início '+fmt(start):''}${start&&update?' · ':''}${update?'atualização '+fmt(update):''}`;
 }
+function workoutUpdateDate(workout){
+  const start=workout?.startDate;
+  return validIsoDate(start)&&addDaysIso(start,0)===start?addDaysIso(start,56):'';
+}
+function activeWorkoutUpdateDate(){
+  const workouts=getWorkouts()||[],id=activeWorkoutId(workouts);
+  return workoutUpdateDate(workouts.find(workout=>workout.id===id));
+}
+function setWorkoutDateFields(start){
+  document.getElementById('input-workout-start-date').value=start;
+  syncWorkoutUpdateDateFromStart();
+}
 function syncWorkoutUpdateDateFromStart(){
   const start=document.getElementById('input-workout-start-date')?.value;
   const update=document.getElementById('input-workout-update-date');
-  if(validIsoDate(start)&&update)update.value=addDaysIso(start,28);
+  if(update)update.value=workoutUpdateDate({startDate:start});
 }
 function syncDietUpdateDateFromStart(){
   const start=document.getElementById('input-diet-start-date')?.value;
@@ -7244,13 +7259,13 @@ window.addEventListener('resize',syncDesktopRoleLayout,{passive:true});
 
 /* Datas dos protocolos. */
 const V104_OPEN_ADD_WORKOUT=openAddWorkoutModal;
-openAddWorkoutModal=function(){V104_OPEN_ADD_WORKOUT();const start=today();document.getElementById('input-workout-start-date').value=start;document.getElementById('input-workout-update-date').value=addDaysIso(start,28);};
+openAddWorkoutModal=function(){V104_OPEN_ADD_WORKOUT();setWorkoutDateFields(today());};
 const V104_OPEN_EDIT_WORKOUT=openEditWorkout;
-openEditWorkout=function(id){V104_OPEN_EDIT_WORKOUT(id);const w=getW(id);if(!w)return;const start=v104DateOr(w.startDate,today());document.getElementById('input-workout-start-date').value=start;document.getElementById('input-workout-update-date').value=v104DateOr(w.updateDate,addDaysIso(start,28));};
+openEditWorkout=function(id){V104_OPEN_EDIT_WORKOUT(id);const w=getW(id);if(w)setWorkoutDateFields(v104DateOr(w.startDate,today()));};
 const V104_OPEN_ADD_WORKOUT_TS=openAddWorkoutModalTs;
-openAddWorkoutModalTs=function(){V104_OPEN_ADD_WORKOUT_TS();const start=today();document.getElementById('input-workout-start-date').value=start;document.getElementById('input-workout-update-date').value=addDaysIso(start,28);};
+openAddWorkoutModalTs=function(){V104_OPEN_ADD_WORKOUT_TS();setWorkoutDateFields(today());};
 const V104_OPEN_EDIT_WORKOUT_TS=openEditWorkoutTs;
-openEditWorkoutTs=function(id){V104_OPEN_EDIT_WORKOUT_TS(id);const w=VIEW_STUDENT?.workouts?.find(item=>item.id===id);if(!w)return;const start=v104DateOr(w.startDate,today());document.getElementById('input-workout-start-date').value=start;document.getElementById('input-workout-update-date').value=v104DateOr(w.updateDate,addDaysIso(start,28));};
+openEditWorkoutTs=function(id){V104_OPEN_EDIT_WORKOUT_TS(id);const w=VIEW_STUDENT?.workouts?.find(item=>item.id===id);if(w)setWorkoutDateFields(v104DateOr(w.startDate,today()));};
 const V104_SAVE_WORKOUT_BASE=saveWorkout;
 saveWorkout=async function(){
   const studentUid=MODAL_TARGET==='student'?VIEW_STUDENT?.uid:null,start=document.getElementById('input-workout-start-date')?.value,update=document.getElementById('input-workout-update-date')?.value;
@@ -7260,8 +7275,8 @@ saveWorkout=async function(){
 };
 const V104_PROTOCOL_SUMMARY=protocolSummaryHtml;
 protocolSummaryHtml=function(workout,dayName=''){
-  const base=V104_PROTOCOL_SUMMARY(workout,dayName),start=v104DateOr(workout?.startDate,''),update=v104DateOr(workout?.updateDate,'');if(dayName||(!start&&!update))return base;
-  return base+`<div class="protocol-cycle-strip"><span>SEMANA ATUAL <b>${v104CycleWeek(start,today())}/8</b></span><span>${start?esc(v104CycleRange(start,v104CycleWeek(start,today()))):'sem início'}</span><span>ATUALIZAÇÃO <b>${update?esc(fmt(update)):'não definida'}</b></span></div>`;
+  const base=V104_PROTOCOL_SUMMARY(workout,dayName),start=v104DateOr(workout?.startDate,''),update=workoutUpdateDate(workout);if(dayName||(!start&&!update))return base;
+  return base+`<div class="protocol-cycle-strip"><span>SEMANA ATUAL <b>${v104CycleWeek(start,today())}/8</b></span><span>${start?esc(v104CycleRange(start,v104CycleWeek(start,today()))):'sem início'}</span><span>ATUALIZAÇÃO DO TREINO <b>${update?esc(fmt(update)):'não definida'}</b></span></div>`;
 };
 const V104_OPEN_WORKOUT=openWorkout;
 openWorkout=function(id){const w=getW(id);if(w?.startDate)LAST_SESSION_WEEK=v104CycleWeek(w.startDate,today());return V104_OPEN_WORKOUT(id);};
@@ -9047,25 +9062,40 @@ openWeeklyCheckinModal=function(){const result=V109_OPEN_WEEKLY_CHECKIN_MODAL.ap
 
 function v109ProtocolState(schedule,date=today()){
   if(!schedule||schedule._exists===false||!validIsoDate(schedule.startDate))return null;
-  const intervalWeeks=Math.max(1,Math.min(52,Math.trunc(Number(schedule.intervalWeeks)||4))),intervalDays=intervalWeeks*7;
+  const intervalWeeks=protocolReviewInterval(schedule.intervalWeeks),intervalDays=intervalWeeks*7;
   const rawDays=v104DateDiffDays(schedule.startDate,date),days=Math.max(0,rawDays),elapsedCycle=rawDays<0?0:Math.floor(days/intervalDays);
   const lastCompletedCycle=Math.max(0,Math.trunc(Number(schedule.lastCompletedCycle)||0));
-  const pendingCycle=elapsedCycle>lastCompletedCycle?elapsedCycle:0,nextCycle=pendingCycle||Math.max(lastCompletedCycle+1,elapsedCycle+1);
+  const nextCycle=lastCompletedCycle+1,pendingCycle=elapsedCycle>=nextCycle?nextCycle:0;
   const nextDueDate=addDaysIso(schedule.startDate,nextCycle*intervalDays),daysUntil=v104DateDiffDays(date,nextDueDate),weekNumber=rawDays<0?0:Math.floor(days/7)+1;
   return{intervalWeeks,intervalDays,elapsedCycle,lastCompletedCycle,pendingCycle,pending:pendingCycle>0,nextCycle,nextDueDate,daysUntil,weekNumber};
 }
+function protocolReviewInterval(value){
+  return Math.max(1,Math.min(52,Math.trunc(Number(value)||4)));
+}
 function v109CyclePayload(previous,studentUid,workout,trainerUid,intervalWeeks){
-  const restart=!previous||previous.startDate!==workout.startDate||!!previous.sourceWorkoutId&&previous.sourceWorkoutId!==workout.id;
+  const priorWeeks=protocolReviewInterval(previous?.intervalWeeks),weeks=intervalWeeks??priorWeeks;
+  const sameWorkout=!!previous&&(previous.sourceWorkoutId===workout.id||!previous.sourceWorkoutId&&previous.startDate===workout.startDate);
+  const sameStart=sameWorkout&&previous.startDate===workout.startDate;
+  const completedDate=previous?.lastCompletedDate;
+  const keepCompletion=sameWorkout&&(sameStart||validIsoDate(completedDate)&&completedDate>=workout.startDate);
+  let completedCycle=keepCompletion?Math.max(0,Math.trunc(Number(previous.lastCompletedCycle)||0)):0;
+  if(keepCompletion&&(!sameStart||weeks!==priorWeeks)){
+    const completedThrough=validIsoDate(completedDate)?completedDate:addDaysIso(previous.startDate,completedCycle*priorWeeks*7);
+    completedCycle=Math.max(0,Math.floor(v104DateDiffDays(workout.startDate,completedThrough)/(weeks*7)));
+  }
   return{studentId:studentUid,trainerId:trainerUid,sourceWorkoutId:workout.id,startDate:workout.startDate,
-    intervalWeeks:intervalWeeks??Math.max(1,Math.min(52,Math.trunc(Number(previous?.intervalWeeks)||4))),
-    lastCompletedCycle:restart?0:Math.max(0,Math.trunc(Number(previous.lastCompletedCycle)||0)),
-    lastCompletedDate:restart?'':String(previous.lastCompletedDate||''),
-    ...(restart?{lastCompletedAt:null}:{}),updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    intervalWeeks:weeks,lastCompletedCycle:completedCycle,lastCompletedDate:keepCompletion?String(completedDate||''):'',
+    ...(!keepCompletion?{lastCompletedAt:null}:{}),updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
 }
 async function v109PersistWorkoutCycle(studentUid,workoutId,changes={},options={}){
   const trainerUid=CURRENT_USER?.uid,known=options.workouts||VIEW_STUDENT?.workouts||[];
   const sameAccount=()=>MODE==='cloud'&&CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===trainerUid&&auth?.currentUser?.uid===trainerUid;
   if(!studentUid||!sameAccount())throw new Error('Entre como treinador para atualizar o protocolo.');
+  if(changes.startDate!==undefined){
+    const updateDate=workoutUpdateDate({startDate:changes.startDate});
+    if(!updateDate)throw new Error('Informe a data de início da prescrição.');
+    changes={...changes,updateDate};
+  }
   return cloudWrite(db.runTransaction(async transaction=>{
     let editedDoc=null;
     if(workoutId&&!options.create&&!options.activate&&options.intervalWeeks===undefined){
@@ -9099,12 +9129,23 @@ async function v109PersistWorkoutCycle(studentUid,workoutId,changes={},options={
     let active=rows.find(row=>row.id===activeWorkoutId(rows));
     if(options.create||options.activate)active={...current,...changes,id:workoutId};
     else if(current&&active?.id===current.id)active={...active,...changes};
+    if(options.activeStartDate!==undefined){
+      if(!active||active.id!==options.expectedWorkoutId)throw new Error('O treino ativo mudou. Reabra o perfil antes de salvar o ciclo.');
+      if((active.startDate||'')!==options.expectedStartDate&&active.startDate!==options.activeStartDate)throw new Error('O início do treino mudou. Confira a data atual antes de salvar.');
+      const dates={startDate:options.activeStartDate,updateDate:workoutUpdateDate({startDate:options.activeStartDate})};
+      if(!dates.updateDate)throw new Error('Informe a data de início do protocolo.');
+      if(active.startDate!==dates.startDate||active.updateDate!==dates.updateDate)transaction.update(active.ref,dates);
+      active={...active,...dates};
+    }
     const ref=workoutId?db.collection('workouts').doc(workoutId):null;
     if(options.create&&!current)transaction.set(ref,{userId:studentUid,...changes,days:[],order:0,isActive:true,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
     else if(ref&&Object.keys(changes).length)transaction.update(ref,changes);
     if(options.create||options.activate){
       let order=1;for(const row of orderedWorkouts(rows)){if(row.id!==workoutId)transaction.update(row.ref,{order:order++,isActive:false});}
-      if(current)transaction.update(ref,{order:0,isActive:true});
+      if(current){
+        const updateDate=workoutUpdateDate(active);
+        transaction.update(ref,{order:0,isActive:true,...(updateDate?{updateDate}:{})});
+      }
     }
     if(!active||!validIsoDate(active.startDate)){
       if(options.intervalWeeks!==undefined)throw new Error('Defina o início no treino ativo antes de salvar o ciclo.');
@@ -9122,7 +9163,7 @@ async function loadProtocolReviewSchedule(studentUid,force=false){
   try{
     const doc=await cloudGet(db.collection('protocolReviewSchedules').doc(studentUid),'ciclo de atualização completa');
     if(CURRENT_USER?.uid!==owner||role==='trainer'&&VIEW_STUDENT?.uid!==studentUid)return null;
-    let schedule=doc.exists?{intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',...doc.data(),_exists:true}:null;
+    let schedule=doc.exists?{studentId:studentUid,intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:'',...doc.data(),_exists:true}:null;
     if(role==='trainer'){
       const workouts=VIEW_STUDENT?.workouts||[],active=workouts.find(w=>w.id===activeWorkoutId(workouts));
       if(validIsoDate(active?.startDate)&&(!schedule||schedule.sourceWorkoutId!==active.id||schedule.startDate!==active.startDate)){
@@ -9133,12 +9174,44 @@ async function loadProtocolReviewSchedule(studentUid,force=false){
     V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=studentUid;return schedule;
   }catch(error){console.warn('Cronograma de atualização indisponível',error);return null;}
 }
+function trainerActiveWorkout(){
+  const workouts=VIEW_STUDENT?.workouts||[],active=workouts.find(workout=>workout.id===activeWorkoutId(workouts));
+  return active;
+}
+function trainerActiveProtocolState(schedule,active=trainerActiveWorkout()){
+  if(!active||!schedule||schedule.studentId!==VIEW_STUDENT?.uid||schedule.startDate!==active.startDate||schedule.sourceWorkoutId!==active.id)return null;
+  return v109ProtocolState(schedule);
+}
 function renderTrainerProtocolReview(schedule){
-  const state=v109ProtocolState(schedule),badge=document.getElementById('trainer-protocol-review-state'),help=document.getElementById('trainer-protocol-review-help'),next=document.getElementById('trainer-protocol-review-next'),complete=document.getElementById('trainer-protocol-review-complete');if(!badge||!help||!next)return;
-  const startInput=document.getElementById('trainer-protocol-start-date'),intervalInput=document.getElementById('trainer-protocol-interval-weeks');if(startInput){startInput.value=validIsoDate(schedule?.startDate)?schedule.startDate:'';startInput.readOnly=true;}if(intervalInput)intervalInput.value=String(Math.max(1,Number(schedule?.intervalWeeks)||4));
-  if(!state){badge.textContent='NÃO CONFIGURADO';badge.className='quest-status pending';help.textContent='Defina a data de início no treino ativo. O ciclo será calculado automaticamente, a cada 4 semanas por padrão.';next.textContent='Próxima atualização completa: —';if(complete)complete.disabled=true;return;}
-  badge.textContent=state.pending?'ATUALIZAÇÃO PENDENTE':'EM DIA';badge.className='quest-status '+(state.pending?'pending':'answered');help.textContent=`${state.weekNumber?`Semana ${state.weekNumber} do ciclo`:'O protocolo ainda não começou'} · atualização completa a cada ${state.intervalWeeks} semanas. Ajustes semanais não reiniciam a contagem.`;
-  next.innerHTML=state.pending?`Atualização completa nº ${state.pendingCycle} pendente desde <b>${esc(fmt(state.nextDueDate))}</b>.`:`Próxima atualização completa: <b>${esc(fmt(state.nextDueDate))}</b>.`;if(complete)complete.disabled=!state.pending;
+  const active=trainerActiveWorkout(),state=trainerActiveProtocolState(schedule,active);
+  const badge=document.getElementById('trainer-protocol-review-state'),help=document.getElementById('trainer-protocol-review-help'),next=document.getElementById('trainer-protocol-review-next'),complete=document.getElementById('trainer-protocol-review-complete');
+  if(!badge||!help||!next)return;
+  const startInput=document.getElementById('trainer-protocol-start-date'),intervalInput=document.getElementById('trainer-protocol-interval-weeks');
+  if(startInput){
+    startInput.value=validIsoDate(active?.startDate)?active.startDate:'';
+    startInput.readOnly=!active;
+    startInput.dataset.studentId=VIEW_STUDENT?.uid||'';
+    startInput.dataset.workoutId=active?.id||'';
+    startInput.dataset.savedStart=active?.startDate||'';
+  }
+  if(intervalInput)intervalInput.value=String(protocolReviewInterval(schedule?.intervalWeeks));
+  const save=document.getElementById('trainer-protocol-review-save');
+  if(save)save.disabled=!active;
+  renderTrainerWorkoutUpdateDate();
+  if(!state){
+    badge.textContent='NÃO CONFIGURADO';badge.className='quest-status pending';
+    help.textContent=active?'Informe o início e salve o ciclo. A revisão mensal começa com intervalo de 4 semanas.':'Crie ou ative um treino para definir o ciclo.';
+    next.textContent='Próxima revisão mensal: —';if(complete)complete.disabled=true;return;
+  }
+  badge.textContent=state.pending?'REVISÃO PENDENTE':'EM DIA';badge.className='quest-status '+(state.pending?'pending':'answered');
+  help.textContent=`${state.weekNumber?`Semana ${state.weekNumber} desde o início`:'O protocolo ainda não começou'} · revisão mensal a cada ${state.intervalWeeks} semanas.`;
+  next.innerHTML=state.pending?`Revisão mensal nº ${state.pendingCycle} pendente desde <b>${esc(fmt(state.nextDueDate))}</b>.`:`Próxima revisão mensal: <b>${esc(fmt(state.nextDueDate))}</b>.`;
+  if(complete)complete.disabled=!state.pending;
+}
+function renderTrainerWorkoutUpdateDate(){
+  const startDate=document.getElementById('trainer-protocol-start-date')?.value;
+  const updateDate=workoutUpdateDate({startDate}),host=document.getElementById('trainer-protocol-workout-next');
+  if(host)host.innerHTML=`Atualização do treino (8 semanas): <b>${updateDate?esc(fmt(updateDate)):'—'}</b>.`;
 }
 async function loadTrainerProtocolReview(studentUid){
   const trainerUid=CURRENT_USER?.uid;
@@ -9168,17 +9241,31 @@ async function v109SyncProtocolMetadataToWeeklySchedule(studentUid,startDate,nex
 v104SyncCycleSchedule=async function(){return null;};
 async function saveProtocolReviewSchedule(){
   const studentUid=VIEW_STUDENT?.uid,trainerUid=CURRENT_USER?.uid;if(!studentUid||CURRENT_USER?.role!=='trainer')return;
+  const input=document.getElementById('trainer-protocol-start-date'),startDate=input?.value;
+  const expectedWorkoutId=input?.dataset.workoutId,expectedStartDate=input?.dataset.savedStart;
+  if(!expectedWorkoutId||input.dataset.studentId!==studentUid){alert('Abra o treino ativo do aluno antes de salvar o ciclo.');return;}
+  const updateDate=workoutUpdateDate({startDate});
+  if(!updateDate){alert('Informe a data de início do protocolo.');return;}
   const intervalWeeks=Number(document.getElementById('trainer-protocol-interval-weeks').value);
   if(!Number.isInteger(intervalWeeks)||intervalWeeks<1||intervalWeeks>52){alert('Escolha um intervalo entre 1 e 52 semanas.');return;}
-  if(!beginAction('save-protocol-review-schedule'))return;
+  const action='save-protocol-review-schedule',cardId='trainer-protocol-review-card';
+  if(!beginAction(action,cardId))return;
   try{
-    const schedule=await v109PersistWorkoutCycle(studentUid,'',{}, {workouts:VIEW_STUDENT.workouts,intervalWeeks});
+    const snapshot=await cloudGet(db.collection('workouts').where('userId','==',studentUid),'confirmar treino ativo');
     if(CURRENT_USER?.uid!==trainerUid||VIEW_STUDENT?.uid!==studentUid)return;
+    const workouts=snapshot.docs.map(doc=>({...doc.data(),id:doc.id}));
+    const schedule=await v109PersistWorkoutCycle(studentUid,'',{}, {workouts,intervalWeeks,activeStartDate:startDate,expectedWorkoutId,expectedStartDate});
+    if(CURRENT_USER?.uid!==trainerUid||VIEW_STUDENT?.uid!==studentUid)return;
+    const active=VIEW_STUDENT.workouts.find(workout=>workout.id===expectedWorkoutId);
+    if(active)Object.assign(active,{startDate,updateDate});
+    if(VIEW_STUDENT_WORKOUT?.id===expectedWorkoutId)Object.assign(VIEW_STUDENT_WORKOUT,{startDate,updateDate});
+    const card=[...document.querySelectorAll('#ts-workout-list .workout-card')].find(item=>item.dataset.workoutId===expectedWorkoutId);
+    const dates=card?.querySelector('.workout-card-cycle');if(dates&&active)dates.textContent=v104CycleMeta(active);
     V109_PROTOCOL_REVIEW_SCHEDULE=schedule;V109_PROTOCOL_REVIEW_STUDENT=studentUid;
-    renderTrainerProtocolReview(schedule);showToast('✓ Ciclo calculado a partir do início do treino ativo');
-    await v109PrepareMonthlyReview(studentUid,trainerUid);
+    renderTrainerProtocolReview(schedule);showToast('✓ Início do treino e revisão mensal salvos');
+    void v109PrepareMonthlyReview(studentUid,trainerUid);
     loadTrainerProtocolReviewAlerts().catch(()=>{});
-  }catch(error){alert(cloudWriteError(error,'salvar o ciclo de atualização'));}finally{endAction('save-protocol-review-schedule');}
+  }catch(error){if(CURRENT_USER?.uid===trainerUid&&VIEW_STUDENT?.uid===studentUid)alert(cloudWriteError(error,'salvar o ciclo de atualização'));}finally{endAction(action,cardId);}
 }
 async function v109PrepareMonthlyReview(studentUid,trainerUid=CURRENT_USER?.uid){
   try{await ensureReportCycleRuntime();if(CURRENT_USER?.uid!==trainerUid||CURRENT_USER?.role!=='trainer')return;await window.TeamBullsMonthlyReports.ensureForStudent(studentUid);}
@@ -9195,7 +9282,7 @@ async function v109CompleteProtocolReview(studentUid,expected){
     const value=(row,key)=>String(row?.[key]??(key==='intervalWeeks'?4:key==='lastCompletedCycle'?0:''));
     if(keys.some(key=>value(schedule,key)!==value(expected,key)))throw new Error('O protocolo mudou desde que esta tela foi aberta. Confira o novo ciclo antes de concluir.');
     const state=v109ProtocolState(schedule);if(!state?.pending)throw new Error('Esta atualização já foi concluída ou ainda não venceu.');
-    const payload={lastCompletedCycle:state.pendingCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+    const payload={lastCompletedCycle:state.elapsedCycle,lastCompletedDate:today(),lastCompletedAt:firebase.firestore.FieldValue.serverTimestamp(),updatedBy:trainerUid,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     transaction.update(ref,payload);return{...schedule,...payload};
   }),'concluir atualização completa');
 }

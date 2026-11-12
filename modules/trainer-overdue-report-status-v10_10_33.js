@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_OVERDUE_REPORT_STATUS_101033__)return;
   window.__TEAM_BULLS_TRAINER_OVERDUE_REPORT_STATUS_101033__=true;
 
-  const VERSION='10.10.33-overduestatus1';
+  const VERSION='10.10.33-overduestatus2';
   const checkinsByStudent=new Map();
   let dueBoundaryTimer=null;
 
@@ -28,7 +28,7 @@
     return{enabled:true,pending,overdue:pending&&iso(dueDate)&&dueDate<todayIso(),request};
   }
   function protocolState(schedule=currentProtocolSchedule()){
-    try{return typeof v109ProtocolState==='function'?v109ProtocolState(schedule):null;}catch(error){return null;}
+    try{return typeof trainerActiveProtocolState==='function'?trainerActiveProtocolState(schedule):null;}catch(error){return null;}
   }
   function weeklyDescription(state){
     if(!state?.pending||!state.request)return'';
@@ -58,13 +58,13 @@
     if(!badge||!help||!next){scheduleNextBoundary(weekly,monthly);return;}
     const anyPending=monthly.pending||weekly.pending;
     if(monthly.pending&&weekly.pending)badge.textContent='2 PENDÊNCIAS';
-    else if(monthly.pending)badge.textContent='ATUALIZAÇÃO PENDENTE';
+    else if(monthly.pending)badge.textContent='REVISÃO PENDENTE';
     else if(weekly.pending)badge.textContent=weekly.overdue?'RELATÓRIO ATRASADO':'RELATÓRIO PENDENTE';
     else badge.textContent='EM DIA';
     badge.className='quest-status '+(anyPending?'pending':'answered');
-    const cycleHelp=`${monthly.weekNumber?`Semana ${monthly.weekNumber} do ciclo`:'O protocolo ainda não começou'} · atualização completa a cada ${monthly.intervalWeeks} semanas. Ajustes semanais não reiniciam a contagem.`;
+    const cycleHelp=`${monthly.weekNumber?`Semana ${monthly.weekNumber} desde o início`:'O protocolo ainda não começou'} · revisão mensal a cada ${monthly.intervalWeeks} semanas.`;
     help.textContent=weekly.pending?cycleHelp+' '+weeklyDescription(weekly):cycleHelp;
-    const monthlyHtml=monthly.pending?`Atualização completa nº ${monthly.pendingCycle} pendente desde <b>${safe(formatDate(monthly.nextDueDate))}</b>.`:`Próxima atualização completa: <b>${safe(formatDate(monthly.nextDueDate))}</b>.`;
+    const monthlyHtml=monthly.pending?`Revisão mensal nº ${monthly.pendingCycle} pendente desde <b>${safe(formatDate(monthly.nextDueDate))}</b>.`:`Próxima revisão mensal: <b>${safe(formatDate(monthly.nextDueDate))}</b>.`;
     next.innerHTML=weekly.pending?`${weeklyInlineHtml(weekly)} ${monthlyHtml}`:monthlyHtml;
     // Relatório semanal atrasado muda apenas o status visual. Nunca libera a ação mensal.
     if(complete)complete.disabled=!monthly.pending;

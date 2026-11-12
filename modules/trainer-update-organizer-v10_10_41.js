@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_UPDATE_ORGANIZER_101041__)return;
   window.__TEAM_BULLS_TRAINER_UPDATE_ORGANIZER_101041__=true;
 
-  const VERSION='10.10.41-updateorganizer3';
+  const VERSION='10.10.41-updateorganizer4';
   const SCREEN_ID='screen-trainer-update-organizer';
   const ENTRY_ID='tb-trainer-update-organizer-entry';
   const STYLE_ID='tb-trainer-update-organizer-style';
@@ -112,8 +112,8 @@
       const state=monthlyState(monthly);
       if(state&&iso(state.nextDueDate)){currentItems.push(taskItem(student,'monthly',state.nextDueDate,{schedule:monthly,state,cycle:Number(state.pendingCycle||state.nextCycle||0),intervalWeeks:Number(state.intervalWeeks||monthly.intervalWeeks||4)}));}
       else missingItems.push({student,kind:'monthly'});
-      if(monthly&&Math.max(0,Number(monthly.lastCompletedCycle)||0)>0&&iso(monthly.lastCompletedDate)){
-        const cycle=Math.max(0,Math.trunc(Number(monthly.lastCompletedCycle)||0)),intervalWeeks=Math.max(1,Math.min(52,Math.trunc(Number(monthly.intervalWeeks)||4))),scheduledDue=iso(monthly.startDate)?addDays(monthly.startDate,cycle*intervalWeeks*7):monthly.lastCompletedDate;
+      if(monthly&&iso(monthly.lastCompletedDate)){
+        const cycle=Math.max(0,Math.trunc(Number(monthly.lastCompletedCycle)||0)),intervalWeeks=Math.max(1,Math.min(52,Math.trunc(Number(monthly.intervalWeeks)||4))),scheduledDue=cycle&&iso(monthly.startDate)?addDays(monthly.startDate,cycle*intervalWeeks*7):monthly.lastCompletedDate;
         completedItems.push(taskItem(student,'monthly',scheduledDue,{completed:true,completedDate:String(monthly.lastCompletedDate),schedule:monthly,cycle,intervalWeeks}));
       }
     }

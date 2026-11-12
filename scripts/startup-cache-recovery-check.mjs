@@ -48,7 +48,7 @@ assert(sw.includes("'/modules/usability-checkup-v10_10_9.js'"),'Usabilidade esta
 assert(sw.includes("'/modules/student-home-profile-v10_10_12.js'"),'Perfil do aluno não está no caminho mutável.');
 assert(sw.includes("'/modules/student-home-layout-v10_10_15.js'"),'Layout do aluno não está no caminho mutável.');
 assert(sw.includes("'/modules/student-home-layout-runtime-v10_10_16.js'"),'Ponte legada da Home não está no caminho mutável.');
-assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home5"),'Shell não prepara a Home otimizada atual.');
+assert(sw.includes("./modules/student-home-layout-v10_10_15.js?v=10.10.21-home6"),'Shell não prepara a Home otimizada atual.');
 
 assert(sw.includes('async function navigationNetworkFirst'),'Navegação ainda não prioriza uma cópia fresca da rede.');
 assert(!sw.includes('navigationCacheFirst(request,event)'),'Estratégia cache-first antiga reapareceu na navegação.');

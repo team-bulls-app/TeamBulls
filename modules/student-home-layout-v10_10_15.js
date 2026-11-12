@@ -10,7 +10,7 @@
   window.__TEAM_BULLS_STUDENT_HOME_LAYOUT_10_10_17__=true;
   window.__TEAM_BULLS_STUDENT_HOME_LAYOUT_10_10_15__=true;
 
-  const VERSION='10.10.21-home5';
+  const VERSION='10.10.21-home6';
   const REFRESH_TTL=30000;
   const MAX_FEEDBACKS=5;
   const MAX_WEIGHT_POINTS=10;
@@ -220,7 +220,7 @@
     const cells=[...stats.querySelectorAll(':scope > .stat-cell')];if(cells.length<2)return[];
     cells.slice(0,2).forEach((cell,index)=>{
       let slot=cell.querySelector('.tb-v17-next');
-      if(!slot){slot=document.createElement('span');slot.className='tb-v17-next';slot.dataset.kind=index===0?'training':'diet';const label=document.createElement('span'),strong=document.createElement('strong');label.textContent=index===0?'PRÓXIMA ATUALIZAÇÃO':'PRÓXIMO PROTOCOLO';strong.textContent='CARREGANDO...';slot.append(label,strong);cell.appendChild(slot);}
+      if(!slot){slot=document.createElement('span');slot.className='tb-v17-next';slot.dataset.kind=index===0?'training':'monthly';const label=document.createElement('span'),strong=document.createElement('strong');label.textContent=index===0?'ATUALIZAÇÃO DO TREINO':'REVISÃO MENSAL';strong.textContent='CARREGANDO...';slot.append(label,strong);cell.appendChild(slot);}
     });
     return cells.slice(0,2).map(cell=>cell.querySelector('.tb-v17-next'));
   }
@@ -241,22 +241,30 @@
     return host;
   }
 
-  function fallbackProtocolDate(){
-    const text=String(document.getElementById('workout-list')?.textContent||document.getElementById('screen-home')?.textContent||'');
-    const match=text.match(/atualiza(?:ção|cao)\s+(\d{2}\/\d{2}\/\d{4})/i);
-    return match?.[1]||'A DEFINIR';
+  function renderTrainingUpdateDate(slot){
+    const update=typeof activeWorkoutUpdateDate==='function'?activeWorkoutUpdateDate():'';
+    const pending=!!update&&typeof today==='function'&&update<=today();
+    renderProtocolDateSlot(slot,update?fmtDate(update):'A DEFINIR',pending,pending?'TREINO A ATUALIZAR DESDE':'ATUALIZAÇÃO DO TREINO');
+  }
+
+  function renderProtocolDateSlot(slot,date,pending,text){
+    if(!slot)return;
+    const state=pending?'pending':'scheduled',label=slot.querySelector('span'),strong=slot.querySelector('strong');
+    if(slot.dataset.state!==state)slot.dataset.state=state;
+    if(label&&label.textContent!==text)label.textContent=text;
+    if(strong&&strong.textContent!==date)strong.textContent=date;
   }
 
   async function refreshProtocolDate(uid,sequence){
-    const slots=ensureNextDateSlots();if(slots.length<2)return;
-    let date=fallbackProtocolDate(),pending=false;
+    const slot=ensureNextDateSlots()[1];if(!slot)return;
+    let date='A DEFINIR',pending=false;
     try{
       if(uid&&typeof loadProtocolReviewSchedule==='function'&&typeof v109ProtocolState==='function'){
         const schedule=await loadProtocolReviewSchedule(uid,true),state=v109ProtocolState(schedule);if(state?.nextDueDate)date=fmtDate(state.nextDueDate);pending=!!state?.pending;
       }
     }catch(error){console.warn('[Team Bulls] Data de protocolo indisponível',error);}
     if(sequence!==refreshSequence||studentUid()!==uid||!isStudentContext())return;
-    slots.forEach((slot,index)=>{if(!slot)return;const state=pending?'pending':'scheduled',text=pending?'ATUALIZAÇÃO PENDENTE DESDE':index===0?'PRÓXIMA ATUALIZAÇÃO':'PRÓXIMO PROTOCOLO';if(slot.dataset.state!==state)slot.dataset.state=state;const label=slot.querySelector('span'),strong=slot.querySelector('strong');if(label&&label.textContent!==text)label.textContent=text;if(strong&&strong.textContent!==date)strong.textContent=date;});
+    renderProtocolDateSlot(slot,date,pending,pending?'REVISÃO MENSAL PENDENTE DESDE':'REVISÃO MENSAL');
   }
 
   function orderedQueryNeedsFallback(error){
@@ -375,6 +383,7 @@
   async function refreshHome(force=false){
     if(!isStudentContext()||activeScreen()!=='screen-home')return false;
     ensureInsights();
+    renderTrainingUpdateDate(ensureNextDateSlots()[0]);
     const uid=studentUid();
     if(!hasRenderedContext||uid!==lastRenderedUid){
       hasRenderedContext=true;lastRenderedUid=uid;lastRefreshUid='';lastRefreshAt=0;lastRefreshFailed=false;
