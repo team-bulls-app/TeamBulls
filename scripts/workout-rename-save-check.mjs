@@ -38,15 +38,15 @@ async function runTrainerRename({writeFails=false}={}){
   const currentName='Protocolo antigo',newName='Protocolo atualizado';
   const original={id:'w1',name:currentName,color:'#e11d48',startDate:'2026-08-24',updateDate:'2026-09-21',exercises:[{id:'e1',name:'Agachamento'}]};
   const persisted={...original};
-  const title={textContent:currentName},card={dataset:{workoutId:'w1'},style:{setProperty(){}},querySelector:()=>title};
+  const title={textContent:currentName},card={dataset:{workoutId:'w1'},style:{setProperty(){}},querySelector:selector=>selector==='.workout-card-name'?title:null};
   const modal={open:true},status={textContent:'',style:{color:''}};
   const fields={'modal-workout':modal,'input-workout-name':{value:newName},'input-workout-start-date':{value:original.startDate},'input-workout-update-date':{value:original.updateDate},'workout-save-status':status};
   const updates=[];
   const context={
     document:{getElementById:id=>fields[id]||null,querySelectorAll:selector=>selector==='#ts-workout-list .workout-card'?[card]:[]},
     VIEW_STUDENT:{uid:'student-1',workouts:[original]},VIEW_STUDENT_WORKOUT:original,
-    CURRENT_USER:{uid:'trainer-1',role:'trainer'},MODE:'cloud',MODAL_TARGET:'student',EDIT_W:'w1',SEL_COLOR:'#e11d48',WORKOUT_CREATE_ID:null,
-    today:()=> '2026-09-24',addDaysIso:()=> '2026-10-22',validIsoDate:value=>/^\d{4}-\d{2}-\d{2}$/.test(value),
+    CURRENT_USER:{uid:'trainer-1',role:'trainer'},MODE:'cloud',MODAL_TARGET:'student',EDIT_W:'w1',SEL_COLOR:'#e11d48',WORKOUT_CREATE_ID:null,V109_PROTOCOL_REVIEW_SCHEDULE:null,
+    today:()=> '2026-09-24',addDaysIso:(date,days)=>new Date(Date.parse(date)+days*86400000).toISOString().slice(0,10),validIsoDate:value=>/^\d{4}-\d{2}-\d{2}$/.test(value),
     normalizedName:value=>String(value||'').trim().toLowerCase(),beginAction:()=>true,endAction:()=>{},
     setWorkoutSaveStatus:(message,error)=>{status.textContent=message;status.style.color=error?'red':'';},
     auth:{currentUser:{uid:'trainer-1'}},firebase:{firestore:{FieldValue:{serverTimestamp:()=>123}}},
@@ -60,13 +60,14 @@ async function runTrainerRename({writeFails=false}={}){
     console:{error:()=>{}}
   };
   vm.createContext(context);
-  vm.runInContext([...orderingFunctions,...cycleFunctions.slice(0,2)].map(fn).join('\n')+'\n'+saveSource+'\nthis.runSave=saveWorkout;',context);
+  vm.runInContext([...orderingFunctions,...cycleFunctions.slice(0,2),'workoutUpdateDate'].map(fn).join('\n')+'\n'+saveSource+'\nthis.runSave=saveWorkout;',context);
   await context.runSave();
   assert.equal(updates.length,1,'Editar deve escrever um documento existente uma só vez.');
   assert.equal(updates[0].collection,'workouts');
   assert.equal(updates[0].id,'w1');
   assert.equal(updates[0].changes.name,newName);
   assert.deepEqual(Object.keys(updates[0].changes).sort(),['color','name','startDate','updateDate']);
+  assert.equal(updates[0].changes.updateDate,'2026-10-19','An old four-week workout date is recalculated to eight weeks on save');
   assert.equal(original.exercises[0].name,'Agachamento','Exercícios devem permanecer intactos.');
   if(writeFails){
     assert.equal(modal.open,true,'Falha no servidor deve manter o editor aberto.');

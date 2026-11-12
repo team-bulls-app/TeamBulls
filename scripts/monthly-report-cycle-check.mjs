@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
+import {fn} from './protocol-cycle-search-check.mjs';
 
 const read=file=>fs.readFileSync(file,'utf8');
 const core=read('app_v10_10_9_core.js'),source=read('modules/monthly-report-cycle-v10_10_59.js');
@@ -38,6 +39,7 @@ function collection(name,filters=[]){
 context.db={collection};vm.createContext(context);
 vm.runInContext(core.slice(core.indexOf('function stableHash('),core.indexOf('function sessionFingerprint(')),context);
 vm.runInContext(core.slice(core.indexOf('function addDaysIso('),core.indexOf('async function fetchWeeklyCheckins(')),context);
+vm.runInContext(['v104DateDiffDays','protocolReviewInterval','v109ProtocolState'].map(fn).join('\n'),context);
 vm.runInContext(source,context);
 const api=context.window.TeamBullsMonthlyReports;
 const schedule={studentId:'student-a',trainerId:'trainer-a',startDate:'2026-08-24',intervalWeeks:4,lastCompletedCycle:0,lastCompletedDate:''};
@@ -68,7 +70,10 @@ const rescheduled=await api.ensureForStudent('student-a');assert.notEqual(resche
 assert.equal(rescheduled.dueDate,'2026-09-28');assert.equal(tables.questionnaires.size,2,'rescheduling never deletes the old request');
 tables.questionnaires.set(first.id,{...first,answered:true,answers:['Bem','80'],photoIds:['1','2','3','4','5','6']});
 tables.protocolReviewSchedules.set('student-a',{...schedule,lastCompletedDate:'2026-09-23',lastCompletedCycle:1});
-const next=await api.ensureForStudent('student-a');assert.equal(next.dueDate,'2026-10-21');assert.notEqual(next.id,first.id);
+const next=await api.ensureForStudent('student-a');assert.equal(next.dueDate,'2026-10-19');assert.notEqual(next.id,first.id);
+assert.equal(next.dueDate,context.v109ProtocolState(tables.protocolReviewSchedules.get('student-a')).nextDueDate,'The monthly request and administrative card use the same date');
+const legacyOnTime={...schedule,lastCompletedCycle:1,lastCompletedDate:'2026-09-21'};
+assert.equal(api.cycle(legacyOnTime).key,JSON.stringify(['trainer-a','student-a','2026-08-24',4,'2026-09-21','2026-10-19']),'An unchanged due date keeps the legacy request identity');
 assert.equal(tables.questionnaires.get(first.id).answers[0],'Bem');
 const before=writes;await api.ensureForStudent('student-a');assert.equal(writes,before);
 context.CURRENT_USER={uid:'trainer-b',role:'trainer'};context.auth.currentUser.uid='trainer-b';
@@ -118,7 +123,6 @@ context.document={getElementById:id=>id==='tb-home-notice-count'?null:docElement
 context.ACCESS_MODE='cloud-active';context.V109_PROTOCOL_REVIEW_SCHEDULE=null;context.V109_PROTOCOL_REVIEW_STUDENT='';
 context.WEEKLY_CHECKIN_SCHEDULE=null;context.WEEKLY_CHECKINS=[];context.WEEKLY_CHECKIN_REQUEST=null;context.WEEKLY_CHECKIN_STATE_UID='';
 context.renderWeeklyCheckinCard=()=>{};
-context.v109ProtocolState=s=>s?{pending:api.cycle(s).dueDate<=date,nextDueDate:api.cycle(s).dueDate,weekNumber:4,intervalWeeks:4}:null;
 function listenCollection(name){return{where(){return this;},limit(){return this;},onSnapshot(fn){listeners.set(name,fn);return()=>{};},doc:()=>({onSnapshot(fn){listeners.set(name,fn);return()=>{};}})};}
 context.db={collection:listenCollection};
 date='2026-09-20';api.remember('student-a',undefined);
@@ -132,7 +136,7 @@ assert.equal(context.window.TeamBullsStudentRequestRealtime.status().counts.ques
 assert.equal(context.window.TeamBullsStudentRequestRealtime.status().counts.protocol,0,'trainer review must not count as a second student response');
 
 const loader=read('modules/intelligence-suite-loader-v10_10_42.js');
-assert.equal((loader.match(/monthly-report-cycle-v10_10_59.js\?v=10.10.59-monthly1/g)||[]).length,2,'both roles receive the monthly module');
+assert.equal((loader.match(/monthly-report-cycle-v10_10_59.js\?v=10.10.59-monthly2/g)||[]).length,2,'both roles receive the monthly module');
 assert.ok(core.includes('await window.TeamBullsMonthlyReports.assertAvailable(report)'));
 assert.ok(core.includes('await window.TeamBullsMonthlyReports.ensureForStudent(studentUid)'));
 assert.ok(!source.includes('setInterval('));assert.ok(!source.includes('.delete('));

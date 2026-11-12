@@ -16,7 +16,7 @@ const session=read('modules/session-restore-recovery-ux-v10_10_31.js');
 const dates=read('modules/student-home-fast-protocol-date-v10_10_31.js');
 
 has(config,"'./modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1'",'Guard de restauração não está no caminho crítico.');
-has(config,"'./modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates1'",'Datas rápidas não estão no runtime prioritário do aluno.');
+has(config,"'./modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates2'",'Datas rápidas não estão no runtime prioritário do aluno.');
 assert(config.indexOf('student-home-layout-v10_10_15.js')<config.indexOf('student-home-fast-protocol-date-v10_10_31.js'),'Datas rápidas devem executar depois do layout canônico da Home.');
 
 has(session,'const QUIET_WINDOW_MS=12000;','Janela silenciosa de restauração foi alterada.');
@@ -29,8 +29,9 @@ lacks(session,'unregister(','Guard de sessão não pode remover Service Worker.'
 lacks(session,'db.collection(','Guard visual não pode gerar leitura ou gravação Firestore.');
 lacks(session,'setInterval(','Guard visual não deve manter polling permanente.');
 
-has(dates,"const CACHE_PREFIX='team_bulls_home_protocol_date_v1_'",'Home não possui cache local isolado da data do protocolo.');
-has(dates,'stateFromRuntime(uid)||cacheRead(uid)||stateFromHomeText()','Home não prioriza estado em memória/cache antes da rede.');
+has(dates,"const CACHE_PREFIX='team_bulls_home_protocol_date_v2_'",'Home não possui cache local isolado da revisão mensal.');
+has(dates,'stateFromRuntime(uid)||cacheRead(uid)','Home não prioriza estado em memória/cache antes da rede.');
+has(dates,'[data-kind="monthly"]','Cache da revisão mensal não está separado do prazo do treino.');
 has(dates,"strong.textContent=safe.date",'Data rápida não substitui CARREGANDO imediatamente.');
 has(dates,"onlyLoading&&current&&current!=='CARREGANDO...'",'Hotfix pode sobrescrever uma data fresca já renderizada.');
 has(dates,"observer.observe(host,{subtree:true,childList:true,characterData:true})",'Cache de data não acompanha apenas o bloco restrito de estatísticas.');

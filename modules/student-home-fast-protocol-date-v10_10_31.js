@@ -4,8 +4,8 @@
   if(window.__TEAM_BULLS_STUDENT_HOME_FAST_PROTOCOL_DATE_10_10_31__)return;
   window.__TEAM_BULLS_STUDENT_HOME_FAST_PROTOCOL_DATE_10_10_31__=true;
 
-  const VERSION='10.10.31-fastdates1';
-  const CACHE_PREFIX='team_bulls_home_protocol_date_v1_';
+  const VERSION='10.10.31-fastdates2';
+  const CACHE_PREFIX='team_bulls_home_protocol_date_v2_';
   const CACHE_MAX_AGE_MS=14*24*60*60*1000;
   let observer=null;
   let patchedLayout=null;
@@ -36,34 +36,27 @@
       const date=fmtDate(state.nextDueDate);return validDisplayDate(date)?{date,pending:!!state.pending}:null;
     }catch(error){return null;}
   }
-  function stateFromHomeText(){
-    const text=String(document.getElementById('workout-list')?.textContent||document.getElementById('screen-home')?.textContent||'');
-    const match=text.match(/atualiza(?:ção|cao)\s+(\d{2}\/\d{2}\/\d{4})/i);
-    return match?{date:match[1],pending:false}:null;
-  }
-  function slots(){return [...document.querySelectorAll('#screen-home .tb-v17-next')].slice(0,2);}
+  function monthlySlot(){return document.querySelector('#screen-home .tb-v17-next[data-kind="monthly"]');}
   function render(state,{onlyLoading=false}={}){
-    const list=slots();if(list.length<2)return false;
+    const slot=monthlySlot();if(!slot)return false;
     const safe=state&&validDisplayDate(state.date)?state:{date:'A DEFINIR',pending:false};
-    list.forEach((slot,index)=>{
-      const strong=slot.querySelector('strong'),label=slot.querySelector('span');if(!strong)return;
-      const current=String(strong.textContent||'').trim().toUpperCase();
-      if(onlyLoading&&current&&current!=='CARREGANDO...'&&current!=='SINCRONIZANDO...')return;
-      slot.dataset.state=safe.pending?'pending':'scheduled';
-      if(label)label.textContent=safe.pending?'ATUALIZAÇÃO PENDENTE DESDE':index===0?'PRÓXIMA ATUALIZAÇÃO':'PRÓXIMO PROTOCOLO';
-      strong.textContent=safe.date;
-    });
+    const strong=slot.querySelector('strong'),label=slot.querySelector('span');if(!strong)return false;
+    const current=String(strong.textContent||'').trim().toUpperCase();
+    if(onlyLoading&&current&&current!=='CARREGANDO...'&&current!=='SINCRONIZANDO...')return false;
+    slot.dataset.state=safe.pending?'pending':'scheduled';
+    if(label)label.textContent=safe.pending?'REVISÃO MENSAL PENDENTE DESDE':'REVISÃO MENSAL';
+    strong.textContent=safe.date;
     return true;
   }
   function fastRender(){
     if(activeScreen()!=='screen-home'||currentUser()?.role!=='student')return false;
-    const uid=studentUid(),state=stateFromRuntime(uid)||cacheRead(uid)||stateFromHomeText();
+    const uid=studentUid(),state=stateFromRuntime(uid)||cacheRead(uid);
     return render(state,{onlyLoading:true});
   }
   function rememberRenderedDate(){
     const uid=studentUid();if(!uid)return;
-    const first=slots()[0],date=String(first?.querySelector('strong')?.textContent||'').trim();
-    if(validDisplayDate(date))cacheWrite(uid,date,first?.dataset.state==='pending');
+    const slot=monthlySlot(),date=String(slot?.querySelector('strong')?.textContent||'').trim();
+    if(validDisplayDate(date))cacheWrite(uid,date,slot?.dataset.state==='pending');
   }
   function observeSlots(){
     const host=document.getElementById('home-stats');if(!host||typeof MutationObserver!=='function')return false;

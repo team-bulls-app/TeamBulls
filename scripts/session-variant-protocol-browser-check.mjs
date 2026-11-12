@@ -2,7 +2,7 @@
 // All accounts/data are synthetic; external requests are blocked.
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
-const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload','hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
+const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
 const renderPrescription=core.match(/^renderExercisePrescription=function\(exercise,elId,week,canEdit,trainerMode\)\{\r?\n[\s\S]+?^\};/m)?.[0];
 const runtimeRows=['addSetRow','addEditSetRow'].map(name=>{
   const start=core.indexOf(name+'=function(');
@@ -25,7 +25,7 @@ const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]
 const setup=`
 let CURRENT_USER={uid:'s',role:'student'},MODE='cloud',LOCAL_OWNER_UID='',INACTIVE_UID='',LOCAL_DB={},AUTH_STATE_REVISION=1;
 let SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',CUR_WORKOUT='w',CUR_EX='e',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',LAST_SESSION_WEEK=2,SESSION_EDITOR_WEEK=2,SET_COUNT=0,EDIT_SET_COUNT=0,VARIANT_LOAD_SEQ=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
-let MODAL_TARGET='student',EDIT_W='w',SEL_COLOR='#a855f7',WORKOUT_CREATE_ID=null;const PALETTE=['#e11d48','#a855f7'],ACTION_LOCKS=new Set();
+let V109_PROTOCOL_REVIEW_SCHEDULE=null,MODAL_TARGET='student',EDIT_W='w',SEL_COLOR='#a855f7',WORKOUT_CREATE_ID=null;const PALETTE=['#e11d48','#a855f7'],ACTION_LOCKS=new Set();
 window.errors=[];window.messages=[];window.reads=[];window.writes=[];window.slowCatalog=false;window.holdRefresh=false;window.failRefresh=false;window.failWrites=false;window.holdWrite=false;window.releaseWrite=null;window.releaseCatalog=null;window.refreshed=0;
 window.alert=m=>messages.push(String(m));window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});
 const group={id:'g',name:'Supino Reto',items:[{id:'dumbbell',name:'Supino reto com halteres'},{id:'barbell',name:'Supino reto com barra'}]};let EXERCISE_OPTIONS={groups:[group]};

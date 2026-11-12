@@ -23,9 +23,9 @@ const usability=fs.existsSync(usabilityPath)?read(usabilityPath):'';
 const feedback=fs.existsSync(feedbackPath)?read(feedbackPath):'';
 const rules=fs.existsSync(rulesPath)?read(rulesPath):'';
 const worker=fs.existsSync(workerPath)?read(workerPath):'';
-const src='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer3';
+const src='./modules/trainer-update-organizer-v10_10_41.js?v=10.10.41-updateorganizer4';
 
-assert(source.includes("const VERSION='10.10.41-updateorganizer3'"),'Agenda não possui revisão própria.');
+assert(source.includes("const VERSION='10.10.41-updateorganizer4'"),'Agenda não possui revisão própria.');
 assert(source.includes("SCREEN_ID='screen-trainer-update-organizer'"),'Tela dedicada de organização está ausente.');
 assert(source.includes("ENTRY_ID='tb-trainer-update-organizer-entry'"),'Atalho da agenda no perfil do treinador está ausente.');
 assert(source.includes('Organização de atualizações — próximas datas'),'Atalho não comunica a finalidade da agenda.');
@@ -46,7 +46,7 @@ assert(source.includes('Isso é apenas um controle de organização e não marca
 
 const cycleCore=read('app_v10_10_9_core.js');
 assert(source.includes('v109CompleteProtocolReview(item.studentId,schedule)'), 'Agenda deve concluir o ciclo oficial com proteção contra confirmação antiga.');
-assert(cycleCore.includes('transaction.update(ref,payload)')&&cycleCore.includes('lastCompletedCycle:state.pendingCycle')&&cycleCore.includes('lastCompletedDate:today()'), 'Conclusão deve persistir o ciclo canônico em transação.');
+assert(cycleCore.includes('transaction.update(ref,payload)')&&cycleCore.includes('lastCompletedCycle:state.elapsedCycle')&&cycleCore.includes('lastCompletedDate:today()'), 'Conclusão deve registrar a data real e avançar até a última revisão vencida em transação.');
 assert(cycleCore.includes("keys=['sourceWorkoutId','startDate','intervalWeeks','lastCompletedCycle','lastCompletedDate']"), 'Confirmações de protocolos anteriores precisam ser recusadas.');
 assert(source.includes('v109SyncActiveProtocolDates')&&source.includes('v109SyncProtocolMetadataToWeeklySchedule'),'Conclusão mensal não preserva a sincronização de datas do fluxo canônico.');
 assert(source.includes("item.dueDate>todayIso()"),'Atualizações futuras podem ser concluídas antes da data.');
@@ -62,7 +62,7 @@ assert(!source.includes('MutationObserver'),'Agenda não deve adicionar observer
 assert(!source.includes('onSnapshot'),'Agenda não deve manter listeners globais apenas para organização.');
 
 assert(usability.includes(src),'Camada network-first não carrega a agenda do treinador.');
-assert(usability.includes("EXPECTED_VERSION='10.10.41-updateorganizer3'"),'Loader não exige a revisão correta da agenda.');
+assert(usability.includes("EXPECTED_VERSION='10.10.41-updateorganizer4'"),'Loader não exige a revisão correta da agenda.');
 assert(usability.includes("CURRENT_USER?.role==='trainer'&&MODE==='cloud'"),'Loader não restringe download/instalação ao treinador cloud.');
 assert(worker.includes("'/modules/usability-checkup-v10_10_9.js'"),'Ponte de carregamento deixou de ser mutável/network-first no Service Worker.');
 assert(worker.includes("'/modules/trainer-update-organizer-v10_10_41.js'"),'Agenda corrigida precisa ser network-first para não ficar presa no cache antigo.');

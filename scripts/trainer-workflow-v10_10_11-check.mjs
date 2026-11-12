@@ -19,7 +19,8 @@ has(training,"'confirmPropagateWeekTechniques'",'Repasse de técnicas não está
 has(training,'event.stopImmediatePropagation()','Cliques residuais podem furar a trava total.');
 has(workflow,'function nextScheduledDueFromSubmission(schedule,checkins)','Agenda semanal pós-envio foi perdida.');
 has(workflow,'return addDaysIso(last.submittedDate,interval);','Agenda semanal não usa o último envio real.');
-has(schedule,'if(iso(schedule.lastCompletedDate))return addDays(String(schedule.lastCompletedDate),weeks*7);','Agenda mensal não usa a última atualização concluída.');
+has(schedule,'v109ProtocolState(schedule)?.nextDueDate','Agenda mensal não usa a data calculada a partir do treino ativo.');
+lacks(schedule,'__tbCompletionAnchored','A agenda não deve deslocar os prazos com a data real de conclusão.');
 has(schedule,'markProtocolReviewCompleted()','Comentário de segurança não referencia o fluxo oficial de conclusão mensal.');
 lacks(schedule,'sendFeedback=','Feedback não pode avançar automaticamente o ciclo mensal.');
 has(core,'function markProtocolReviewCompleted()','Fluxo oficial de conclusão da atualização mensal desapareceu.');

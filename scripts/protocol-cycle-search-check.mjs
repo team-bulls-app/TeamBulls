@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
 export function fn(name){const start=core.indexOf(`function ${name}(`);assert(start>=0,name);const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));}
-export const cycleFunctions=['v109CyclePayload','v109PersistWorkoutCycle','v109ProtocolState','loadProtocolReviewSchedule','v109PrepareMonthlyReview','v109CompleteProtocolReview'];
+export const cycleFunctions=['v109CyclePayload','v109PersistWorkoutCycle','v109ProtocolState','loadProtocolReviewSchedule','v109PrepareMonthlyReview','v109CompleteProtocolReview','protocolReviewInterval','workoutUpdateDate'];
 export const catalogFunctions=['exerciseOptionsSearchText','exerciseOptionsActiveItems','renderExerciseOptions','clearExerciseOptionsSearch'];
 export const orderingFunctions=['normalizedName','hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId'];
 export function fixture({fail=false,readHook=null,retryHook=null}={}){
@@ -28,7 +28,7 @@ if(process.argv[1]?.endsWith('protocol-cycle-search-check.mjs')){
     const f=fixture(),expected=structuredClone(f.remote['protocolReviewSchedules/s']);await create(f);const before=JSON.stringify(f.remote);await assert.rejects(f.c.v109CompleteProtocolReview('s',expected),/protocolo mudou/);assert.equal(JSON.stringify(f.remote),before,'An old monthly confirmation cannot complete the new protocol');count++;
   }
   {
-    const f=fixture(),s=f.remote['protocolReviewSchedules/s'];s.lastCompletedDate='2026-09-01';s.lastCompletedCycle=0;const next=await f.c.v109CompleteProtocolReview('s',structuredClone(s));assert.equal(next.startDate,'2026-09-01');assert.equal(next.lastCompletedDate,'2026-11-09');assert.equal(f.remote['workouts/old'].updateDate,'2026-12-01');await assert.rejects(f.c.v109CompleteProtocolReview('s',structuredClone(s)),/protocolo mudou/);count++;
+    const f=fixture(),s=f.remote['protocolReviewSchedules/s'];s.lastCompletedDate='2026-09-01';s.lastCompletedCycle=0;const next=await f.c.v109CompleteProtocolReview('s',structuredClone(s));assert.equal(next.startDate,'2026-09-01');assert.equal(next.lastCompletedDate,'2026-11-09');assert.equal(f.c.v109ProtocolState(next).nextDueDate,'2026-11-24','Late completion does not move the calendar');assert.equal(f.remote['workouts/old'].updateDate,'2026-12-01');await assert.rejects(f.c.v109CompleteProtocolReview('s',structuredClone(s)),/protocolo mudou/);count++;
   }
   {
     const f=fixture({retryHook:remote=>{remote['workouts/concurrent']={...remote['workouts/old'],isActive:true,startDate:'2026-11-01'};remote['workouts/old'].isActive=false;remote['protocolReviewSchedules/s']={...remote['protocolReviewSchedules/s'],sourceWorkoutId:'concurrent',startDate:'2026-11-01',intervalWeeks:7};}});
@@ -52,8 +52,47 @@ if(process.argv[1]?.endsWith('protocol-cycle-search-check.mjs')){
     const f=fixture({fail:true}),before=JSON.stringify(f.remote);await assert.rejects(create(f),/unavailable/);assert.equal(JSON.stringify(f.remote),before,'No partial workout/schedule write');count++;
   }
   {
-    const f=fixture();await f.c.v109PersistWorkoutCycle('s','old',{name:'Renomeado'},{workouts:f.c.VIEW_STUDENT.workouts});assert.equal(f.writes.length,1);assert.equal(f.remote['protocolReviewSchedules/s'].lastCompletedDate,'2026-10-30');assert.equal(f.c.v109ProtocolState(f.remote['protocolReviewSchedules/s']).nextDueDate,'2026-11-27');count++;
-    await f.c.v109PersistWorkoutCycle('s','old',{startDate:'2026-11-08'},{workouts:f.c.VIEW_STUDENT.workouts});assert.equal(f.remote['protocolReviewSchedules/s'].lastCompletedDate,'');assert.equal(f.c.v109ProtocolState(f.remote['protocolReviewSchedules/s']).nextDueDate,'2026-12-06');count++;
+    const f=fixture();await f.c.v109PersistWorkoutCycle('s','old',{name:'Renomeado'},{workouts:f.c.VIEW_STUDENT.workouts});assert.equal(f.writes.length,1);assert.equal(f.remote['protocolReviewSchedules/s'].lastCompletedDate,'2026-10-30');assert.equal(f.c.v109ProtocolState(f.remote['protocolReviewSchedules/s']).nextDueDate,'2026-11-24');count++;
+    await f.c.v109PersistWorkoutCycle('s','old',{startDate:'2026-11-08'},{workouts:f.c.VIEW_STUDENT.workouts});assert.equal(f.remote['protocolReviewSchedules/s'].lastCompletedDate,'');assert.equal(f.remote['workouts/old'].updateDate,'2027-01-03');assert.equal(f.c.v109ProtocolState(f.remote['protocolReviewSchedules/s']).nextDueDate,'2026-12-06');count++;
+  }
+  {
+    const f=fixture(),edit={intervalWeeks:6,activeStartDate:'2026-09-07',expectedWorkoutId:'old',expectedStartDate:'2026-09-01'};
+    const result=await f.c.v109PersistWorkoutCycle('s','',{},edit);
+    assert.equal(result.startDate,f.remote['workouts/old'].startDate);
+    assert.equal(result.lastCompletedDate,'2026-10-30','Correcting the same active workout preserves the actual review date');
+    assert.equal(result.lastCompletedCycle,1);
+    assert.equal(f.c.v109ProtocolState(result).nextDueDate,'2026-11-30','The adjustable monthly interval remains anchored to the edited start');
+    assert.equal(f.remote['workouts/old'].updateDate,'2026-11-02','The monthly interval cannot change the fixed 56 days');
+    assert.deepEqual(f.remote['workouts/old'].days,[{name:'A'}]);
+    const firstWriteCount=f.writes.length;
+    await f.c.v109PersistWorkoutCycle('s','',{},edit);
+    assert.equal(f.writes.length,firstWriteCount,'Retry after a lost confirmation must be idempotent');
+    count++;
+  }
+  {
+    const f=fixture({fail:true}),before=JSON.stringify(f.remote);
+    await assert.rejects(f.c.v109PersistWorkoutCycle('s','',{}, {intervalWeeks:4,activeStartDate:'2026-11-10',expectedWorkoutId:'old',expectedStartDate:'2026-09-01'}),/unavailable/);
+    assert.equal(JSON.stringify(f.remote),before);count++;
+  }
+  {
+    const f=fixture();
+    f.remote['workouts/old'].isActive=false;
+    f.remote['workouts/newer']={...f.remote['workouts/old'],startDate:'2026-11-11',isActive:true};
+    f.remote['protocolReviewSchedules/s'].sourceWorkoutId='newer';
+    await assert.rejects(f.c.v109PersistWorkoutCycle('s','',{}, {intervalWeeks:4,activeStartDate:'2026-11-10',expectedWorkoutId:'old',expectedStartDate:'2026-09-01'}),/treino ativo mudou/);
+    assert.equal(f.writes.length,0);count++;
+    const g=fixture();g.remote['workouts/old'].startDate='2026-09-15';
+    await assert.rejects(g.c.v109PersistWorkoutCycle('s','',{}, {intervalWeeks:4,activeStartDate:'2026-11-10',expectedWorkoutId:'old',expectedStartDate:'2026-09-01'}),/início do treino mudou/);
+    assert.equal(g.writes.length,0);count++;
+  }
+  {
+    const f=fixture(),s={startDate:'2026-09-21',intervalWeeks:4,lastCompletedCycle:1,lastCompletedDate:'2026-10-22'};
+    assert.equal(f.c.workoutUpdateDate({startDate:s.startDate,updateDate:'2026-10-19'}),'2026-11-16');
+    assert.equal(f.c.v109ProtocolState(s,'2026-11-12').nextDueDate,'2026-11-16');
+    assert.equal(f.c.v109ProtocolState(s,'2026-11-16').pending,true);
+    assert.equal(f.c.workoutUpdateDate({startDate:'2028-02-15'}),'2028-04-11');
+    assert.equal(f.c.workoutUpdateDate({startDate:'2026-02-31'}),'');
+    count++;
   }
   {
     const f=fixture();f.remote['protocolReviewSchedules/s'].intervalWeeks=6;const s=await create(f);assert.equal(f.c.v109ProtocolState(s).nextDueDate,'2026-12-21');count++;
