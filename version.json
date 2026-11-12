@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111102,
-  "revision": "mobile-proportions-1",
+  "build": 2026111103,
+  "revision": "payment-consultation-1",
   "publishedAt": "2026-11-11T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Início, treino e exercício se adaptam ao tamanho da tela e à fonte escolhida no celular."
+  "message": "Pagamentos confirmados aparecem na lista na hora. Consulte os dados e o comprovante pelo botão Consultar."
 }

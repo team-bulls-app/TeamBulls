@@ -12,18 +12,32 @@ let CARDIO_CONTEXT={trainer:true,local:false,targetUid:'a'},CARDIO_DOCUMENT={mai
 const CARDIO_TIMER_MEMORY=new Map(),ACTION_LOCKS=new Set();let seq=0;
 const seed={main:{id:'m',type:'Esteira',durationMinutes:30,daysPerWeek:3,notes:''},substitutions:[{id:'b',type:'Bike',durationMinutes:30,daysPerWeek:3,order:0},{id:'e',type:'Elíptico',durationMinutes:30,daysPerWeek:3,order:1}]};
 window.remote={'mealPlans/a':{plans:[{id:'diet-keep'}],cardioPlan:structuredClone(seed)}};window.failWrites=false;window.failReceiptLink=false;window.uploads=[];window.deleted=[];window.pendingReads={};window.pendingReceipts={};window.deferReads=false;
+window.holdReceiptUpload=false;window.releaseUpload=null;const listeners=new Map();
 const canSelfManagePlan=()=>false,uid=()=> 'new-'+(++seq),showToast=m=>messages.push(m),cloudWriteError=e=>e.message,cloudWrite=p=>p,withTimeout=p=>p,focusEditorField=()=>{},playSurvivalTone=()=>{};
 const beginAsyncNavigation=()=>++NAVIGATION_SEQ,isNavigationCurrent=n=>n===NAVIGATION_SEQ;
 function showScreen(id){NAVIGATION_SEQ++;document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));document.getElementById(id).classList.add('active');}
-function closeCardioScreen(){}function confirmLogout(){CURRENT_USER=null;}function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}const jsArg=s=>esc(JSON.stringify(s));
+function closeCardioScreen(){}function renderTrainer(){}function confirmLogout(){CURRENT_USER=null;}function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}const jsArg=s=>esc(JSON.stringify(s));
 const firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}};
 const users={docs:[{id:'a',data:()=>({name:'Aluno A',email:'synthetic-a@example.invalid',role:'student',trainerId:'coach',status:'active'})}]};
-function ref(key){return{key,doc:id=>ref(key+'/'+id),collection:name=>ref(key+'/'+name),where:()=>ref(key),limit:()=>ref(key),get:async()=>key==='users'?users:{exists:!!remote[key],data:()=>structuredClone(remote[key])},set:async payload=>{if(failWrites)throw new Error('offline');remote[key]={...remote[key],...structuredClone(payload)};if(failReceiptLink&&payload.receiptPath)throw new Error('timeout-after-commit');},delete:async()=>{deleted.push(key);}};}
-const db={collection:name=>ref(name),runTransaction:async task=>{let stage;const result=await task({get:r=>r.get(),set:(r,payload)=>{stage={r,payload};}});if(failWrites)throw new Error('offline');if(stage)remote[stage.r.key]={...remote[stage.r.key],...structuredClone(stage.payload)};return result;}};
+function snapshot(key){return{docs:Object.entries(remote).filter(([name])=>name.startsWith(key+'/')).map(([name,value])=>({id:name.split('/').at(-1),metadata:{hasPendingWrites:false},data:()=>structuredClone(value)})),docChanges:()=>[]};}
+function ref(key){return{key,doc:id=>ref(key+'/'+id),collection:name=>ref(key+'/'+name),where:()=>ref(key),limit:()=>ref(key),orderBy:()=>ref(key),
+  onSnapshot:(options,receive)=>{const callback=typeof options==='function'?options:receive;listeners.set(key,callback);callback(snapshot(key));return()=>listeners.delete(key);},
+  get:async()=>key==='users'?users:{exists:!!remote[key],data:()=>structuredClone(remote[key]),docs:[]},
+  set:async payload=>{if(failWrites)throw new Error('offline');remote[key]={...remote[key],...structuredClone(payload)};if(failReceiptLink&&payload.receiptPath)throw new Error('timeout-after-commit');},delete:async()=>{deleted.push(key);}};}
+const db={collection:name=>ref(name),runTransaction:async task=>{let stage;const result=await task({get:r=>r.get(),set:(r,payload)=>{stage={r,payload};}});if(failWrites)throw new Error('offline');if(stage)await stage.r.set(stage.payload);return result;}};
+const billing='trainerBilling/coach/payments';
+remote['trainerActivity/coach/meta/index']={indexedVersion:1};
+for(const id of ['a','b','c','d','foreign']){
+  remote[billing+'/history-'+id]={trainerId:'coach',studentId:'a',planType:'quarterly',amountCents:12000,validFrom:'2026-01-15',nextDueDate:'2026-04-15',createdAt:100,
+    note:'Pagamento anterior '+id,receiptPath:'paymentReceipts/'+(id==='foreign'?'other-coach':'coach')+'/a/'+id+'.jpg'};
+}
+window.emitPayments=()=>listeners.get(billing)?.(snapshot(billing));
 function cloudGet(r){if(deferReads&&r.key.startsWith('mealPlans/'))return new Promise(resolve=>pendingReads[r.key]=resolve);return r.get();}
 window.releaseRead=(id,plan)=>pendingReads['mealPlans/'+id]({exists:true,data:()=>({cardioPlan:plan})});
-function ensureStorageService(){return Promise.resolve({ref:key=>({put:async file=>uploads.push({key,name:file.name}),delete:async()=>deleted.push(key),getDownloadURL:()=>new Promise(resolve=>pendingReceipts[key]=resolve)})});}
-window.releaseReceipt=key=>pendingReceipts[key]('/'+key+'.png');
+function ensureStorageService(){return Promise.resolve({ref:key=>({
+  put:async file=>{uploads.push({key,name:file.name});if(holdReceiptUpload)await new Promise(resolve=>releaseUpload=resolve);},
+  delete:async()=>deleted.push(key),getDownloadURL:()=>new Promise(resolve=>pendingReceipts[key]=resolve)})});}
+window.releaseReceipt=key=>pendingReceipts[key]('/'+key.split('/').at(-1)+'.png');
 ${names.map(fn).join('\n')}
 window.readyFixture=true;
 `;
@@ -93,25 +107,41 @@ try {
     await evaluate('releaseRead("b",{main:{id:"b-plan",type:"Cardio B",durationMinutes:10,daysPerWeek:3},substitutions:[]})');await sleep(30);
     await evaluate('releaseRead("a",{main:{id:"a-plan",type:"Cardio A"},substitutions:[]})');await sleep(30);
     assert.equal(await evaluate('CARDIO_DOCUMENT.main.id'),'b-plan');assert((await evaluate('document.getElementById("ts-cardio-content").textContent')).includes('Cardio B'));
-    await evaluate('(async()=>{deferReads=false;await TeamBullsTrainerHub.openPaymentEditor("a");})()');
-    await evaluate(`document.getElementById('tb-payment-amount').value='600';document.getElementById('tb-payment-valid-from').value='2026-09-15';const transfer=new DataTransfer();transfer.items.add(new File(['synthetic receipt'],'receipt.jpg',{type:'image/jpeg'}));const input=document.getElementById('tb-payment-receipt');input.files=transfer.files;input.dispatchEvent(new Event('change'));failReceiptLink=true;document.getElementById('tb-payment-save').click()`);await sleep(45);
+    await evaluate('(async()=>{deferReads=false;await renderTrainer();await TeamBullsTrainerHub.openPayments();await TeamBullsTrainerHub.openPaymentEditor("a");})()');
+    await evaluate(`document.getElementById('tb-payment-amount').value='600';document.getElementById('tb-payment-valid-from').value='2026-09-15';document.getElementById('tb-payment-note').value='Pix <confirmado>';const transfer=new DataTransfer();transfer.items.add(new File(['synthetic receipt'],'receipt.jpg',{type:'image/jpeg'}));const input=document.getElementById('tb-payment-receipt');input.files=transfer.files;input.dispatchEvent(new Event('change'));failReceiptLink=true;holdReceiptUpload=true;document.getElementById('tb-payment-save').click()`);await sleep(45);
+    assert(await evaluate('!document.getElementById("modal-trainer-payment").classList.contains("open")'),'Payment form closes while the attachment is waiting');
+    assert.equal(await evaluate('document.getElementById("tb-payment-save").disabled'),false);
+    assert.match(await evaluate('document.querySelector(".tb-payment-card").textContent'),/600,00.*ENVIANDO COMPROVANTE/,'The new payment appears before any server snapshot');
+    await evaluate('document.querySelector(".tb-payment-actions .secondary").click()');
+    assert.match(await evaluate('document.getElementById("tb-payment-details").textContent'),/Aluno A.*Trimestral.*600,00.*2026-09-15.*2026-12-15.*Pix <confirmado>/);
+    assert.equal(await evaluate('document.querySelectorAll("#modal-payment-receipt :is(input,select,textarea,confirmado)").length'),0,'Consultation is read-only and escapes saved text');
+    assert.match(await evaluate('document.getElementById("tb-payment-attachment-state").textContent'),/já foi salvo.*sendo enviado/);
+    await evaluate('releaseUpload()');await sleep(45);
     assert.equal(await evaluate('uploads.length'),1);assert.equal(await evaluate('deleted.length'),0,'Receipt confirmed by the server must survive a client timeout');
-    assert.equal(await evaluate('Object.entries(remote).find(([key])=>key.startsWith("trainerBilling/coach/payments/"))[1].receiptPath'),await evaluate('uploads[0].key'));
-    assert(await evaluate('!document.getElementById("modal-trainer-payment").classList.contains("open")'));assert.equal(await evaluate('document.getElementById("tb-payment-save").disabled'),false);
-    // The actual module's receipt viewer must keep the latest selection.
-    await evaluate('void TeamBullsTrainerHub.openReceipt("a");void TeamBullsTrainerHub.openReceipt("b")');await sleep(20);
-    await evaluate('releaseReceipt("b")');await sleep(20);await evaluate('releaseReceipt("a")');await sleep(20);
-    assert((await evaluate('document.getElementById("tb-payment-receipt-view").getAttribute("src")')).endsWith('/b.png'));
-    await evaluate('void TeamBullsTrainerHub.openReceipt("c")');await sleep(20);await evaluate('closeModal("modal-payment-receipt");releaseReceipt("c")');await sleep(20);
+    assert.equal(await evaluate('Object.entries(remote).find(([key])=>key.startsWith(billing+"/pay-"))[1].receiptPath'),await evaluate('uploads[0].key'));
+    assert.match(await evaluate('document.getElementById("tb-payment-attachment-state").textContent'),/ainda não foi confirmado/);
+    await evaluate('emitPayments()');await sleep(20);await evaluate('releaseReceipt(uploads[0].key)');await sleep(25);
+    assert(await evaluate('!document.getElementById("tb-payment-receipt-link").hidden'));
+    assert(await evaluate('document.getElementById("tb-payment-attachment-state").hidden'));
+    assert.match(await evaluate('document.querySelector(".tb-payment-card").textContent'),/COMPROVANTE ✓/);
+    // A history action opens that exact record, and older responses cannot replace it.
+    await evaluate('closeModal("modal-payment-receipt");document.querySelector(\x27.tb-payment-history button[onclick*="history-a"]\x27).click()');await sleep(20);
+    assert.match(await evaluate('document.getElementById("tb-payment-details").textContent'),/Pagamento anterior a/);
+    await evaluate('void TeamBullsTrainerHub.openPaymentDetails("history-b")');await sleep(20);
+    await evaluate('releaseReceipt("paymentReceipts/coach/a/b.jpg")');await sleep(20);await evaluate('releaseReceipt("paymentReceipts/coach/a/a.jpg")');await sleep(20);
+    assert((await evaluate('document.getElementById("tb-payment-receipt-view").getAttribute("src")')).endsWith('/b.jpg.png'));
+    await evaluate('void TeamBullsTrainerHub.openPaymentDetails("history-c")');await sleep(20);await evaluate('closeModal("modal-payment-receipt");releaseReceipt("paymentReceipts/coach/a/c.jpg")');await sleep(20);
     assert(await evaluate('!document.getElementById("modal-payment-receipt").classList.contains("open")'));assert.equal(await evaluate('document.getElementById("tb-payment-receipt-view").getAttribute("src")'),null);
-    await evaluate('void TeamBullsTrainerHub.openReceipt("d")');await sleep(20);
-    await evaluate('confirmLogout();CURRENT_USER={uid:"coach",role:"trainer"};openModal("modal-payment-receipt");releaseReceipt("d")');await sleep(20);
+    assert.equal(await evaluate('TeamBullsTrainerHub.openPaymentDetails("history-foreign")'),false);
+    assert.equal(await evaluate('!!pendingReceipts["paymentReceipts/other-coach/a/foreign.jpg"]'),false,'Foreign receipt paths cannot be fetched');
+    await evaluate('void TeamBullsTrainerHub.openPaymentDetails("history-d")');await sleep(20);
+    await evaluate('confirmLogout();CURRENT_USER={uid:"coach",role:"trainer"};openModal("modal-payment-receipt");releaseReceipt("paymentReceipts/coach/a/d.jpg")');await sleep(20);
     assert.equal(await evaluate('document.getElementById("tb-payment-receipt-view").getAttribute("src")'),null,'Logout must invalidate a receipt request even if the same trainer signs in again');
-    await evaluate('CURRENT_USER={uid:"a",role:"student"}');assert.equal(await evaluate('TeamBullsTrainerHub.savePayment()'),false);assert.equal(await evaluate('TeamBullsTrainerHub.openReceipt("denied")'),false,'Student cannot use trainer receipt actions');
+    await evaluate('CURRENT_USER={uid:"a",role:"student"}');assert.equal(await evaluate('TeamBullsTrainerHub.savePayment()'),false);assert.equal(await evaluate('TeamBullsTrainerHub.openPaymentDetails("history-a")'),false,'Student cannot use trainer payment details');
     assert.deepEqual(await evaluate('errors'),[]);results.push({width,height});
   }
   assert.deepEqual(exceptions,[]);
-  console.log('PASS deep browser clicks at 390/1440 px: active timer preserved on failure, cardio save/retry with concurrent addition, stale student read, real payment module with uncertain receipt link and receipt viewer selection/close.');
+  console.log('PASS deep browser clicks at 390/1440 px: cardio regressions, immediate payment confirmation, read-only consultation and history, delayed receipt link, access scope and stale receipt selection/close.');
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();server.close();
