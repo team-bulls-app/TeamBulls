@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__)return;
   window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__=true;
 
-  const VERSION='10.10.21-usability8';
+  const VERSION='10.10.21-usability9';
   const scrollByHistoryKey=new Map();
   let scrollFrame=0;
   let profileLogoutHooks=false;
@@ -202,8 +202,8 @@
 
 /* Carrega o quadro semanal corrigido por uma camada network-first já existente. */
 (()=>{
-  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout3';
-  const EXPECTED_VERSION='10.10.40-weeklayout3';
+  const SRC='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
+  const EXPECTED_VERSION='10.10.40-weeklayout4';
   let loading=null;
   const studentContext=()=>{
     try{

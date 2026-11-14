@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111202,
-  "revision": "mixed-food-portions-1",
-  "publishedAt": "2026-11-12T00:00:00Z",
+  "build": 2026111401,
+  "revision": "student-techniques-nutrition-1",
+  "publishedAt": "2026-11-14T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Alimentos diversos podem ser escolhidos na refeição com desconto automático das porções previstas."
+  "message": "Técnicas em destaque no treino do aluno e orientações alimentares editáveis pelo treinador."
 }
