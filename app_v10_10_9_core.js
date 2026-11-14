@@ -2331,8 +2331,10 @@ function renderExerciseRows(exercises,trainerMode=false){
     const eid=jsArg(e.id);
     const orderControls=trainerMode?`<div class="exercise-order-controls"><button class="drag-handle" data-drag-handle="exercise" onclick="event.stopPropagation()" title="Segure e arraste para reordenar" aria-label="Arrastar exercício">⋮⋮</button><button class="order-btn" ${index===0?'disabled':''} onclick="event.stopPropagation();moveTrainerExercise(${eid},-1)" title="Mover exercício para cima">↑</button><button class="order-btn" ${index===ordered.length-1?'disabled':''} onclick="event.stopPropagation();moveTrainerExercise(${eid},1)" title="Mover exercício para baixo">↓</button></div>`:'';
     const instructionHint=String(e.instructions||'').trim()?` · 📝 ${esc(String(e.instructions).trim().slice(0,70))}${String(e.instructions).trim().length>70?'…':''}`:'';
-    const techniqueItems=techniqueItemsForExercise(e),partner=findSupersetPartner(e);
-    const techniqueBadges=techniqueItems.length?`<div class="exercise-row-techniques">${techniqueItems.map(item=>`<span>${esc(item.code)}</span>`).join('')}${partner?`<b>Conjugado com ${esc(partner.name)}</b>`:''}</div>`:'';
+    const partner=findSupersetPartner(e,undefined,week),techniqueItems=trainerMode?techniqueItemsForExercise(e,week):[];
+    const techniqueBadges=trainerMode
+      ?(techniqueItems.length?`<div class="exercise-row-techniques">${techniqueItems.map(item=>`<span>${esc(item.code)}</span>`).join('')}${partner?`<b>Conjugado com ${esc(partner.name)}</b>`:''}</div>`:'')
+      :studentTechniqueLabels(e,week);
     return`<div class="exercise-row ${trainerMode?'trainer-orderable reorderable-card':''} ${partner?'superset-linked':''}" data-reorder-exercise="${esc(e.id)}" onclick="${trainerMode?'openTsExercise':'openExercise'}(${eid})"><div class="exercise-row-dot"></div><div class="exercise-row-info"><div class="exercise-row-name">${esc(e.name)}</div><div class="exercise-row-last">${info}${instructionHint}</div>${techniqueBadges}</div>${orderControls}${trainerMode?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="event.stopPropagation();showConfirm('Excluir exercício','Excluir este exercício? O histórico de séries fica preservado.',function(){deleteTsExercise(${eid});})" title="Excluir">🗑</button>`:''}<div class="exercise-row-arrow">›</div></div>`;
   }).join('');
 }
@@ -2348,7 +2350,11 @@ function renderWorkout(){
 }
 function openDay(dayName){
   const w=getW(CUR_WORKOUT),day=getWorkoutDays(w).find(item=>normalizedName(item.name)===normalizedName(dayName));if(!w||!day)return goWorkout();
+  const loading=loadTechniqueCatalog(),owner=CURRENT_USER?.uid,catalog=TECHNIQUE_CATALOG;
   CUR_DAY=day.name;renderDay();showScreen('screen-day');
+  void loading.then(next=>{
+    if(next!==catalog&&CURRENT_USER?.uid===owner&&CUR_WORKOUT===w.id&&CUR_DAY===day.name&&activeScreenId()==='screen-day')renderDay();
+  });
 }
 function renderDay(){
   const w=getW(CUR_WORKOUT);if(!w)return goHome();const day=getWorkoutDays(w).find(item=>normalizedName(item.name)===normalizedName(CUR_DAY));if(!day)return goWorkout();
@@ -6250,6 +6256,17 @@ document.addEventListener('visibilitychange',()=>{
 ══════════════════════════════════════════════════ */
 const GENERAL_INSTRUCTIONS_CACHE_KEY='team_bulls_general_instructions_v1';
 const TECHNIQUE_CATALOG_CACHE_KEY='team_bulls_training_techniques_v1';
+const DEFAULT_NUTRITION_INSTRUCTIONS_TEXT=`• Pesar os alimentos já preparados (cozidos, assados etc.).
+• Priorizar alimentos frescos.
+• Prefira alimentos mais limpos, como arroz, mandioca, batata, frango, peixe, grãos, sementes e cereais.
+• Usar pouco sódio.
+• Dar preferência a temperos naturais, como canela, alho, cebola, pimentão, cebolinha, coentro, salsa, pimenta-do-reino e orégano.
+• Bebidas zero calorias à vontade.
+• Prefira refeições livres mais limpas.
+• Não exagere no óleo na hora de preparar os alimentos.
+• Priorize alimentos com bastante fibra.
+• Os vegetais podem ser remanejados conforme a preferência do aluno, desde que seja ingerida a quantidade prescrita, sem mais nem menos.
+• Comer alimentos que estão na dieta, mas preparados com excesso de gordura deixa de se enquadrar na proposta por elevar gordura, sódio e calorias. Exemplos: frango frito, comida japonesa com muitos molhos, carnes vermelhas gordas, excesso de óleo no preparo e marmitas preparadas com muita gordura.`;
 const DEFAULT_GENERAL_INSTRUCTIONS_TEXT=`Realizar 2 séries de AQUECIMENTO antes do primeiro exercício.
 
 Realizar de 1 a 3 séries PREPARATÓRIAS antes das séries válidas e realizar pelo menos 2 séries preparatórias no primeiro exercício.
@@ -6297,7 +6314,14 @@ let EDIT_TECHNIQUE_ID='';
 const CATALOG_EDITOR_CONTEXTS={};
 
 function defaultGeneralInstructionsLibrary(){
-  return{catalogVersion:1,revision:1,folders:[{id:'general',name:'Orientações gerais',active:true,locked:true,order:0,items:[{id:'general-main',title:'Instruções gerais',text:DEFAULT_GENERAL_INSTRUCTIONS_TEXT,videoUrl:'',active:true,locked:true,order:0}]}]};
+  return{catalogVersion:1,revision:1,nutritionInitialized:true,folders:[
+    {id:'general',name:'Orientações gerais',active:true,locked:true,order:0,items:[{id:'general-main',title:'Instruções gerais',text:DEFAULT_GENERAL_INSTRUCTIONS_TEXT,videoUrl:'',active:true,locked:true,order:0}]},
+    defaultNutritionInstructionFolder()
+  ]};
+}
+function defaultNutritionInstructionFolder(){
+  return{id:'nutrition',name:'Alimentação · observações e orientações',active:true,locked:false,order:1,
+    items:[{id:'nutrition-main',title:'Orientações para preparo e escolhas alimentares',text:DEFAULT_NUTRITION_INSTRUCTIONS_TEXT,videoUrl:'',active:true,locked:false,order:0}]};
 }
 function normalizeInstructionItem(value,index=0){
   const source=value&&typeof value==='object'?value:{};
@@ -6319,8 +6343,11 @@ function normalizeGeneralInstructions(value){
     standard.items=standard.items.map(item=>item.id==='general-main'?main:item);
     folders=folders.map(folder=>folder.id==='general'?standard:folder);
   }
+  if(source.nutritionInitialized!==true&&!folders.some(folder=>folder.id==='nutrition'||folder.items.some(item=>item.id==='nutrition-main'))){
+    folders.push({...defaultNutritionInstructionFolder(),order:Math.max(...folders.map(folder=>folder.order))+1});
+  }
   folders=folders.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name,'pt-BR')).map((folder,i)=>({...folder,order:i,items:folder.items.sort((a,b)=>a.order-b.order||a.title.localeCompare(b.title,'pt-BR')).map((item,j)=>({...item,order:j}))}));
-  return{catalogVersion:1,revision:Math.max(1,parseInt(source.revision,10)||1),folders};
+  return{catalogVersion:1,revision:Math.max(1,parseInt(source.revision,10)||1),nutritionInitialized:true,folders};
 }
 function defaultTechniqueCatalog(){return{catalogVersion:1,revision:1,items:DEFAULT_TECHNIQUE_DEFINITIONS.map(item=>({...item}))};}
 function normalizeTechniqueItem(value,index=0){
@@ -6538,10 +6565,20 @@ function exerciseHasOptionalTechnique(exercise,id){return exerciseOptionalTechni
 function exerciseUsesResistedTime(exercise){return exerciseHasTechnique(exercise,'is');}
 function techniqueItemsForExercise(exercise){const ids=exerciseTechniqueIds(exercise);return ids.map(id=>TECHNIQUE_CATALOG.items.find(item=>item.id===id)).filter(Boolean);}
 function renderExerciseTechniquePanels(exercise,trainerMode=false){const techniqueHost=document.getElementById(trainerMode?'ts-exercise-techniques-box':'exercise-techniques-box'),supersetHost=document.getElementById(trainerMode?'ts-exercise-superset-box':'exercise-superset-box');if(!techniqueHost||!supersetHost||!exercise)return;const items=techniqueItemsForExercise(exercise);techniqueHost.innerHTML=items.length?`<div class="exercise-technique-panel"><div class="exercise-technique-panel-head">Técnicas aplicadas</div><div class="exercise-technique-chips">${items.map(item=>`<button class="exercise-technique-chip ${exerciseHasOptionalTechnique(exercise,item.id)?'optional':''}" onclick="openTechniqueDetail(${jsArg(item.id)})">${esc(item.code)} · ${esc(item.name)}${exerciseHasOptionalTechnique(exercise,item.id)?' · OPCIONAL':''}</button>`).join('')}</div></div>`:'';const partner=findSupersetPartner(exercise);if(partner){const open=trainerMode?`openTsExercise(${jsArg(partner.id)})`:`openExercise(${jsArg(partner.id)})`;supersetHost.innerHTML=`<div class="superset-card"><span class="superset-badge">SS</span><div class="superset-main"><div class="superset-title">Conjugado com ${esc(partner.name)}</div><div class="superset-note">Execute os dois exercícios em sequência conforme a orientação.</div></div><button class="superset-open" onclick="${open}">ABRIR</button></div>`;}else supersetHost.innerHTML='';}
+function refreshStudentExerciseTechniquePanels(){
+  const exercise=getE(CUR_WORKOUT,CUR_EX);if(!exercise||activeScreenId()!=='screen-exercise')return;
+  const repsButton=document.getElementById('btn-reps');
+  if(repsButton)repsButton.textContent=exerciseUsesResistedTime(exercise)?'TEMPO':'REPS';
+  const loading=loadTechniqueCatalog(),owner=CURRENT_USER?.uid,catalog=TECHNIQUE_CATALOG;
+  renderExerciseTechniquePanels(exercise,false);
+  void loading.then(next=>{
+    if(next!==catalog&&CURRENT_USER?.uid===owner&&activeScreenId()==='screen-exercise'&&getE(CUR_WORKOUT,CUR_EX)===exercise)renderExerciseTechniquePanels(exercise,false);
+  });
+}
 const renderExerciseV101=renderExercise;
-renderExercise=function(){const result=renderExerciseV101.apply(this,arguments);const exercise=getE(CUR_WORKOUT,CUR_EX);if(exercise){const repsButton=document.getElementById('btn-reps');if(repsButton)repsButton.textContent=exerciseUsesResistedTime(exercise)?'TEMPO':'REPS';loadTechniqueCatalog().then(()=>renderExerciseTechniquePanels(exercise,false));}return result;};
+renderExercise=function(){const result=renderExerciseV101.apply(this,arguments);refreshStudentExerciseTechniquePanels();return result;};
 const openExerciseV101=openExercise;
-openExercise=function(eid){const result=openExerciseV101.apply(this,arguments);const exercise=getE(CUR_WORKOUT,CUR_EX);if(exercise){const repsButton=document.getElementById('btn-reps');if(repsButton)repsButton.textContent=exerciseUsesResistedTime(exercise)?'TEMPO':'REPS';loadTechniqueCatalog().then(()=>renderExerciseTechniquePanels(exercise,false));}return result;};
+openExercise=function(eid){const result=openExerciseV101.apply(this,arguments);refreshStudentExerciseTechniquePanels();return result;};
 const openTsExerciseV101=openTsExercise;
 openTsExercise=function(eid){const result=openTsExerciseV101.apply(this,arguments);if(VIEW_STUDENT_EXERCISE){const repsButton=document.getElementById('ts-btn-reps');if(repsButton)repsButton.textContent=exerciseUsesResistedTime(VIEW_STUDENT_EXERCISE)?'TEMPO':'REPS';loadTechniqueCatalog().then(()=>renderExerciseTechniquePanels(VIEW_STUDENT_EXERCISE,true));}return result;};
 
@@ -7603,6 +7640,22 @@ exerciseResultUnit=function(exercise,week=inferExerciseTechniqueWeek(exercise)){
 exerciseTimerPresets=function(exercise,week=inferExerciseTechniqueWeek(exercise)){const ids=new Set(exerciseTechniqueIds(exercise,week)),standard=[60,90,120,150,180],short=[20,25,30,35,40,45];let values=[];if(ids.has('mp')&&exerciseHasOptionalTechnique(exercise,'mp',week))values=[...short,...standard];else if(ids.has('cs')||ids.has('mp')||ids.has('it'))values=[...short];else values=[...standard];if(ids.has('rest-pause'))values.push(10,15,20,...standard);if(ids.has('dcs'))values.push(20,...standard);if(ids.has('is'))values.push(35,40,45,...standard);return[...new Set(values)].sort((a,b)=>a-b);};
 renderRestTimerPresetsForExercise=function(exercise,week=inferExerciseTechniqueWeek(exercise)){const host=document.getElementById('rest-timer-presets');if(!host)return;const items=techniqueItemsForExercise(exercise,week);host.innerHTML=(items.length?`<div class="timer-context">Semana ${week} · ${esc(items.map(item=>item.code).join(' · '))}</div>`:'')+exerciseTimerPresets(exercise,week).map(seconds=>`<button onclick="startRestTimer(${seconds})">${timerLabel(seconds)}</button>`).join('');};
 function weekTechniqueSummary(exercise,week){const items=techniqueItemsForExercise(exercise,week);if(!items.length)return'<span class="week-technique-none">Sem técnica nesta semana</span>';return items.map(item=>`<span>${esc(item.code)}${exerciseHasOptionalTechnique(exercise,item.id,week)?' · opcional':''}</span>`).join('');}
+function studentTechniqueLabels(exercise,week,showDetails=false){
+  const items=techniqueItemsForExercise(exercise,week);
+  if(!items.length)return '';
+  const labels=items.map(item=>{
+    const optional=exerciseHasOptionalTechnique(exercise,item.id,week);
+    const content=`<span class="student-technique-code">${esc(item.code)}</span><span class="student-technique-name">${esc(item.name)}${optional?'<small>Opcional</small>':''}</span>`;
+    return showDetails
+      ?`<button type="button" class="student-technique-label" onclick="openTechniqueDetail(${jsArg(item.id)})">${content}<span class="student-technique-action">Como fazer</span></button>`
+      :`<span class="student-technique-label">${content}</span>`;
+  }).join('');
+  return `<span class="student-technique-labels">${labels}</span>`;
+}
+function studentTechniqueGuide(exercise,week){
+  const labels=studentTechniqueLabels(exercise,week,true);
+  return labels?`<div class="student-technique-guide"><b>Técnicas prescritas · semana ${esc(week)}</b>${labels}</div>`:'';
+}
 const V1058_CHANGE_EXERCISE_WEEK=changeExerciseWeek;
 changeExerciseWeek=function(delta,trainerMode){
   V1058_CHANGE_EXERCISE_WEEK(delta,trainerMode);
@@ -7611,16 +7664,26 @@ changeExerciseWeek=function(delta,trainerMode){
 };
 renderExerciseTechniquePanels=function(exercise,trainerMode=false){
   const week=trainerMode?(Number(TRAINER_ACTIVE_WEEK)||1):(Number(LAST_SESSION_WEEK)||1),techniqueHost=document.getElementById(trainerMode?'ts-exercise-techniques-box':'exercise-techniques-box'),supersetHost=document.getElementById(trainerMode?'ts-exercise-superset-box':'exercise-superset-box');if(!techniqueHost||!supersetHost||!exercise)return;
-  const items=techniqueItemsForExercise(exercise,week);techniqueHost.innerHTML=`<div class="exercise-technique-panel"><div class="exercise-technique-panel-head">Técnicas · semana ${week}</div><div class="exercise-technique-chips">${items.length?items.map(item=>`<button class="exercise-technique-chip ${exerciseHasOptionalTechnique(exercise,item.id,week)?'optional':''}" onclick="openTechniqueDetail(${jsArg(item.id)})">${esc(item.code)} · ${esc(item.name)}${exerciseHasOptionalTechnique(exercise,item.id,week)?' · OPCIONAL':''}</button>`).join(''):'<span class="week-technique-none">Nenhuma técnica nesta semana</span>'}</div></div>`;
+  const items=trainerMode?techniqueItemsForExercise(exercise,week):[];techniqueHost.innerHTML=trainerMode?`<div class="exercise-technique-panel"><div class="exercise-technique-panel-head">Técnicas · semana ${week}</div><div class="exercise-technique-chips">${items.length?items.map(item=>`<button class="exercise-technique-chip ${exerciseHasOptionalTechnique(exercise,item.id,week)?'optional':''}" onclick="openTechniqueDetail(${jsArg(item.id)})">${esc(item.code)} · ${esc(item.name)}${exerciseHasOptionalTechnique(exercise,item.id,week)?' · OPCIONAL':''}</button>`).join(''):'<span class="week-technique-none">Nenhuma técnica nesta semana</span>'}</div></div>`:'';
+  if(!trainerMode){
+    const guide=document.querySelector('#exercise-prescription-card [data-student-technique-guide]');
+    if(guide)guide.innerHTML=studentTechniqueGuide(exercise,week);
+  }
   const partner=findSupersetPartner(exercise,workoutContainingExercise(exercise),week);if(partner){const open=trainerMode?`openTsExercise(${jsArg(partner.id)})`:`openExercise(${jsArg(partner.id)})`;supersetHost.innerHTML=`<div class="superset-card"><span class="superset-badge">SS</span><div class="superset-main"><div class="superset-title">Semana ${week} · conjugado com ${esc(partner.name)}</div><div class="superset-note">Este vínculo de Super set vale para esta semana.</div></div><button class="superset-open" onclick="${open}">ABRIR</button></div>`;}else supersetHost.innerHTML='';
 };
 renderExercisePrescription=function(exercise,elId,week,canEdit,trainerMode){
   const el=document.getElementById(elId);if(!el||!exercise)return;const base=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,base.sets,week),completed=(exercise.sessions||[]).filter(session=>Number(session.week)===Number(week)),unit=exerciseResultUnit(exercise,week);
   const rows=sets.length?sets.map((set,index)=>`<div class="prescription-set-row ${set.backoff?'backoff-row':''}"><span class="prescription-set-number">${index+1}ª${set.backoff?'<span class="backoff-label">BOS</span>':''}</span><span class="prescription-range">${esc(prescribedRangeLabel(set))} ${unit}${set.backoff?'<span class="backoff-label">-20% de carga</span>':''}</span><span class="ger-pill">${formatGerLevel(set.ger)} ${renderGerMeter(set.ger)}</span></div>`).join(''):'<div class="prescription-empty">Nenhuma série prescrita para esta semana.</div>';
   const source=base.inherited?`Herdada da semana ${base.sourceWeek}`:(base.sourceWeek?'Personalizada nesta semana':'Aguardando prescrição'),target=trainerMode?'trainer':'local',action=canEdit?`<button class="btn-primary" onclick="openPrescriptionModal(${jsArg(exercise.id)},${week},'${target}')">✎ EDITAR PRESCRIÇÃO</button>`:`<button class="btn-primary" onclick="openLogSessionModal()">REGISTRAR RESULTADO</button>`;
-  el.innerHTML=`<div class="prescription-card"><div class="prescription-card-head"><div><div class="prescription-eyebrow">Prescrição do treinador</div><div class="prescription-title">Semana ${week}</div><div class="prescription-source">${esc(source)}</div></div><div class="week-stepper"><button onclick="changeExerciseWeek(-1,${trainerMode?'true':'false'})" ${week<=1?'disabled':''}>‹</button><span>${week}/8</span><button onclick="changeExerciseWeek(1,${trainerMode?'true':'false'})" ${week>=8?'disabled':''}>›</button></div></div><div class="prescription-week-techniques"><b>TÉCNICAS DA SEMANA</b><div>${weekTechniqueSummary(exercise,week)}</div></div><div class="prescription-set-list">${rows}</div>${exerciseHasOptionalTechnique(exercise,'mp',week)?'<div class="optional-technique-note"><b>MP OPCIONAL</b> — o aluno pode executar estas séries em Myo Reps ou de forma convencional.</div>':''}${completed.length?`<div class="prescription-result">✓ ${completed.length} ${completed.length===1?'sessão registrada':'sessões registradas'} nesta semana</div>`:''}<div class="prescription-actions"><button class="btn-ghost" onclick="openGerInfo()">? ESCALA GER</button>${action}</div></div>`;
+  const techniques=trainerMode?`<div class="prescription-week-techniques"><b>TÉCNICAS DA SEMANA</b><div>${weekTechniqueSummary(exercise,week)}</div></div>`:`<div data-student-technique-guide>${studentTechniqueGuide(exercise,week)}</div>`;
+  el.innerHTML=`<div class="prescription-card"><div class="prescription-card-head"><div><div class="prescription-eyebrow">Prescrição do treinador</div><div class="prescription-title">Semana ${week}</div><div class="prescription-source">${esc(source)}</div></div><div class="week-stepper"><button onclick="changeExerciseWeek(-1,${trainerMode?'true':'false'})" ${week<=1?'disabled':''}>‹</button><span>${week}/8</span><button onclick="changeExerciseWeek(1,${trainerMode?'true':'false'})" ${week>=8?'disabled':''}>›</button></div></div>${techniques}<div class="prescription-set-list">${rows}</div>${exerciseHasOptionalTechnique(exercise,'mp',week)?'<div class="optional-technique-note"><b>MP OPCIONAL</b> — o aluno pode executar estas séries em Myo Reps ou de forma convencional.</div>':''}${completed.length?`<div class="prescription-result">✓ ${completed.length} ${completed.length===1?'sessão registrada':'sessões registradas'} nesta semana</div>`:''}<div class="prescription-actions"><button class="btn-ghost" onclick="openGerInfo()">? ESCALA GER</button>${action}</div></div>`;
 };
-renderSessionPrescriptionSummary=function(exercise,week,elId){const el=document.getElementById(elId);if(!el)return;const summary=prescriptionCompactSummary(exercise,week),partner=findSupersetPartner(exercise,workoutContainingExercise(exercise),week),techniques=techniqueItemsForExercise(exercise,week);el.innerHTML=summary.rx.sets.length?`<strong>Semana ${week}:</strong> ${esc(summary.reps)} · ${esc(summary.ger)}.${techniques.length?` <b>Técnicas: ${esc(techniques.map(item=>item.code).join(' · '))}.</b>`:''}${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''}${exerciseHasOptionalTechnique(exercise,'mp',week)?' <b>Myo Reps opcional: escolha MP ou séries normais.</b>':''} Preencha somente o que você conseguiu realizar.`:`<strong>Semana ${week}:</strong> sem prescrição cadastrada. O registro continuará disponível, mas confirme a orientação com o treinador.`;};
+renderSessionPrescriptionSummary=function(exercise,week,elId){
+  const el=document.getElementById(elId);if(!el)return;
+  const summary=prescriptionCompactSummary(exercise,week),partner=findSupersetPartner(exercise,workoutContainingExercise(exercise),week);
+  const info=summary.rx.sets.length?`${esc(summary.reps)} · ${esc(summary.ger)}.${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''} Preencha somente o que você conseguiu realizar.`:'Sem prescrição de séries. Confirme a orientação com o treinador.';
+  el.innerHTML=`<strong>Semana ${week}:</strong> ${info}${studentTechniqueGuide(exercise,week)}`;
+};
 populateSessionEditorForWeek=function(week){const exercise=getE(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets,week);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos',week))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise,week)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise,week);renderOptionalTechniqueMode(exercise);};
 
 function currentWeekTechniqueEditorConfig(){

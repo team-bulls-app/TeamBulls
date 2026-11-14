@@ -3,6 +3,11 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
 const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
+const techniqueNames=['studentTechniqueLabels','studentTechniqueGuide','openTechniqueDetail'];
+const hasTechniqueGuide=core.includes('function studentTechniqueGuide(');
+if(hasTechniqueGuide)names.push(...techniqueNames);
+const renderSessionGuide=hasTechniqueGuide?core.match(/^renderSessionPrescriptionSummary=function\(exercise,week,elId\)\{\r?\n[\s\S]+?^\};/m)?.[0]:'';
+if(hasTechniqueGuide)assert(renderSessionGuide);
 const renderPrescription=core.match(/^renderExercisePrescription=function\(exercise,elId,week,canEdit,trainerMode\)\{\r?\n[\s\S]+?^\};/m)?.[0];
 const runtimeRows=['addSetRow','addEditSetRow'].map(name=>{
   const start=core.indexOf(name+'=function(');
@@ -24,7 +29,7 @@ const stylesheet=baseline<0?fs.readFileSync('styles_v10_10_9.css'):spawnSync('gi
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const setup=`
 let CURRENT_USER={uid:'s',role:'student'},MODE='cloud',LOCAL_OWNER_UID='',INACTIVE_UID='',LOCAL_DB={},AUTH_STATE_REVISION=1;
-let SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',CUR_WORKOUT='w',CUR_EX='e',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',LAST_SESSION_WEEK=2,SESSION_EDITOR_WEEK=2,SET_COUNT=0,EDIT_SET_COUNT=0,VARIANT_LOAD_SEQ=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
+let SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',CUR_WORKOUT='w',CUR_EX='e',CUR_DAY='A',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',LAST_SESSION_WEEK=2,SESSION_EDITOR_WEEK=2,SET_COUNT=0,EDIT_SET_COUNT=0,VARIANT_LOAD_SEQ=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
 let V109_PROTOCOL_REVIEW_SCHEDULE=null,MODAL_TARGET='student',EDIT_W='w',SEL_COLOR='#a855f7',WORKOUT_CREATE_ID=null;const PALETTE=['#e11d48','#a855f7'],ACTION_LOCKS=new Set();
 window.errors=[];window.messages=[];window.reads=[];window.writes=[];window.slowCatalog=false;window.holdRefresh=false;window.failRefresh=false;window.failWrites=false;window.holdWrite=false;window.releaseWrite=null;window.releaseCatalog=null;window.refreshed=0;
 window.alert=m=>messages.push(String(m));window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});
@@ -41,18 +46,32 @@ let useResistedTime=false,FONT_SCALE_RULES_PREPARED=false;
 function saveSession(){throw new Error('The registered-student durable save module must handle this click');}window.TeamBulls107={flushPendingMutationSync:async()=>{}};
 const normalizePrescriptionSet=s=>s?.targetMin?s:null,prescribedRangeLabel=()=> '8–12',resolveWeekPrescription=()=>({sets:[{targetMin:8,targetMax:12,ger:2}]}),prescriptionCompactSummary=e=>({rx:resolveWeekPrescription(),reps:'8–12',ger:'2'});
 const effectivePrescriptionSets=(_exercise,sets)=>sets,exerciseResultUnit=()=> 'reps';
-const weekTechniqueSummary=()=> '<span>UNL</span>',techniqueItemsForExercise=()=>[{code:'UNL'}];
-const exerciseHasOptionalTechnique=()=>false,exerciseTimerPresets=()=>[60,90,120,150,180];
+const TECHNIQUE_CATALOG={items:[
+  {id:'unl',code:'UNL',name:'Unilateral',description:'Faça um lado de cada vez.'},
+  {id:'mp',code:'MP',name:'Myo Reps com nome personalizado para a prescrição do treinador',description:'Siga a técnica prescrita.'}
+]};
+const weekTechniqueSummary=()=> '<span>UNL</span>';
+const techniqueItemsForExercise=(_exercise,week)=>TECHNIQUE_CATALOG.items.filter((_,index)=>index===Number(week)-1);
+const exerciseHasOptionalTechnique=(_exercise,id,week)=>id==='mp'&&week===2;
+const exerciseTimerPresets=()=>[60,90,120,150,180],findSupersetPartner=()=>null,workoutContainingExercise=()=>tree[0];
+const getWorkoutDays=()=>[{name:'A'}],exercisesForDay=w=>w.exercises;
+function renderDay(){}
+function openStudentWeekExercise(id,week){
+  CUR_EX=id;LAST_SESSION_WEEK=week;showLayoutScreen('screen-exercise');
+  renderExercisePrescription(exercise,'exercise-prescription-card',week,false,false);
+}
 function renderExercisePrescription(){}
 const renderOptionalTechniqueMode=()=>{},renderEditOptionalTechniqueMode=()=>{},selectedPerformedTechniqueMode=()=>'',resetRestTimer=()=>{},focusEditorField=()=>{};
 const findSessionOwner=id=>({exercise,session:exercise.sessions.find(s=>s.id===id),workout:tree[0]});
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const jsArg=s=>esc(JSON.stringify(String(s)));
 const cachedExerciseCatalog=()=>({groups:[group]});async function loadExerciseOptions(){if(slowCatalog)await new Promise(r=>releaseCatalog=r);return EXERCISE_OPTIONS;}
 async function renderTrainerStudent(){refreshed++;if(holdRefresh)await new Promise(r=>window.releaseRefresh=r);if(failRefresh)throw new Error('refresh unavailable');}
 ${names.map(source).join('\n')}
 const addEditSetRowV101=addEditSetRow;
 ${runtimeRows.join('\n')}
 ${renderPrescription}
+${renderSessionGuide}
 ${profileHeader}
 function showLayoutScreen(id){
   document.querySelectorAll('.screen.active').forEach(screen=>screen.classList.remove('active'));
@@ -96,8 +115,8 @@ window.openExerciseLayout=()=>{
 window.openProtocol=()=>{CURRENT_USER={uid:'t',role:'trainer'};VIEW_STUDENT={uid:'s',name:'Aluno de teste',workouts:tree};openEditWorkoutTs('w');document.getElementById('input-workout-start-date').value='2026-08-29';document.getElementById('input-workout-update-date').value='2026-10-24';};
 const baseSave=saveWorkout;saveWorkout=function(){return window.saveCompletion=baseSave();};window.fixtureReady=true;
 `;
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script></body>');
-const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end([profileCss,homeCss,summaryCss].join('\n'));if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script><script src="/week.js"></script></body>');
+const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end([profileCss,homeCss,summaryCss].join('\n'));if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/week.js')return res.end(fs.readFileSync('modules/student-week-workout-layout-v10_10_40.js'));if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : ['google-chrome','chromium','chromium-browser'].map(name => spawnSync('which',[name],{encoding:'utf8'}).stdout?.trim()).find(Boolean));
@@ -186,6 +205,34 @@ try{
   await evaluate(`localStorage.clear();document.documentElement.dataset.theme=${JSON.stringify(theme)};document.body.dataset.ambience='0';TeamBullsSessionPerformance.ready()`);
   await evaluate('openExerciseLayout()');
   await sleep(250);
+  if(hasTechniqueGuide){
+    const drill=await evaluate(`(()=>{
+      showLayoutScreen('screen-day');
+      const weekly=TeamBullsStudentWeekWorkoutLayout;
+      weekly.render();
+      const sheet=document.getElementById('tb-student-day-week-sheet');
+      const previous=()=>sheet.querySelector('[data-week-delta="-1"]').click();
+      const next=()=>sheet.querySelector('[data-week-delta="1"]').click();
+      const labels=()=>[...sheet.querySelectorAll('.student-technique-name')].map(label=>label.textContent);
+      const inWeek2=labels();
+      previous();const inWeek1=labels();next();next();const inWeek3=labels();previous();
+      sheet.querySelector('[data-week-exercise="e"]').click();
+      const prescription=document.getElementById('exercise-prescription-card');
+      const guide=prescription.querySelector('.student-technique-guide');
+      const button=guide.querySelector('button');
+      const rect=button.getBoundingClientRect(),card=guide.getBoundingClientRect();
+      button.click();
+      const detail=document.getElementById('modal-technique-detail').classList.contains('open')&&document.getElementById('technique-detail-body').textContent;
+      closeModal('modal-technique-detail');
+      return {inWeek2,inWeek1,inWeek3,guide:guide.textContent,detail,fits:rect.width<=card.width&&rect.height>=44};
+    })()`);
+    assert.deepEqual(drill.inWeek1,['Unilateral']);
+    assert.deepEqual(drill.inWeek2,['Myo Reps com nome personalizado para a prescrição do treinadorOpcional']);
+    assert.deepEqual(drill.inWeek3,[]);
+    assert.match(drill.guide,/semana 2.*Myo Reps.*Opcional.*Como fazer/i);
+    assert.match(drill.detail,/Siga a técnica prescrita/);
+    assert(drill.fits,`Technique control must fit and remain touch-friendly at ${width}px in ${theme}`);
+  }
   if(width<=520){
     await assertPhoneScreens(width,1);
     await assertPhoneScreens(width,1.35);
@@ -219,6 +266,10 @@ try{
     })()`);
   }
   await evaluate(`slowCatalog=true;openLogSessionModal();document.querySelector('#sets-editor [data-f="w"]').value='82.5';document.querySelector('#sets-editor [data-f="r"]').value='10';void 0`);
+  if(hasTechniqueGuide){
+    const summary=await evaluate("document.querySelector('#session-prescription-summary .student-technique-guide')?.textContent");
+    assert.match(summary,/semana 2.*Myo Reps.*Opcional.*Como fazer/i);
+  }
   if(width<=520){
     await evaluate('renderRestTimerPresetsForExercise(exercise);addSetRow(66,8,{targetMin:8,targetMax:12,ger:3,backoff:true});void 0');
     for(const scale of [1,1.35]){
@@ -265,7 +316,7 @@ try{
   await evaluate(`olderRefresh();olderCompletion`);assert.equal(await evaluate(`VIEW_STUDENT.workouts[0].name`),'Nome final','An older reload cannot reapply its previous confirmed name after a newer save');
   assert.deepEqual(await evaluate('errors'),[]);passed++;
  }
- console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, and immediate unlock after confirmation and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
+ console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, immediate unlock after confirmation, technique names, optional status and help by week, and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

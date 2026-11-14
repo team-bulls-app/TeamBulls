@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_DAY_WEEK_WORKOUT_LAYOUT_101040_2__)return;
   window.__TEAM_BULLS_STUDENT_DAY_WEEK_WORKOUT_LAYOUT_101040_2__=true;
 
-  const VERSION='10.10.40-weeklayout3';
+  const VERSION='10.10.40-weeklayout4';
   const selectedWeeks=new Map();
 
   const currentUser=()=>{try{return typeof CURRENT_USER!=='undefined'?CURRENT_USER:null;}catch(error){return null;}};
@@ -69,19 +69,15 @@
     const start=String(workout?.startDate||''),date=String(session?.date||'');if(!validIsoDate(start)||!validIsoDate(date))return true;return date>=start;
   }
   function completedCount(exercise,workout,week){return (exercise?.sessions||[]).filter(session=>Number(session?.week)===Number(week)&&belongsToCurrentCycle(session,workout)).length;}
-  function techniqueCodes(exercise,week){
-    try{if(typeof techniqueItemsForExercise!=='function')return[];return techniqueItemsForExercise(exercise,week).map(item=>String(item?.code||'').trim()).filter(Boolean);}catch(error){return[];}
-  }
   function supersetPartner(exercise,workout,week){try{return typeof findSupersetPartner==='function'?findSupersetPartner(exercise,workout,week):null;}catch(error){return null;}}
   function prescriptionSummary(exercise,week){try{if(typeof prescriptionCompactSummary==='function')return prescriptionCompactSummary(exercise,week);}catch(error){}return{ger:'',reps:'Sem prescrição',rx:{sets:[],inherited:false,sourceWeek:0}};}
 
   function rowHtml(exercise,workout,week){
     const summary=prescriptionSummary(exercise,week),sets=Array.isArray(summary?.rx?.sets)?summary.rx.sets:[];
-    const completed=completedCount(exercise,workout,week),techniques=techniqueCodes(exercise,week),partner=supersetPartner(exercise,workout,week),inherited=summary?.rx?.inherited===true&&summary?.rx?.sourceWeek;
-    const badges=[];if(summary?.ger)badges.push(`<span class="tb-week-rx-chip ger">${html(summary.ger)}</span>`);techniques.forEach(code=>badges.push(`<span class="tb-week-rx-chip">${html(code)}</span>`));if(partner)badges.push('<span class="tb-week-rx-chip ss">SS</span>');if(inherited)badges.push(`<span class="tb-week-rx-chip inherited">HERDA S${html(summary.rx.sourceWeek)}</span>`);
+    const completed=completedCount(exercise,workout,week),techniques=typeof studentTechniqueLabels==='function'?studentTechniqueLabels(exercise,week):'',partner=supersetPartner(exercise,workout,week),inherited=summary?.rx?.inherited===true&&summary?.rx?.sourceWeek;
+    const badges=[];if(summary?.ger)badges.push(`<span class="tb-week-rx-chip ger">${html(summary.ger)}</span>`);if(inherited)badges.push(`<span class="tb-week-rx-chip inherited">HERDA S${html(summary.rx.sourceWeek)}</span>`);
     const primary=sets.length?html(summary.reps||`${sets.length} séries`):'<span class="tb-week-no-rx">Sem prescrição</span>',done=completed?`<span class="tb-week-row-done">✓ ${completed>1?completed+' registros':'registrado'}</span>`:'',relation=partner?`<span class="tb-week-row-note">com ${html(partner.name)}</span>`:'';
-    const aria=`${exercise?.name||'Exercício'}, semana ${week}, ${summary?.reps||'sem prescrição'}${completed?`, ${completed} registro${completed>1?'s':''}`:''}`;
-    return `<button type="button" class="tb-week-row${completed?' is-done':''}" data-week-exercise="${html(exercise?.id||'')}" data-week="${week}" aria-label="${html(aria)}"><span class="tb-week-exercise"><strong>${html(exercise?.name||'Exercício')}</strong>${done}${relation}</span><span class="tb-week-prescription"><strong>${primary}</strong>${badges.length?`<span class="tb-week-rx-meta">${badges.join('')}</span>`:''}</span><span class="tb-week-row-arrow" aria-hidden="true">›</span></button>`;
+    return `<button type="button" class="tb-week-row${completed?' is-done':''}" data-week-exercise="${html(exercise?.id||'')}" data-week="${week}"><span class="tb-week-exercise"><strong>${html(exercise?.name||'Exercício')}</strong>${done}${relation}</span><span class="tb-week-prescription"><strong>${primary}</strong>${badges.length?`<span class="tb-week-rx-meta">${badges.join('')}</span>`:''}</span><span class="tb-week-row-arrow" aria-hidden="true">›</span>${techniques}</button>`;
   }
 
   function injectStyles(){
@@ -104,6 +100,7 @@
       #screen-day .tb-week-columns span:nth-child(2){padding-left:10px}
       #screen-day .tb-week-row{width:100%;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(128px,.85fr) 18px;align-items:center;min-height:70px;padding:0 10px;border:0;border-bottom:1px solid #302923;background:transparent;color:#e9ddd4;text-align:left;cursor:pointer}
       #screen-day .tb-week-row:active{background:rgba(137,31,33,.16)}#screen-day .tb-week-row.is-done{background:linear-gradient(90deg,rgba(40,94,61,.08),transparent 54%)}
+      #screen-day .tb-week-row > .student-technique-labels{grid-column:1/-1;margin-bottom:9px}
       #screen-day .tb-week-exercise{min-width:0;padding:11px 10px 11px 0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
       #screen-day .tb-week-exercise>strong{max-width:100%;font:700 14px/1.15 'Barlow',system-ui,sans-serif;white-space:normal;overflow-wrap:anywhere;color:#eee3db}
       #screen-day .tb-week-row-done{font:700 7px/1 'DM Mono',monospace;color:#6cbb82;letter-spacing:.55px;text-transform:uppercase}
@@ -112,7 +109,7 @@
       #screen-day .tb-week-prescription>strong{font:800 12px/1.2 'DM Mono',monospace;color:#e5d7cc;letter-spacing:-.15px}
       #screen-day .tb-week-no-rx{color:#6c625b;font-weight:600;font-size:9px}#screen-day .tb-week-rx-meta{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
       #screen-day .tb-week-rx-chip{display:inline-flex;align-items:center;max-width:100%;padding:3px 4px;border:1px solid #44372f;background:#151210;color:#9c8c80;font:700 6.5px/1 'DM Mono',monospace;letter-spacing:.35px;white-space:nowrap}
-      #screen-day .tb-week-rx-chip.ger{border-color:rgba(179,48,51,.54);background:rgba(124,24,27,.15);color:#d07070}#screen-day .tb-week-rx-chip.ss{border-color:rgba(174,116,47,.5);color:#c9a36e}#screen-day .tb-week-rx-chip.inherited{color:#72675e}
+      #screen-day .tb-week-rx-chip.ger{border-color:rgba(179,48,51,.54);background:rgba(124,24,27,.15);color:#d07070}#screen-day .tb-week-rx-chip.inherited{color:#72675e}
       #screen-day .tb-week-row-arrow{padding-left:5px;color:#5e554e;font:800 18px/1 'Barlow Condensed',sans-serif;text-align:right}
       #screen-day .tb-day-week-compare{width:100%;min-height:42px;border:0;border-top:1px solid #352e28;background:#0e0d0c;color:#87796f;font:700 8px/1 'DM Mono',monospace;letter-spacing:.75px;text-transform:uppercase;cursor:pointer}
       #screen-day .tb-day-week-compare[aria-expanded="true"]{color:#c6b6aa;background:#15110f}#screen-day #student-day-weekly-board[hidden]{display:none!important}#screen-day #student-day-weekly-board:not([hidden]){border-top:1px solid #352e28;padding-top:2px}

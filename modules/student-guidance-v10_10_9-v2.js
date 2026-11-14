@@ -4,22 +4,9 @@
   if(window.__TEAM_BULLS_STUDENT_GUIDANCE_V2_V10109__)return;
   window.__TEAM_BULLS_STUDENT_GUIDANCE_V2_V10109__=true;
 
-  const VERSION='10.10.9-guidance3';
+  const VERSION='10.10.9-guidance4';
   const STATIC_REVISION='nutrition-stretch-2';
   const ACK_PREFIX='team_bulls_instruction_ack_v2_';
-  const NUTRITION_GUIDANCE=[
-    'Pesar os alimentos já preparados (cozidos, assados etc.).',
-    'Priorizar alimentos frescos.',
-    'Prefira alimentos mais limpos, como arroz, mandioca, batata, frango, peixe, grãos, sementes e cereais.',
-    'Usar pouco sódio.',
-    'Dar preferência a temperos naturais, como canela, alho, cebola, pimentão, cebolinha, coentro, salsa, pimenta-do-reino e orégano.',
-    'Bebidas zero calorias à vontade.',
-    'Prefira refeições livres mais limpas.',
-    'Não exagere no óleo na hora de preparar os alimentos.',
-    'Priorize alimentos com bastante fibra.',
-    'Os vegetais podem ser remanejados conforme a preferência do aluno, desde que seja ingerida a quantidade prescrita, sem mais nem menos.',
-    'Comer alimentos que estão na dieta, mas preparados com excesso de gordura deixa de se enquadrar na proposta por elevar gordura, sódio e calorias. Exemplos: frango frito, comida japonesa com muitos molhos, carnes vermelhas gordas, excesso de óleo no preparo e marmitas preparadas com muita gordura.'
-  ];
   const STRETCH_PAGES=[
     {title:'PLANILHA DE ALONGAMENTOS',items:[['Guia Team Bulls','Material de consulta para os alongamentos prescritos. Use as setas ou deslize para navegar pelas páginas.']]},
     {title:'ILIOPSOAS',items:[['1 · Alongamento para Iliopsoas','Posicione uma perna flexionada no chão ajoelhado(a), a outra perna de apoio atrás. Projete a perna flexionada para frente juntamente do quadril enquanto contrai o glúteo da perna de apoio.'],['2 · Alongamento para Iliopsoas e Calcanhar','Posicione uma perna flexionada no chão ajoelhado(a) de forma lateralizada, a outra perna de apoio atrás, formando 90° com as pernas. Projete a perna flexionada para frente juntamente do quadril.']]},
@@ -42,7 +29,12 @@
   const safeEsc=value=>typeof esc==='function'?esc(String(value??'')):String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[ch]));
   function safeHydration(value){const n=Math.round(Number(value)||0);return Number.isFinite(n)?Math.max(0,Math.min(12000,n)):0;}
   function hydrationText(value){const ml=safeHydration(value);if(!ml)return'Meta de água não definida';const liters=(ml/1000).toLocaleString('pt-BR',{minimumFractionDigits:ml%1000?1:0,maximumFractionDigits:2});return`${liters} L por dia · ${ml.toLocaleString('pt-BR')} ml`;}
-  function nutritionHtml(){return`<ul class="tb-nutrition-list">${NUTRITION_GUIDANCE.map(item=>`<li>${safeEsc(item)}</li>`).join('')}</ul>`;}
+  function nutritionHtml(){
+    if(typeof GENERAL_INSTRUCTIONS==='undefined')return '';
+    const items=GENERAL_INSTRUCTIONS.folders.filter(folder=>folder.active)
+      .flatMap(folder=>folder.items.filter(item=>item.active&&(folder.id==='nutrition'||item.id==='nutrition-main')));
+    return items.map(item=>`<details class="tb-nutrition-details" data-nutrition-item="${safeEsc(item.id)}"><summary>${safeEsc(item.title)}</summary><div class="tb-nutrition-text">${safeEsc(item.text)}</div>${typeof instructionVideoAction==='function'?instructionVideoAction(item.videoUrl,item.title):''}</details>`).join('');
+  }
 
   function ensureStyles(){
     if(document.getElementById('tb-student-guidance-v2-style'))return;
@@ -50,8 +42,9 @@
       .tb-guidance-card{border:1px solid rgba(185,43,43,.34);background:linear-gradient(180deg,rgba(43,18,18,.52),rgba(16,16,16,.96));padding:14px 16px;margin:12px 0;border-radius:3px}
       .tb-guidance-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}.tb-guidance-head strong{font:800 15px/1.1 'Barlow Condensed',sans-serif;letter-spacing:.04em;color:#f1e5dc}.tb-guidance-head small{display:block;margin-top:3px;font:500 9px/1.2 'DM Mono',monospace;color:#8f7a70;letter-spacing:.08em}
       .tb-hydration-value{font:900 24px/1 'Barlow Condensed',sans-serif;color:#d8e9ff;margin:8px 0}.tb-hydration-note{font:500 10px/1.45 'DM Mono',monospace;color:#8d8d8d}
-      .tb-nutrition-details{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}.tb-nutrition-details summary{cursor:pointer;font:800 12px/1 'Barlow Condensed',sans-serif;color:#e5d7cd;letter-spacing:.05em}.tb-nutrition-list{margin:9px 0 0;padding-left:19px}.tb-nutrition-list li{margin:7px 0;color:#d0bfb4;font:500 13px/1.45 'Barlow',sans-serif}.tb-nutrition-list li::marker{color:#b92727}
-      .tb-guidance-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.tb-guidance-actions button{min-height:38px}.tb-instruction-static{margin-top:12px}.tb-instruction-static .instruction-item-text{white-space:normal}
+      .tb-nutrition-details{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}.tb-nutrition-details summary{cursor:pointer;font:800 12px/1.3 'Barlow Condensed',sans-serif;color:#e5d7cd;letter-spacing:.05em}.tb-nutrition-text{margin-top:9px;color:var(--text-dim);font-size:14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+      html[data-theme="light"] .tb-nutrition-text{color:var(--tb-light-ink,var(--text))}
+      .tb-guidance-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.tb-guidance-actions button{min-height:38px}
       .tb-stretch-overlay{position:fixed;inset:0;z-index:100200;background:#080808;display:none;flex-direction:column;color:#fff;overscroll-behavior:contain}.tb-stretch-overlay.open{display:flex}
       .tb-stretch-head{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid rgba(185,43,43,.35);background:#0d0d0d;flex:0 0 auto}.tb-stretch-close,.tb-stretch-nav{appearance:none;border:1px solid rgba(255,255,255,.16);background:#171717;color:#fff;min-width:42px;height:40px;font:700 20px/1 system-ui;cursor:pointer}.tb-stretch-title{min-width:0;flex:1}.tb-stretch-title strong{display:block;font:800 15px/1.1 'Barlow Condensed',sans-serif;letter-spacing:.04em}.tb-stretch-title small{display:block;margin-top:3px;color:#a8a8a8;font:500 10px/1.2 'DM Mono',monospace}.tb-stretch-counter{font:700 11px/1 'DM Mono',monospace;color:#d8d8d8;white-space:nowrap}
       .tb-stretch-track{display:flex;flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;background:#111;scrollbar-width:none}.tb-stretch-track::-webkit-scrollbar{display:none}.tb-stretch-page{flex:0 0 100%;height:100%;scroll-snap-align:center;overflow-y:auto;padding:22px;box-sizing:border-box;display:flex;align-items:center;justify-content:center}.tb-stretch-sheet{width:min(820px,100%);min-height:min(760px,calc(100vh - 180px));background:#666;border:1px solid #777;padding:30px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;box-shadow:0 10px 40px rgba(0,0,0,.45)}.tb-stretch-sheet h2{text-align:center;margin:0 0 24px;color:#a80d1f;font:900 30px/1.05 'Barlow Condensed',sans-serif}.tb-stretch-item{display:grid;gap:8px;margin:18px 0;padding:18px;background:rgba(0,0,0,.08);border-left:3px solid #a80d1f}.tb-stretch-item strong{color:#a80d1f;font:900 24px/1.05 'Barlow Condensed',sans-serif}.tb-stretch-item p{margin:0;color:#fff;font:600 18px/1.5 'Barlow',sans-serif}.tb-stretch-source{text-align:center;margin-top:18px;color:#eee;font:500 10px/1.3 'DM Mono',monospace;letter-spacing:.05em}
@@ -82,20 +75,40 @@
     if(typeof openAddDietModal==='function'&&!openAddDietModal.__tbHydrationV2){const base=openAddDietModal;const wrapped=function(){ensureHydrationField();const result=base.apply(this,arguments);const field=document.getElementById('input-diet-hydration-ml');if(field)field.value='';return result;};wrapped.__tbHydrationV2=true;openAddDietModal=wrapped;}
     if(typeof openEditDietModal==='function'&&!openEditDietModal.__tbHydrationV2){const base=openEditDietModal;const wrapped=function(id=CURRENT_DIET_ID){ensureHydrationField();const result=base.apply(this,arguments);const plan=DIET_DOCUMENT?.plans?.find(item=>String(item.id)===String(id));const field=document.getElementById('input-diet-hydration-ml');if(field)field.value=safeHydration(plan?.hydrationMl)||'';return result;};wrapped.__tbHydrationV2=true;openEditDietModal=wrapped;}
     if(typeof saveDietPlan==='function'&&!saveDietPlan.__tbHydrationV2){const base=saveDietPlan;const wrapped=async function(){ensureHydrationField();pendingHydrationMl=safeHydration(document.getElementById('input-diet-hydration-ml')?.value);pendingHydration=true;try{return await base.apply(this,arguments);}finally{pendingHydration=false;renderDietGuidance();}};wrapped.__tbHydrationV2=true;saveDietPlan=wrapped;}
-    if(typeof openDietDetail==='function'&&!openDietDetail.__tbGuidanceV2){const base=openDietDetail;const wrapped=async function(){const result=await base.apply(this,arguments);renderDietGuidance();return result;};wrapped.__tbGuidanceV2=true;openDietDetail=wrapped;}
+    if(typeof openDietDetail==='function'&&!openDietDetail.__tbGuidanceV2){
+      const base=openDietDetail;
+      const wrapped=async function(){
+        const result=await base.apply(this,arguments);
+        renderDietGuidance();
+        const owner=CURRENT_USER?.uid,plan=typeof currentDiet==='function'?currentDiet():null,screen=typeof activeScreenId==='function'?activeScreenId():'';
+        if(plan&&['screen-diet-detail','screen-ts-diet-detail'].includes(screen)&&typeof loadGeneralInstructions==='function'){
+          const previousNutrition=nutritionHtml();
+          void loadGeneralInstructions().then(()=>{
+            if(CURRENT_USER?.uid===owner&&currentDiet()===plan&&activeScreenId()===screen&&nutritionHtml()!==previousNutrition)renderDietGuidance();
+          });
+        }
+        return result;
+      };
+      wrapped.__tbGuidanceV2=true;openDietDetail=wrapped;
+    }
   }
 
   function guidanceCard(plan,trainer){
     const id=typeof jsArg==='function'?jsArg(plan.id):JSON.stringify(plan.id);
-    return`<section class="tb-guidance-card" data-tb-diet-guidance="1"><div class="tb-guidance-head"><div><strong>ÁGUA E ORIENTAÇÕES DA DIETA</strong><small>ACESSO RÁPIDO</small></div>${trainer?`<button class="section-mini-btn" type="button" onclick="openEditDietModal(${id})">EDITAR META</button>`:''}</div><div class="tb-hydration-value">${safeEsc(hydrationText(plan.hydrationMl))}</div><div class="tb-hydration-note">Quantidade diária prescrita. Distribua ao longo do dia, salvo orientação individual diferente do treinador.</div><details class="tb-nutrition-details"><summary>VER OBSERVAÇÕES E ORIENTAÇÕES DA DIETA</summary>${nutritionHtml()}</details><div class="tb-guidance-actions"><button class="btn-ghost" type="button" onclick="openStretchGuide()">ALONGAMENTOS</button><button class="btn-ghost" type="button" onclick="openInstructions()">INSTRUÇÕES GERAIS</button></div></section>`;
+    return`<section class="tb-guidance-card" data-tb-diet-guidance="1"><div class="tb-guidance-head"><div><strong>ÁGUA E ORIENTAÇÕES DA DIETA</strong><small>ACESSO RÁPIDO</small></div>${trainer?`<button class="section-mini-btn" type="button" onclick="openEditDietModal(${id})">EDITAR META</button>`:''}</div><div class="tb-hydration-value">${safeEsc(hydrationText(plan.hydrationMl))}</div><div class="tb-hydration-note">Quantidade diária prescrita. Distribua ao longo do dia, salvo orientação individual diferente do treinador.</div>${nutritionHtml()}<div class="tb-guidance-actions"><button class="btn-ghost" type="button" onclick="openStretchGuide()">ALONGAMENTOS</button><button class="btn-ghost" type="button" onclick="openInstructions()">INSTRUÇÕES GERAIS</button></div></section>`;
   }
-  function renderDietGuidance(){try{const plan=typeof currentDiet==='function'?currentDiet():null;if(!plan)return;const trainer=!!(typeof DIET_CONTEXT!=='undefined'&&DIET_CONTEXT.trainer);const host=document.getElementById(trainer?'ts-diet-energy-summary':'diet-energy-summary');if(!host)return;host.parentElement?.querySelector('[data-tb-diet-guidance="1"]')?.remove();host.insertAdjacentHTML('afterend',guidanceCard(plan,trainer));}catch(error){console.warn('[Team Bulls] Orientações da dieta indisponíveis',error);}}
-
-  function renderStaticInstructions(){
-    const host=document.getElementById('instructions-folders');if(!host)return;host.querySelector('#tb-static-nutrition-instructions')?.remove();
-    const section=document.createElement('section');section.id='tb-static-nutrition-instructions';section.className='instruction-folder tb-instruction-static';section.innerHTML=`<div class="instruction-folder-head"><div class="instruction-folder-icon">🍴</div><div class="instruction-folder-title">Alimentação · observações e orientações</div></div><article class="instruction-item"><div class="instruction-item-title-row"><div class="instruction-item-title">Orientações para preparo e escolhas alimentares</div></div><div class="instruction-item-text">${nutritionHtml()}</div><div class="tb-guidance-actions"><button class="btn-ghost" type="button" onclick="openStretchGuide()">ABRIR PLANILHA DE ALONGAMENTOS</button></div></article>`;host.appendChild(section);
+  function renderDietGuidance(){
+    try{
+      const plan=typeof currentDiet==='function'?currentDiet():null;if(!plan)return;
+      const trainer=!!(typeof DIET_CONTEXT!=='undefined'&&DIET_CONTEXT.trainer);
+      const host=document.getElementById(trainer?'ts-diet-energy-summary':'diet-energy-summary');if(!host)return;
+      const previous=host.parentElement?.querySelector('[data-tb-diet-guidance="1"]');
+      const expanded=new Set(Array.from(previous?.querySelectorAll('details[open]')||[],detail=>detail.dataset.nutritionItem));
+      previous?.remove();
+      host.insertAdjacentHTML('afterend',guidanceCard(plan,trainer));
+      host.nextElementSibling.querySelectorAll('details').forEach(detail=>{if(expanded.has(detail.dataset.nutritionItem))detail.open=true;});
+    }catch(error){console.warn('[Team Bulls] Orientações da dieta indisponíveis',error);}
   }
-  function patchInstructionsRender(){if(typeof renderInstructions==='function'&&!renderInstructions.__tbStaticGuidanceV2){const base=renderInstructions;const wrapped=function(){const result=base.apply(this,arguments);renderStaticInstructions();return result;};wrapped.__tbStaticGuidanceV2=true;renderInstructions=wrapped;}}
 
   function instructionIdentity(){try{return String(CURRENT_USER?.uid||LOCAL_OWNER_UID||LOCAL_GUEST_OWNER||'');}catch(error){return'';}}
   function instructionToken(){try{return String(GENERAL_INSTRUCTIONS?.revision||1)+'|'+STATIC_REVISION;}catch(error){return'1|'+STATIC_REVISION;}}
@@ -148,6 +161,6 @@
     const home=document.querySelector('#screen-home .content')||document.querySelector('#screen-home');if(home&&!home.querySelector('[data-tb-stretch-home]')){const button=document.createElement('button');button.type='button';button.dataset.tbStretchHome='1';button.className='tb-stretch-home-access';button.innerHTML='<span><strong>ALONGAMENTOS</strong><small>PLANILHA DE CONSULTA · 15 POSIÇÕES</small></span><span aria-hidden="true">ABRIR ›</span>';button.onclick=()=>openStretchGuide();const workout=document.getElementById('workout-list');workout?.parentElement?.insertBefore(button,workout)||home.appendChild(button);}
   }
 
-  function install(){ensureStyles();ensureHydrationField();patchDietModel();patchInstructionsRender();patchInstructionPrompt();patchEntryPoints();ensureStretchViewer();renderStaticInstructions();renderDietGuidance();window.openStretchGuide=openStretchGuide;window.closeStretchGuide=closeStretchGuide;window.TeamBullsStudentGuidance=Object.freeze({version:VERSION,refresh:()=>{ensureHydrationField();renderStaticInstructions();renderDietGuidance();patchEntryPoints();},openStretchGuide});}
+  function install(){ensureStyles();ensureHydrationField();patchDietModel();patchInstructionPrompt();patchEntryPoints();ensureStretchViewer();renderDietGuidance();window.openStretchGuide=openStretchGuide;window.closeStretchGuide=closeStretchGuide;window.TeamBullsStudentGuidance=Object.freeze({version:VERSION,refresh:()=>{ensureHydrationField();renderDietGuidance();patchEntryPoints();},openStretchGuide});}
   install();
 })();
