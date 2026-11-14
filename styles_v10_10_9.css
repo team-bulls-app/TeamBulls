@@ -2876,7 +2876,6 @@ html[data-theme="light"] .exercise-technique-panel .week-technique-none,
 html[data-theme="light"] .superset-note,
 html[data-theme="light"] .tb-guidance-head small,
 html[data-theme="light"] .tb-hydration-note,
-html[data-theme="light"] .tb-nutrition-list li,
 html[data-theme="light"] .tb-guidance-card .week-technique-none{
   color:#d0c7bc;
 }
@@ -3467,6 +3466,7 @@ html[data-theme="light"] :is(.student-technique-guide,.student-technique-label) 
   border-color: var(--tb-light-line-strong);
 }
 html[data-theme="light"] .student-technique-guide > b { color: var(--tb-light-ink); }
+html[data-theme="light"] .student-technique-name small { color: var(--tb-light-muted); }
 #modal-exercise .catalog-picker-field>span{color:var(--text-muted);font:600 8px/1.2 'DM Mono',monospace;letter-spacing:.7px;text-transform:uppercase}
 #modal-exercise .catalog-picker-grid .form-input{
   min-height:46px;
