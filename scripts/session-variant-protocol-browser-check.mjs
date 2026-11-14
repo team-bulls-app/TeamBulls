@@ -221,16 +221,29 @@ try{
       const guide=prescription.querySelector('.student-technique-guide');
       const button=guide.querySelector('button');
       const rect=button.getBoundingClientRect(),card=guide.getBoundingClientRect();
+      const nameStyle=getComputedStyle(button.querySelector('.student-technique-name'));
+      const nameFont=nameStyle.fontFamily;
+      const font=parseFloat(nameStyle.fontSize);
       button.click();
       const detail=document.getElementById('modal-technique-detail').classList.contains('open')&&document.getElementById('technique-detail-body').textContent;
       closeModal('modal-technique-detail');
-      return {inWeek2,inWeek1,inWeek3,guide:guide.textContent,detail,fits:rect.width<=card.width&&rect.height>=44};
+      return {inWeek2,inWeek1,inWeek3,guide:guide.textContent,detail,nameFont,font,fits:rect.width<=card.width&&rect.height>=44};
     })()`);
     assert.deepEqual(drill.inWeek1,['Unilateral']);
-    assert.deepEqual(drill.inWeek2,['Myo Reps com nome personalizado para a prescrição do treinadorOpcional']);
+    assert.deepEqual(drill.inWeek2,['Myo Reps com nome personalizado para a prescrição do treinador']);
     assert.deepEqual(drill.inWeek3,[]);
     assert.match(drill.guide,/semana 2.*Myo Reps.*Opcional.*Como fazer/i);
     assert.match(drill.detail,/Siga a técnica prescrita/);
+    assert.match(drill.nameFont,/Barlow Condensed/);
+    assert(drill.font>=20,`Technique name must be prominent at ${width}px: ${JSON.stringify(drill)}`);
+    await evaluate("document.documentElement.style.setProperty('--font-scale',1.35);void 0");
+    const scaled=await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      const button=document.querySelector('#exercise-prescription-card .student-technique-label');
+      const name=button.querySelector('.student-technique-name');
+      resolve({size:parseFloat(getComputedStyle(name).fontSize),fits:button.scrollWidth<=button.clientWidth+1});
+    })))`);
+    assert(scaled.size>=26&&scaled.fits,`Technique name must fit with larger text at ${width}px: ${JSON.stringify(scaled)}`);
+    await evaluate("document.documentElement.style.removeProperty('--font-scale');void 0");
     assert(drill.fits,`Technique control must fit and remain touch-friendly at ${width}px in ${theme}`);
   }
   if(width<=520){

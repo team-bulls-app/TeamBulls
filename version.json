@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111401,
-  "revision": "student-techniques-nutrition-1",
+  "build": 2026111402,
+  "revision": "student-technique-typography-1",
   "publishedAt": "2026-11-14T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Técnicas em destaque no treino do aluno e orientações alimentares editáveis pelo treinador."
+  "message": "Tipografia e destaque das técnicas, com orientações da dieta mais legíveis."
 }

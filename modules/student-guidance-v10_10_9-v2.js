@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_GUIDANCE_V2_V10109__)return;
   window.__TEAM_BULLS_STUDENT_GUIDANCE_V2_V10109__=true;
 
-  const VERSION='10.10.9-guidance4';
+  const VERSION='10.10.9-guidance5';
   const STATIC_REVISION='nutrition-stretch-2';
   const ACK_PREFIX='team_bulls_instruction_ack_v2_';
   const STRETCH_PAGES=[
@@ -33,18 +33,25 @@
     if(typeof GENERAL_INSTRUCTIONS==='undefined')return '';
     const items=GENERAL_INSTRUCTIONS.folders.filter(folder=>folder.active)
       .flatMap(folder=>folder.items.filter(item=>item.active&&(folder.id==='nutrition'||item.id==='nutrition-main')));
-    return items.map(item=>`<details class="tb-nutrition-details" data-nutrition-item="${safeEsc(item.id)}"><summary>${safeEsc(item.title)}</summary><div class="tb-nutrition-text">${safeEsc(item.text)}</div>${typeof instructionVideoAction==='function'?instructionVideoAction(item.videoUrl,item.title):''}</details>`).join('');
+    return items.map(item=>`<details class="tb-nutrition-details" data-nutrition-item="${safeEsc(item.id)}"><summary class="instruction-item-title">${safeEsc(item.title)}</summary><div class="tb-nutrition-text instruction-item-text">${safeEsc(item.text)}</div>${typeof instructionVideoAction==='function'?instructionVideoAction(item.videoUrl,item.title):''}</details>`).join('');
   }
 
   function ensureStyles(){
     if(document.getElementById('tb-student-guidance-v2-style'))return;
     const style=document.createElement('style');style.id='tb-student-guidance-v2-style';style.textContent=`
-      .tb-guidance-card{border:1px solid rgba(185,43,43,.34);background:linear-gradient(180deg,rgba(43,18,18,.52),rgba(16,16,16,.96));padding:14px 16px;margin:12px 0;border-radius:3px}
-      .tb-guidance-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}.tb-guidance-head strong{font:800 15px/1.1 'Barlow Condensed',sans-serif;letter-spacing:.04em;color:#f1e5dc}.tb-guidance-head small{display:block;margin-top:3px;font:500 9px/1.2 'DM Mono',monospace;color:#8f7a70;letter-spacing:.08em}
-      .tb-hydration-value{font:900 24px/1 'Barlow Condensed',sans-serif;color:#d8e9ff;margin:8px 0}.tb-hydration-note{font:500 10px/1.45 'DM Mono',monospace;color:#8d8d8d}
-      .tb-nutrition-details{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}.tb-nutrition-details summary{cursor:pointer;font:800 12px/1.3 'Barlow Condensed',sans-serif;color:#e5d7cd;letter-spacing:.05em}.tb-nutrition-text{margin-top:9px;color:var(--text-dim);font-size:14px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
-      html[data-theme="light"] .tb-nutrition-text{color:var(--tb-light-panel-muted,#d0c7bc)}
-      .tb-guidance-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.tb-guidance-actions button{min-height:38px}
+      .tb-guidance-card{border:1px solid var(--border-l);border-inline-start:3px solid var(--accent);background:var(--surface);padding:12px 14px;margin:12px 0}
+      .tb-guidance-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px}
+      .tb-guidance-head strong{font-family:'DM Mono',monospace;font-size:calc(11px * var(--font-scale,1));font-weight:500;letter-spacing:.05em;color:#e4b0ac}
+      .tb-hydration-value{font-family:'Barlow Condensed','Arial Narrow',sans-serif;font-size:calc(20px * var(--font-scale,1));font-weight:800;line-height:1.2;color:var(--text)}
+      .tb-hydration-note{margin-top:4px;color:var(--text-dim)}
+      .tb-nutrition-details{margin-top:8px;border-top:1px solid var(--border-l)}
+      .tb-nutrition-details summary{padding:10px 0;min-height:44px;cursor:pointer;line-height:1.2;letter-spacing:normal;color:var(--text);overflow-wrap:anywhere}
+      .tb-nutrition-details summary::marker{color:#e4b0ac}
+      .tb-nutrition-details summary:focus-visible{outline:2px solid var(--accent)}
+      .tb-nutrition-text{margin:2px 0 8px;overflow-wrap:anywhere}
+      html[data-theme="light"] .tb-guidance-card{--text:var(--tb-light-panel-ink);--text-dim:var(--tb-light-panel-muted);--border-l:var(--tb-light-panel-border);--accent:var(--tb-light-brand-on-panel)}
+      .tb-guidance-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+      .tb-guidance-actions .btn-ghost{min-height:44px;margin:0;padding:7px 10px;color:var(--text);border-color:var(--border-l);font-size:calc(13px * var(--font-scale,1))}
       .tb-stretch-overlay{position:fixed;inset:0;z-index:100200;background:#080808;display:none;flex-direction:column;color:#fff;overscroll-behavior:contain}.tb-stretch-overlay.open{display:flex}
       .tb-stretch-head{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid rgba(185,43,43,.35);background:#0d0d0d;flex:0 0 auto}.tb-stretch-close,.tb-stretch-nav{appearance:none;border:1px solid rgba(255,255,255,.16);background:#171717;color:#fff;min-width:42px;height:40px;font:700 20px/1 system-ui;cursor:pointer}.tb-stretch-title{min-width:0;flex:1}.tb-stretch-title strong{display:block;font:800 15px/1.1 'Barlow Condensed',sans-serif;letter-spacing:.04em}.tb-stretch-title small{display:block;margin-top:3px;color:#a8a8a8;font:500 10px/1.2 'DM Mono',monospace}.tb-stretch-counter{font:700 11px/1 'DM Mono',monospace;color:#d8d8d8;white-space:nowrap}
       .tb-stretch-track{display:flex;flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;background:#111;scrollbar-width:none}.tb-stretch-track::-webkit-scrollbar{display:none}.tb-stretch-page{flex:0 0 100%;height:100%;scroll-snap-align:center;overflow-y:auto;padding:22px;box-sizing:border-box;display:flex;align-items:center;justify-content:center}.tb-stretch-sheet{width:min(820px,100%);min-height:min(760px,calc(100vh - 180px));background:#666;border:1px solid #777;padding:30px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center;box-shadow:0 10px 40px rgba(0,0,0,.45)}.tb-stretch-sheet h2{text-align:center;margin:0 0 24px;color:#a80d1f;font:900 30px/1.05 'Barlow Condensed',sans-serif}.tb-stretch-item{display:grid;gap:8px;margin:18px 0;padding:18px;background:rgba(0,0,0,.08);border-left:3px solid #a80d1f}.tb-stretch-item strong{color:#a80d1f;font:900 24px/1.05 'Barlow Condensed',sans-serif}.tb-stretch-item p{margin:0;color:#fff;font:600 18px/1.5 'Barlow',sans-serif}.tb-stretch-source{text-align:center;margin-top:18px;color:#eee;font:500 10px/1.3 'DM Mono',monospace;letter-spacing:.05em}
@@ -95,7 +102,7 @@
 
   function guidanceCard(plan,trainer){
     const id=typeof jsArg==='function'?jsArg(plan.id):JSON.stringify(plan.id);
-    return`<section class="tb-guidance-card" data-tb-diet-guidance="1"><div class="tb-guidance-head"><div><strong>ÁGUA E ORIENTAÇÕES DA DIETA</strong><small>ACESSO RÁPIDO</small></div>${trainer?`<button class="section-mini-btn" type="button" onclick="openEditDietModal(${id})">EDITAR META</button>`:''}</div><div class="tb-hydration-value">${safeEsc(hydrationText(plan.hydrationMl))}</div><div class="tb-hydration-note">Quantidade diária prescrita. Distribua ao longo do dia, salvo orientação individual diferente do treinador.</div>${nutritionHtml()}<div class="tb-guidance-actions"><button class="btn-ghost" type="button" onclick="openStretchGuide()">ALONGAMENTOS</button><button class="btn-ghost" type="button" onclick="openInstructions()">INSTRUÇÕES GERAIS</button></div></section>`;
+    return`<section class="tb-guidance-card" data-tb-diet-guidance="1"><div class="tb-guidance-head"><div><strong>ÁGUA</strong></div>${trainer?`<button class="section-mini-btn" type="button" onclick="openEditDietModal(${id})">EDITAR META</button>`:''}</div><div class="tb-hydration-value">${safeEsc(hydrationText(plan.hydrationMl))}</div><div class="tb-hydration-note">Quantidade diária prescrita. Distribua ao longo do dia, salvo orientação individual diferente do treinador.</div>${nutritionHtml()}<div class="tb-guidance-actions"><button class="btn-ghost" type="button" onclick="openStretchGuide()">ALONGAMENTOS</button><button class="btn-ghost" type="button" onclick="openInstructions()">INSTRUÇÕES GERAIS</button></div></section>`;
   }
   function renderDietGuidance(){
     try{

@@ -7645,7 +7645,7 @@ function studentTechniqueLabels(exercise,week,showDetails=false){
   if(!items.length)return '';
   const labels=items.map(item=>{
     const optional=exerciseHasOptionalTechnique(exercise,item.id,week);
-    const content=`<span class="student-technique-code">${esc(item.code)}</span><span class="student-technique-name">${esc(item.name)}${optional?'<small>Opcional</small>':''}</span>`;
+    const content=`<span class="student-technique-code">${esc(item.code)}</span><span class="student-technique-caption"><span class="student-technique-name">${esc(item.name)}</span>${optional?' <small class="student-technique-optional">Opcional</small>':''}</span>`;
     return showDetails
       ?`<button type="button" class="student-technique-label" onclick="openTechniqueDetail(${jsArg(item.id)})">${content}<span class="student-technique-action">Como fazer</span></button>`
       :`<span class="student-technique-label">${content}</span>`;

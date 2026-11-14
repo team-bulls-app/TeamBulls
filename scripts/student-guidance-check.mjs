@@ -28,8 +28,8 @@ assert(syntax.status===0,`JavaScript inválido em ${modulePath}: ${syntax.stderr
 assert(publicVersion==='10.10.9','A versão pública mudou durante a revisão de orientações.');
 
 // Loader e ordem de camadas.
-const guidanceLoader='./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance4';
-has(config,guidanceLoader,'Loader não inclui student-guidance guidance4.');
+const guidanceLoader='./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance5';
+has(config,guidanceLoader,'Loader não inclui student-guidance guidance5.');
 assert((config.match(/student-guidance-v10_10_9-v2\.js/g)||[]).length===1,'Student guidance deve ser carregado uma única vez.');
 assert(config.indexOf('diet-delete-fix-v10_10_9.js')<config.indexOf('student-guidance-v10_10_9-v2.js'),'Student guidance precisa executar depois da correção de dieta.');
 assert(config.indexOf('student-guidance-v10_10_9-v2.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Estabilidade de modais deve permanecer por último.');
@@ -110,7 +110,7 @@ has(guidance,"event.key==='Escape'",'Viewer de alongamentos perdeu fechamento po
 has(guidance,"event.key==='ArrowLeft'",'Viewer de alongamentos perdeu seta esquerda.');
 has(guidance,"event.key==='ArrowRight'",'Viewer de alongamentos perdeu seta direita.');
 
-has(guidance,"const VERSION='10.10.9-guidance4'",'Camada ativa de orientações não está na revisão de navegação segura.');
+has(guidance,"const VERSION='10.10.9-guidance5'",'Camada ativa de orientações não está na revisão de navegação segura.');
 has(guidance,"NAVIGATION_SEQ!==navigation",'Aviso automático perdeu validação de navegação.');
 has(guidance,"instructionIdentity()!==uid",'Aviso automático perdeu validação de aluno.');
 has(guidance,"result===false&&token&&forcedPromptToken===token",'Abertura cancelada pode bloquear o aviso permanentemente.');
