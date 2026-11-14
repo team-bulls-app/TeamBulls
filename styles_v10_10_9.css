@@ -2889,6 +2889,102 @@ html[data-theme="light"] .superset-badge{color:#ffd27c}
 html[data-theme="light"] .tb-guidance-card .tb-hydration-value{color:#b8d9ff}
 html[data-theme="light"] .tb-guidance-card .tb-nutrition-details summary::marker{color:#ed7779}
 
+/* Técnicas da semana dentro da prescrição e do registro do aluno. */
+.student-technique-guide {
+  margin-block: 10px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-l);
+  border-inline-start: 3px solid var(--accent);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+.student-technique-guide > b {
+  display: block;
+  margin-bottom: 4px;
+  font-family: 'DM Mono', monospace;
+  font-size: calc(11px * var(--font-scale, 1));
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: #e4b0ac;
+}
+.student-technique-labels { display: grid; min-width: 0; }
+.student-technique-label {
+  display: grid;
+  grid-template-columns: fit-content(7ch) minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  color: var(--text);
+  text-align: left;
+}
+.student-technique-labels > span.student-technique-label { padding-block: 3px; }
+button.student-technique-label {
+  grid-template-columns: fit-content(7ch) minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+button.student-technique-label + button.student-technique-label { border-top: 1px solid var(--border-l); }
+button.student-technique-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.student-technique-code {
+  min-width: 3ch;
+  padding: 3px 5px;
+  border: 1px solid #783934;
+  background: #231514;
+  color: #efb9b2;
+  font-family: 'DM Mono', monospace;
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.student-technique-caption { min-width: 0; overflow-wrap: anywhere; }
+.student-technique-name {
+  font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  font-size: calc(16px * var(--font-scale, 1));
+  font-weight: 800;
+  line-height: 1.15;
+}
+.student-technique-guide .student-technique-name { font-size: calc(20px * var(--font-scale, 1)); }
+.student-technique-optional {
+  display: block;
+  margin-top: 3px;
+  color: #f0c57b;
+  font-family: 'Barlow', system-ui, sans-serif;
+  font-size: calc(12px * var(--font-scale, 1));
+  font-weight: 600;
+  line-height: 1.2;
+}
+.student-technique-action {
+  padding: 4px 6px;
+  border: 1px solid var(--border-l);
+  color: inherit;
+  font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+button.student-technique-label:is(:hover,:focus-visible) .student-technique-action { border-color: var(--accent); }
+@media (max-width: 360px) {
+  button.student-technique-label { grid-template-columns: fit-content(7ch) minmax(0, 1fr); align-items: start; }
+  .student-technique-action { grid-column: 2; justify-self: start; }
+}
+html[data-theme="light"] .student-technique-guide {
+  --accent: var(--tb-light-brand-on-panel);
+  --border-l: var(--tb-light-panel-border-strong);
+  --text: var(--tb-light-panel-ink);
+  background: var(--tb-light-panel);
+}
+
 /* Team Bulls v10.10.9 — contraste dos cartões de dieta e do resumo diário no tema claro. */
 html[data-theme="light"] .options-intro,
 html[data-theme="light"] .diet-free-meal-policy,
@@ -2966,11 +3062,12 @@ html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"]{
   background:var(--tb-light-panel)!important;
   border-color:var(--tb-light-panel-border)!important;
 }
-html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head strong,
-html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details summary{
-  color:var(--tb-light-panel-muted)!important;
+html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head strong{
+  color:var(--tb-light-brand-on-panel);
 }
-html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details{border-color:var(--tb-light-panel-border)!important}
+html[data-theme="light"] #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details summary{
+  color:var(--tb-light-panel-ink);
+}
 html[data-theme="light"] #screen-diet-detail #diet-energy-summary .diet-energy-metric>span{color:var(--tb-light-panel-muted)!important}
 
 /* Históricos, cobranças e resumos usam a mesma escala legível dos protocolos. */
@@ -3408,65 +3505,6 @@ html[data-theme="light"] .settings-grid>.btn-ghost{background:var(--tb-light-pan
 }
 
 #modal-exercise .catalog-picker-field{display:grid;min-width:0;gap:5px}
-
-.student-technique-guide {
-  margin-block: 10px 12px;
-  padding: 10px;
-  border: 1px solid var(--border-l);
-  border-inline-start: 3px solid var(--accent);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-}
-.student-technique-guide > b {
-  display: block;
-  margin-bottom: 7px;
-  font: 800 calc(16px * var(--font-scale, 1))/1.2 'Barlow Condensed', sans-serif;
-  letter-spacing: .03em;
-  color: var(--text);
-}
-.student-technique-labels { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.student-technique-label {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px 8px;
-  max-width: 100%;
-  padding: 5px 8px;
-  border: 1px solid var(--border-l);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text);
-  font: 700 calc(13px * var(--font-scale, 1))/1.25 'Barlow', system-ui, sans-serif;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-button.student-technique-label { min-height: 44px; cursor: pointer; }
-.student-technique-label:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.student-technique-code {
-  padding: 3px 5px;
-  border-radius: 4px;
-  background: #96212d;
-  color: #fff;
-  font-family: 'DM Mono', monospace;
-}
-.student-technique-name { min-width: 0; }
-.student-technique-name small {
-  display: inline-block;
-  margin-inline: 5px;
-  color: var(--text-dim);
-  font-size: .92em;
-}
-.student-technique-action { margin-inline-start: auto; text-decoration: underline; }
-.student-technique-guide .student-technique-label { flex: 1 1 100%; }
-html[data-theme="light"] :is(.student-technique-guide,.student-technique-label) {
-  background: var(--tb-light-canvas-soft);
-  color: var(--tb-light-ink);
-  border-color: var(--tb-light-line-strong);
-}
-html[data-theme="light"] .student-technique-guide > b { color: var(--tb-light-ink); }
-html[data-theme="light"] .student-technique-name small { color: var(--tb-light-muted); }
 #modal-exercise .catalog-picker-field>span{color:var(--text-muted);font:600 8px/1.2 'DM Mono',monospace;letter-spacing:.7px;text-transform:uppercase}
 #modal-exercise .catalog-picker-grid .form-input{
   min-height:46px;

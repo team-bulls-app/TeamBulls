@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_DIET_COMPACT_LIVE_101023__)return;
   window.__TEAM_BULLS_STUDENT_DIET_COMPACT_LIVE_101023__=true;
 
-  const VERSION='10.10.23-dietcompact2';
+  const VERSION='10.10.23-dietcompact3';
   let observer=null;
   let patchFrame=0;
   let dietUnsubscribe=null;
@@ -63,35 +63,17 @@
       }
       #screen-diet-detail #diet-energy-summary .diet-energy-metric>small{display:none!important}
       #screen-diet-detail [data-tb-diet-guidance="1"]{
-        margin:4px 0 10px!important;padding:8px 9px!important;border:1px solid #453029!important;border-radius:0!important;
-        background:linear-gradient(100deg,rgba(55,20,21,.28),#0e0d0c 58%)!important;
+        margin:4px 0 10px;
       }
       #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head{
-        display:inline-flex!important;align-items:center!important;vertical-align:middle;margin:0 8px 0 0!important;gap:0!important;
+        display:inline-flex;vertical-align:baseline;margin:0 8px 0 0;
       }
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head>div{display:block!important}
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head strong{
-        color:#9b6965!important;font:700 7px/1 'DM Mono',monospace!important;letter-spacing:.75px!important;
-      }
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head small{display:none!important}
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-head>.section-mini-btn{display:none!important}
       #screen-diet-detail [data-tb-diet-guidance="1"] .tb-hydration-value{
-        display:inline-block!important;margin:0!important;color:#d8e9ff!important;font:800 15px/1 'Barlow Condensed',sans-serif!important;
-        vertical-align:middle;letter-spacing:.1px!important;
+        display:inline-block;vertical-align:baseline;
       }
       #screen-diet-detail [data-tb-diet-guidance="1"] .tb-hydration-note{display:none!important}
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details{
-        margin-top:7px!important;padding-top:7px!important;border-top:1px solid #302722!important;
-      }
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-nutrition-details summary{
-        color:#a9998e!important;font:700 8px/1.25 'Barlow Condensed',sans-serif!important;letter-spacing:.35px!important;
-      }
       #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-actions{
-        display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important;margin-top:7px!important;
-      }
-      #screen-diet-detail [data-tb-diet-guidance="1"] .tb-guidance-actions button{
-        min-height:30px!important;margin:0!important;padding:6px 4px!important;border-radius:0!important;
-        font:700 8px/1 'Barlow Condensed',sans-serif!important;letter-spacing:.35px!important;
+        display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
       }
       @media(max-width:380px){
         #screen-diet-detail #diet-cycle-summary>span{padding-left:5px;padding-right:5px;font-size:6.1px;letter-spacing:.2px}
@@ -126,7 +108,6 @@
     const card=document.querySelector('#screen-diet-detail [data-tb-diet-guidance="1"]');
     if(!energy||!card)return false;
     if(energy.nextElementSibling!==card)energy.insertAdjacentElement('afterend',card);
-    setTextIfChanged(card.querySelector('.tb-guidance-head strong'),'ÁGUA');
     const value=card.querySelector('.tb-hydration-value');
     if(value)setTextIfChanged(value,String(value.textContent||'').replace(/\s+por\s+dia\s*·\s*/i,' · ').trim());
     return true;
