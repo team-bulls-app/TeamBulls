@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111503,
-  "revision": "student-daily-battle-1",
+  "build": 2026111504,
+  "revision": "student-workout-storage-recovery-1",
   "publishedAt": "2026-11-15T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Batalha do dia com treino guiado, pausa e histórico por exercício."
+  "message": "Batalha do Dia abaixo do cabeçalho e recuperação local ao iniciar ou concluir treinos."
 }

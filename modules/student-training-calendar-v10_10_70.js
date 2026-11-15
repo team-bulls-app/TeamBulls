@@ -23,29 +23,124 @@
   const storageKey=uid=>LOCAL_PREFIX+cleanOwner(uid);
   const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const idFor=(prefix,...parts)=>typeof stableEntityId==='function'?stableEntityId(prefix,...parts):prefix+'_'+parts.map(value=>String(value||'')).join('_').replace(/[^A-Za-z0-9_-]/g,'_').slice(0,100);
-  const readLocal=uid=>{try{const raw=localStorage.getItem(storageKey(uid));const value=raw?JSON.parse(raw):{};return{states:value.states&&typeof value.states==='object'?value.states:{},completions:value.completions&&typeof value.completions==='object'?value.completions:{}};}catch(error){return{states:{},completions:{}};}};
-  const writeLocal=(uid,data)=>{try{localStorage.setItem(storageKey(uid),JSON.stringify(data));return true;}catch(error){console.warn('Falha ao gravar estado local do ciclo',error);return false;}};
+  const progressKey=uid=>'workout-progress:'+String(uid);
+  const fallbackKey=uid=>'team_bulls_workout_progress_v2_'+encodeURIComponent(uid);
+  const guideKey=uid=>'team_bulls_guided_workout_v1_'+encodeURIComponent(uid);
+  const snapshots=new Map(),progressLoads=new Map();
+  let progressChannel=null;
+  try{if(typeof BroadcastChannel==='function')progressChannel=new BroadcastChannel('team-bulls-workout-progress-v2');}catch(error){}
+  function readJson(key){
+    try{return JSON.parse(localStorage.getItem(key)||'null');}catch(error){return null;}
+  }
+  const isRecord=value=>value&&typeof value==='object'&&!Array.isArray(value);
+  function validGuide(guide,uid){
+    return guide?.uid===uid&&guide.id&&validDate(guide.date)&&Array.isArray(guide.done)&&Array.isArray(guide.deferred)?guide:null;
+  }
+  function progressData(value,uid){
+    const owned=records=>Object.fromEntries(Object.entries(isRecord(records)?records:{}).filter(([,item])=>item?.studentUid===uid));
+    return {uid,revision:Number(value?.revision)||0,guideRevision:Number(value?.guideRevision)||0,states:owned(value?.states),completions:owned(value?.completions),guide:validGuide(value?.guide,uid)};
+  }
+  function mergeProgress(latest,other){
+    if(latest.revision===other.revision)return latest;
+    const merge=(left,right)=>{
+      const output={...right,...left};
+      for(const [key,record] of Object.entries(right)){
+        if(record.pendingSync===false&&left[key]?.pendingSync===true)output[key]=record;
+      }
+      return output;
+    };
+    const guideSource=other.guideRevision>latest.guideRevision?other:latest;
+    return {...latest,guide:guideSource.guide,guideRevision:guideSource.guideRevision,states:merge(latest.states,other.states),completions:merge(latest.completions,other.completions)};
+  }
+  function latestProgress(uid,...candidates){
+    const valid=candidates.filter(value=>value?.uid===uid&&value.revision>0).sort((a,b)=>b.revision-a.revision);
+    if(valid.length)return valid.reduce(mergeProgress);
+    return progressData({...readJson(storageKey(uid)),guide:readJson(guideKey(uid))},uid);
+  }
+  function readLocal(uid){
+    if(!uid)return progressData(null,uid);
+    const fallback=readJson(fallbackKey(uid));
+    return latestProgress(uid,snapshots.get(uid),fallback?.uid===uid?progressData(fallback,uid):null);
+  }
+  async function progressTransaction(uid,write,callback){
+    if(typeof openMediaDb!=='function')return null;
+    let database;
+    try{database=await withTimeout(openMediaDb(),2500,'abrir progresso do treino');}catch(error){return null;}
+    if(!database)return null;
+    return new Promise(resolve=>{
+      let tx,timer,result=null;
+      const finish=value=>{clearTimeout(timer);resolve(value);};
+      try{
+        tx=database.transaction('media',write?'readwrite':'readonly');
+        const store=tx.objectStore('media'),key=progressKey(uid),request=store.get(key);
+        tx.oncomplete=()=>finish(result);
+        tx.onabort=()=>finish(null);
+        request.onsuccess=()=>{
+          try{
+            const value=request.result;
+            result=callback(value?.uid===uid?progressData(value,uid):null);
+            if(write&&result?.next)store.put(result.next,key);
+          }catch(error){tx.abort();}
+        };
+        // Abortar a transação evita confirmar um fallback enquanto a gravação
+        // original ainda pode ser aplicada.
+        timer=setTimeout(()=>{try{tx.abort();}catch(error){}},2500);
+      }catch(error){finish(null);}
+    });
+  }
+  function ensureProgress(uid){
+    if(!uid)return Promise.resolve(null);
+    if(progressLoads.has(uid))return progressLoads.get(uid);
+    const pending=progressTransaction(uid,false,indexed=>latestProgress(uid,indexed,readLocal(uid))).then(snapshot=>{
+      const value=latestProgress(uid,snapshot,readLocal(uid));snapshots.set(uid,value);return value;
+    }).finally(()=>progressLoads.delete(uid));
+    progressLoads.set(uid,pending);
+    return pending;
+  }
+  async function mutateProgress(uid,mutate){
+    let observed=null;
+    const apply=previous=>{
+      observed=latestProgress(uid,previous,readLocal(uid));
+      const draft={...observed,states:{...observed.states},completions:{...observed.completions}};
+      if(!mutate(draft))return {status:'unchanged',snapshot:observed};
+      draft.revision=Math.max(Date.now(),observed.revision+1);
+      if(draft.guide!==observed.guide)draft.guideRevision=draft.revision;
+      return {status:'saved',next:draft};
+    };
+    let result=await progressTransaction(uid,true,apply);
+    if(!result){
+      result=apply(observed);
+      if(result.next){
+        try{localStorage.setItem(fallbackKey(uid),JSON.stringify(result.next));}
+        catch(error){result={status:'unavailable',snapshot:observed};}
+      }
+    }
+    const next=result.next||result.snapshot;
+    snapshots.set(uid,latestProgress(uid,next,readLocal(uid)));
+    if(result.status==='saved')progressChannel?.postMessage(uid);
+    return result.status;
+  }
+  function matchesGuide(saved,expected){
+    return saved?.id===expected?.id&&saved?.revision===expected?.revision;
+  }
   function workoutDays(workout){try{return typeof getWorkoutDays==='function'?getWorkoutDays(workout):[];}catch(error){return[];}}
   function legacyInitialWeek(workout){
     try{if(validDate(workout?.startDate)&&typeof v104CycleWeek==='function'&&typeof today==='function')return Math.max(1,Math.min(8,Number(v104CycleWeek(workout.startDate,today()))||1));}catch(error){}
     const weeks=(workout?.exercises||[]).flatMap(exercise=>(exercise.sessions||[]).map(session=>Number(session.week)||0)).filter(week=>week>=1&&week<=8);
     return weeks.length?Math.max(...weeks):1;
   }
-  function stateFor(workout,uid=ownerUid(),create=false){
-    if(!uid||!workout?.id)return null;
-    const data=readLocal(uid),key=cycleKey(workout);let state=data.states[key];
-    if(!state&&create){
-      state={docId:idFor('wcs',uid,workout.id,cycleStartDate(workout)),studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),initialWeek:legacyInitialWeek(workout),pendingSync:shouldSync(uid),syncError:''};
-      data.states[key]=state;writeLocal(uid,data);
-    }
-    return state||null;
+  function stateFor(workout,uid=ownerUid()){
+    return uid&&workout?.id?readLocal(uid).states[cycleKey(workout)]||null:null;
+  }
+  function newCycleState(workout,uid){
+    return {docId:idFor('wcs',uid,workout.id,cycleStartDate(workout)),studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),initialWeek:legacyInitialWeek(workout),pendingSync:shouldSync(uid),syncError:''};
   }
   function completionId(uid,workout,week,day){return idFor('wcomp',uid,workout.id,cycleStartDate(workout),week,day.id);}
   function completionFor(workout,week,day,uid=ownerUid()){
     if(!uid)return null;const data=readLocal(uid);return data.completions[completionId(uid,workout,week,day)]||null;
   }
   function currentWeek(workout,uid=ownerUid()){
-    if(!workout)return 1;const state=stateFor(workout,uid,false),initial=Math.max(1,Math.min(8,Number(state?.initialWeek)||legacyInitialWeek(workout))),days=workoutDays(workout);
+    if(!workout)return 1;const state=stateFor(workout,uid),initial=Math.max(1,Math.min(8,Number(state?.initialWeek)||legacyInitialWeek(workout))),days=workoutDays(workout);
     if(!days.length)return initial;
     const data=readLocal(uid);
     for(let week=initial;week<=8;week++){
@@ -72,6 +167,8 @@
   async function syncStudentProgress(uid){
     const revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
     const current=()=>mode()==='cloud'&&shouldSync(uid)&&(revision===null||revision===AUTH_STATE_REVISION)&&auth?.currentUser?.uid===uid;
+    await ensureProgress(uid);
+    if(!current())return false;
     const data=readLocal(uid),lookups=new Map();
     let ok=true;
     for(const [bucket,collection] of [['states','workoutCycleStates'],['completions','workoutCompletions']]){
@@ -99,42 +196,59 @@
           Object.assign(changes,{pendingSync:false,syncError:''});
         }catch(error){changes.syncError=String(error?.message||error).slice(0,180);ok=false;}
         if(!current())return false;
-        const latest=readLocal(uid),entry=latest[bucket][key];
-        if(entry?.pendingSync&&!writeLocal(uid,{...latest,[bucket]:{...latest[bucket],[key]:{...entry,...changes}}}))ok=false;
+        const saved=await mutateProgress(uid,draft=>{
+          const entry=draft[bucket][key];
+          if(!current()||!entry?.pendingSync)return false;
+          draft[bucket][key]={...entry,...changes};return true;
+        });
+        if(saved==='unavailable')ok=false;
       }
     }
     return ok;
   }
   async function loadCycleData(workout,uid=ownerUid()){
     if(!uid||!workout?.id)return false;
-    const key=uid+'|'+cycleKey(workout);if(cycleLoads.has(key))return cycleLoads.get(key);if(Date.now()-(cycleLoadedAt.get(key)||0)<60000)return true;
+    const key=uid+'|'+cycleKey(workout);
+    if(cycleLoads.has(key))return cycleLoads.get(key);
+    if(Date.now()-(cycleLoadedAt.get(key)||0)<60000)return true;
+    const revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
+    const current=()=>ownerUid()===uid&&(revision===null||revision===AUTH_STATE_REVISION);
     const promise=(async()=>{
-      const state=stateFor(workout,uid,true);
-      if(mode()!=='cloud'||navigator.onLine===false||currentUser()?.uid!==uid||!['student','trainer'].includes(currentUser()?.role)){cycleLoadedAt.set(key,Date.now());return true;}
+      await ensureProgress(uid);
+      if(!current())return false;
+      if(mode()!=='cloud'||navigator.onLine===false){cycleLoadedAt.set(key,Date.now());return true;}
       try{
         const [states,completions]=await Promise.all([
           queryStudentRecords('workoutCycleStates',uid,workout.id),
           queryStudentRecords('workoutCompletions',uid,workout.id)
         ]);
-        if(ownerUid()!==uid||mode()!=='cloud')return false;
-        const local=readLocal(uid),cloudState=states.find(item=>String(item.startDate||'')===cycleStartDate(workout));
-        if(cloudState){local.states[cycleKey(workout)]={docId:cloudState.id,studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),initialWeek:Math.max(1,Math.min(8,Number(cloudState.initialWeek)||1)),pendingSync:false,syncError:''};}
-        for(const saved of completions){
-          if(String(saved.startDate||'')!==cycleStartDate(workout)||!validDate(saved.completedDate))continue;
-          const day=workoutDays(workout).find(item=>String(item.id)===String(saved.dayId));if(!day)continue;
-          const id=completionId(uid,workout,saved.week,day);
-          local.completions[id]={studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),week:Number(saved.week),dayId:String(saved.dayId),dayName:String(saved.dayName||day.name),completedDate:String(saved.completedDate),pendingSync:false,syncError:''};
-        }
-        writeLocal(uid,local);
-        if(currentUser()?.role==='student'&&currentUser()?.uid===uid)await syncPending(uid);
-        cycleLoadedAt.set(key,Date.now());
+        if(!current()||mode()!=='cloud')return false;
+        const startDate=cycleStartDate(workout),cloudState=states.find(item=>item.studentUid===uid&&item.startDate===startDate);
+        const days=new Map(workoutDays(workout).map(day=>[String(day.id),day]));
+        await mutateProgress(uid,local=>{
+          if(!current()||mode()!=='cloud')return false;
+          const cycle=cycleKey(workout);
+          if(cloudState){
+            local.states[cycle]={...newCycleState(workout,uid),docId:cloudState.id,initialWeek:Math.max(1,Math.min(8,Number(cloudState.initialWeek)||1)),pendingSync:false};
+          }else local.states[cycle]??=newCycleState(workout,uid);
+          for(const saved of completions){
+            const day=days.get(String(saved.dayId)),week=Number(saved.week);
+            if(saved.studentUid!==uid||saved.startDate!==startDate||!validDate(saved.completedDate)||!day||!Number.isInteger(week)||week<1||week>8)continue;
+            const id=completionId(uid,workout,week,day);
+            local.completions[id]={studentUid:uid,workoutId:String(workout.id),startDate,week,dayId:String(day.id),dayName:String(saved.dayName||day.name),completedDate:saved.completedDate,pendingSync:false,syncError:''};
+          }
+          if(local.guide?.cycle===cycle){
+            const day=days.get(local.guide.dayId);
+            if(day&&local.completions[completionId(uid,workout,local.guide.week,day)])local.guide=null;
+          }
+          return true;
+        });
+        if(current())void syncPending(uid).catch(()=>{});
         return true;
       }catch(error){
         console.warn('Falha ao carregar o progresso do ciclo',error);
-        const cachedState=stateFor(workout,uid,false);
-        if(cachedState?.pendingSync&&ownerUid()===uid){cachedState.syncError=String(error?.code||'Falha ao carregar o progresso. Tente novamente.').slice(0,120);const cached=readLocal(uid);cached.states[cycleKey(workout)]=cachedState;writeLocal(uid,cached);}
-        cycleLoadedAt.set(key,Date.now());return false;
-      }
+        return false;
+      }finally{if(current())cycleLoadedAt.set(key,Date.now());}
     })();
     cycleLoads.set(key,promise);try{return await promise;}finally{cycleLoads.delete(key);}
   }
@@ -146,7 +260,7 @@
   }
   function setCompletionPanel(workout,day,uid){
     const host=document.getElementById('student-workout-completion');if(!host||!workout||!day)return;
-    const state=stateFor(workout,uid,false),week=currentWeek(workout,uid),record=completionFor(workout,week,day,uid),days=workoutDays(workout),done=days.filter(item=>completionFor(workout,week,item,uid)).length;
+    const state=stateFor(workout,uid),week=currentWeek(workout,uid),record=completionFor(workout,week,day,uid),days=workoutDays(workout),done=days.filter(item=>completionFor(workout,week,item,uid)).length;
     const canWrite=studentCanComplete(uid),allDone=isWeekComplete(workout,week,uid),cycleDone=week===8&&allDone;
     const pending=Object.values(readLocal(uid).completions).filter(item=>item.workoutId===String(workout.id)&&item.startDate===cycleStartDate(workout)&&item.pendingSync);
     const needsRetry=!!(pending.length||state?.pendingSync);
@@ -178,46 +292,47 @@
   }
   function normalizedDay(value){try{return normalizedName(value);}catch(error){return String(value||'').trim().toLowerCase();}}
   async function completeCurrentDay(){
-    const uid=ownerUid(),workout=getW(CUR_WORKOUT),day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(CUR_DAY)),guide=readGuide(uid);
+    const uid=ownerUid(),workout=getW(CUR_WORKOUT),day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(CUR_DAY));
+    await ensureProgress(uid);
+    if(ownerUid()!==uid||CUR_WORKOUT!==workout?.id||normalizedDay(CUR_DAY)!==normalizedDay(day?.name))return false;
+    const guide=readGuide(uid);
     if(guide){
       if(sameDay(guide,workout,day))return finishGuided();
       showToast('Conclua ou cancele o treino que já está iniciado.',true);return false;
     }
     return completeDay({uid,workout,day,week:currentWeek(workout,uid)});
   }
-  async function completeDay({uid,workout,day,week,guide},{backgroundSync=false}={}){
-    if(!workout||!day||!studentCanComplete(uid)){showToast('Esta confirmação exige uma conta ativa ou um plano local editável.',true);return false;}
+  async function completeDay({uid,workout,day,week,guide}){
+    if(!workout||!day||!uid||!studentCanComplete(uid)){showToast('Esta confirmação exige uma conta ativa ou um plano local editável.',true);return false;}
     const revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
-    const action='complete-day:'+completionId(uid,workout,week,day);
-    const current=()=>{
-      const opened=readGuide(uid);
-      return ownerUid()===uid&&studentCanComplete(uid)&&(revision===null||revision===AUTH_STATE_REVISION)&&
-        (guide?opened?.id===guide.id&&opened.revision===guide.revision:!opened);
-    };
+    const id=completionId(uid,workout,week,day),action='complete-day:'+id;
+    const current=()=>ownerUid()===uid&&studentCanComplete(uid)&&(revision===null||revision===AUTH_STATE_REVISION);
     if(!beginAction(action))return false;
     const button=document.querySelector('#student-workout-completion .workout-completion-button');
     if(button)button.disabled=true;
     try{
-      await loadCycleData(workout,uid);
-      if(!current())return false;
-      const data=readLocal(uid),id=completionId(uid,workout,week,day);
-      if(!data.completions[id])data.completions[id]={studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),week,dayId:String(day.id),dayName:String(day.name),completedDate:today(),pendingSync:shouldSync(uid),syncError:''};
-      if(!writeLocal(uid,data)){showToast('Não foi possível gravar a conclusão neste aparelho.',true);return false;}
-      monthCache.clear();
-      if(backgroundSync){
-        showToast(data.completions[id].pendingSync?'✓ Treino concluído neste aparelho · sincronização pendente':'✓ Treino concluído');
-        if(mode()==='cloud')void syncPending(uid).then(()=>{
-          if(ownerUid()===uid&&readLocal(uid).completions[id]?.pendingSync&&navigator.onLine!==false)return syncPending(uid);
-        }).then(()=>{if(ownerUid()===uid)refreshBattleScreens();}).catch(()=>{});
+      const saved=await mutateProgress(uid,draft=>{
+        if(!current()||!matchesGuide(draft.guide,guide))return false;
+        // A conclusão e o encerramento do guia sobrevivem juntos à reabertura do app.
+        draft.states[cycleKey(workout)]??=newCycleState(workout,uid);
+        draft.completions[id]??={studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),week,dayId:String(day.id),dayName:String(day.name),completedDate:today(),pendingSync:shouldSync(uid),syncError:''};
+        if(guide)draft.guide=null;
         return true;
-      }
-      const synced=mode()==='cloud'?await syncPending(uid):!shouldSync(uid);
-      if(current())showToast(synced?'✓ Treino concluído':'✓ Treino concluído neste aparelho · sincronização pendente');
+      });
+      if(!current())return false;
+      if(saved==='unavailable'){showToast('O aparelho não conseguiu guardar a conclusão. Tente concluir novamente.',true);return false;}
+      refreshBattleScreens();
+      if(saved!=='saved')return false;
+      if(activeScreenId()==='screen-day'&&CUR_WORKOUT===workout.id&&normalizedDay(CUR_DAY)===normalizedDay(day.name))renderStudentDay();
+      monthCache.clear();
+      showToast(readLocal(uid).completions[id]?.pendingSync?'✓ Treino concluído neste aparelho · sincronização pendente':'✓ Treino concluído');
+      if(mode()==='cloud')void syncPending(uid).then(ok=>{
+        if(ok&&current()&&readLocal(uid).completions[id]?.pendingSync)return syncPending(uid);
+      }).then(()=>{if(current())refreshBattleScreens();}).catch(()=>{});
       return true;
     }finally{
       endAction(action);
       if(button)button.disabled=false;
-      if(!backgroundSync&&ownerUid()===uid&&activeScreenId()==='screen-day')renderStudentDay();
     }
   }
   async function retrySync(){
@@ -237,30 +352,33 @@
   }
   function diagnostics(){const data=readLocal(ownerUid()),items=[...Object.values(data.states),...Object.values(data.completions)],pending=items.filter(item=>item?.pendingSync),failed=pending.filter(item=>!!item.syncError);return{pending:pending.length,failed:failed.length};}
 
-  function guideKey(uid){return 'team_bulls_guided_workout_v1_'+encodeURIComponent(uid);}
   function readGuide(uid=ownerUid()){
-    if(!uid||currentUser()?.role==='trainer')return null;
-    try{
-      const guide=JSON.parse(localStorage.getItem(guideKey(uid))||'null');
-      return guide?.uid===uid&&guide.id&&validDate(guide.date)&&Array.isArray(guide.done)&&Array.isArray(guide.deferred)?guide:null;
-    }catch(error){return null;}
+    return uid&&currentUser()?.role!=='trainer'?readLocal(uid).guide:null;
   }
-  function saveGuide(uid,current,next){
+  async function saveGuide(uid,current,next,completionKey=''){
     if(!uid||ownerUid()!==uid)return false;
-    const saved=readGuide(uid);
-    if(saved?.revision!==current?.revision||saved?.id!==current?.id){
-      showToast('O treino mudou em outra janela. Confira o progresso antes de continuar.',true);
-      refreshBattleScreens();return false;
-    }
-    try{
-      if(next)localStorage.setItem(guideKey(uid),JSON.stringify({...next,revision:(current?.revision??0)+1}));
-      else localStorage.removeItem(guideKey(uid));
-      refreshBattleScreens();
-      if(next?.status==='active'&&(!current||current.status==='paused'||next.exerciseId!==current.exerciseId)){
-        document.querySelector('.screen.active .student-guided-card h3')?.focus({preventScroll:true});
+    const revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
+    const sameOwner=()=>ownerUid()===uid&&studentCanComplete(uid)&&(revision===null||revision===AUTH_STATE_REVISION);
+    const result=await mutateProgress(uid,draft=>{
+      if(!sameOwner()||!matchesGuide(draft.guide,current))return false;
+      if(completionKey){
+        const workout=getW(next.workoutId);
+        if(!workout||cycleKey(workout)!==next.cycle||draft.completions[completionKey])return false;
+        draft.states[next.cycle]??=newCycleState(workout,uid);
       }
+      draft.guide=next?{...next,revision:(current?.revision??0)+1}:null;
       return true;
-    }catch(error){showToast('Não foi possível salvar o treino neste aparelho.',true);return false;}
+    });
+    if(!sameOwner())return false;
+    if(result==='unavailable'){showToast('O armazenamento do aparelho está indisponível. Tente novamente.',true);return false;}
+    refreshBattleScreens();
+    if(result==='unchanged'){
+      showToast('O progresso mudou. Confira o dia atual antes de continuar.',true);return false;
+    }
+    if(next?.status==='active'&&(!current||current.status==='paused'||next.exerciseId!==current.exerciseId)){
+      document.querySelector('.screen.active .student-guided-card h3')?.focus({preventScroll:true});
+    }
+    return true;
   }
   function sameDay(guide,workout,day){
     return !!(guide&&workout&&day&&guide.cycle===cycleKey(workout)&&guide.dayId===String(day.id));
@@ -319,11 +437,13 @@
     const first=exercisesForDay(workout,day.name)[0];
     if(!first){showToast('Este dia ainda não tem exercícios prescritos.',true);return false;}
     const date=today();
-    return saveGuide(uid,null,{id:idFor('guide',uid,Date.now()),uid,workoutId:workout.id,dayId:String(day.id),cycle:cycleKey(workout),week,date,done:[],deferred:[],exerciseId:String(first.id),status:'active'});
+    return saveGuide(uid,null,{id:idFor('guide',uid,Date.now()),uid,workoutId:workout.id,dayId:String(day.id),cycle:cycleKey(workout),week,date,done:[],deferred:[],exerciseId:String(first.id),status:'active'},completionId(uid,workout,week,day));
   }
   async function startGuidedFromHome(allowRest=false){
-    const uid=ownerUid(),guide=readGuide(uid);
-    if(guide)return resumeGuided();
+    const uid=ownerUid();
+    await ensureProgress(uid);
+    if(ownerUid()!==uid||activeScreenId()!=='screen-home')return false;
+    if(readGuide(uid))return resumeGuided();
     const workout=homeWorkout();
     if(!workout||!studentCanComplete(uid)||!beginAction('begin-guided'))return false;
     try{
@@ -331,11 +451,13 @@
       if(ownerUid()!==uid||activeScreenId()!=='screen-home'||homeWorkout()?.id!==workout.id)return false;
       const plan=homeTraining(homeWorkout(),uid,today());
       if(plan.status!=='ready'&&!(allowRest&&plan.status==='rest')){refreshHomeSummary();return false;}
-      return beginGuide(plan.workout,plan.day,uid,plan.week);
+      return await beginGuide(plan.workout,plan.day,uid,plan.week);
     }finally{endAction('begin-guided');}
   }
   async function startGuidedWorkout(){
     const uid=ownerUid(),workout=getW(CUR_WORKOUT),dayName=String(CUR_DAY||'');
+    await ensureProgress(uid);
+    if(ownerUid()!==uid||CUR_WORKOUT!==workout?.id||CUR_DAY!==dayName||activeScreenId()!=='screen-day')return false;
     const day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(dayName)),guide=readGuide(uid);
     if(guide)return sameDay(guide,workout,day)?resumeGuided():false;
     if(!day||!studentCanComplete(uid)||!beginAction('begin-guided'))return false;
@@ -344,7 +466,7 @@
       if(ownerUid()!==uid||CUR_WORKOUT!==workout.id||CUR_DAY!==dayName||activeScreenId()!=='screen-day')return false;
       const latest=getW(workout.id),latestDay=workoutDays(latest).find(item=>item.id===day.id);
       if(!latest||cycleKey(latest)!==cycleKey(workout))return false;
-      return beginGuide(latest,latestDay,uid,currentWeek(latest,uid));
+      return await beginGuide(latest,latestDay,uid,currentWeek(latest,uid));
     }finally{endAction('begin-guided');}
   }
   function resumeGuided(){
@@ -407,8 +529,7 @@
       showConfirm('Encerrar treino com exercícios pendentes?',`Ainda faltam ${left} ${left===1?'exercício':'exercícios'}. Encerrar agora pode prejudicar sua evolução e o planejamento do treinador. Se aconteceu algum imprevisto e não dá para continuar, tudo bem encerrar. As séries registradas ficam salvas.`,()=>finishGuided(true,guide));
       return false;
     }
-    const done=await completeDay(context,{backgroundSync:true});
-    return done&&saveGuide(guide.uid,guide,null);
+    return completeDay(context);
   }
   function showGuidedVideo(){
     const exercise=guideContext()?.exercise;if(!exercise||!canUseCatalogVideos())return false;
@@ -508,6 +629,8 @@
     const seq=++calendarLoadSeq,year=CAL_YEAR,month=CAL_MONTH,uid=calendarUid(),key=uid+'|'+monthKey(year,month),{start,end,prefix}=monthBounds(year,month);
     if(!uid){if(currentUser()?.role==='trainer')showToast('Abra o arquivo de um aluno para ver o calendário.',true);return;}
     if(monthCache.has(key)){renderCalendar();return;}
+    await ensureProgress(uid);
+    if(seq!==calendarLoadSeq||calendarUid()!==uid)return;
     const events=localCalendarFoodEvents(uid,year,month);
     if(mode()!=='cloud'||!currentUser()?.uid){
       const plan=await loadDietDocument().catch(()=>null);
@@ -604,6 +727,11 @@
     screen.classList.toggle('student-battle-home',student);
     host.hidden=!uid||!student&&mode()!=='local';
     if(host.hidden||activeScreenId()!=='screen-home')return;
+    if(!snapshots.has(uid)){
+      renderBattleContent(host,'<div class="home-daily-summary-head"><strong>Batalha do dia</strong></div><p role="status">Carregando progresso do treino…</p>');
+      void ensureProgress(uid).then(()=>{if(ownerUid()===uid)refreshHomeSummary();});
+      return;
+    }
     const guide=readGuide(uid),workout=homeWorkout(),date=today();
     const plan=guide?null:homeTraining(workout,uid,date);
     const available=plan&&(plan.status==='ready'||plan.status==='rest');
@@ -676,8 +804,8 @@
   const baseShowScreen=typeof showScreen==='function'?showScreen:null;
   if(baseShowScreen)showScreen=function(id){const result=baseShowScreen.apply(this,arguments);if(result!==false){
     document.body.classList.toggle('student-no-overview',currentUser()?.role==='student');
-    if(id==='screen-workout')markDayFolders();
-    if(id==='screen-workout-library')renderLibraryGuide();
+    if(id==='screen-workout'){markDayFolders();if(!snapshots.has(ownerUid()))refreshFromStorage(ownerUid());}
+    if(id==='screen-workout-library'){renderLibraryGuide();if(!snapshots.has(ownerUid()))refreshFromStorage(ownerUid());}
     if(id==='screen-auth'){
       const home=document.getElementById('home-daily-summary');
       if(home){home.replaceChildren();battleContent.delete(home);}
@@ -689,8 +817,19 @@
 
   window.addEventListener('storage',event=>{
     const uid=ownerUid();
-    if(uid&&event.key===guideKey(uid))refreshBattleScreens();
+    if(uid&&event.key===fallbackKey(uid))refreshFromStorage(uid);
   });
+  function refreshFromStorage(uid){
+    if(!uid||ownerUid()!==uid)return;
+    void ensureProgress(uid).then(()=>{
+      if(ownerUid()!==uid)return;
+      monthCache.clear();
+      refreshBattleScreens();
+      if(activeScreenId()==='screen-calendar')void loadCalendarMonth();
+    });
+  }
+  if(progressChannel)progressChannel.onmessage=event=>refreshFromStorage(event.data);
+  window.addEventListener('pageshow',()=>refreshFromStorage(ownerUid()));
   window.TeamBullsWorkoutCompletion=Object.freeze({
     currentWeek,completeCurrentDay,renderStudentDay,retrySync,syncPending,diagnostics,
     startGuidedWorkout,startGuidedFromHome,resumeGuided,pauseGuided,cancelGuided,finishGuided,

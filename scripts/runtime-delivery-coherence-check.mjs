@@ -47,10 +47,10 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='student-daily-battle-1','Release precisa identificar a versão da Batalha do Dia.');
+assert(version.revision==='student-workout-storage-recovery-1','Release precisa identificar a versão da Batalha do Dia.');
 const weekLayoutRef='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
 assert(usability.includes(weekLayoutRef)&&updater.includes(weekLayoutRef)&&sw.includes(weekLayoutRef),'Layout semanal deve usar a mesma revisão no loader, atualizador e cache.');
-const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar4';
+const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar5';
 assert(index.includes(guidedCalendarRef.slice(2))&&sw.includes(guidedCalendarRef)&&updater.includes(guidedCalendarRef),'Treino guiado precisa chegar no HTML, no cache e na atualização.');
 const cycleUsabilityRef='./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability10';
 assert(config.includes(cycleUsabilityRef)&&sw.includes(cycleUsabilityRef)&&updater.includes(cycleUsabilityRef)&&usability.includes("const VERSION='10.10.21-usability10'"),'A ponte do ciclo precisa ser entregue na mesma revisão pelo loader, atualizador e cache.');
