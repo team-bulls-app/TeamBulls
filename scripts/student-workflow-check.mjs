@@ -124,18 +124,52 @@ assert.equal(await api.syncPending('student'),true);
 assert.equal(remote.size,2);
 assert.equal(await api.startGuidedFromHome(),false,'A finished workout is not offered again from Home on the same day');
 
-date='2026-11-16';activeScreen='screen-day';progress.CUR_DAY='Anterior';
-assert(await api.startGuidedWorkout());
+date='2026-11-16';activeScreen='screen-day';
+progress.CUR_DAY='Dia A';
+assert.equal(await api.startGuidedWorkout(),false);
+assert.equal(guide(),null);
+assert.match(messages.at(-1),/último treino que você concluiu/);
+assert.match(messages.at(-1),/Dia B/);
+const originalCompletion=JSON.stringify(JSON.parse(stored.get(storeKey)).completions);
+exercises[0].sessions.push({id:'before-repeat',date,week:1,sets:[{weight:10,reps:8}]});
+assert(await confirmAction());
+assert.equal(guide().repeat,true);
+assert.equal(api.finishExercise(),false,'Earlier series from the same date cannot advance the repeat');
+assert.equal(await api.finishGuided(),false);
+assert(await confirmAction());
+assert.equal(guide(),null);
+assert.equal(JSON.stringify(JSON.parse(stored.get(storeKey)).completions),originalCompletion,'Repeating leaves the original cycle completion intact');
+
+progress.CUR_DAY='Anterior';
+assert.equal(await api.startGuidedWorkout(),false);
+assert.match(messages.at(-1),/sequência planejada pelo treinador.*Dia B/);
+activeScreen='screen-home';
+await confirmAction();
+assert.equal(guide(),null,'Changing screens invalidates the start confirmation');
+activeScreen='screen-day';progress.CUR_DAY='Dia B';
+assert(await api.startGuidedWorkout(),'The recommended day starts immediately from the day screen');
 assert(api.cancelGuided());
 assert(guide());
 assert(await confirmAction());
 assert.equal(guide(),null);
 assert.equal(priorExercise.sessions.length,1,'Cancelling does not remove logged series');
-assert(await api.startGuidedWorkout());
+
+progress.CUR_DAY='Anterior';
+assert.equal(await api.startGuidedWorkout(),false);
+assert(await confirmAction());
 assert.equal(await api.finishGuided(),false,'An early end must ask for confirmation');
 assert.match(messages.at(-1),/prejudicar sua evolução/);
 assert(await confirmAction());
 assert.equal(guide(),null);
+
+progress.CUR_DAY='Dia A';
+assert.equal(await api.startGuidedWorkout(),false);
+assert.match(messages.at(-1),/já concluiu este treino nesta semana/);
+assert(await confirmAction());
+assert.equal(await api.finishGuided(),false);
+assert(await confirmAction());
+assert.equal(await api.startGuidedWorkout(),false);
+assert.match(messages.at(-1),/último treino que você concluiu/,'A finished repeat becomes the most recent without advancing the cycle');
 
 const math=vm.createContext({Date});
 vm.runInContext(['dietVariantForDate','studentMyoRepBand'].map(source).join('\n'),math);

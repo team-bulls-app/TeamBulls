@@ -101,7 +101,7 @@ window.savedBattle=()=>mediaGet('workout-progress:s');
 window.blockBattleStorage=()=>{
   const legacy=localStorage.getItem('team_bulls_workout_cycle_v1_s');
   if(!legacy)localStorage.setItem('team_bulls_workout_cycle_v1_s',JSON.stringify({
-    states:{},completions:{legacyB:{studentUid:'s',workoutId:'w',startDate:'2026-11-01',week:1,dayId:'b',dayName:'B',completedDate:'2026-11-08',pendingSync:true}}
+    states:{},completions:{'wcomp_s_w_2026-11-01_2_b':{studentUid:'s',workoutId:'w',startDate:'2026-11-01',week:2,dayId:'b',dayName:'B',completedDate:'2026-11-08',pendingSync:true}}
   }));
   const set=Storage.prototype.setItem;
   Storage.prototype.setItem=function(key,value){
@@ -422,6 +422,29 @@ try{
  await evaluate(`document.getElementById('confirm-ok-btn').click()`);
  for(let i=0;i<100;i++){if(await evaluate(`savedBattle().then(data=>data.guide===null)`))break;await sleep(20);}
  assert.equal(await evaluate(`savedBattle().then(data=>data.guide)`),null);
+ await evaluate(`openWorkout('w');openDay('B')`);
+ for(const theme of ['light','dark']){
+   await evaluate(`document.documentElement.dataset.theme='${theme}'`);
+   const layout=await evaluate(`(()=>{
+     const panel=document.getElementById('student-workout-completion');
+     const progress=panel.querySelector('.workout-completion-progress');
+     const button=panel.querySelector('[onclick*="startGuidedWorkout"]');
+     return {fits:progress.getBoundingClientRect().bottom+8<=button.getBoundingClientRect().top,height:button.getBoundingClientRect().height,
+       directEnd:!!panel.querySelector('[onclick*="completeCurrentDay"],[onclick*="finishGuided"]')};
+   })()`);
+   assert(layout.fits&&layout.height>=44&&!layout.directEnd,'The completed day must offer a separated start action in '+theme);
+ }
+ assert.equal(await evaluate(api+'.startGuidedWorkout()'),false);
+ assert.match(await evaluate(`document.getElementById('confirm-text').textContent`),/\u00faltimo treino que voc\u00ea concluiu/);
+ assert.equal(await evaluate(`savedBattle().then(data=>data.guide)`),null);
+ await evaluate(`document.getElementById('confirm-ok-btn').click()`);
+ for(let i=0;i<100;i++){if(await evaluate(`savedBattle().then(data=>data.guide?.repeat===true)`))break;await sleep(20);}
+ assert.equal(await evaluate(`savedBattle().then(data=>data.guide?.repeat)`),true);
+ assert.equal(await evaluate(api+'.finishGuided()'),false);
+ await evaluate(`document.getElementById('confirm-ok-btn').click()`);
+ for(let i=0;i<100;i++){if(await evaluate(`savedBattle().then(data=>data.guide===null)`))break;await sleep(20);}
+ assert.equal(await evaluate(`savedBattle().then(data=>Object.keys(data.completions).length)`),1,'A guided repeat must not duplicate the legacy completion');
+ await evaluate(`openBattleFixture()`);
  assert(await evaluate(api+'.startGuidedFromHome()'));
  assert.equal(await evaluate(api+'.finishGuided()'),false,'Incomplete workout must ask for confirmation');
  await evaluate(`document.getElementById('confirm-ok-btn').click()`);
@@ -430,14 +453,10 @@ try{
  assert.equal(storedProgress.guide,null,'Completion and clearing the guide must be persisted together');
  assert(Object.values(storedProgress.completions).some(record=>record.dayId==='a'&&record.pendingSync===true));
  assert(Object.values(storedProgress.completions).some(record=>record.dayId==='b'&&record.pendingSync===true),'Legacy pending completion must survive migration');
- await evaluate(`openWorkout('w');openDay('B')`);
- assert(await evaluate(api+'.completeCurrentDay()'),'Manual finish must work with localStorage at quota too');
- const manual=await evaluate(`savedBattle()`);
- assert(Object.values(manual.completions).some(record=>record.dayId==='b'&&record.week===2&&record.pendingSync===true));
  assert.equal(await evaluate(`localStorage.getItem('team_bulls_workout_progress_v2_s')`),null,'Browser test must exercise IndexedDB, not the local fallback');
  assert.equal(await evaluate(`exercise.sessions.some(item=>item.id==='old')`),true);
  assert.deepEqual(await evaluate('errors'),[]);
- console.log('PASS Batalha do dia in browser: stays on Home, preserves guide in Treino, highlights the day, shows history and video, uses existing register editor, restores after reload and preserves legacy data and both completion paths with full localStorage.');
+ console.log('PASS Batalha do dia in browser: stays on Home, preserves guide in Treino, highlights the day, shows history and video, uses existing register editor, restores after reload and preserves legacy data and allows a confirmed repeat without adding a duplicate completion with full localStorage.');
  console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, immediate unlock after confirmation, technique names, optional status and help by week, and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
