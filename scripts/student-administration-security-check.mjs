@@ -9,7 +9,7 @@ assert(!profile.includes("db.collection('users').doc(uid).update({name})"),'Nick
 assert(profile.includes("api.request('nickname',{studentUid:uid,nickname})"));
 assert(client.includes("'X-Firebase-AppCheck':check.token")&&client.includes("'Authorization':'Bearer '+token"));
 assert(client.includes('sessionRevision()===revision')&&client.includes('auth?.currentUser?.uid===actor')&&client.includes('editorCurrent(context)'),'Late responses must not change another account/editor');
-const asset='./modules/trainer-student-administration-v10_10_71.js?v=10.10.71-studentadmin2';
+const asset='./modules/trainer-student-administration-v10_10_71.js?v=10.10.71-studentadmin3';
 for(const p of ['config_v10_7.js','sw.js','sw_47.js','update_v10_10_9.js'])assert(read(p).includes(asset),'Administration module absent from '+p);
 const config=read('config_v10_7.js');
 assert(config.indexOf("'./modules/security-hardening-v10_10_9.js")<config.indexOf("'./modules/trainer-student-administration-v10_10_71.js"),'Security must load before administration');

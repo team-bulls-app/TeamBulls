@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__)return;
   window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__=true;
 
-  const VERSION='10.10.12-inboxpayments6';
+  const VERSION='10.10.12-inboxpayments7';
   const ACTIVITY_INDEX_VERSION=1;
   const PAYMENT_MAX_FILE=15*1024*1024;
   const ACTIVITY_LIMIT=200;
@@ -456,7 +456,7 @@
     }
   }
 
-  function updateBadges(){if(!trainer())return;const unread=activityEvents.filter(item=>item.read!==true).length,pay=paymentAttentionCount();document.querySelectorAll('[data-tb-inbox-count]').forEach(element=>element.textContent=unread?String(unread):'');document.querySelectorAll('[data-tb-payment-count]').forEach(element=>element.textContent=pay?String(pay):'');const home=document.getElementById('tb-trainer-home-tabs');if(home)home.innerHTML=hubTabs('students');}
+  function updateBadges(){if(!trainer())return;const unread=activityEvents.filter(item=>item.read!==true).length,pay=paymentAttentionCount();document.querySelectorAll('[data-tb-inbox-count]').forEach(element=>element.textContent=unread?String(unread):'');document.querySelectorAll('[data-tb-payment-count]').forEach(element=>element.textContent=pay?String(pay):'');}
 
   async function initTrainer(){
     if(!trainer()||trainerInitUid===CURRENT_USER.uid)return;

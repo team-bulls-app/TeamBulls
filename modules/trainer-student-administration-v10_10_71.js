@@ -2,15 +2,15 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentAdministration)return;
-  const VERSION='10.10.71-studentadmin2',records=new Map(),preferences=new Map(),pendingMoves=new Map();
-  let owner='',ownerRevision=null,generation=0,renderSequence=0,preferencesRevision=0,archived=false,editor=null;
+  const VERSION='10.10.71-studentadmin3',records=new Map(),preferences=new Map(),pendingMoves=new Map();
+  let owner='',ownerRevision=null,generation=0,renderSequence=0,preferencesRevision=0,archived=false,organizing=false,editor=null;
   const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const arg=value=>safe(JSON.stringify(String(value||'')));
   const clean=value=>String(value||'').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g,'').replace(/\s+/g,' ').trim().slice(0,100);
   const trainer=()=>CURRENT_USER?.role==='trainer'&&MODE==='cloud';
   async function bounded(task,ms,message){let timer;try{return await Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error(message),{code:'unavailable'})),ms);})]);}finally{clearTimeout(timer);}}
   const sessionRevision=()=>typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:auth?.currentUser;
-  function ensureOwner(){const next=trainer()?String(CURRENT_USER.uid):'',revision=sessionRevision();if(next!==owner||ownerRevision!==revision){owner=next;ownerRevision=revision;generation++;renderSequence++;records.clear();preferences.clear();pendingMoves.clear();archived=false;editor=null;}return owner;}
+  function ensureOwner(){const next=trainer()?String(CURRENT_USER.uid):'',revision=sessionRevision();if(next!==owner||ownerRevision!==revision){owner=next;ownerRevision=revision;generation++;renderSequence++;records.clear();preferences.clear();pendingMoves.clear();archived=false;organizing=false;editor=null;}return owner;}
   function identity(row){const registeredName=clean(row?.registeredName||row?.name)||'Aluno',nickname=typeof row?.nickname==='string'?clean(row.nickname):'';return{...row,registeredName,name:registeredName,nickname:nickname!==registeredName?nickname:''};}
   function getStudent(uid){return ensureOwner()?records.get(String(uid))||null:null;}
   async function request(action,data={}){
@@ -48,7 +48,7 @@
       if(ensureOwner()===uid&&revision===generation&&readRevision!==preferencesRevision)return{...preferences.get(uid),promise:undefined};
       let order=cached?.order||[];if(!order.length)try{const saved=JSON.parse(localStorage.getItem('team_bulls_roster_order_'+uid)||'[]');if(Array.isArray(saved))order=saved;}catch{}
       let archivedIds=cached?.archivedIds||[];if(!archivedIds.length)try{const saved=JSON.parse(localStorage.getItem('team_bulls_roster_archived_'+uid)||'[]');if(Array.isArray(saved))archivedIds=saved;}catch{}
-      const value={order,archivedIds,pendingDeletions:cached?.pendingDeletions||[],ready:false,error:error.message,at:Date.now()};
+      const value={order,archivedIds,pendingDeletions:cached?.pendingDeletions||[],ready:false,errorCode:error.code||'',at:Date.now()};
       if(ensureOwner()===uid&&revision===generation)preferences.set(uid,value);return value;
     });preferences.set(uid,{...cached,promise});return promise;
   }
@@ -67,15 +67,39 @@
     records.clear();rows.filter(row=>row.role==='student'&&String(row.trainerId||'')===uid).forEach(row=>records.set(String(row.uid),{...row,isArchived:settings.archivedIds.includes(String(row.uid))}));
     const all=[...records.values()],main=all.filter(row=>!row.isArchived),removed=all.filter(row=>row.isArchived),visible=archived?removed:sorted(main,settings.order);
     let toolbar=document.getElementById('tb-roster-toolbar');if(!toolbar){toolbar=document.createElement('div');toolbar.id='tb-roster-toolbar';toolbar.className='tb-roster-toolbar';list.before(toolbar);}
-    toolbar.innerHTML=`<button class="btn-add-set" type="button" onclick="TeamBullsStudentAdministration.showArchived(false)" ${archived?'':'aria-current="page"'}>ALUNOS PRINCIPAIS (${main.length})</button><button class="btn-add-set" type="button" onclick="TeamBullsStudentAdministration.showArchived(true)" ${archived?'aria-current="page"':''}>ALUNOS ARQUIVADOS (${removed.length+settings.pendingDeletions.length})</button>${settings.ready?'':`<div class="plan-help" role="status">${settings.loading?'Carregando organização dos alunos. A lista e os históricos já estão disponíveis.':'Organização de alunos indisponível agora. A lista e os históricos continuam acessíveis.'} ${settings.loading?'':`<button type="button" onclick="TeamBullsStudentAdministration.refresh()">TENTAR NOVAMENTE</button>`}</div>`}`;
+    const archivedCount=removed.length+settings.pendingDeletions.length;
+    const organize=settings.ready&&!archived?`<button class="btn-add-set" type="button" aria-pressed="${organizing}" onclick="TeamBullsStudentAdministration.toggleOrganizing()">${organizing?'CONCLUIR ORGANIZAÇÃO':'ORGANIZAR LISTA'}</button>`:'';
+    const status=archived&&!settings.ready?`<div class="tb-roster-status" role="status"><span>${settings.loading?'Consultando os alunos arquivados…':settings.errorCode==='404'?'O serviço de arquivamento ainda precisa ser publicado.':'Não foi possível confirmar os arquivos agora.'}</span>${settings.loading||settings.errorCode==='404'?'':'<button class="btn-add-set" type="button" onclick="TeamBullsStudentAdministration.refresh()">TENTAR NOVAMENTE</button>'}</div>`:'';
+    toolbar.innerHTML=`<button class="btn-add-set" type="button" onclick="TeamBullsStudentAdministration.showArchived(false)" ${archived?'':'aria-current="page"'}>LISTA PRINCIPAL</button><button class="btn-add-set" type="button" onclick="TeamBullsStudentAdministration.showArchived(true)" ${archived?'aria-current="page"':''}>ARQUIVADOS${settings.ready?' ('+archivedCount+')':''}</button>${organize}${status}`;
     const stats=document.getElementById('trainer-stats');if(stats)stats.innerHTML=`<div class="stat-cell"><div class="num">${main.length}</div><div class="lbl">Alunos</div></div><div class="stat-cell"><div class="num">${main.filter(row=>row.status==='active').length}</div><div class="lbl">Ativos</div></div><div class="stat-cell"><div class="num">${main.filter(row=>row.status!=='active').length}</div><div class="lbl">Pausados</div></div>`;
     const disabled=settings.ready?'':'disabled';
-    list.innerHTML=visible.map((raw,index)=>{const row=identity(raw),active=row.status==='active',initials=row.registeredName.split(/\s+/).map(n=>n[0]).slice(0,2).join('');return`<div class="student-card tb-managed-student" data-student-uid="${safe(row.uid)}" data-student-status="${active?'active':'inactive'}"><div class="student-avatar">${safe(initials)}</div><div class="student-info"><div class="archive-file-kicker">ARQUIVO ${typeof studentArchiveCode==='function'?safe(studentArchiveCode(row.uid)):''}</div><div class="student-name-row"><span class="tb-student-status-dot ${active?'active':'inactive'}" role="img" aria-label="${active?'Aluno ativo':'Aluno bloqueado'}"></span><div class="student-name" title="${safe(row.name)}">${safe(row.name)}</div></div>${row.nickname?`<div class="student-meta tb-student-nickname" title="Apelido: ${safe(row.nickname)}">${safe(row.nickname)}</div>`:''}<div class="student-meta" title="${safe(row.email)}">${safe(row.email||'')}</div></div><div class="student-actions tb-roster-actions">${archived?'':`<button type="button" onclick="TeamBullsStudentAdministration.move(${arg(row.uid)},-1)" aria-label="Mover ${safe(row.name)} para cima" ${index===0?'disabled':disabled}>↑</button><button type="button" onclick="TeamBullsStudentAdministration.move(${arg(row.uid)},1)" aria-label="Mover ${safe(row.name)} para baixo" ${index===visible.length-1?'disabled':disabled}>↓</button>`}<button class="btn-view-student" onclick="viewStudent(${arg(row.uid)},${arg(row.name)},${arg(row.email)},${arg(row.status)})">ABRIR</button>${archived?`<button type="button" onclick="TeamBullsStudentAdministration.restore(${arg(row.uid)})" ${disabled}>RESTAURAR ACESSO</button><button type="button" class="tb-roster-danger" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})" ${disabled}>EXCLUIR DEFINITIVAMENTE</button>`:`<button class="toggle-btn ${active?'deactivate':'activate'}" onclick="toggleStudent(${arg(row.uid)},${active})">${active?'PAUSAR':'ATIVAR'}</button><button type="button" class="tb-roster-danger" onclick="TeamBullsStudentAdministration.archive(${arg(row.uid)})" ${disabled}>REMOVER</button>`}</div></div>`;}).join('');
+    list.dataset.rosterView=archived||organizing?'managed':'regular';
+    list.innerHTML=visible.map((raw,index)=>{const row=identity(raw),active=row.status==='active',initials=row.registeredName.split(/\s+/).map(n=>n[0]).slice(0,2).join('');return`<div class="student-card tb-managed-student" data-student-uid="${safe(row.uid)}" data-student-status="${active?'active':'inactive'}"><div class="student-avatar">${safe(initials)}</div><div class="student-info"><div class="archive-file-kicker">ARQUIVO ${typeof studentArchiveCode==='function'?safe(studentArchiveCode(row.uid)):''}</div><div class="student-name-row"><span class="tb-student-status-dot ${active?'active':'inactive'}" role="img" aria-label="${active?'Aluno ativo':'Aluno bloqueado'}"></span><div class="student-name" title="${safe(row.name)}">${safe(row.name)}</div></div>${row.nickname?`<div class="student-meta tb-student-nickname" title="Apelido: ${safe(row.nickname)}">${safe(row.nickname)}</div>`:''}<div class="student-meta" title="${safe(row.email)}">${safe(row.email||'')}</div></div><div class="student-actions tb-roster-actions">${archived||!organizing||!settings.ready?'':`<button type="button" onclick="TeamBullsStudentAdministration.move(${arg(row.uid)},-1)" aria-label="Mover ${safe(row.name)} para cima" ${index===0?'disabled':disabled}>↑</button><button type="button" onclick="TeamBullsStudentAdministration.move(${arg(row.uid)},1)" aria-label="Mover ${safe(row.name)} para baixo" ${index===visible.length-1?'disabled':disabled}>↓</button>`}<button class="btn-view-student" onclick="viewStudent(${arg(row.uid)},${arg(row.name)},${arg(row.email)},${arg(row.status)})">ABRIR</button>${archived?`<button type="button" onclick="TeamBullsStudentAdministration.restore(${arg(row.uid)})" ${disabled}>RESTAURAR ACESSO</button><button type="button" class="tb-roster-danger" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})" ${disabled}>EXCLUIR DEFINITIVAMENTE</button>`:`<button class="toggle-btn ${active?'deactivate':'activate'}" onclick="toggleStudent(${arg(row.uid)},${active})">${active?'PAUSAR':'ATIVAR'}</button>${organizing&&settings.ready?`<button type="button" class="tb-roster-danger" onclick="TeamBullsStudentAdministration.archive(${arg(row.uid)})">ARQUIVAR</button>`:''}`}</div></div>`;}).join('');
     if(archived)list.innerHTML+=settings.pendingDeletions.map(row=>`<div class="student-card tb-roster-pending"><div class="student-info"><strong>${safe(row.registeredName||'Aluno')}</strong><div class="plan-help">Exclusão definitiva ainda não confirmada. O acesso permanece bloqueado.</div></div><button type="button" onclick="TeamBullsStudentAdministration.openEditor('delete',${arg(row.uid)})">CONSULTAR / CONCLUIR EXCLUSÃO</button></div>`).join('');
-    if(empty)empty.style.display=visible.length||archived&&settings.pendingDeletions.length?'none':'block';enhanceProfile();
+    if(empty){
+      empty.style.display=visible.length||archived&&(!settings.ready||settings.pendingDeletions.length)?'none':'block';
+      const title=empty.querySelector('.empty-label'),hint=empty.querySelector('.empty-hint');
+      if(title)title.textContent=archived?'Nenhum aluno arquivado':'Nenhum aluno cadastrado';
+      if(hint)hint.textContent=archived?'':'Use Convidar aluno para iniciar um novo cadastro.';
+    }
+    const search=document.getElementById('trainer-roster-search'),filter=document.getElementById('trainer-roster-status');
+    if(search)search.disabled=organizing&&settings.ready;
+    if(filter){filter.disabled=archived||organizing&&settings.ready;if(archived)filter.value='';}
+    if(typeof filterTrainerRoster==='function')filterTrainerRoster();
+    enhanceProfile();
   }
   async function refresh(){await loadPreferences(true);if(trainer())return renderTrainer();}
-  function showArchived(value){if(!ensureOwner())return;archived=value;return renderRoster([...records.values()]);}
+  function showArchived(value){if(!ensureOwner())return;archived=!!value;if(archived)organizing=false;return renderRoster([...records.values()]);}
+  function toggleOrganizing(){
+    const actor=ensureOwner();if(!actor||archived||!preferences.get(actor)?.ready)return false;
+    organizing=!organizing;
+    if(organizing){
+      const search=document.getElementById('trainer-roster-search'),status=document.getElementById('trainer-roster-status');
+      if(search)search.value='';
+      if(status)status.value='';
+    }
+    return renderRoster([...records.values()]);
+  }
   async function move(uid,direction){
     const actor=ensureOwner(),row=getStudent(uid);if(!actor||!row||row.isArchived||![-1,1].includes(direction))return false;
     const key='move-student';if(!beginAction(key))return false;
@@ -152,6 +176,6 @@
   }
   if(typeof viewStudent==='function'){const base=viewStudent;viewStudent=function(uid,name,email,status){const row=getStudent(uid);return base.call(this,uid,row?identity(row).name:name,email,status);};}
   if(typeof renderTrainerStudent==='function'){const base=renderTrainerStudent;renderTrainerStudent=async function(){const result=await base.apply(this,arguments);enhanceProfile();return result;};}
-  window.TeamBullsStudentAdministration=Object.freeze({version:VERSION,request,identity,getStudent,renderRoster,loadPreferences,refresh,showArchived,move,archive:uid=>confirmLifecycle(uid,'archive'),restore:uid=>confirmLifecycle(uid,'restore'),openEditor,closeEditor});
+  window.TeamBullsStudentAdministration=Object.freeze({version:VERSION,request,identity,getStudent,renderRoster,loadPreferences,refresh,showArchived,toggleOrganizing,move,archive:uid=>confirmLifecycle(uid,'archive'),restore:uid=>confirmLifecycle(uid,'restore'),openEditor,closeEditor});
   window.addEventListener('team-bulls-runtime-state',()=>ensureOwner());
 })();
