@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111504,
-  "revision": "student-workout-storage-recovery-1",
+  "build": 2026111505,
+  "revision": "student-workout-start-guidance-1",
   "publishedAt": "2026-11-15T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Batalha do Dia abaixo do cabeçalho e recuperação local ao iniciar ou concluir treinos."
+  "message": "Início de treino organizado e aviso para repetir ou iniciar fora da sequência do treinador."
 }
