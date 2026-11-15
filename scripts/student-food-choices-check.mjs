@@ -154,7 +154,7 @@ export async function checkFoodChoices(){
   assert.ok(first().includes('120 g</span>'));assert.ok(!first().includes('>Guardar</button>'));assert.equal([...compact.remote.values()][0].foodId,compact.fish().id);
 
   // Choice records cannot become completion marks or inflate adherence.
-  const completionContext={db:{collection:()=>({where(){return this;},get:async()=>({docs:[{data:()=>({mealId:'choice',recordType:'food_choice'})},{data:()=>({mealId:'done'})}]})})},cloudGet:ref=>ref.get(),today:()=> '2026-10-08',Set,console};
+  const completionContext={CURRENT_USER:{role:'student',uid:'student-a'},ownMealCompletionCache:new Map(),db:{collection:()=>({where(){return this;},get:async()=>({docs:[{data:()=>({mealId:'choice',recordType:'food_choice'})},{data:()=>({mealId:'done'})}]})})},cloudGet:ref=>ref.get(),today:()=> '2026-10-08',Set,console};
   vm.runInNewContext(core.slice(core.indexOf('async function fetchCompletionsToday('),core.indexOf('function isMealDoneToday(')),completionContext);
   assert.deepEqual([...await completionContext.fetchCompletionsToday('student-a')],['done']);
   assert.ok(fs.readFileSync('modules/v107-operations.js','utf8').includes("filter(item=>item.recordType!=='food_choice')"));

@@ -2889,6 +2889,14 @@ html[data-theme="light"] .superset-badge{color:#ffd27c}
 html[data-theme="light"] .tb-guidance-card .tb-hydration-value{color:#b8d9ff}
 html[data-theme="light"] .tb-guidance-card .tb-nutrition-details summary::marker{color:#ed7779}
 
+.student-rx-note,.student-ger-guide{margin-block:9px;padding:9px 11px;background:var(--surface);border-inline-start:3px solid var(--accent);color:var(--text)}
+.student-rx-note b,.student-rx-note span{display:block}
+.photo-capture-mode{display:flex;align-items:center;gap:8px;min-height:44px;color:var(--text);font-family:'Barlow',system-ui,sans-serif}
+.photo-capture-mode input,[data-cardio-alert]{accent-color:var(--accent)}
+.student-ger-guide summary{min-height:32px;cursor:pointer;font-weight:700}
+.student-ger-guide p+p{margin-top:6px}
+.tb-student-nickname{font-family:'Barlow',system-ui,sans-serif;overflow-wrap:anywhere}
+
 /* Técnicas da semana dentro da prescrição e do registro do aluno. */
 .student-technique-guide {
   margin-block: 10px 12px;

@@ -402,7 +402,7 @@ let VIDEO_EDIT_EXERCISE_ID=null;
 let SESSION_CREATE_ID=null;
 let SET_COUNT=0;
 let SESSION_VARIANT={itemId:'',name:''};
-let REST_INTERVAL=null, REST_REMAINING=0, REST_TOTAL=0, REST_PAUSED=false;
+let REST_INTERVAL=null, REST_REMAINING=0, REST_TOTAL=0, REST_PAUSED=false, REST_END_AT=0;
 let CAL_YEAR=null, CAL_MONTH=null;
 const MONTH_NAMES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 let CHART_MODE='weight';
@@ -753,6 +753,15 @@ function prescriptionCompactSummary(exercise,week){
   };
 }
 function getGerDefinition(level){return GER_DEFINITIONS.find(x=>x.level===Number(level));}
+function setReportCameraMode(prefix,useCamera){
+  if(!['weekly','report'].includes(prefix))return;
+  for(let slot=0;slot<6;slot++){
+    const input=document.getElementById(prefix+'-photo-'+slot);
+    if(!input)continue;
+    if(useCamera)input.setAttribute('capture','environment');
+    else input.removeAttribute('capture');
+  }
+}
 function openGerInfo(){
   document.getElementById('ger-definitions-list').innerHTML=GER_DEFINITIONS.map(item=>
     `<div class="ger-definition"><strong>G.E.R ${String(item.level).padStart(2,'0')}</strong><span>${esc(item.text)}</span></div>`
@@ -1715,6 +1724,12 @@ function canSelfManagePlan(){
 function canUseCatalogVideos(){return MODE==='cloud'&&CURRENT_USER?.role==='student'&&CURRENT_USER?.status!=='inactive';}
 function beginAsyncNavigation(){return ++NAVIGATION_SEQ;}
 function isNavigationCurrent(token){return token===NAVIGATION_SEQ;}
+function resetScreenScroll(target){
+  for(const element of [document.scrollingElement,document.getElementById('app'),target]){
+    if(!element)continue;
+    if(element.scrollTop||element.scrollLeft)element.scrollTo({top:0,left:0,behavior:'instant'});
+  }
+}
 function showScreen(id,expectedToken=null){
   if(id!=='screen-ts-workout')closeModal('modal-training-recommendations');
   if(!['screen-trainer-student','screen-ts-workout','screen-ts-day','screen-ts-exercise'].includes(id))closeTrainerProgress();
@@ -1724,7 +1739,11 @@ function showScreen(id,expectedToken=null){
   NAVIGATION_SEQ++;
   document.querySelectorAll('.screen').forEach(screen=>screen.classList.remove('active'));
   target.classList.add('active');
-  try{window.scrollTo(0,0);}catch(error){}
+  resetScreenScroll(target);
+  const navigation=NAVIGATION_SEQ;
+  requestAnimationFrame(()=>{
+    if(isNavigationCurrent(navigation)&&target.classList.contains('active'))resetScreenScroll(target);
+  });
   const isReadonly=CURRENT_USER?.role==='trainer'&&VIEW_STUDENT!==null;
   const display=(elementId,visible)=>{const element=document.getElementById(elementId);if(element)element.style.display=visible?'flex':'none';};
   display('fab-home',id==='screen-home'&&!isReadonly&&canSelfManagePlan());
@@ -2695,6 +2714,7 @@ let EDIT_MEAL_ID=null;
 let MEAL_PLAN_CACHE={meals:[]};
 let MEAL_CTX={listId:'meals-list',emptyId:'meals-empty',canEditContent:false,canToggleDone:true,targetUid:null};
 let MEAL_COMPLETIONS_TODAY=new Set();
+const ownMealCompletionCache=new Map();
 
 function cacheOwnMealPlan(targetUid,meals){
   if(!targetUid||CURRENT_USER?.uid!==targetUid||CURRENT_USER.role==='trainer')return;
@@ -2720,20 +2740,28 @@ async function loadMealPlan(uidOverride){
   }catch(e){console.error('loadMealPlan',e);return [];}
 }
 async function fetchCompletionsToday(uid){
-  const completions=new Set();
+  const date=today(),own=CURRENT_USER?.role==='student'&&CURRENT_USER.uid===uid;
+  const previous=own?ownMealCompletionCache.get(uid):null;
+  const cache=previous?.date===date?previous:{date,values:new Set(),changes:new Map(),revision:0};
+  if(own)ownMealCompletionCache.set(uid,cache);
+  const before=cache.revision;
   try{
     let docs;
     try{
-      const snap=await cloudGet(db.collection('mealCompletions').where('studentUid','==',uid).where('date','==',today()),'refeições concluídas');
+      const snap=await cloudGet(db.collection('mealCompletions').where('studentUid','==',uid).where('date','==',date),'refeições concluídas');
       docs=snap.docs;
     }catch(indexError){
       const fallback=await cloudGet(db.collection('mealCompletions').where('studentUid','==',uid),'histórico de refeições');
-      docs=fallback.docs.filter(d=>d.data().date===today());
+      docs=fallback.docs.filter(d=>d.data().date===date);
     }
     // Escolhas recorrentes usam registros próprios; nunca são uma conclusão.
-    docs.filter(d=>d.data().recordType!=='food_choice').forEach(d=>completions.add(d.data().mealId));
+    const ids=new Set(docs.filter(d=>d.data().recordType!=='food_choice').map(d=>String(d.data().mealId||'')).filter(Boolean));
+    for(const [id,change] of cache.changes){if(change.revision>before){if(change.done)ids.add(id);else ids.delete(id);}}
+    cache.values=ids;cache.confirmed=true;
   }catch(e){console.error('fetchCompletionsToday',e);}
-  return completions;
+  const result=new Set(cache.values);
+  result.unconfirmed=!cache.confirmed;
+  return result;
 }
 function isMealDoneToday(m){
   if(MODE==='local' && !MEAL_CTX.targetUid) return (m.doneDates||[]).includes(today());
@@ -2852,10 +2880,17 @@ async function toggleMealDone(mid){
     }else{
       const uidTarget=MEAL_CTX.targetUid||CURRENT_USER?.uid;if(!uidTarget)throw new Error('Conta não identificada.');
       const compId=uidTarget+'_'+mid+'_'+t;
-      if(MEAL_COMPLETIONS_TODAY.has(mid)){await cloudWrite(db.collection('mealCompletions').doc(compId).delete(),'atualizar refeição');MEAL_COMPLETIONS_TODAY.delete(mid);}
-      else{await cloudWrite(db.collection('mealCompletions').doc(compId).set({studentUid:uidTarget,mealId:mid,date:t}),'atualizar refeição');MEAL_COMPLETIONS_TODAY.add(mid);}
+      const done=!MEAL_COMPLETIONS_TODAY.has(mid),ref=db.collection('mealCompletions').doc(compId);
+      await cloudWrite(done?ref.set({studentUid:uidTarget,mealId:mid,date:t}):ref.delete(),'atualizar refeição');
+      if(CURRENT_USER?.uid!==uidTarget||today()!==t)return;
+      const cached=ownMealCompletionCache.get(uidTarget),state=cached?.date===t?cached:{date:t,values:new Set(MEAL_COMPLETIONS_TODAY),changes:new Map(),revision:0};
+      state.changes.set(String(mid),{done,revision:++state.revision});
+      if(done){MEAL_COMPLETIONS_TODAY.add(mid);state.values.add(String(mid));}
+      else{MEAL_COMPLETIONS_TODAY.delete(mid);state.values.delete(String(mid));}
+      ownMealCompletionCache.set(uidTarget,state);
     }
     renderMealsList();
+    window.dispatchEvent(new Event('team-bulls-meal-completion-changed'));
   }catch(e){alert('Erro ao atualizar: '+e.message);}
   finally{endAction(actionKey);}
 }
@@ -3765,13 +3800,12 @@ function exerciseOptionsActiveItems(){
   }else workouts=getWorkouts()||[];
   const workout=workouts.find(item=>String(item.id)===String(activeWorkoutId(workouts))),matches=new Set();
   for(const exercise of workout?.exercises||[]){
-    for(const group of EXERCISE_OPTIONS.groups){
-      if(exercise.catalogGroupId&&String(exercise.catalogGroupId)!==String(group.id))continue;
-      for(const item of group.items||[]){
-        const match=exercise.catalogItemId?String(exercise.catalogItemId)===String(item.id):normalizedName(exercise.name)===normalizedName(item.name);
-        if(match)matches.add(JSON.stringify([String(group.id),String(item.id)]));
-      }
-    }
+    const group=findExerciseGroup(exercise);
+    if(!group)continue;
+    matches.add(JSON.stringify([String(group.id)]));
+    const item=(group.items||[]).find(entry=>String(entry.id)===String(exercise.catalogItemId))||
+      (group.items||[]).find(entry=>normalizedName(entry.name)===normalizedName(exercise.name));
+    if(item)matches.add(JSON.stringify([String(group.id),String(item.id)]));
   }
   return matches;
 }
@@ -3813,7 +3847,7 @@ function renderExerciseOptions(){
   if(!groups.length)html+='<div class="empty-state"><div class="empty-label">Nenhum exercício encontrado</div><button class="btn-add-set" onclick="clearExerciseOptionsSearch()">LIMPAR PESQUISA</button></div>';
   html+=groups.map(({group:gr,index,items:visibleItems})=>{
     const videoAllowed=canUseCatalogVideos()||canEdit;
-    const groupActive=(gr.items||[]).some(it=>active.has(JSON.stringify([String(gr.id),String(it.id)])));
+    const groupActive=active.has(JSON.stringify([String(gr.id)]));
     const items=visibleItems.map(it=>{const itemIndex=gr.items.findIndex(item=>item.id===it.id),prescribed=active.has(JSON.stringify([String(gr.id),String(it.id)]));return `<div class="food-item-row${prescribed?' exercise-option-prescribed':''}">
         <span class="food-item-name">${prescribed?`<strong>${esc(it.name)}</strong><span class="exercise-option-active-label">NO TREINO ATIVO</span>`:esc(it.name)}</span>
         <div class="food-item-actions">${canEdit?`<button class="btn-icon ghost exercise-option-move" onclick="moveExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)},-1)" title="Mover ${esc(it.name)} para cima" aria-label="Mover ${esc(it.name)} para cima" ${itemIndex===0?'disabled':''}>↑</button><button class="btn-icon ghost exercise-option-move" onclick="moveExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)},1)" title="Mover ${esc(it.name)} para baixo" aria-label="Mover ${esc(it.name)} para baixo" ${itemIndex===gr.items.length-1?'disabled':''}>↓</button>`:''}${it.videoUrl?`<button class="catalog-video-btn ${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(it.videoUrl)},${jsArg(it.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:''}${canEdit?`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:12px" onclick="openEditExOptItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Editar ${esc(it.name)}" aria-label="Editar ${esc(it.name)}">✏️</button><button class="btn-icon ghost exercise-option-delete" style="width:28px;height:28px;font-size:12px" onclick="deleteExerciseOptionItem(${jsArg(gr.id)},${jsArg(it.id)})" title="Excluir ${esc(it.name)}" aria-label="Excluir ${esc(it.name)}">🗑</button>`:''}</div>
@@ -5323,7 +5357,8 @@ function removeSet(btn){
 ══════════════════════════════════════════════════ */
 function startRestTimer(seconds){
   clearInterval(REST_INTERVAL);
-  REST_TOTAL=seconds;REST_REMAINING=seconds;REST_PAUSED=false;
+  REST_TOTAL=seconds;REST_REMAINING=seconds;REST_PAUSED=false;REST_END_AT=Date.now()+seconds*1000;
+  window.TeamBullsCardioAlert?.prime();
   document.getElementById('rest-timer-presets').style.display='none';
   document.getElementById('rest-timer-controls').style.display='grid';
   document.getElementById('rest-timer-toggle-btn').textContent='⏸ Pausar';
@@ -5335,13 +5370,13 @@ function restTick(){
   // Auto-limpa se o modal foi fechado (backdrop, ESC ou salvar) sem passar por resetRestTimer
   const modal=document.getElementById('modal-session');
   if(!modal||!modal.classList.contains('open')){clearInterval(REST_INTERVAL);REST_INTERVAL=null;return;}
-  REST_REMAINING--;
+  REST_REMAINING=Math.max(0,Math.ceil((REST_END_AT-Date.now())/1000));
   if(REST_REMAINING<=0){
     REST_REMAINING=0;renderRestTick();
     clearInterval(REST_INTERVAL);REST_INTERVAL=null;
     document.getElementById('rest-timer-display').classList.add('done');
-    beepRestDone();
-    if(navigator.vibrate)navigator.vibrate([200,100,200]);
+    if(window.TeamBullsCardioAlert?.restFinished)window.TeamBullsCardioAlert.restFinished();
+    else beepRestDone();
     return;
   }
   renderRestTick();
@@ -5356,9 +5391,13 @@ function toggleRestTimer(){
   if(REST_REMAINING<=0)return;
   if(REST_PAUSED){
     REST_PAUSED=false;
+    REST_END_AT=Date.now()+REST_REMAINING*1000;
+    window.TeamBullsCardioAlert?.prime();
     REST_INTERVAL=setInterval(restTick,1000);
     document.getElementById('rest-timer-toggle-btn').textContent='⏸ Pausar';
   }else{
+    restTick();
+    if(REST_REMAINING<=0)return;
     REST_PAUSED=true;
     clearInterval(REST_INTERVAL);REST_INTERVAL=null;
     document.getElementById('rest-timer-toggle-btn').textContent='▶ Continuar';
@@ -5366,7 +5405,7 @@ function toggleRestTimer(){
 }
 function resetRestTimer(){
   clearInterval(REST_INTERVAL);REST_INTERVAL=null;
-  REST_REMAINING=0;REST_TOTAL=0;REST_PAUSED=false;
+  REST_REMAINING=0;REST_TOTAL=0;REST_PAUSED=false;REST_END_AT=0;
   const disp=document.getElementById('rest-timer-display');
   if(disp){disp.textContent='00:00';disp.classList.remove('done');}
   const bar=document.getElementById('rest-timer-bar');if(bar)bar.style.width='0%';
@@ -7443,11 +7482,18 @@ function syncDietVariantDaysFromWeekdays(){
   if(fixed||allocated){if(!field.disabled)field.dataset.manualValue=field.value;field.value=String(fixed||allocated);field.disabled=true;}
   else{field.disabled=false;field.value=field.dataset.manualValue||'0';}
 }
+function dietVariantForDate(plan,date){
+  const variants=plan?.variants||[],weekday=new Date(date+'T12:00:00').getDay();
+  const days=variant=>[...(variant.weekdays||[]),...(variant.restWeekdays||[])];
+  const fixed=variants.filter(variant=>days(variant).some(day=>Number(day)===weekday));
+  if(fixed.length===1)return fixed[0];
+  return variants.length===1&&!days(variants[0]).length?variants[0]:null;
+}
 function v104DietDistribution(plan){const total=(plan?.variants||[]).reduce((sum,item)=>sum+Number(item.daysPerWeek||0),0);return{total,remaining:7-total};}
 function renderDietVariantTabs(trainerMode=false){
   const plan=currentDiet(),host=document.getElementById(trainerMode?'ts-diet-variant-tabs':'diet-variant-tabs'),distribution=document.getElementById(trainerMode?'ts-diet-week-distribution':'diet-week-distribution');if(!plan||!host)return;
   const active=currentDietVariant();host.innerHTML=plan.variants.map((variant,index)=>`<div class="diet-variant-card ${variant.id===active?.id?'active':''}" onclick="selectDietVariant(${jsArg(variant.id)},${trainerMode})"><div><strong>${esc(variant.name)}</strong><span>${variant.daysPerWeek} ${variant.daysPerWeek===1?'dia':'dias'} por semana · ${variant.meals.length} refeições${dietVariantDayLabel(variant)?' · '+esc(dietVariantDayLabel(variant)):''}</span>${dietVariantWorkoutLabels(variant).length?`<span>Treinos vinculados: ${esc(dietVariantWorkoutLabels(variant).join(' · '))}</span>`:''}</div>${trainerMode?`<div class="diet-variant-actions"><button ${index===0?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},-1)">↑</button><button ${index===plan.variants.length-1?'disabled':''} onclick="event.stopPropagation();moveDietVariant(${jsArg(variant.id)},1)">↓</button><button onclick="event.stopPropagation();openEditDietVariantModal(${jsArg(variant.id)})" title="Editar divisão" aria-label="Editar divisão ${esc(variant.name)}">✎</button>${plan.variants.length>1?`<button type="button" onclick="event.stopPropagation();deleteDietVariant(${jsArg(variant.id)})" title="Excluir divisão" aria-label="Excluir divisão ${esc(variant.name)}" style="color:var(--danger)">✕</button>`:''}</div>`:''}</div>`).join('');
-  const d=v104DietDistribution(plan);if(distribution){const todayVariant=!trainerMode&&plan.isActive?plan.variants.find(item=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(new Date().getDay())):null;const hasSpecificDays=plan.variants.some(item=>(item.weekdays||[]).length||(item.restWeekdays||[]).length);distribution.innerHTML=`<span>Distribuição semanal: <b>${plan.variants.map(item=>`${esc(item.name)} ${item.daysPerWeek}×`).join(' · ')}</b></span><span class="${d.total===7?'ok':'warn'}">${d.total===7?'✓ 7 dias programados':d.total<7?`Faltam ${7-d.total} dia(s)`:`Excedeu em ${d.total-7} dia(s)`}</span>${!trainerMode&&hasSpecificDays?`<span class="${todayVariant?'ok':'warn'}">${todayVariant?'Hoje: '+esc(todayVariant.name):'Hoje sem divisão definida; confirme com o treinador.'}</span>`:''}`;}
+  const d=v104DietDistribution(plan);if(distribution){const todayVariant=!trainerMode&&plan.isActive?dietVariantForDate(plan,today()):null;const hasSpecificDays=plan.variants.some(item=>(item.weekdays||[]).length||(item.restWeekdays||[]).length);distribution.innerHTML=`<span>Distribuição semanal: <b>${plan.variants.map(item=>`${esc(item.name)} ${item.daysPerWeek}×`).join(' · ')}</b></span><span class="${d.total===7?'ok':'warn'}">${d.total===7?'✓ 7 dias programados':d.total<7?`Faltam ${7-d.total} dia(s)`:`Excedeu em ${d.total-7} dia(s)`}</span>${!trainerMode&&hasSpecificDays?`<span class="${todayVariant?'ok':'warn'}">${todayVariant?'Hoje: '+esc(todayVariant.name):'Hoje sem divisão definida; confirme com o treinador.'}</span>`:''}`;}
   renderDietEnergySummary(trainerMode?'ts-diet-energy-summary':'diet-energy-summary',plan,trainerMode&&dietCanEdit());
 }
 function v104ActivateVariantMeals(trainerMode){const plan=currentDiet(),variant=currentDietVariant();if(!plan||!variant)return;variant.meals=Array.isArray(variant.meals)?variant.meals:[];plan.meals=variant.meals;MEAL_PLAN_CACHE.meals=variant.meals;MEAL_CTX.listId=trainerMode?'ts-diet-meals-list':'diet-meals-list';MEAL_CTX.emptyId=trainerMode?'ts-diet-meals-empty':'diet-meals-empty';const label=document.getElementById(trainerMode?'ts-diet-meals-section-label':'diet-meals-section-label');if(label)label.textContent='Refeições — '+variant.name;renderMealsList();}
@@ -7457,9 +7503,12 @@ renderDietList=function(listId,emptyId,trainerMode){
   list.innerHTML=plans.map((plan,index)=>{const openCall=trainerMode?`openDietDetail(${jsArg(plan.id)},true)`:`openDietDetail(${jsArg(plan.id)},false)`,d=v104DietDistribution(plan),controls=dietCanEdit()?`<div class="diet-card-controls"><button class="order-btn" ${index===0?'disabled':''} onclick="event.stopPropagation();moveDietPlan(${jsArg(plan.id)},-1)">↑</button><button class="order-btn" ${index===plans.length-1?'disabled':''} onclick="event.stopPropagation();moveDietPlan(${jsArg(plan.id)},1)">↓</button>${plan.isActive?'':`<button class="activate-workout-btn" onclick="event.stopPropagation();activateDietPlan(${jsArg(plan.id)})">ATIVAR</button>`}<button class="btn-icon ghost" onclick="event.stopPropagation();openEditDietModal(${jsArg(plan.id)})">✎</button></div>`:'';return`<div class="diet-folder-card ${plan.isActive?'is-active':'is-inactive'}" onclick="${openCall}"><div class="diet-folder-main">${dietStatusBadge(plan)}<div class="diet-folder-name">${esc(plan.name)}</div><div class="diet-folder-meta">${plan.variants.length} divisões · ${d.total}/7 dias · atualização ${esc(fmt(plan.updateDate))}</div><div class="diet-folder-variants">${plan.variants.map(item=>`<span>${esc(item.name)} ${item.daysPerWeek}×</span>`).join('')}</div></div>${controls}<span class="exercise-row-arrow">›</span></div>`;}).join('');
 };
 openDietDetail=async function(id,trainerMode=false){
+  const user=CURRENT_USER?.uid,navigation=beginAsyncNavigation();
   DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);const plan=DIET_DOCUMENT.plans.find(item=>String(item.id)===String(id));if(!plan)return;CURRENT_DIET_ID=plan.id;if(!plan.variants.some(item=>item.id===CURRENT_DIET_VARIANT_ID))CURRENT_DIET_VARIANT_ID=plan.variants[0]?.id||'';
-  if(!trainerMode&&plan.isActive){const todayVariant=plan.variants.find(item=>[...(item.weekdays||[]),...(item.restWeekdays||[])].includes(new Date().getDay()));if(todayVariant)CURRENT_DIET_VARIANT_ID=todayVariant.id;}
-  const targetUid=DIET_CONTEXT.targetUid,completions=MODE==='cloud'&&targetUid?await fetchCompletionsToday(targetUid):new Set();MEAL_COMPLETIONS_TODAY=completions;
+  if(!trainerMode&&plan.isActive){const todayVariant=dietVariantForDate(plan,today());if(todayVariant)CURRENT_DIET_VARIANT_ID=todayVariant.id;}
+  const targetUid=DIET_CONTEXT.targetUid,completions=MODE==='cloud'&&targetUid?await fetchCompletionsToday(targetUid):new Set();
+  if(!isNavigationCurrent(navigation)||user!==CURRENT_USER?.uid||targetUid!==DIET_CONTEXT.targetUid)return false;
+  MEAL_COMPLETIONS_TODAY=completions;
   const cycle=`<span>INÍCIO <b>${esc(fmt(plan.startDate))}</b></span><span>ATUALIZAÇÃO <b>${esc(fmt(plan.updateDate))}</b></span><span>SEMANA <b>${v104CycleWeek(plan.startDate,today())}/8</b></span>`;
   if(trainerMode){MEAL_CTX={listId:'ts-diet-meals-list',emptyId:'ts-diet-meals-empty',canEditContent:true,canToggleDone:false,targetUid};document.getElementById('ts-diet-detail-title').textContent=plan.name.toUpperCase();document.getElementById('ts-diet-detail-status').innerHTML=dietStatusBadge(plan)+(plan.isActive?'<span>Plano atual do aluno</span>':'<span>Dieta anterior preservada</span>');document.getElementById('ts-diet-cycle-summary').innerHTML=cycle;renderDietVariantTabs(true);v104ActivateVariantMeals(true);renderDietSupportTables('ts-diet-support-tables',plan,true);showScreen('screen-ts-diet-detail');}
   else{const canEdit=DIET_CONTEXT.local;MEAL_CTX={listId:'diet-meals-list',emptyId:'diet-meals-empty',canEditContent:canEdit,canToggleDone:true,targetUid};document.getElementById('diet-detail-title').textContent=plan.name.toUpperCase();document.getElementById('diet-detail-status').innerHTML=dietStatusBadge(plan)+(plan.isActive?'<span>Siga este plano como dieta atual</span>':'<span>Dieta anterior disponível para consulta</span>');document.getElementById('diet-cycle-summary').innerHTML=cycle;renderDietVariantTabs(false);v104ActivateVariantMeals(false);renderDietSupportTables('diet-support-tables',plan,canEdit);showScreen('screen-diet-detail');}
@@ -7656,6 +7705,24 @@ function studentTechniqueGuide(exercise,week){
   const labels=studentTechniqueLabels(exercise,week,true);
   return labels?`<div class="student-technique-guide"><b>Técnicas prescritas · semana ${esc(week)}</b>${labels}</div>`:'';
 }
+function studentMyoRepBand(set){
+  const min=Number(set?.targetMin),max=Number(set?.targetMax);
+  if(min===5&&max===9)return '6–8';
+  if(min===9&&max===12)return '8–12';
+  return '';
+}
+function studentMyoRepGuide(exercise,week,sets){
+  if(!exerciseHasTechnique(exercise,'mp',week)||exerciseUsesResistedTime(exercise,week))return '';
+  const ranges=sets.map((set,index)=>({index,range:studentMyoRepBand(set)})).filter(item=>item.range);
+  if(!ranges.length)return '';
+  const optional=exerciseHasOptionalTechnique(exercise,'mp',week);
+  return `<div class="student-rx-note"><b>${optional?'Se usar Myo Reps':'Faixas para Myo Reps'}</b><span>${ranges.map(({index,range})=>`${index+1}ª série: ${range} reps`).join(' · ')}</span></div>`;
+}
+function studentGerGuide(sets){
+  const grades=[...new Set(sets.map(set=>set.ger))].map(getGerDefinition).filter(Boolean);
+  if(!grades.length)return '';
+  return `<details class="student-ger-guide"><summary>Como aplicar o GER destas séries</summary>${grades.map(item=>`<p><b>${formatGerLevel(item.level)}</b> · ${esc(item.text)}</p>`).join('')}</details>`;
+}
 const V1058_CHANGE_EXERCISE_WEEK=changeExerciseWeek;
 changeExerciseWeek=function(delta,trainerMode){
   V1058_CHANGE_EXERCISE_WEEK(delta,trainerMode);
@@ -7676,13 +7743,13 @@ renderExercisePrescription=function(exercise,elId,week,canEdit,trainerMode){
   const rows=sets.length?sets.map((set,index)=>`<div class="prescription-set-row ${set.backoff?'backoff-row':''}"><span class="prescription-set-number">${index+1}ª${set.backoff?'<span class="backoff-label">BOS</span>':''}</span><span class="prescription-range">${esc(prescribedRangeLabel(set))} ${unit}${set.backoff?'<span class="backoff-label">-20% de carga</span>':''}</span><span class="ger-pill">${formatGerLevel(set.ger)} ${renderGerMeter(set.ger)}</span></div>`).join(''):'<div class="prescription-empty">Nenhuma série prescrita para esta semana.</div>';
   const source=base.inherited?`Herdada da semana ${base.sourceWeek}`:(base.sourceWeek?'Personalizada nesta semana':'Aguardando prescrição'),target=trainerMode?'trainer':'local',action=canEdit?`<button class="btn-primary" onclick="openPrescriptionModal(${jsArg(exercise.id)},${week},'${target}')">✎ EDITAR PRESCRIÇÃO</button>`:`<button class="btn-primary" onclick="openLogSessionModal()">REGISTRAR RESULTADO</button>`;
   const techniques=trainerMode?`<div class="prescription-week-techniques"><b>TÉCNICAS DA SEMANA</b><div>${weekTechniqueSummary(exercise,week)}</div></div>`:`<div data-student-technique-guide>${studentTechniqueGuide(exercise,week)}</div>`;
-  el.innerHTML=`<div class="prescription-card"><div class="prescription-card-head"><div><div class="prescription-eyebrow">Prescrição do treinador</div><div class="prescription-title">Semana ${week}</div><div class="prescription-source">${esc(source)}</div></div><div class="week-stepper"><button onclick="changeExerciseWeek(-1,${trainerMode?'true':'false'})" ${week<=1?'disabled':''}>‹</button><span>${week}/8</span><button onclick="changeExerciseWeek(1,${trainerMode?'true':'false'})" ${week>=8?'disabled':''}>›</button></div></div>${techniques}<div class="prescription-set-list">${rows}</div>${exerciseHasOptionalTechnique(exercise,'mp',week)?'<div class="optional-technique-note"><b>MP OPCIONAL</b> — o aluno pode executar estas séries em Myo Reps ou de forma convencional.</div>':''}${completed.length?`<div class="prescription-result">✓ ${completed.length} ${completed.length===1?'sessão registrada':'sessões registradas'} nesta semana</div>`:''}<div class="prescription-actions"><button class="btn-ghost" onclick="openGerInfo()">? ESCALA GER</button>${action}</div></div>`;
+  el.innerHTML=`<div class="prescription-card"><div class="prescription-card-head"><div><div class="prescription-eyebrow">Prescrição do treinador</div><div class="prescription-title">Semana ${week}</div><div class="prescription-source">${esc(source)}</div></div><div class="week-stepper"><button onclick="changeExerciseWeek(-1,${trainerMode?'true':'false'})" ${week<=1?'disabled':''}>‹</button><span>${week}/8</span><button onclick="changeExerciseWeek(1,${trainerMode?'true':'false'})" ${week>=8?'disabled':''}>›</button></div></div>${techniques}<div class="prescription-set-list">${rows}</div>${trainerMode?'':studentMyoRepGuide(exercise,week,sets)+studentGerGuide(sets)}${exerciseHasOptionalTechnique(exercise,'mp',week)?'<div class="optional-technique-note"><b>MP OPCIONAL</b> — o aluno pode executar estas séries em Myo Reps ou de forma convencional.</div>':''}${completed.length?`<div class="prescription-result">✓ ${completed.length} ${completed.length===1?'sessão registrada':'sessões registradas'} nesta semana</div>`:''}<div class="prescription-actions"><button class="btn-ghost" onclick="openGerInfo()">? ESCALA GER</button>${action}</div></div>`;
 };
 renderSessionPrescriptionSummary=function(exercise,week,elId){
   const el=document.getElementById(elId);if(!el)return;
   const summary=prescriptionCompactSummary(exercise,week),partner=findSupersetPartner(exercise,workoutContainingExercise(exercise),week);
   const info=summary.rx.sets.length?`${esc(summary.reps)} · ${esc(summary.ger)}.${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''} Preencha somente o que você conseguiu realizar.`:'Sem prescrição de séries. Confirme a orientação com o treinador.';
-  el.innerHTML=`<strong>Semana ${week}:</strong> ${info}${studentTechniqueGuide(exercise,week)}`;
+  el.innerHTML=`<strong>Semana ${week}:</strong> ${info}${studentTechniqueGuide(exercise,week)}${studentMyoRepGuide(exercise,week,summary.rx.sets)}${studentGerGuide(summary.rx.sets)}`;
 };
 populateSessionEditorForWeek=function(week){const exercise=getE(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets,week);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos',week))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise,week)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise,week);renderOptionalTechniqueMode(exercise);};
 
@@ -8114,7 +8181,10 @@ function renderTrainerDayQuickNav(){
     return `<button class="trainer-day-quick-chip${active?' active':''}" type="button" onclick="openTsDay(${jsArg(day.name)})"><span>${esc(day.name)}</span><small>${count} ${count===1?'exercício':'exercícios'}</small></button>`;
   }).join('')+`<button class="trainer-day-quick-chip add" type="button" onclick="openAddDayModal('student')"><span>+ NOVO DIA</span><small>criar pasta</small></button>`;
   const active=host.querySelector('.trainer-day-quick-chip.active');
-  if(active)requestAnimationFrame(()=>active.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'}));
+  if(active)requestAnimationFrame(()=>{
+    if(!host.contains(active))return;
+    host.scrollLeft=active.offsetLeft-host.firstElementChild.offsetLeft-(host.clientWidth-active.offsetWidth)/2;
+  });
 }
 
 const V10513_BOARD_TOKENS=new Map();
@@ -8765,7 +8835,7 @@ showScreen=function(id,expectedToken=null){
   const result=V106_BASE_SHOW_SCREEN_CLEANUP(id,expectedToken);
   if(result!==false&&id==='screen-auth'){
     setAuthSecretsEnabled(true);
-    if(!CURRENT_USER){v106ReleaseMediaObjectUrls();FREE_MEAL_LOGS=[];MEAL_PLAN_CACHE={meals:[]};MEAL_COMPLETIONS_TODAY=new Set();}
+    if(!CURRENT_USER){v106ReleaseMediaObjectUrls();FREE_MEAL_LOGS=[];MEAL_PLAN_CACHE={meals:[]};MEAL_COMPLETIONS_TODAY=new Set();ownMealCompletionCache.clear();}
   }else if(result!==false){clearTransientAuthSecrets();setAuthSecretsEnabled(false);}
   return result;
 };

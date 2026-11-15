@@ -23,6 +23,7 @@
     const app=appScroller(),doc=document.scrollingElement;
     return{
       screen:activeScreenId(),
+      navigation:typeof NAVIGATION_SEQ==='number'?NAVIGATION_SEQ:null,
       appTop:Number(app?.scrollTop||0),
       docTop:Number(doc?.scrollTop||0),
       windowTop:Number(window.scrollY||0)
@@ -31,6 +32,7 @@
   function clamp(value,max){return Math.max(0,Math.min(Math.max(0,Number(max)||0),Math.max(0,Number(value)||0)));}
   function applyScroll(state){
     if(!state||activeScreenId()!==state.screen||!isWorkoutScreen(state.screen))return false;
+    if(state.navigation!==null&&typeof NAVIGATION_SEQ==='number'&&state.navigation!==NAVIGATION_SEQ)return false;
     const app=appScroller(),doc=document.scrollingElement;
     if(app)app.scrollTop=clamp(state.appTop,app.scrollHeight-app.clientHeight);
     if(doc)doc.scrollTop=clamp(state.docTop,doc.scrollHeight-doc.clientHeight);

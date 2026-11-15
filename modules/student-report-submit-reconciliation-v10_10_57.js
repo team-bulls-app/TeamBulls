@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010577__)return;
   window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010577__=true;
 
-  const VERSION='10.10.57-submitstate7';
+  const VERSION='10.10.57-submitstate8';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -103,6 +103,48 @@
     try{return await fetchJson(documentUrl(collection,id),{method:'GET',headers},REST_GET_TIMEOUT,'consulta do relatório');}
     catch(error){if(error?.status===404)return null;throw error;}
   }
+  function decodeRestReportFields(fields){
+    const decode=value=>{
+      if(!value||'nullValue' in value)return null;
+      if('integerValue' in value)return Number(value.integerValue);
+      if('doubleValue' in value)return Number(value.doubleValue);
+      if('timestampValue' in value){
+        const millis=Date.parse(value.timestampValue);
+        return {toMillis:()=>millis,toDate:()=>new Date(millis)};
+      }
+      if('arrayValue' in value)return (value.arrayValue.values||[]).map(decode);
+      if('mapValue' in value)return decodeRestReportFields(value.mapValue.fields);
+      return value.stringValue??value.booleanValue??null;
+    };
+    return Object.fromEntries(Object.entries(fields||{}).map(([key,value])=>[key,decode(value)]));
+  }
+
+  async function readWeeklyPeriod(uid){
+    const user=auth?.currentUser;
+    const assertOwner=()=>{
+      if(!uid||studentUid()!==uid||user?.uid!==uid||auth?.currentUser!==user)
+        throw new Error('A sessão do aluno mudou durante a confirmação.');
+    };
+    assertOwner();
+    const headers=await authHeaders();
+    assertOwner();
+    let schedule;
+    try{schedule=await fetchJson(documentUrl('checkinSchedules',uid),{method:'GET',headers},REST_GET_TIMEOUT,'confirmar programação semanal');}
+    catch(error){if(error?.status===404)return{schedule:null,history:[]};throw error;}
+    assertOwner();
+    const url='https://firestore.googleapis.com/v1/projects/'+encodeURIComponent(projectId())+'/databases/(default)/documents:runQuery';
+    const body=JSON.stringify({structuredQuery:{
+      from:[{collectionId:'weeklyCheckins'}],
+      where:{fieldFilter:{field:{fieldPath:'studentId'},op:'EQUAL',value:{stringValue:uid}}}
+    }});
+    const rows=await fetchJson(url,{method:'POST',headers,body},REST_GET_TIMEOUT,'confirmar histórico semanal');
+    assertOwner();
+    if(!Array.isArray(rows))throw new Error('O histórico semanal não foi confirmado pelo servidor.');
+    return {schedule:decodeRestReportFields(schedule.fields),history:rows.filter(row=>row.document).map(({document})=>({
+      ...decodeRestReportFields(document.fields),id:document.name.split('/').at(-1)
+    }))};
+  }
+
   async function restCommit(writes,label){
     const headers=await authHeaders();
     const payload=JSON.stringify({writes});
@@ -369,5 +411,5 @@
   window.addEventListener('team-bulls-student-runtime-ready',install);
   window.addEventListener('pageshow',()=>{if(student()){install();reconcileQuestionnaires().catch(()=>{});}},{passive:true});
 
-  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,weeklyReceipt:()=>weeklyReceipt,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
+  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,readWeeklyPeriod,weeklyReceipt:()=>weeklyReceipt,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
 })();

@@ -16,6 +16,7 @@
     if(!scroller||!screen)return null;
     return{
       screenId:screen.id,
+      navigation:typeof NAVIGATION_SEQ==='number'?NAVIGATION_SEQ:null,
       appTop:Number(scroller.scrollTop)||0,
       screenTop:Number(screen.scrollTop)||0,
       dietId:typeof CURRENT_DIET_ID!=='undefined'?String(CURRENT_DIET_ID||''):'',
@@ -23,7 +24,7 @@
     };
   }
   function contextStillMatches(state){
-    if(!state)return false;
+    if(!state||state.navigation!==null&&typeof NAVIGATION_SEQ==='number'&&state.navigation!==NAVIGATION_SEQ)return false;
     const screen=document.getElementById(state.screenId);
     if(!screen?.classList.contains('active'))return false;
     if(state.dietId&&typeof CURRENT_DIET_ID!=='undefined'&&String(CURRENT_DIET_ID||'')!==state.dietId)return false;

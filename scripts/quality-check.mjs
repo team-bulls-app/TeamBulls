@@ -57,7 +57,7 @@ const config=read('config_v10_7.js');
   ['modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','Loader não usa workspace3 do visualizador de relatórios.'],
   ['modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','Loader não inclui o cronômetro corrigido.'],
   ['modules/global-performance-v10_10_9.js?v=10.10.9-perf2','Loader não inclui perf2.'],
-  ['modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout1','Loader não inclui o hotfix de treino.'],
+  ['modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2','Loader não inclui o hotfix de treino.'],
   ['modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','Loader não inclui a otimização desktop.'],
   ['modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1','Loader não inclui GER em lote.'],
   ['modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','Loader não inclui actions2.'],
@@ -280,12 +280,12 @@ has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não e
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
   './modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1',
-  './modules/diet-scroll-fix-v10_10_9.js?v=10.10.9',
+  './modules/diet-scroll-fix-v10_10_9.js?v=10.10.9&scroll=top1',
   './modules/modal-form-guard-v10_10_9.js?v=10.10.9',
   './modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace3',
   './modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1',
   './modules/global-performance-v10_10_9.js?v=10.10.9-perf2',
-  './modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout1',
+  './modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2',
   './modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1',
   './modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1',
   './modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2',
