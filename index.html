@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="10.10.9" name="team-bulls-version"/>
-<meta content="2026111503" name="team-bulls-build"/>
+<meta content="2026111504" name="team-bulls-build"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
@@ -163,6 +163,10 @@
 <span class="user-chip-name" id="user-chip-name">offline</span>
 </div>
 </div>
+<div class="home-hero">
+<div class="home-hero-eyebrow" id="hero-eyebrow">// modo offline</div>
+<div class="home-hero-title">SALA<br/><span class="dim">VERMELHA</span></div>
+</div>
 <section class="home-daily-summary" id="home-daily-summary" aria-label="Batalha do dia" hidden></section>
 <div id="inactive-banner" style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:10px 14px;margin:10px 18px 0;font-family:'DM Mono',monospace;font-size:11px;color:#fca5a5;letter-spacing:.3px;">
       ⏸ Consultoria pausada — visualização somente leitura. Seus dados estão preservados.
@@ -186,10 +190,6 @@
 <div class="feedback-banner-label" id="protocol-review-home-label">Atualização completa dos protocolos</div>
 <div class="feedback-banner-text" id="protocol-review-home-text">Carregando o cronograma de atualização...</div>
 <button class="btn-primary" onclick="openProtocolReviewInfo()" style="margin-top:8px;padding:8px">VER CRONOGRAMA</button>
-</div>
-<div class="home-hero">
-<div class="home-hero-eyebrow" id="hero-eyebrow">// modo offline</div>
-<div class="home-hero-title">SALA<br/><span class="dim">VERMELHA</span></div>
 </div>
 <div class="stats-grid" id="home-stats"></div>
 <div class="quick-nav" aria-label="Atalhos do aluno">
@@ -865,7 +865,7 @@
 </div>
 <div class="settings-card app-update-settings-card">
 <h3>Atualizações do aplicativo</h3>
-<div class="setting-row"><div class="setting-label">Versão instalada<span class="setting-value" id="tb-installed-release">v10.10.9 · revisão 2026111503</span></div></div>
+<div class="setting-row"><div class="setting-label">Versão instalada<span class="setting-value" id="tb-installed-release">v10.10.9 · revisão 2026111504</span></div></div>
 <button class="btn-add-set full" type="button" onclick="window.TeamBullsUpdater?.manualCheck ? window.TeamBullsUpdater.manualCheck() : location.assign('./recuperar.html')">VERIFICAR ATUALIZAÇÃO</button>
 <p><a href="./recuperar.html">Corrigir aplicativo desatualizado</a></p>
 <div class="pdf-note">Quando uma versão nova estiver disponível, o Team Bulls exibirá o botão “Atualizar agora”. Login, instalação e dados locais são preservados.</div>
@@ -1542,9 +1542,9 @@
 </div>
 </div>
 <script defer src="config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1&protocol=activecycle1&studentadmin=roster1&recovery=bounded1&payments=consult1&workoutdates=cycle2&mixedfoods=1&trainingguidance=2&studentworkflow=1&trainercentral=1"></script>
-<script defer src="update_v10_10_9.js?v=10.10.9&b=2026111503"></script>
+<script defer src="update_v10_10_9.js?v=10.10.9&b=2026111504"></script>
 <script defer src="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1"></script>
-<script defer src="modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar4"></script>
+<script defer src="modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar5"></script>
 <script defer src="modules/student-feedback-device-notices-v10_10_62.js?v=10.10.62-device-notices2"></script>
 <script defer src="modules/support-diagnostics-v10_10_9.js?v=10.10.9-diagnostics4"></script>
 <script defer src="modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4"></script>

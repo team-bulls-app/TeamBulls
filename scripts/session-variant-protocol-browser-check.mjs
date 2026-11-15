@@ -93,6 +93,22 @@ function openWorkout(id){
 }
 function openDay(name){CUR_DAY=name;renderDay();showScreen('screen-day');}
 function openCalendar(){showScreen('screen-calendar');}
+const MEDIA_DB_NAME='team-bulls-media-browser-test',MEDIA_STORE='media';
+let MEDIA_DB_PROMISE=null;
+${source('openMediaDb')}
+${source('mediaGet')}
+window.savedBattle=()=>mediaGet('workout-progress:s');
+window.blockBattleStorage=()=>{
+  const legacy=localStorage.getItem('team_bulls_workout_cycle_v1_s');
+  if(!legacy)localStorage.setItem('team_bulls_workout_cycle_v1_s',JSON.stringify({
+    states:{},completions:{legacyB:{studentUid:'s',workoutId:'w',startDate:'2026-11-01',week:1,dayId:'b',dayName:'B',completedDate:'2026-11-08',pendingSync:true}}
+  }));
+  const set=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value){
+    if(this===localStorage)throw new DOMException('Synthetic full storage','QuotaExceededError');
+    return set.call(this,key,value);
+  };
+};
 let getCalendarMonthData,openCalDay,openExerciseFromCalendar;
 ${source('buildSessions')}
 window.openBattleFixture=()=>{
@@ -361,8 +377,10 @@ try{
  await command('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
  const api='TeamBullsWorkoutCompletion';
  const clickBattle=async name=>evaluate(`(()=>{const button=document.querySelector('.screen.active button[onclick*="${name}("]'); if(!button||button.disabled)return false;button.click();return true;})()`);
- await evaluate(`document.documentElement.dataset.theme='light';openBattleFixture()`);
- assert.equal(await evaluate(`document.getElementById('home-daily-summary').previousElementSibling.classList.contains('header')`),true,'Batalha do dia belongs directly below the home header');
+ await evaluate(`document.documentElement.dataset.theme='light';blockBattleStorage();openBattleFixture()`);
+ for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('#home-daily-summary [onclick*="startGuidedFromHome"]')`))break;await sleep(20);}
+ assert.equal(await evaluate(`document.getElementById('home-daily-summary').previousElementSibling.classList.contains('home-hero')`),true,'Batalha do dia must follow the Sala Vermelha header');
+ assert.equal(await evaluate(`document.querySelector('.home-hero').previousElementSibling.classList.contains('header')`),true,'Sala Vermelha must come first after the navigation header');
  assert.match(await evaluate(`document.getElementById('home-daily-summary').textContent`),/Batalha do dia.*semana 2/s);
  assert.equal(await evaluate(`[...document.querySelectorAll('#home-stats :is(.num,.lbl)')].every(node=>getComputedStyle(node).display==='none')`),true);
  assert(await evaluate(api+'.startGuidedFromHome()'));
@@ -374,7 +392,7 @@ try{
  const history=await evaluate(`[...document.querySelectorAll('#battle-history-list .session-date-badge')].map(node=>node.textContent)`);
  assert(history[0].includes('2026-11-10')&&history[1].includes('2026-11-01'),'History shows the latest sessions first');
  await evaluate(`closeModal('modal-battle-history')`);
- assert(await clickBattle('finishExercise'));
+ assert(await evaluate(api+'.finishExercise()'));
  assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Remada com apoio');
  await evaluate(`openWorkout('w');openDay('B')`);
  assert.equal(await evaluate(`document.querySelector('#student-workout-completion [onclick*="startGuidedWorkout"]')`),null,'Another day cannot start while a session is open');
@@ -389,23 +407,37 @@ try{
  assert(await clickBattle('pauseGuided'));
  assert.match(await evaluate(`document.getElementById('modal-confirm').textContent`),/Pausar treino/);
  await evaluate(`document.getElementById('confirm-ok-btn').click()`);
- assert.equal(await evaluate(`JSON.parse(localStorage.getItem('team_bulls_guided_workout_v1_s')).status`),'paused');
+ assert.equal(await evaluate(`(async()=>{for(let n=0;n<80;n++){const saved=await savedBattle();if(saved.guide?.status==='paused')return saved.guide.status;await new Promise(r=>setTimeout(r,20));}})()`),'paused');
  const previousOrigin=await evaluate('performance.timeOrigin');
  await command('Page.reload');
  for(let i=0;i<120;i++){try{if(await evaluate(`performance.timeOrigin!==${previousOrigin}&&!!window.TeamBullsWorkoutCompletion`))break;}catch{}await sleep(30);}
  await evaluate(`openBattleFixture()`);
  assert.match(await evaluate(`document.getElementById('home-daily-summary').textContent`),/Treino pausado/);
- assert(await clickBattle('resumeGuided'));
+ assert(await evaluate(api+'.resumeGuided()'));
  assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Remada com apoio');
  assert(await clickBattle('finishGuided'));
  assert.match(await evaluate(`document.getElementById('modal-confirm').textContent`),/Encerrar treino com exercícios pendentes/);
  await evaluate(`closeModal('modal-confirm');document.querySelector('.student-guided-end').open=true`);
  assert(await clickBattle('cancelGuided'));
  await evaluate(`document.getElementById('confirm-ok-btn').click()`);
- assert.equal(await evaluate(`localStorage.getItem('team_bulls_guided_workout_v1_s')`),null);
+ for(let i=0;i<100;i++){if(await evaluate(`savedBattle().then(data=>data.guide===null)`))break;await sleep(20);}
+ assert.equal(await evaluate(`savedBattle().then(data=>data.guide)`),null);
+ assert(await evaluate(api+'.startGuidedFromHome()'));
+ assert.equal(await evaluate(api+'.finishGuided()'),false,'Incomplete workout must ask for confirmation');
+ await evaluate(`document.getElementById('confirm-ok-btn').click()`);
+ for(let i=0;i<100;i++){if(await evaluate(`savedBattle().then(data=>data.guide===null)`))break;await sleep(20);}
+ const storedProgress=await evaluate(`savedBattle()`);
+ assert.equal(storedProgress.guide,null,'Completion and clearing the guide must be persisted together');
+ assert(Object.values(storedProgress.completions).some(record=>record.dayId==='a'&&record.pendingSync===true));
+ assert(Object.values(storedProgress.completions).some(record=>record.dayId==='b'&&record.pendingSync===true),'Legacy pending completion must survive migration');
+ await evaluate(`openWorkout('w');openDay('B')`);
+ assert(await evaluate(api+'.completeCurrentDay()'),'Manual finish must work with localStorage at quota too');
+ const manual=await evaluate(`savedBattle()`);
+ assert(Object.values(manual.completions).some(record=>record.dayId==='b'&&record.week===2&&record.pendingSync===true));
+ assert.equal(await evaluate(`localStorage.getItem('team_bulls_workout_progress_v2_s')`),null,'Browser test must exercise IndexedDB, not the local fallback');
  assert.equal(await evaluate(`exercise.sessions.some(item=>item.id==='old')`),true);
  assert.deepEqual(await evaluate('errors'),[]);
- console.log('PASS Batalha do dia in browser: stays on Home, preserves guide in Treino, highlights the day, shows history and video, uses existing register editor, restores after reload and confirms pause, partial finish and cancellation.');
+ console.log('PASS Batalha do dia in browser: stays on Home, preserves guide in Treino, highlights the day, shows history and video, uses existing register editor, restores after reload and preserves legacy data and both completion paths with full localStorage.');
  console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, immediate unlock after confirmation, technique names, optional status and help by week, and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
