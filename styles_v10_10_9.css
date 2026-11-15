@@ -3609,6 +3609,167 @@ html[data-theme="light"] #tb-roster-toolbar{--text:#302820;--text-muted:#625448;
 html[data-theme="light"] #tb-roster-toolbar>.btn-add-set,
 html[data-theme="light"] #tb-student-profile-actions>.btn-add-set{background:#fff;color:#302820;border-color:#8d7d6d;}
 html[data-theme="light"] #tb-roster-toolbar>[aria-current="page"]{border-color:#a51e20;color:#a51e20;}
+
+#screen-trainer .trainer-central-content,
+body.trainer-desktop #screen-trainer > .trainer-central-content {
+  display: block;
+  max-width: 1280px;
+  padding-block: 22px 36px;
+}
+.trainer-central-heading,.trainer-roster-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.trainer-central-heading h1,.trainer-roster-heading h2 {
+  margin: 0;
+  color: var(--text);
+  font: 900 calc(clamp(29px, 3vw, 40px) * var(--font-scale, 1))/1.05 'Barlow Condensed','Arial Narrow',sans-serif;
+}
+.trainer-central-heading .trainer-invite { width: auto; min-height: 44px; margin: 0; padding-inline: 20px; }
+.trainer-central-content #tb-trainer-home-tabs {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  margin: 18px 0 0;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-l);
+}
+.trainer-central-content #tb-trainer-home-tabs .tb-hub-tab {
+  min-height: 48px;
+  padding: 8px 5px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: 800 calc(16px * var(--font-scale, 1))/1.15 'Barlow Condensed','Arial Narrow',sans-serif;
+  letter-spacing: .015em;
+}
+.trainer-central-content #tb-trainer-home-tabs .tb-hub-count:empty { display: none; }
+.trainer-central-content #tb-trainer-home-tabs .tb-hub-tab[aria-busy="true"] { opacity: .65; cursor: wait; }
+.trainer-central-content #tb-trainer-home-tabs .tb-hub-tab:is(.active,:hover,:focus-visible) {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+.trainer-central-content #trainer-stats {
+  width: 100%;
+  margin: 12px 0;
+  padding: 0;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 8px;
+}
+.trainer-central-content #trainer-stats .stat-cell {
+  min-height: 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.trainer-central-content #trainer-stats .num { font-size: calc(24px * var(--font-scale, 1)); color: var(--text); }
+.trainer-central-content #trainer-stats .lbl { font-size: calc(11px * var(--font-scale, 1)); color: var(--text-dim); letter-spacing: .04em; }
+.trainer-central-content #trainer-protocol-alert { width: 100%; margin: 8px 0 12px; }
+.trainer-central-tools {
+  margin: 12px 0 24px;
+  background: var(--surface);
+  border: 1px solid var(--border-l);
+}
+.trainer-central-tools > summary {
+  padding: 12px 14px;
+  min-height: 44px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.trainer-central-tools > summary::marker { color: var(--accent); }
+.trainer-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit,minmax(min(100%,185px),1fr));
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+.trainer-tools-grid section { min-width: 0; padding-top: 12px; border-top: 1px solid var(--border-l); }
+.trainer-tools-grid h2,.trainer-roster-heading h2 {
+  font: 800 calc(24px * var(--font-scale, 1))/1.15 'Barlow Condensed','Arial Narrow',sans-serif;
+}
+.trainer-tools-grid section > button {
+  display: block;
+  min-height: 44px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  color: var(--text-dim);
+  font: 600 calc(14px * var(--font-scale, 1))/1.3 'Barlow',system-ui,sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.trainer-tools-grid section > button:is(:hover,:focus-visible) { color: var(--text); text-decoration: underline; }
+.trainer-tools-grid button[aria-busy="true"] { cursor: wait; opacity: .65; }
+#trainer-link-tools .tb-student-link-health { margin: 4px 0 0; font-size: 12px; }
+#trainer-link-tools .tb-student-link-health:not(.warn) > span { display: none; }
+.trainer-roster-filters { display: flex; flex: 1 1 420px; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.trainer-roster-filters .form-input { width: auto; min-height: 44px; min-width: 0; font-size: max(16px, 1rem); }
+.trainer-roster-filters input { flex: 1 1 260px; }
+#screen-trainer .trainer-central-content .tb-roster-toolbar { align-items: center; margin: 10px 0 14px; gap: 6px; }
+#screen-trainer .trainer-central-content .tb-roster-toolbar > .btn-add-set {
+  flex: 0 1 auto;
+  margin: 0;
+  padding-inline: 12px;
+  min-height: 44px;
+  border-style: solid;
+  font-size: calc(13px * var(--font-scale, 1));
+}
+.tb-roster-status { display: flex; flex: 1 0 100%; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--text-dim); }
+.tb-roster-status .btn-add-set { width: auto; margin: 0; min-height: 44px; }
+#screen-trainer .trainer-central-content [hidden],
+#screen-trainer .trainer-central-content :is(#tb-trainer-sent-reports-entry,#tb-trainer-feedback-archive-entry,#tb-trainer-update-organizer-entry,#tb-trainer-command-center-entry) { display: none !important; }
+#trainer-desktop-nav #tb-nav-command-center { display: none !important; }
+#screen-trainer .trainer-central-content .student-actions > button { min-height: 40px; }
+@media(min-width: 1100px) {
+  body.trainer-desktop #screen-trainer .trainer-central-content #student-list:not([data-roster-view="managed"]) .student-card.tb-managed-student {
+    min-height: 80px;
+    grid-template-columns: 44px minmax(0,1fr) auto;
+  }
+  body.trainer-desktop #screen-trainer .trainer-central-content #student-list:not([data-roster-view="managed"]) .tb-roster-actions {
+    grid-column: auto;
+    width: auto;
+    align-items: center;
+  }
+  body.trainer-desktop #screen-trainer .trainer-central-content .tb-roster-actions button { white-space: nowrap; }
+}
+html[data-theme="light"] .trainer-central-content {
+  --text: var(--tb-light-ink);
+  --text-dim: var(--tb-light-muted);
+  --surface: var(--tb-light-canvas-soft);
+  --border: var(--tb-light-line);
+  --border-l: var(--tb-light-line-strong);
+  --accent: var(--tb-light-brand);
+}
+html[data-theme="light"] .trainer-central-content #tb-trainer-home-tabs .tb-hub-tab { color: var(--tb-light-muted); }
+html[data-theme="light"] .trainer-central-content #tb-trainer-home-tabs .tb-hub-tab:is(.active,:hover,:focus-visible) {
+  color: var(--tb-light-ink);
+  border-bottom-color: var(--tb-light-brand);
+}
+html[data-theme="light"] .trainer-central-content .trainer-roster-filters .form-input {
+  background: var(--tb-light-canvas);
+  color: var(--tb-light-ink);
+  border-color: var(--tb-light-line-strong);
+  color-scheme: light;
+}
+.trainer-roster-filters input::placeholder { color: var(--text-dim); opacity: 1; }
+.trainer-roster-filters select { appearance: auto; }
+@media(max-width: 560px) {
+  .trainer-central-heading .trainer-invite { padding-inline: 12px; }
+  .trainer-roster-filters { justify-content: stretch; }
+  .trainer-roster-filters .form-input { flex: 1 1 180px; }
+  #screen-trainer .trainer-central-content .tb-roster-toolbar > .btn-add-set { padding-inline: 8px; }
+}
 #exercise-options-search-results{font-size:12px;line-height:1.4;margin-top:8px;}
 .exercise-group-prescribed{padding-inline-start:10px;}
 html[data-theme="light"] #screen-exercise-options .exercise-options-search-panel,

@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SECURITY_HARDENING_V101010__)return;
   window.__TEAM_BULLS_SECURITY_HARDENING_V101010__=true;
 
-  const VERSION='10.10.10-security9';
+  const VERSION='10.10.10-security10';
   const SAFE_COLORS=new Set(['#e11d48','#3b82f6','#22c55e','#a855f7','#ec4899','#14b8a6','#f59e0b','#ef4444','#64748b']);
   const DEFAULT_COLOR='#e11d48';
   const authorizedStudents=new Set();
@@ -75,7 +75,8 @@
     if(!el){
       el=document.createElement('div');el.id='tb-student-link-health';el.className='tb-student-link-health';
       const list=document.getElementById('student-list');
-      (list?.parentElement||screen).insertBefore(el,list||null);
+      const tools=document.getElementById('trainer-link-tools');
+      if(tools)tools.appendChild(el);else (list?.parentElement||screen).insertBefore(el,list||null);
     }
     el.classList.toggle('warn',!!warn);el.textContent='';
     const label=document.createElement('span');label.textContent=message;el.appendChild(label);
@@ -133,6 +134,7 @@
             </div>
           </div>`;
         }).join('');
+        if(typeof filterTrainerRoster==='function')filterTrainerRoster();
         renderLinkHealth(`${students.length} aluno(s) encontrados no cadastro.`);
       }catch(error){
         if(loadSeq===TRAINER_LIST_LOAD_SEQ){

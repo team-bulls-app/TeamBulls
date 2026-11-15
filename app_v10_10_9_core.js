@@ -5515,6 +5515,64 @@ async function saveSession(){
 /* ══════════════════════════════════════════════════
    TRAINER DASHBOARD
 ══════════════════════════════════════════════════ */
+function filterTrainerRoster(){
+  const list=document.getElementById('student-list');
+  const search=document.getElementById('trainer-roster-search'),status=document.getElementById('trainer-roster-status');
+  const empty=document.getElementById('trainer-roster-no-match');
+  if(!list||!search||!status||!empty)return;
+  const query=exerciseOptionsSearchText(search.value);
+  const cards=[...list.querySelectorAll('.student-card')];
+  let visible=0;
+  for(const card of cards){
+    const text=exerciseOptionsSearchText(card.querySelector('.student-info')?.textContent);
+    card.hidden=!(text.includes(query)&&(!status.value||card.dataset.studentStatus===status.value));
+    if(!card.hidden)visible++;
+  }
+  empty.hidden=!cards.length||!!visible;
+}
+
+async function openTrainerCentralTool(tool,button){
+  if(CURRENT_USER?.role!=='trainer'||activeScreenId()!=='screen-trainer'||button?.disabled)return false;
+  const owner=CURRENT_USER.uid,navigation=NAVIGATION_SEQ;
+  const simple={
+    invites:()=>openV107Operations('invites'),operations:()=>openV107Operations('overview'),
+    photos:openReportGuideManager,exercises:openExerciseOptions,techniques:openTechniques,
+    foods:openFoodOptions,calories:openFreeMealCatalog,instructions:openInstructions
+  };
+  const target={
+    inbox:()=>window.TeamBullsTrainerHub?.openInbox,
+    payments:()=>window.TeamBullsTrainerHub?.openPayments,
+    agenda:()=>window.TeamBullsTrainerUpdateOrganizer?.open,
+    sent:()=>window.TeamBullsTrainerSentReports?.open,
+    feedback:()=>window.TeamBullsTrainerFeedbackArchive?.open
+  };
+  const action=Object.hasOwn(simple,tool)?simple[tool]:null,resolve=Object.hasOwn(target,tool)?target[tool]:null;
+  if(!action&&!resolve)return false;
+  if(button){button.disabled=true;button.setAttribute('aria-busy','true');}
+  const current=()=>CURRENT_USER?.role==='trainer'&&CURRENT_USER.uid===owner&&isNavigationCurrent(navigation)&&activeScreenId()==='screen-trainer';
+  try{
+    if(action)return await action();
+    if(tool==='agenda'&&!resolve())await window.TeamBullsTrainerUpdateOrganizerLoader?.load();
+    if(tool==='sent'||tool==='feedback'){
+      if(!window.TeamBullsTrainerRuntimeReliability)await window.TeamBullsTrainerColdStart?.loadRuntime();
+      await window.TeamBullsTrainerRuntimeReliability?.ensureArchives();
+    }
+    if(!resolve()&&(tool==='inbox'||tool==='payments')){
+      const loader=window.TeamBullsRuntimeLoader;
+      await withTimeout(Promise.resolve(loader?.ready),4500,'carregar a Central').catch(()=>{});
+      if(!resolve()&&current())await withTimeout(Promise.resolve(loader?.retry?.()),4500,'recuperar a Central');
+    }
+    if(!current())return false;
+    const open=resolve();
+    if(!open)throw new Error('Ferramenta indisponível');
+    return await open();
+  }catch(error){
+    if(current())showToast('Não foi possível abrir esta ferramenta agora. Tente novamente.',true);
+    return false;
+  }finally{
+    if(button){button.disabled=false;button.removeAttribute('aria-busy');}
+  }
+}
 let TRAINER_LIST_LOAD_SEQ=0;
 async function renderTrainer(){
   // Garante que os catálogos globais existam no Firestore assim que o
@@ -9150,7 +9208,10 @@ function v10102GuideError(error){
 }
 async function openReportGuideManager(){
   if(CURRENT_USER?.role!=='trainer')return;
-  const settings=await loadReportSettings(CURRENT_USER.uid,true),input=document.getElementById('input-report-guide-pdf');
+  const owner=CURRENT_USER.uid,navigation=NAVIGATION_SEQ;
+  const settings=await loadReportSettings(owner,true);
+  if(CURRENT_USER?.role!=='trainer'||CURRENT_USER.uid!==owner||!isNavigationCurrent(navigation))return false;
+  const input=document.getElementById('input-report-guide-pdf');
   document.getElementById('input-report-photo-instruction').value=String(settings?.photoInstruction||V109_PHOTO_INSTRUCTION);if(input)input.value='';
   const exists=!!v109SafeGuidePath(settings?.photoGuidePath);
   v10102SetGuideManagerBusy(false,'SALVAR GUIA GERAL');

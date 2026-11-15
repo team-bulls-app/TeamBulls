@@ -5,7 +5,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="10.10.9" name="team-bulls-version"/>
-<meta content="2026111501" name="team-bulls-build"/>
+<meta content="2026111502" name="team-bulls-build"/>
 <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <meta content="yes" name="apple-mobile-web-app-capable"/>
@@ -27,7 +27,7 @@
 <!-- Firebase é carregado sob demanda após a interface ficar disponível. -->
 <script src="viewport_v10_10_9.js?v=10.10.9&device=local-access1"></script>
 <script src="boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1"></script>
-<link as="style" href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1" rel="preload"/><link href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1" rel="stylesheet"/><link as="script" href="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1" rel="preload"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(max-width: 899px), (pointer: coarse)" rel="preload" type="image/png"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(min-width: 900px) and (hover: hover) and (pointer: fine)" rel="preload" type="image/png"/>
+<link as="style" href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1" rel="preload"/><link href="styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1" rel="stylesheet"/><link as="script" href="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1" rel="preload"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(max-width: 899px), (pointer: coarse)" rel="preload" type="image/png"/><link as="image" href="team-bulls-desktop-login-stone-v2.png" media="(min-width: 900px) and (hover: hover) and (pointer: fine)" rel="preload" type="image/png"/>
 <link crossorigin="anonymous" href="https://www.gstatic.com" rel="preconnect"/><link crossorigin="anonymous" href="https://firestore.googleapis.com" rel="preconnect"/><link crossorigin="anonymous" href="https://firebasestorage.googleapis.com" rel="preconnect"/></head>
 <body>
 <div id="portrait-lock-overlay" aria-hidden="true" inert>
@@ -508,29 +508,60 @@
 <span class="user-chip-name" id="trainer-chip-name">treinador</span>
 </div>
 </div>
-<div class="trainer-header-info">
-<div class="trainer-eyebrow">// acesso do treinador</div>
-<div class="trainer-title">CENTRAL<br/><span class="dim">DE COMANDO</span></div>
+<main class="content trainer-central-content" aria-labelledby="trainer-central-title">
+<div class="trainer-central-heading">
+<h1 id="trainer-central-title">Central do treinador</h1>
+<button class="btn-primary trainer-invite" type="button" onclick="openTrainerCentralTool('invites',this)">CONVIDAR ALUNO</button>
 </div>
+<nav id="tb-trainer-home-tabs" class="tb-hub-tabs" aria-label="Áreas do treinador">
+<button class="tb-hub-tab active" aria-current="page" type="button" onclick="goTrainer()">Alunos</button>
+<button class="tb-hub-tab" type="button" onclick="openTrainerCentralTool('inbox',this)">Relatórios e atualizações <span class="tb-hub-count" data-tb-inbox-count></span></button>
+<button class="tb-hub-tab" type="button" onclick="openTrainerCentralTool('payments',this)">Pagamentos <span class="tb-hub-count" data-tb-payment-count></span></button>
+</nav>
 <div class="stats-grid" id="trainer-stats"></div>
-<button class="feedback-banner trainer-protocol-alert" id="trainer-protocol-alert" type="button" style="display:none" onclick="focusFirstPendingProtocolReview()"><div class="feedback-banner-label">ATUALIZAÇÕES COMPLETAS PENDENTES</div><div class="feedback-banner-text" id="trainer-protocol-alert-text">Verificando os ciclos dos alunos...</div></button>
-<div class="content">
-<button class="btn-add-set global-guide-manager-entry" onclick="openReportGuideManager()" style="margin-bottom:14px">📄 Guia geral de fotos — todos os alunos</button>
-<button class="btn-add-set" onclick="openFoodOptions()" style="margin-bottom:14px">🍎 Opções de alimentos (tabela de substituições)</button>
-<button class="btn-add-set" onclick="openFreeMealCatalog()" style="margin-bottom:14px">🍔 Tabela de calorias — refeições livres</button>
-<button class="btn-add-set" onclick="openExerciseOptions()" style="margin-bottom:14px">🔄 Substituições de exercícios (tabela de trocas)</button>
-<button class="btn-add-set" onclick="openInstructions()" style="margin-bottom:14px">📖 Instruções gerais e vídeos</button>
-<button class="btn-add-set" onclick="openTechniques()" style="margin-bottom:14px">⚙ Biblioteca de técnicas de treino</button>
-<button class="btn-add-set v107-command-button" onclick="openV107Operations('overview')" style="margin-bottom:14px">◉ Central de operações, versões e sincronização</button>
-<button class="btn-add-set" onclick="openV107Operations('invites')" style="margin-bottom:14px">⌁ Convites individuais de alunos</button>
-<div class="section-header"><span class="section-label">Arquivos dos alunos</span></div>
+<button class="feedback-banner trainer-protocol-alert" id="trainer-protocol-alert" type="button" style="display:none" onclick="openTrainerCentralTool('agenda',this)"><div class="feedback-banner-label">Atualizações completas pendentes</div><div class="feedback-banner-text" id="trainer-protocol-alert-text"></div></button>
+<details class="trainer-central-tools">
+<summary>Ferramentas da consultoria</summary>
+<div class="trainer-tools-grid">
+<section>
+<h2>Relatórios</h2>
+<button type="button" onclick="openTrainerCentralTool('agenda',this)">Agenda de atualizações</button>
+<button type="button" onclick="openTrainerCentralTool('sent',this)">Histórico de solicitações</button>
+<button type="button" onclick="openTrainerCentralTool('feedback',this)">Feedbacks enviados</button>
+<button type="button" onclick="openTrainerCentralTool('photos',this)">Guia geral de fotos</button>
+</section>
+<section>
+<h2>Bibliotecas</h2>
+<button type="button" onclick="openTrainerCentralTool('exercises',this)">Substituições de exercícios</button>
+<button type="button" onclick="openTrainerCentralTool('techniques',this)">Técnicas de treino</button>
+<button type="button" onclick="openTrainerCentralTool('foods',this)">Substituições de alimentos</button>
+<button type="button" onclick="openTrainerCentralTool('calories',this)">Calorias para refeições livres</button>
+<button type="button" onclick="openTrainerCentralTool('instructions',this)">Instruções gerais</button>
+</section>
+<section>
+<h2>Administração</h2>
+<button type="button" onclick="openTrainerCentralTool('operations',this)">Operações e sincronização</button>
+<div id="trainer-link-tools"></div>
+</section>
+</div>
+</details>
+<section class="trainer-roster-heading" aria-labelledby="trainer-roster-title">
+<h2 id="trainer-roster-title">Alunos</h2>
+<div class="trainer-roster-filters">
+<input class="form-input" type="search" id="trainer-roster-search" aria-label="Buscar aluno" placeholder="Buscar por nome, apelido ou e-mail" autocomplete="off" maxlength="100" oninput="filterTrainerRoster()">
+<select class="form-input" id="trainer-roster-status" aria-label="Filtrar alunos por situação" onchange="filterTrainerRoster()">
+<option value="">Todos os status</option><option value="active">Ativos</option><option value="inactive">Pausados</option>
+</select>
+</div>
+</section>
+<p id="trainer-roster-no-match" class="no-data-inline" role="status" hidden>Nenhum aluno encontrado com esses filtros.</p>
 <div id="student-list"></div>
 <div class="empty-state" id="student-empty" style="display:none">
 <div class="empty-icon">👥</div>
 <div class="empty-label">Nenhum aluno ainda</div>
 <div class="empty-hint">Os alunos aparecem aqui quando se cadastram com seu código.</div>
 </div>
-</div>
+</main>
 </div>
 <!-- TRAINER VIEWING STUDENT -->
 <div class="screen" id="screen-trainer-student">
@@ -834,7 +865,7 @@
 </div>
 <div class="settings-card app-update-settings-card">
 <h3>Atualizações do aplicativo</h3>
-<div class="setting-row"><div class="setting-label">Versão instalada<span class="setting-value" id="tb-installed-release">v10.10.9 · revisão 2026111501</span></div></div>
+<div class="setting-row"><div class="setting-label">Versão instalada<span class="setting-value" id="tb-installed-release">v10.10.9 · revisão 2026111502</span></div></div>
 <button class="btn-add-set full" type="button" onclick="window.TeamBullsUpdater?.manualCheck ? window.TeamBullsUpdater.manualCheck() : location.assign('./recuperar.html')">VERIFICAR ATUALIZAÇÃO</button>
 <p><a href="./recuperar.html">Corrigir aplicativo desatualizado</a></p>
 <div class="pdf-note">Quando uma versão nova estiver disponível, o Team Bulls exibirá o botão “Atualizar agora”. Login, instalação e dados locais são preservados.</div>
@@ -1502,9 +1533,9 @@
 </div>
 </div>
 </div>
-<script defer src="config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1&protocol=activecycle1&studentadmin=roster1&recovery=bounded1&payments=consult1&workoutdates=cycle2&mixedfoods=1&trainingguidance=2&studentworkflow=1"></script>
-<script defer src="update_v10_10_9.js?v=10.10.9&b=2026111501"></script>
-<script defer src="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1"></script>
+<script defer src="config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1&protocol=activecycle1&studentadmin=roster1&recovery=bounded1&payments=consult1&workoutdates=cycle2&mixedfoods=1&trainingguidance=2&studentworkflow=1&trainercentral=1"></script>
+<script defer src="update_v10_10_9.js?v=10.10.9&b=2026111502"></script>
+<script defer src="app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1"></script>
 <script defer src="modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar3"></script>
 <script defer src="modules/student-feedback-device-notices-v10_10_62.js?v=10.10.62-device-notices2"></script>
 <script defer src="modules/support-diagnostics-v10_10_9.js?v=10.10.9-diagnostics4"></script>
