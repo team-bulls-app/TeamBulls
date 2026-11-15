@@ -36,22 +36,30 @@ await assert.rejects(readPeriod('other'),/sessão/);
 assert.equal(reportCalls.length,2);
 
 const currentDay={id:'day',name:'Dia A'};
+const priorDay={id:'prior',name:'Anterior'},laterDay={id:'later',name:'Dia B'};
 const exercises=['first','second','third'].map(id=>({id,sessions:[]}));
+const priorExercise={id:'prev',sessions:[{date:'2026-11-14',week:1,sets:[{weight:10,reps:8}]}]};
+const otherExercise={id:'later-exercise',sessions:[]};
 const workout={id:'w',isActive:true,startDate:'2026-11-01',exercises};
+let activeScreen='screen-home',date='2026-11-15',confirmAction;
+const actions=new Set();
 const stored=new Map(),remote=new Map(),messages=[],opened=[];
 const progress=vm.createContext({
   console,CURRENT_USER:{uid:'student',role:'student',status:'active'},MODE:'cloud',ACCESS_MODE:'cloud',
   auth:{currentUser:{uid:'student'}},navigator:{onLine:true},AUTH_STATE_REVISION:1,
   CUR_WORKOUT:'w',CUR_DAY:'Dia A',CUR_EX:null,LAST_SESSION_WEEK:1,
   openCalDay:null,getCalendarMonthData:null,openExerciseFromCalendar:null,openCalendar:null,
-  window:{addEventListener(){}},document:{createElement:()=>({}),head:{appendChild(){}},addEventListener(){},getElementById(){return null;}},
-  localStorage:{getItem:id=>stored.get(id),setItem:(id,value)=>stored.set(id,value)},
-  Date,today:()=> '2026-11-15',v104CycleWeek:()=>1,normalizedName:value=>String(value).toLowerCase(),
-  getWorkoutDays:()=>[currentDay],getW:()=>workout,getE:(_wid,id)=>exercises.find(x=>x.id===id),
-  exercisesForDay:()=>exercises,showToast:message=>messages.push(message),
-  openStudentWeekExercise:(id,week)=>{progress.CUR_EX=id;progress.LAST_SESSION_WEEK=week;opened.push(id);},
-  showConfirm:(_title,message,confirm)=>{messages.push(message);confirm();},
-  openLogSessionModal:()=>opened.push('register'),goDay:()=>opened.push('day'),
+  window:{addEventListener(){}},document:{createElement:()=>({}),head:{appendChild(){}},addEventListener(){},getElementById(){return null;},querySelector(){return null;}},
+  localStorage:{getItem:id=>stored.get(id),setItem:(id,value)=>stored.set(id,value),removeItem:id=>stored.delete(id)},
+  Date,today:()=>date,v104CycleWeek:()=>1,normalizedName:value=>String(value).toLowerCase(),
+  activeScreenId:()=>activeScreen,getWorkouts:()=>[workout],activeWorkoutId:()=>workout.id,
+  getWorkoutDays:()=>[priorDay,currentDay,laterDay],getW:()=>workout,
+  exercisesForDay:(_workout,name)=>name===currentDay.name?exercises:name===priorDay.name?[priorExercise]:[otherExercise],
+  showToast:message=>messages.push(message),
+  beginAction:name=>{if(actions.has(name))return false;actions.add(name);return true;},endAction:name=>actions.delete(name),
+  showConfirm:(_title,message,confirmed)=>{messages.push(message);confirmAction=confirmed;},
+  openLogSessionModal:()=>opened.push([progress.CUR_WORKOUT,progress.CUR_EX]),
+  openWorkout:()=>{throw new Error('Unexpected navigation to the workout tab');},
   cloudGet:async query=>{
     assert(query.filters.some(([field,value])=>field==='studentUid'&&value==='student'),'Access requires an owner-scoped query');
     return {docs:[...remote].filter(([key,value])=>key.startsWith(query.collection+'/')&&query.filters.every(([field,expected])=>value[field]===expected)).map(([key,value])=>({id:key.split('/')[1],data:()=>value}))};
@@ -68,33 +76,66 @@ function collection(name,filters=[]){
 progress.db={collection};
 vm.runInContext(read('modules/student-training-calendar-v10_10_70.js'),progress);
 const api=progress.window.TeamBullsWorkoutCompletion;
-assert(api.startGuidedWorkout());
-assert.deepEqual(opened,['first']);
-assert.equal(api.finishExercise(),false);
-assert.equal(opened.at(-1),'register');
+const guideKey='team_bulls_guided_workout_v1_student';
+const guide=()=>JSON.parse(stored.get(guideKey)||'null');
+const storeKey='team_bulls_workout_cycle_v1_student';
+assert(await api.startGuidedFromHome());
+assert.equal(activeScreen,'screen-home','Starting at home must not navigate');
+assert.equal(guide().dayId,'day','Prior session selects the next unfinished day');
+assert.equal(guide().exerciseId,'first');
+assert.equal(api.finishExercise(),false,'Cannot advance with no sets logged');
+assert.deepEqual(opened.at(-1),['w','first'], 'Registration uses the existing session editor with the prescribed exercise');
+activeScreen='screen-day';progress.CUR_DAY='Anterior';
+assert.equal(await api.startGuidedWorkout(),false,'The same account cannot start another day');
+progress.CUR_DAY='Dia A';
+assert(await api.startGuidedWorkout());
 assert(api.postponeExercise());
 assert.match(messages.at(-1),/ordem foi planejada/);
+assert.equal(guide().exerciseId,'first','The order changes only after confirmation');
+assert(confirmAction());
+assert(api.pauseGuided());
+assert.equal(guide().status,'active');
+assert(confirmAction());
+assert.equal(guide().status,'paused');
+assert.equal(guide().exerciseId,'second');
+progress.CURRENT_USER={uid:'other',role:'student',status:'active'};
+assert.equal(api.dayState(workout,currentDay),'','The saved guide is scoped to its student');
+progress.CURRENT_USER={uid:'student',role:'student',status:'active'};
+activeScreen='screen-home';
+assert(await api.startGuidedFromHome());
+assert.equal(guide().status,'active');
 for(const id of ['second','third','first']){
-  assert.equal(opened.at(-1),id);
+  assert.equal(guide().exerciseId,id);
   exercises.find(item=>item.id===id).sessions.push({date:'2026-11-15',week:1,sets:[{weight:10,reps:8}]});
   assert(api.finishExercise());
 }
-assert.equal(opened.at(-1),'day');
-const storeKey='team_bulls_workout_cycle_v1_student';
-const cycle={studentUid:'student',workoutId:'w',startDate:workout.startDate,pendingSync:true,syncError:''};
-stored.set(storeKey,JSON.stringify({
-  states:{'w|2026-11-01':{...cycle,docId:'state',initialWeek:1}},
-  completions:{completion:{...cycle,week:1,dayId:'day',dayName:'Dia A',completedDate:'2026-11-15'}}
-}));
+assert.equal(guide().done.length,3);
 progress.navigator.onLine=false;
+assert(await api.finishGuided());
+assert.equal(guide(),null);
+assert.equal(Object.values(JSON.parse(stored.get(storeKey)).completions)[0].completedDate,'2026-11-15');
 assert.equal(await api.syncPending('student'),false);
-assert.equal(api.diagnostics().pending,2);
+assert.equal(api.diagnostics().pending,1);
 progress.navigator.onLine=true;
 assert.equal(await api.syncPending('student'),true);
 assert.equal(remote.size,2);
 assert.equal(api.diagnostics().pending,0);
 assert.equal(await api.syncPending('student'),true);
 assert.equal(remote.size,2);
+assert.equal(await api.startGuidedFromHome(),false,'A finished workout is not offered again from Home on the same day');
+
+date='2026-11-16';activeScreen='screen-day';progress.CUR_DAY='Anterior';
+assert(await api.startGuidedWorkout());
+assert(api.cancelGuided());
+assert(guide());
+assert(confirmAction());
+assert.equal(guide(),null);
+assert.equal(priorExercise.sessions.length,1,'Cancelling does not remove logged series');
+assert(await api.startGuidedWorkout());
+assert.equal(await api.finishGuided(),false,'An early end must ask for confirmation');
+assert.match(messages.at(-1),/prejudicar sua evolução/);
+assert(await confirmAction());
+assert.equal(guide(),null);
 
 const math=vm.createContext({Date});
 vm.runInContext(['dietVariantForDate','studentMyoRepBand'].map(source).join('\n'),math);

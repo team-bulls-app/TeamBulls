@@ -37,7 +37,7 @@ assert(sw.includes(`'./${indexConfigRefs[0]}'`)&&updater.includes(`'./${indexCon
 
 
 const styleRefs=[...index.matchAll(/href="(styles_v10_10_9\.css\?[^"]+)"/g)].map(match=>match[1]);
-assert(styleRefs.length>=2&&new Set(styleRefs).size===1&&styleRefs[0].endsWith('&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1'),'Pré-carregamento e folha de estilo precisam usar a revisão móvel.');
+assert(styleRefs.length>=2&&new Set(styleRefs).size===1&&styleRefs[0].endsWith('&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1&battle=1'),'Pré-carregamento e folha de estilo precisam usar a revisão móvel.');
 assert(updater.includes('./'+styleRefs[0])&&sw.includes('./'+styleRefs[0]),'CSS móvel precisa chegar pela atualização e pelo cache offline.');
 
 const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1';
@@ -47,10 +47,10 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='trainer-central-layout-1','Release precisa identificar os ajustes de técnicas e orientações.');
+assert(version.revision==='student-daily-battle-1','Release precisa identificar a versão da Batalha do Dia.');
 const weekLayoutRef='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
 assert(usability.includes(weekLayoutRef)&&updater.includes(weekLayoutRef)&&sw.includes(weekLayoutRef),'Layout semanal deve usar a mesma revisão no loader, atualizador e cache.');
-const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar3';
+const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar4';
 assert(index.includes(guidedCalendarRef.slice(2))&&sw.includes(guidedCalendarRef)&&updater.includes(guidedCalendarRef),'Treino guiado precisa chegar no HTML, no cache e na atualização.');
 const cycleUsabilityRef='./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability10';
 assert(config.includes(cycleUsabilityRef)&&sw.includes(cycleUsabilityRef)&&updater.includes(cycleUsabilityRef)&&usability.includes("const VERSION='10.10.21-usability10'"),'A ponte do ciclo precisa ser entregue na mesma revisão pelo loader, atualizador e cache.');
