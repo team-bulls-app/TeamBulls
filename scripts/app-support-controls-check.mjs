@@ -110,7 +110,7 @@ assert.equal(sw,sw47,'Os service workers publicados devem permanecer idênticos.
 assert.ok(CURRENT_BUILD>0,'O build publicado deve acompanhar os arquivos atualizados.');
 assert.match(updater,new RegExp(`const CURRENT_BUILD=${CURRENT_BUILD}`));
 assert.match(sw,new RegExp(`const BUILD_REVISION=${CURRENT_BUILD}`));
-assert.match(index,/student-training-calendar-v10_10_70\.js\?v=10\.10\.70-guided-calendar3/);
+assert.match(index,/student-training-calendar-v10_10_70\.js\?v=10\.10\.70-guided-calendar4/);
 assert.match(index,/styles_v10_10_9\.css\?v=10\.10.9&theme=light14/);
 
 console.log('APROVADO — ativação, desativação remota, preferência offline pendente, retomada de conexão, reinscrição controlada e diagnóstico local sem dados pessoais.');

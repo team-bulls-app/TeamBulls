@@ -1,4 +1,4 @@
-/* Team Bulls v10.10.70 — conclusão explícita do treino, resumo diário e calendário integrado. */
+/* Team Bulls v10.10.70 — Batalha do dia, conclusão do treino e calendário integrado. */
 'use strict';
 (()=>{
   if(window.__TB_STUDENT_TRAINING_CALENDAR_101070__)return;
@@ -7,9 +7,8 @@
   const LOCAL_PREFIX='team_bulls_workout_cycle_v1_';
   const cycleLoads=new Map(),syncFlights=new Map();
   const cycleLoadedAt=new Map();
-  const monthCache=new Map(),homeDietReads=new Map();
-  let guidedWorkout=null;
-  let calendarReturn='home',calendarLoadSeq=0,homeLoadSeq=0,trainerCalendarExerciseReturn=null;
+  const monthCache=new Map();
+  let calendarReturn='home',calendarLoadSeq=0,trainerCalendarExerciseReturn=null;
   const validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
   const currentUser=()=>{try{return CURRENT_USER||null;}catch(error){return null;}};
   const mode=()=>{try{return String(MODE||'');}catch(error){return'';}};
@@ -111,7 +110,7 @@
     const key=uid+'|'+cycleKey(workout);if(cycleLoads.has(key))return cycleLoads.get(key);if(Date.now()-(cycleLoadedAt.get(key)||0)<60000)return true;
     const promise=(async()=>{
       const state=stateFor(workout,uid,true);
-      if(mode()!=='cloud'||currentUser()?.uid!==uid||!['student','trainer'].includes(currentUser()?.role)){cycleLoadedAt.set(key,Date.now());return true;}
+      if(mode()!=='cloud'||navigator.onLine===false||currentUser()?.uid!==uid||!['student','trainer'].includes(currentUser()?.role)){cycleLoadedAt.set(key,Date.now());return true;}
       try{
         const [states,completions]=await Promise.all([
           queryStudentRecords('workoutCycleStates',uid,workout.id),
@@ -153,9 +152,15 @@
     const needsRetry=!!(pending.length||state?.pendingSync);
     const status=record?.pendingSync?(record.syncError?'Salvo neste aparelho · falha na sincronização':'Salvo neste aparelho · aguardando sincronização'):record?'Conclusão registrada'+(mode()==='cloud'?' e sincronizada':' neste aparelho'):state?.syncError?'Não foi possível carregar/sincronizar o progresso.':state?.pendingSync?'Progresso salvo neste aparelho · aguardando sincronização':'';
     const pendingNote=pending.length&&!record?.pendingSync?`<div class="workout-completion-status pending">${pending.length} confirmação(ões) aguardando sincronização</div>`:'';
-    const start=canWrite&&!record&&!cycleDone&&exercisesForDay(workout,day.name).length
-      ?`<button class="btn-primary student-guided-home" type="button" onclick="TeamBullsWorkoutCompletion.startGuidedWorkout()">${guidedMatches({uid,workout,day,week,date:today()})?'RETOMAR TREINO':'INICIAR TREINO'}</button>`:'';
-    host.innerHTML=`${start}<div class="workout-completion-head"><div><span>PROGRESSO DO CICLO</span><strong>${cycleDone?'Ciclo de 8 semanas concluído':`Semana ${week} de 8`}</strong></div><span class="workout-completion-count">${done}/${days.length} dias</span></div><div class="workout-completion-track"><span style="width:${days.length?Math.round(done/days.length*100):0}%"></span></div>${status?`<div class="workout-completion-status ${needsRetry?'pending':''}" role="status">${escapeHtml(status)}</div>`:''}${!canWrite?`<div class="workout-completion-status">Somente leitura</div>`:record?`<button class="workout-completion-button completed" type="button" disabled>✓ DIA CONCLUÍDO</button>`:cycleDone?`<div class="workout-completion-status">Todas as pastas do ciclo foram confirmadas.</div>`:`<button class="workout-completion-button" type="button" onclick="TeamBullsWorkoutCompletion.completeCurrentDay()">CONCLUIR TREINO</button><small>Confirme ao terminar este dia. A semana só avança quando todos os dias do plano forem concluídos.</small>`}${pendingNote}${canWrite&&needsRetry?`<button class="workout-completion-retry" type="button" onclick="TeamBullsWorkoutCompletion.retrySync()">TENTAR SINCRONIZAR</button>`:''}`;
+    const guide=readGuide(uid);
+    const same=sameDay(guide,workout,day);
+    const start=guide&&!same?`<p class="student-guided-context">Você já tem um treino iniciado.</p>${guideButton('Abrir treino iniciado','showFullDay()')}`
+      :canWrite&&!guide&&!record&&!cycleDone&&exercisesForDay(workout,day.name).length
+      ?guideButton('Iniciar treino','startGuidedWorkout()',true):'';
+    const manual=guide?'':`<button class="workout-completion-button" type="button" onclick="TeamBullsWorkoutCompletion.completeCurrentDay()">CONCLUIR TREINO</button><small>Confirme ao terminar este dia. A semana só avança quando todos os dias do plano forem concluídos.</small>`;
+    const panel=same?guidedPanel(guide):start;
+    const content=`${panel}<div class="workout-completion-head"><div><span>PROGRESSO DO CICLO</span><strong>${cycleDone?'Ciclo de 8 semanas concluído':`Semana ${week} de 8`}</strong></div><span class="workout-completion-count">${done}/${days.length} dias</span></div><div class="workout-completion-track"><span style="width:${days.length?Math.round(done/days.length*100):0}%"></span></div>${status?`<div class="workout-completion-status ${needsRetry?'pending':''}" role="status">${escapeHtml(status)}</div>`:''}${!canWrite?'<div class="workout-completion-status">Somente leitura</div>':record?'<button class="workout-completion-button completed" type="button" disabled>✓ DIA CONCLUÍDO</button>':cycleDone?'<div class="workout-completion-status">Todas as pastas do ciclo foram confirmadas.</div>':manual}${pendingNote}${canWrite&&needsRetry?'<button class="workout-completion-retry" type="button" onclick="TeamBullsWorkoutCompletion.retrySync()">TENTAR SINCRONIZAR</button>':''}`;
+    renderBattleContent(host,content);
   }
   function renderStudentDay(){
     const host=document.getElementById('student-workout-completion');if(!host)return;
@@ -173,28 +178,46 @@
   }
   function normalizedDay(value){try{return normalizedName(value);}catch(error){return String(value||'').trim().toLowerCase();}}
   async function completeCurrentDay(){
-    let workout=null,dayName='';try{workout=getW(CUR_WORKOUT);dayName=String(CUR_DAY||'');}catch(error){}
-    const uid=ownerUid(),day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(dayName));
+    const uid=ownerUid(),workout=getW(CUR_WORKOUT),day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(CUR_DAY)),guide=readGuide(uid);
+    if(guide){
+      if(sameDay(guide,workout,day))return finishGuided();
+      showToast('Conclua ou cancele o treino que já está iniciado.',true);return false;
+    }
+    return completeDay({uid,workout,day,week:currentWeek(workout,uid)});
+  }
+  async function completeDay({uid,workout,day,week,guide},{backgroundSync=false}={}){
     if(!workout||!day||!studentCanComplete(uid)){showToast('Esta confirmação exige uma conta ativa ou um plano local editável.',true);return false;}
-    const week=currentWeek(workout,uid),action='complete-day:'+completionId(uid,workout,week,day);
+    const revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
+    const action='complete-day:'+completionId(uid,workout,week,day);
+    const current=()=>{
+      const opened=readGuide(uid);
+      return ownerUid()===uid&&studentCanComplete(uid)&&(revision===null||revision===AUTH_STATE_REVISION)&&
+        (guide?opened?.id===guide.id&&opened.revision===guide.revision:!opened);
+    };
     if(!beginAction(action))return false;
     const button=document.querySelector('#student-workout-completion .workout-completion-button');
     if(button)button.disabled=true;
     try{
       await loadCycleData(workout,uid);
-      if(ownerUid()!==uid||!studentCanComplete(uid))return false;
+      if(!current())return false;
       const data=readLocal(uid),id=completionId(uid,workout,week,day);
       if(!data.completions[id])data.completions[id]={studentUid:uid,workoutId:String(workout.id),startDate:cycleStartDate(workout),week,dayId:String(day.id),dayName:String(day.name),completedDate:today(),pendingSync:shouldSync(uid),syncError:''};
       if(!writeLocal(uid,data)){showToast('Não foi possível gravar a conclusão neste aparelho.',true);return false;}
-      const synced=mode()==='cloud'?await syncPending(uid):!shouldSync(uid);
-      if(ownerUid()!==uid)return false;
       monthCache.clear();
-      showToast(synced?'✓ Treino concluído':'✓ Treino concluído neste aparelho · sincronização pendente');
+      if(backgroundSync){
+        showToast(data.completions[id].pendingSync?'✓ Treino concluído neste aparelho · sincronização pendente':'✓ Treino concluído');
+        if(mode()==='cloud')void syncPending(uid).then(()=>{
+          if(ownerUid()===uid&&readLocal(uid).completions[id]?.pendingSync&&navigator.onLine!==false)return syncPending(uid);
+        }).then(()=>{if(ownerUid()===uid)refreshBattleScreens();}).catch(()=>{});
+        return true;
+      }
+      const synced=mode()==='cloud'?await syncPending(uid):!shouldSync(uid);
+      if(current())showToast(synced?'✓ Treino concluído':'✓ Treino concluído neste aparelho · sincronização pendente');
       return true;
     }finally{
       endAction(action);
       if(button)button.disabled=false;
-      if(ownerUid()===uid&&activeScreenId()==='screen-day')renderStudentDay();
+      if(!backgroundSync&&ownerUid()===uid&&activeScreenId()==='screen-day')renderStudentDay();
     }
   }
   async function retrySync(){
@@ -214,74 +237,217 @@
   }
   function diagnostics(){const data=readLocal(ownerUid()),items=[...Object.values(data.states),...Object.values(data.completions)],pending=items.filter(item=>item?.pendingSync),failed=pending.filter(item=>!!item.syncError);return{pending:pending.length,failed:failed.length};}
 
-  function guidedContext(){
-    const uid=ownerUid(),workout=getW(CUR_WORKOUT),day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(CUR_DAY));
-    return uid&&workout&&day?{uid,workout,day,week:currentWeek(workout,uid),date:today()}:null;
+  function guideKey(uid){return 'team_bulls_guided_workout_v1_'+encodeURIComponent(uid);}
+  function readGuide(uid=ownerUid()){
+    if(!uid||currentUser()?.role==='trainer')return null;
+    try{
+      const guide=JSON.parse(localStorage.getItem(guideKey(uid))||'null');
+      return guide?.uid===uid&&guide.id&&validDate(guide.date)&&Array.isArray(guide.done)&&Array.isArray(guide.deferred)?guide:null;
+    }catch(error){return null;}
   }
-  function guidedMatches(context){
-    const guide=guidedWorkout;
-    return !!(context&&guide&&guide.uid===context.uid&&guide.workoutId===context.workout.id&&guide.dayId===context.day.id&&guide.date===context.date&&guide.week===context.week);
+  function saveGuide(uid,current,next){
+    if(!uid||ownerUid()!==uid)return false;
+    const saved=readGuide(uid);
+    if(saved?.revision!==current?.revision||saved?.id!==current?.id){
+      showToast('O treino mudou em outra janela. Confira o progresso antes de continuar.',true);
+      refreshBattleScreens();return false;
+    }
+    try{
+      if(next)localStorage.setItem(guideKey(uid),JSON.stringify({...next,revision:(current?.revision??0)+1}));
+      else localStorage.removeItem(guideKey(uid));
+      refreshBattleScreens();
+      if(next?.status==='active'&&(!current||current.status==='paused'||next.exerciseId!==current.exerciseId)){
+        document.querySelector('.screen.active .student-guided-card h3')?.focus({preventScroll:true});
+      }
+      return true;
+    }catch(error){showToast('Não foi possível salvar o treino neste aparelho.',true);return false;}
   }
-  function openGuidedExercise(id){
-    const context=guidedContext();
-    if(!guidedMatches(context)||!exercisesForDay(context.workout,context.day.name).some(exercise=>exercise.id===id))return false;
-    guidedWorkout.exerciseId=id;
-    openStudentWeekExercise(id,guidedWorkout.week);
-    return true;
+  function sameDay(guide,workout,day){
+    return !!(guide&&workout&&day&&guide.cycle===cycleKey(workout)&&guide.dayId===String(day.id));
   }
-  function startGuidedWorkout(){
-    const context=guidedContext();
-    if(!context||!studentCanComplete(context.uid))return false;
-    const ids=exercisesForDay(context.workout,context.day.name).map(exercise=>exercise.id);
-    if(!ids.length){showToast('Este dia ainda não tem exercícios prescritos.',true);return false;}
-    if(!guidedMatches(context))guidedWorkout={uid:context.uid,workoutId:context.workout.id,dayId:context.day.id,week:context.week,date:context.date,done:new Set(),deferred:new Set(),exerciseId:ids[0]};
-    const id=ids.includes(guidedWorkout.exerciseId)?guidedWorkout.exerciseId:ids[0];
-    return openGuidedExercise(id);
+  function guideContext(guide=readGuide()){
+    if(!guide)return null;
+    const workout=getW(guide.workoutId),day=workoutDays(workout).find(day=>String(day.id)===guide.dayId);
+    if(!sameDay(guide,workout,day))return null;
+    const exercises=exercisesForDay(workout,day.name);
+    const remaining=exercises.filter(item=>!guide.done.includes(String(item.id)));
+    const queue=[...remaining.filter(item=>!guide.deferred.includes(String(item.id))),...remaining.filter(item=>guide.deferred.includes(String(item.id)))];
+    const exercise=queue.find(item=>String(item.id)===guide.exerciseId)||queue[0];
+    return {uid:guide.uid,workout,day,week:guide.week,guide,exercises,remaining,queue,exercise};
   }
-  function startGuidedFromHome(){
-    const workouts=getWorkouts()||[],active=workouts.find(item=>String(item.id)===activeWorkoutId(workouts));
-    if(!active)return;
-    const uid=ownerUid(),days=workoutDays(active),week=currentWeek(active,uid),remaining=days.filter(day=>!completionFor(active,week,day,uid));
-    const previous=guidedWorkout?.uid===uid&&guidedWorkout.workoutId===active.id&&guidedWorkout.week===week&&guidedWorkout.date===today()?remaining.find(day=>day.id===guidedWorkout.dayId):null;
-    openWorkout(active.id);
-    const day=previous||(remaining.length===1?remaining[0]:null);
-    if(day){openDay(day.name);startGuidedWorkout();}
-    else if(remaining.length)showToast('Escolha o dia de treino para começar.');
+  function canUseGuide(guide){return !!guide&&studentCanComplete(guide.uid)&&ownerUid()===guide.uid;}
+  function dayState(workout,day){
+    const guide=readGuide();
+    return sameDay(guide,workout,day)?guide.status:'';
   }
-  function guidedQueue(context){
-    const exercises=exercisesForDay(context.workout,context.day.name),guide=guidedWorkout;
-    const remaining=exercises.filter(item=>!guide.done.has(item.id)&&item.id!==guide.exerciseId);
-    return [...remaining.filter(item=>!guide.deferred.has(item.id)),...remaining.filter(item=>guide.deferred.has(item.id))];
+  function homeWorkout(){
+    const workouts=getWorkouts()||[],activeId=activeWorkoutId(workouts);
+    return workouts.find(workout=>String(workout.id)===activeId);
   }
-  function renderGuidedExercise(){
-    const host=document.getElementById('student-guided-exercise');if(!host)return;
-    const context=guidedContext();
-    if(!guidedMatches(context)||guidedWorkout.exerciseId!==CUR_EX||LAST_SESSION_WEEK!==guidedWorkout.week){host.innerHTML='';return;}
-    const exercises=exercisesForDay(context.workout,context.day.name);
-    const progress=`${guidedWorkout.done.size} de ${exercises.length} exercícios concluídos`;
-    host.innerHTML=`<section class="student-guided-card"><div class="section-label">Treino guiado · ${escapeHtml(progress)}</div><div class="student-guided-actions"><button class="btn-primary" type="button" onclick="TeamBullsWorkoutCompletion.finishExercise()">FINALIZAR EXERCÍCIO</button><button class="btn-ghost" type="button" onclick="goDay()">VER TREINO TODO</button>${guidedQueue(context).length?'<button class="btn-ghost" type="button" onclick="TeamBullsWorkoutCompletion.postponeExercise()">APARELHO OCUPADO</button>':''}</div></section>`;
+  function homeTraining(workout,uid,date){
+    if(!workout)return {status:'empty'};
+    if(validDate(workout.startDate)&&date<workout.startDate)return {status:'future'};
+    const days=workoutDays(workout),week=currentWeek(workout,uid),cycleStart=cycleStartDate(workout),data=readLocal(uid);
+    const completions=Object.values(data.completions).filter(item=>item.workoutId===String(workout.id)&&item.startDate===cycleStart&&item.completedDate<=date);
+    if(completions.some(item=>item.completedDate===date))return {status:'today-complete',week};
+    const ordered=days.map(day=>{
+      const exercises=exercisesForDay(workout,day.name);
+      let latest='';
+      for(const exercise of exercises)for(const session of exercise.sessions||[]){
+        const written=String(session?.date||'');
+        if(Number(session?.week)===week&&session?.sets?.length&&written>=cycleStart&&written<=date&&written>latest)latest=written;
+      }
+      return {day,exercises,latest,record:data.completions[completionId(uid,workout,week,day)]};
+    });
+    const available=item=>item.exercises.length&&!item.record;
+    const underway=ordered.find(item=>available(item)&&item.latest===date);
+    if(underway)return {status:'ready',workout,week,day:underway.day};
+    const prior=ordered.map((item,index)=>{
+      const lastCompletion=completions.filter(record=>String(record.dayId)===String(item.day.id)).reduce((last,record)=>record.completedDate>last?record.completedDate:last,'');
+      return {index,date:lastCompletion>item.latest?lastCompletion:item.latest};
+    }).sort((a,b)=>b.date.localeCompare(a.date)||b.index-a.index)[0];
+    const pivot=prior?.date?prior.index+1:0;
+    const next=[...ordered.slice(pivot),...ordered.slice(0,pivot)].find(available);
+    const weekday=(new Date(date+'T12:00:00').getDay()+6)%7;
+    const weekdays=workout.trainingRecommendations?.weekdays;
+    const rest=Array.isArray(weekdays)&&weekdays.length&&!weekdays.includes(weekday);
+    return next?{status:rest?'rest':'ready',workout,week,day:next.day}:{status:ordered.some(item=>item.exercises.length)?'cycle-complete':'empty',week};
+  }
+  function beginGuide(workout,day,uid,week){
+    if(!studentCanComplete(uid)||readGuide(uid)||!workout||!day||completionFor(workout,week,day,uid))return false;
+    if(validDate(workout.startDate)&&today()<workout.startDate){showToast('Este protocolo ainda não começou.',true);return false;}
+    const first=exercisesForDay(workout,day.name)[0];
+    if(!first){showToast('Este dia ainda não tem exercícios prescritos.',true);return false;}
+    const date=today();
+    return saveGuide(uid,null,{id:idFor('guide',uid,Date.now()),uid,workoutId:workout.id,dayId:String(day.id),cycle:cycleKey(workout),week,date,done:[],deferred:[],exerciseId:String(first.id),status:'active'});
+  }
+  async function startGuidedFromHome(allowRest=false){
+    const uid=ownerUid(),guide=readGuide(uid);
+    if(guide)return resumeGuided();
+    const workout=homeWorkout();
+    if(!workout||!studentCanComplete(uid)||!beginAction('begin-guided'))return false;
+    try{
+      await loadCycleData(workout,uid);
+      if(ownerUid()!==uid||activeScreenId()!=='screen-home'||homeWorkout()?.id!==workout.id)return false;
+      const plan=homeTraining(homeWorkout(),uid,today());
+      if(plan.status!=='ready'&&!(allowRest&&plan.status==='rest')){refreshHomeSummary();return false;}
+      return beginGuide(plan.workout,plan.day,uid,plan.week);
+    }finally{endAction('begin-guided');}
+  }
+  async function startGuidedWorkout(){
+    const uid=ownerUid(),workout=getW(CUR_WORKOUT),dayName=String(CUR_DAY||'');
+    const day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(dayName)),guide=readGuide(uid);
+    if(guide)return sameDay(guide,workout,day)?resumeGuided():false;
+    if(!day||!studentCanComplete(uid)||!beginAction('begin-guided'))return false;
+    try{
+      await loadCycleData(workout,uid);
+      if(ownerUid()!==uid||CUR_WORKOUT!==workout.id||CUR_DAY!==dayName||activeScreenId()!=='screen-day')return false;
+      const latest=getW(workout.id),latestDay=workoutDays(latest).find(item=>item.id===day.id);
+      if(!latest||cycleKey(latest)!==cycleKey(workout))return false;
+      return beginGuide(latest,latestDay,uid,currentWeek(latest,uid));
+    }finally{endAction('begin-guided');}
+  }
+  function resumeGuided(){
+    const guide=readGuide();
+    if(!canUseGuide(guide)||!guideContext(guide))return false;
+    if(guide.status==='active'){refreshBattleScreens();return true;}
+    return saveGuide(guide.uid,guide,{...guide,status:'active'});
+  }
+  function registerGuided(){
+    const context=guideContext(),guide=context?.guide,exercise=context?.exercise;
+    if(!exercise||guide.status!=='active'||!canUseGuide(guide))return false;
+    const previous=[CUR_WORKOUT,CUR_DAY,CUR_EX,LAST_SESSION_WEEK];
+    try{
+      CUR_WORKOUT=context.workout.id;CUR_DAY=context.day.name;CUR_EX=exercise.id;LAST_SESSION_WEEK=guide.week;
+      const opened=openLogSessionModal();
+      if(opened===false)return false;
+      const select=document.getElementById('input-session-week');
+      if(select&&Number(select.value)!==guide.week){
+        select.value=String(guide.week);SESSION_EDITOR_WEEK=guide.week;LAST_SESSION_WEEK=guide.week;
+        populateSessionEditorForWeek(guide.week);
+      }
+      return true;
+    }finally{[CUR_WORKOUT,CUR_DAY,CUR_EX,LAST_SESSION_WEEK]=previous;}
   }
   function finishExercise(){
-    const context=guidedContext(),guide=guidedWorkout,exercise=getE(CUR_WORKOUT,CUR_EX);
-    if(!guidedMatches(context)||!exercise||guide.exerciseId!==exercise.id||LAST_SESSION_WEEK!==guide.week)return false;
-    const logged=(exercise.sessions||[]).some(session=>String(session.date)===guide.date&&Number(session.week)===guide.week&&session.sets?.length);
-    if(!logged){showToast('Registre as séries realizadas antes de finalizar este exercício.',true);openLogSessionModal();return false;}
-    guide.done.add(exercise.id);
-    const next=guidedQueue(context)[0];
-    if(next)return openGuidedExercise(next.id);
-    guidedWorkout=null;goDay();showToast('Todos os exercícios registrados. Confirme em Concluir treino.');return true;
+    const context=guideContext(),guide=context?.guide,exercise=context?.exercise;
+    if(!exercise||guide.status!=='active'||!canUseGuide(guide))return false;
+    const date=today(),logged=(exercise.sessions||[]).some(session=>validDate(session.date)&&session.date>=guide.date&&session.date<=date&&Number(session.week)===guide.week&&session.sets?.length);
+    if(!logged){showToast('Registre as séries realizadas antes de seguir para o próximo exercício.',true);registerGuided();return false;}
+    const next=context.queue.find(item=>item!==exercise);
+    return saveGuide(guide.uid,guide,{...guide,done:[...guide.done,String(exercise.id)],exerciseId:next?String(next.id):''});
   }
   function postponeExercise(){
-    const context=guidedContext(),guide=guidedWorkout;
-    if(!guidedMatches(context)||guide.exerciseId!==CUR_EX||!guidedQueue(context).length)return false;
-    const id=guide.exerciseId;
-    showConfirm('Aparelho ocupado','A ordem foi planejada pelo treinador. Alterá-la pode afetar o desempenho e a progressão. Pule somente se precisar e volte a este exercício antes de concluir o treino.',()=>{
-      const fresh=guidedContext();
-      if(guidedWorkout!==guide||!guidedMatches(fresh)||CUR_EX!==id)return;
-      const next=guidedQueue(fresh)[0];
-      if(next){guide.deferred.add(id);openGuidedExercise(next.id);}
-    });
+    const context=guideContext(),guide=context?.guide,exercise=context?.exercise;
+    if(!exercise||guide.status!=='active'||!canUseGuide(guide))return false;
+    const next=context.queue.find(item=>item!==exercise);
+    if(!next)return false;
+    showConfirm('Aparelho ocupado','A ordem foi planejada pelo treinador. Mudar a sequência pode prejudicar a progressão. Se precisar, siga para o próximo exercício e volte a este depois.',()=>
+      saveGuide(guide.uid,guide,{...guide,exerciseId:String(next.id),deferred:[...guide.deferred,String(exercise.id)]}));
     return true;
+  }
+  function pauseGuided(){
+    const guide=readGuide();if(!canUseGuide(guide))return false;
+    showConfirm('Pausar treino?','Seu progresso fica salvo neste aparelho. Ao voltar, você pode retomar do mesmo exercício.',()=>
+      saveGuide(guide.uid,guide,{...guide,status:'paused'}));
+    return true;
+  }
+  function cancelGuided(){
+    const guide=readGuide();if(!canUseGuide(guide))return false;
+    showConfirm('Cancelar o treino iniciado?','O início e a posição no treino serão descartados. As séries já registradas ficam no histórico e o dia permanece sem conclusão.',()=>
+      saveGuide(guide.uid,guide,null));
+    return true;
+  }
+  async function finishGuided(confirmPartial=false,expected=null){
+    const context=guideContext(),guide=context?.guide;
+    if(!canUseGuide(guide))return false;
+    if(expected&&(guide.id!==expected.id||guide.revision!==expected.revision))return false;
+    if(context.remaining.length&&!confirmPartial){
+      const left=context.remaining.length;
+      showConfirm('Encerrar treino com exercícios pendentes?',`Ainda faltam ${left} ${left===1?'exercício':'exercícios'}. Encerrar agora pode prejudicar sua evolução e o planejamento do treinador. Se aconteceu algum imprevisto e não dá para continuar, tudo bem encerrar. As séries registradas ficam salvas.`,()=>finishGuided(true,guide));
+      return false;
+    }
+    const done=await completeDay(context,{backgroundSync:true});
+    return done&&saveGuide(guide.uid,guide,null);
+  }
+  function showGuidedVideo(){
+    const exercise=guideContext()?.exercise;if(!exercise||!canUseCatalogVideos())return false;
+    return openCatalogVideo(resolveExerciseVideoUrl(exercise),exercise.name);
+  }
+  function showGuidedHistory(){
+    const context=guideContext(),exercise=context?.exercise;
+    if(!exercise)return false;
+    document.getElementById('battle-history-title').textContent='Histórico · '+exercise.name;
+    buildSessions(exercise,'battle-history-list',true,context.workout.id);
+    openModal('modal-battle-history');return true;
+  }
+  function showFullDay(){
+    const context=guideContext();if(!context)return false;
+    if(activeScreenId()!=='screen-day'||CUR_WORKOUT!==context.workout.id||normalizedDay(CUR_DAY)!==normalizedDay(context.day.name)){openWorkout(context.workout.id);openDay(context.day.name);}
+    document.querySelector('#screen-day .weekly-plan-shell')?.scrollIntoView({block:'start'});
+    return true;
+  }
+  function guideButton(label,action,primary=false){
+    return `<button class="${primary?'btn-primary':'btn-ghost'}" type="button" onclick="TeamBullsWorkoutCompletion.${action}">${label}</button>`;
+  }
+  function guidedPanel(guide){
+    const context=guideContext(guide);
+    if(!canUseGuide(guide))return '';
+    if(!context)return `<p>O dia iniciado não está disponível neste protocolo.</p>${guideButton('Cancelar treino iniciado','cancelGuided()')}`;
+    const {day,exercise,exercises,remaining,workout}=context;
+    const progress=`${exercises.length-remaining.length} de ${exercises.length} exercícios concluídos`;
+    const finished=!remaining.length;
+    const video=exercise&&typeof canUseCatalogVideos==='function'&&canUseCatalogVideos()&&extractYouTubeId(resolveExerciseVideoUrl(exercise));
+    const prescription=exercise&&typeof prescriptionCompactSummary==='function'?prescriptionCompactSummary(exercise,guide.week):null;
+    const techniques=exercise&&typeof studentTechniqueLabels==='function'?studentTechniqueLabels(exercise,guide.week):'';
+    const subtitle=`${escapeHtml(workout.name)} · ${escapeHtml(day.name)} · semana ${guide.week}`;
+    return `<div class="student-guided-card"><div class="student-guided-state">${guide.status==='paused'?'Treino pausado':'Treino em andamento'}</div><p class="student-guided-context">${subtitle}</p><p class="student-guided-progress" role="status">${progress}</p>${
+      guide.status==='paused'?guideButton('Retomar treino','resumeGuided()',true):finished?guideButton('Concluir treino','finishGuided()',true):`<h3 tabindex="-1">${escapeHtml(exercise.name)}</h3>${prescription?.rx?.sets?.length?`<p class="student-guided-context">${escapeHtml(prescription.reps)} · ${escapeHtml(prescription.ger)}</p>`:''}
+        ${techniques}${exercise.instructions?`<p class="student-guided-instructions">${escapeHtml(exercise.instructions)}</p>`:''}
+        <div class="student-guided-actions">${guideButton('Registrar séries','registerGuided()',true)}${guideButton(remaining.length===1?'Finalizar exercício':'Seguir','finishExercise()')}</div>
+        <div class="student-guided-actions">${video?guideButton('Ver vídeo','showGuidedVideo()'):''}${guideButton('Ver histórico','showGuidedHistory()')}${remaining.length>1?guideButton('Aparelho ocupado','postponeExercise()'):''}</div>`}
+      <div class="student-guided-actions">${guideButton('Ver treino todo','showFullDay()')}${guide.status==='active'&&!finished?guideButton('Pausar treino','pauseGuided()'):''}</div>
+      <details class="student-guided-end"><summary>Opções do treino</summary><div class="student-guided-actions">${!finished?guideButton('Encerrar treino','finishGuided()'):''}${guideButton('Cancelar início','cancelGuided()')}</div></details></div>`;
   }
   const style=document.createElement('style');style.textContent=`
     .student-guided-card{border:1px solid var(--border-l);border-left:3px solid var(--accent);background:var(--surface);padding:12px;margin:12px 0}
@@ -419,11 +585,6 @@
   if(baseShiftMonth)calShiftMonth=function(delta){const result=baseShiftMonth.apply(this,arguments);monthCache.delete(calendarUid()+'|'+monthKey(CAL_YEAR,CAL_MONTH));loadCalendarMonth();return result;};
   window.goBackFromCalendar=function(){if(calendarReturn==='trainer-student'&&trainerTargetUid()){goTrainerStudent();return;}if(currentUser()?.role==='trainer'){goTrainer();return;}goHome();};
 
-  function renderHomeSummaryShell(){
-    const stats=document.getElementById('home-stats');if(!stats)return null;let host=document.getElementById('home-daily-summary');
-    if(!host){host=document.createElement('section');host.id='home-daily-summary';host.className='home-daily-summary';host.setAttribute('aria-live','polite');stats.insertAdjacentElement('afterend',host);}
-    return host;
-  }
   function dietForDate(dietDocument,date){
     const plans=dietDocument?.plans||[],plan=plans.find(item=>item?.isActive===true)||plans[0];
     if(!plan||plan.startDate&&date<plan.startDate)return null;
@@ -436,61 +597,105 @@
       if(diet?.meals?.length)pushUniqueEvent(events,date,{kind:'food',label:'Dieta programada',detail:diet.name});
     }
   }
-  function readHomeDiet(uid,date){
-    const key=uid+'|'+date;
-    if(homeDietReads.has(key))return homeDietReads.get(key);
-    const task=Promise.all([loadDietDocument(uid),fetchCompletionsToday(uid)]).finally(()=>homeDietReads.delete(key));
-    homeDietReads.set(key,task);
-    return task;
+  function refreshHomeSummary(){
+    const screen=document.getElementById('screen-home'),host=document.getElementById('home-daily-summary');
+    const student=currentUser()?.role==='student',uid=ownerUid();
+    if(!host||!screen)return;
+    screen.classList.toggle('student-battle-home',student);
+    host.hidden=!uid||!student&&mode()!=='local';
+    if(host.hidden||activeScreenId()!=='screen-home')return;
+    const guide=readGuide(uid),workout=homeWorkout(),date=today();
+    const plan=guide?null:homeTraining(workout,uid,date);
+    const available=plan&&(plan.status==='ready'||plan.status==='rest');
+    const messages={
+      empty:'Nenhum dia de treino disponível.',
+      future:'Seu protocolo de treino ainda não começou.',
+      'today-complete':'Treino de hoje concluído.',
+      'cycle-complete':'Ciclo do protocolo concluído.'
+    };
+    const details=available?`${escapeHtml(plan.day.name)} · semana ${plan.week}`:messages[plan?.status];
+    const start=available&&studentCanComplete(uid)
+      ?guideButton(plan.status==='rest'?'Iniciar mesmo assim':'Iniciar treino',`startGuidedFromHome(${plan.status==='rest'})`,true):'';
+    const content=`<div class="home-daily-summary-head"><strong>Batalha do dia</strong><span>${escapeHtml(fmt(date))}</span></div>
+      ${guide?guidedPanel(guide):`<div class="home-daily-summary-foot">${plan.status==='rest'?'Descanso recomendado · próximo treino: ':''}${details||''}</div>${start}`}
+      <button class="btn-ghost student-battle-calendar" type="button" onclick="openCalendar()">Calendário de treino e dieta</button>`;
+    renderBattleContent(host,content);
+    if(workout&&mode()==='cloud'){
+      const key=uid+'|'+cycleKey(workout);
+      if(!cycleLoads.has(key)&&Date.now()-(cycleLoadedAt.get(key)||0)>=60000)void loadCycleData(workout,uid).then(()=>{
+        if(ownerUid()===uid&&activeScreenId()==='screen-home')refreshHomeSummary();
+      });
+    }
   }
-  async function refreshHomeSummary(){
-    if(currentUser()?.role==='trainer'||document.getElementById('screen-home')?.classList.contains('active')===false)return;
-    const host=renderHomeSummaryShell();if(!host)return;const seq=++homeLoadSeq,uid=ownerUid(),date=typeof today==='function'?today():new Date().toISOString().slice(0,10),workouts=(()=>{try{return getWorkouts()||[];}catch(error){return[];}})();
-    const sessions=workouts.reduce((sum,workout)=>sum+(workout.exercises||[]).reduce((sub,exercise)=>sub+(exercise.sessions||[]).filter(session=>String(session.date||'')===date).length,0),0);
-    const active=workouts.find(workout=>workout.isActive===true)||workouts[0],week=active?currentWeek(active,uid):0,days=active?workoutDays(active):[],done=active?days.filter(day=>completionFor(active,week,day,uid)).length:0;
-    const start=active&&days.length&&studentCanComplete(uid)?'<button class="btn-primary student-guided-home" type="button" onclick="TeamBullsWorkoutCompletion.startGuidedFromHome()">INICIAR TREINO</button>':'';
-    const calendar='<button class="btn-ghost" type="button" onclick="openCalendar()">CALENDÁRIO DE TREINO E DIETA</button>';
-    host.innerHTML=`<div class="home-daily-summary-head"><strong>Resumo de hoje</strong><span>${escapeHtml(typeof fmt==='function'?fmt(date):date)}</span></div><div class="home-daily-summary-grid"><div class="home-daily-summary-item"><strong>${sessions}</strong><span>Sessões registradas</span></div><div class="home-daily-summary-item"><strong>—</strong><span>Refeições concluídas</span></div></div>${active?`<div class="home-daily-summary-foot">${escapeHtml(active.name)} · semana ${week}/8 · ${done}/${days.length} dias confirmados</div>`:'<div class="home-daily-summary-foot">Nenhum protocolo de treino cadastrado.</div>'}${start}${calendar}`;
-    let diet=null,completed=new Set(),loadError=false;
-    try{
-      if(mode()==='local'){
-        const dietDocument=await loadDietDocument();
-        diet=dietForDate(dietDocument,date);
-        for(const plan of dietDocument?.plans||[])for(const meal of plan.variants?.length?plan.variants.flatMap(item=>item.meals||[]):plan.meals||[]){
-          if((meal.doneDates||[]).includes(date))completed.add(String(meal.id));
-        }
-      }else if(currentUser()?.role==='student'&&currentUser()?.uid===uid){
-        const [dietDocument,marked]=await readHomeDiet(uid,date);
-        diet=dietForDate(dietDocument,date);completed=marked;loadError=marked.unconfirmed;
+  const battleContent=new WeakMap();
+  function renderBattleContent(host,content){
+    if(battleContent.get(host)===content)return;
+    host.innerHTML=content;battleContent.set(host,content);
+  }
+  function markDayFolders(){
+    const workout=getW(CUR_WORKOUT),guide=readGuide();
+    const day=workoutDays(workout).find(day=>sameDay(guide,workout,day));
+    document.querySelectorAll('#day-folder-list [data-reorder-day]').forEach(card=>{
+      const selected=day?.name===card.dataset.reorderDay;
+      if(selected)card.dataset.battleState=guide.status;
+      else delete card.dataset.battleState;
+      card.querySelector('.student-guided-day-label')?.remove();
+      if(selected){
+        const status=document.createElement('span');status.className='student-guided-day-label';
+        status.textContent=guide.status==='paused'?'Treino pausado':'Treino em andamento';
+        card.querySelector('.day-folder-info')?.append(status);
       }
-    }catch(error){loadError=true;diet=dietForDate(LOCAL_DB?.mealPlan,date);}
-    if(seq!==homeLoadSeq||ownerUid()!==uid||activeScreenId()!=='screen-home')return;
-    const count=host.querySelector('.home-daily-summary-item:nth-child(2) strong'),label=host.querySelector('.home-daily-summary-item:nth-child(2) span');
-    const meals=diet?.meals||[],completedCount=meals.filter(meal=>completed.has(String(meal.id))).length;
-    const outsideSchedule=completed.size-completedCount;
-    if(count)count.textContent=loadError&&!completed.size?'—':meals.length?`${completedCount}/${meals.length}${outsideSchedule>0?' + '+outsideSchedule:''}`:String(completed.size);
-    if(label)label.textContent='Refeições concluídas';
-    const foot=host.querySelector('.home-daily-summary-foot');
-    if(foot&&diet?.name)foot.textContent+=' · Dieta de hoje: '+diet.name;
-    if(foot&&!diet&&completed.size)foot.textContent+=' · Sem divisão alimentar programada para hoje';
-    if(foot&&loadError)foot.textContent+=' · confirmação alimentar pendente';
+    });
+  }
+  function renderLibraryGuide(){
+    const target=document.getElementById('tb-student-workout-list');if(!target)return;
+    let host=document.getElementById('student-battle-library');
+    if(!host){host=document.createElement('div');host.id='student-battle-library';host.className='student-guided-card';target.before(host);}
+    const context=guideContext();
+    host.hidden=!context;
+    renderBattleContent(host,context?`<p class="student-guided-state">${context.guide.status==='paused'?'Treino pausado':'Treino em andamento'} · ${escapeHtml(context.day.name)}</p>${guideButton('Abrir treino iniciado','showFullDay()')}`:'');
+  }
+  function refreshBattleScreens(){
+    switch(activeScreenId()){
+      case 'screen-home':refreshHomeSummary();break;
+      case 'screen-day':{
+        const workout=getW(CUR_WORKOUT),day=workoutDays(workout).find(item=>normalizedDay(item.name)===normalizedDay(CUR_DAY));
+        if(day)setCompletionPanel(workout,day,ownerUid());
+        break;
+      }
+      case 'screen-workout':markDayFolders();break;
+      case 'screen-workout-library':renderLibraryGuide();break;
+    }
   }
   window.addEventListener('team-bulls-meal-completion-changed',()=>{
     monthCache.clear();
-    if(activeScreenId()==='screen-home')void refreshHomeSummary();
+    if(activeScreenId()==='screen-calendar')void loadCalendarMonth();
   });
   const baseRenderHome=typeof renderHome==='function'?renderHome:null;
   if(baseRenderHome)renderHome=function(){const result=baseRenderHome.apply(this,arguments);refreshHomeSummary();return result;};
   const baseShowScreen=typeof showScreen==='function'?showScreen:null;
   if(baseShowScreen)showScreen=function(id){const result=baseShowScreen.apply(this,arguments);if(result!==false){
     document.body.classList.toggle('student-no-overview',currentUser()?.role==='student');
-    if(id==='screen-auth')guidedWorkout=null;
-    if(id==='screen-exercise')renderGuidedExercise();
+    if(id==='screen-workout')markDayFolders();
+    if(id==='screen-workout-library')renderLibraryGuide();
+    if(id==='screen-auth'){
+      const home=document.getElementById('home-daily-summary');
+      if(home){home.replaceChildren();battleContent.delete(home);}
+      document.getElementById('battle-history-list')?.replaceChildren();
+    }
   }if(result!==false&&id==='screen-home')setTimeout(refreshHomeSummary,0);if(result!==false&&id==='screen-day')setTimeout(()=>{if(activeScreenId()==='screen-day')renderStudentDay();},0);return result;};
   window.addEventListener('online',()=>{const uid=ownerUid(),year=Number.isInteger(CAL_YEAR)?CAL_YEAR:new Date().getFullYear(),month=Number.isInteger(CAL_MONTH)?CAL_MONTH:new Date().getMonth();for(const key of cycleLoadedAt.keys())if(key.startsWith(uid+'|'))cycleLoadedAt.delete(key);monthCache.delete(calendarUid()+'|'+monthKey(year,month));syncPending(uid).then(()=>{if(activeScreenId()==='screen-day')renderStudentDay();refreshHomeSummary();if(activeScreenId()==='screen-calendar')loadCalendarMonth();});});
   window.addEventListener('team-bulls-runtime-ready',()=>syncPending(ownerUid()).catch(()=>{}));
 
-  window.TeamBullsWorkoutCompletion=Object.freeze({currentWeek,completeCurrentDay,renderStudentDay,retrySync,syncPending,diagnostics,startGuidedWorkout,startGuidedFromHome,finishExercise,postponeExercise});
+  window.addEventListener('storage',event=>{
+    const uid=ownerUid();
+    if(uid&&event.key===guideKey(uid))refreshBattleScreens();
+  });
+  window.TeamBullsWorkoutCompletion=Object.freeze({
+    currentWeek,completeCurrentDay,renderStudentDay,retrySync,syncPending,diagnostics,
+    startGuidedWorkout,startGuidedFromHome,resumeGuided,pauseGuided,cancelGuided,finishGuided,
+    registerGuided,finishExercise,postponeExercise,showGuidedVideo,showGuidedHistory,showFullDay,dayState
+  });
   if(document.getElementById('screen-day')?.classList.contains('active'))renderStudentDay();
   if(document.getElementById('screen-home')?.classList.contains('active'))refreshHomeSummary();
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){refreshHomeSummary();if(activeScreenId()==='screen-calendar')loadCalendarMonth();}});

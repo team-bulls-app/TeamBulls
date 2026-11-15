@@ -2,7 +2,7 @@
 // All accounts/data are synthetic; external requests are blocked.
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
-const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
+const names=[...variantFunctions,'openLogSessionModal','showConfirm','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
 const techniqueNames=['studentTechniqueLabels','studentTechniqueGuide','openTechniqueDetail',...(core.includes('function studentMyoRepGuide(')?['studentMyoRepBand','studentMyoRepGuide','studentGerGuide']:[])];
 const hasTechniqueGuide=core.includes('function studentTechniqueGuide(');
 if(hasTechniqueGuide)names.push(...techniqueNames);
@@ -56,7 +56,7 @@ const exerciseHasTechnique=(_exercise,id,week)=>id==='mp'&&week===2;
 const getGerDefinition=level=>level===2?{level,text:'Execução controlada'}:null;
 const exerciseHasOptionalTechnique=(_exercise,id,week)=>id==='mp'&&week===2;
 const exerciseTimerPresets=()=>[60,90,120,150,180],findSupersetPartner=()=>null,workoutContainingExercise=()=>tree[0];
-const getWorkoutDays=()=>[{name:'A'}],exercisesForDay=w=>w.exercises;
+const getWorkoutDays=()=>[{id:'a',name:'A'},{id:'b',name:'B'}],exercisesForDay=(w,name)=>w.exercises.filter(item=>(item.dayName||'A')===name);
 function renderDay(){}
 function openStudentWeekExercise(id,week){
   CUR_EX=id;LAST_SESSION_WEEK=week;showLayoutScreen('screen-exercise');
@@ -80,6 +80,30 @@ function showLayoutScreen(id){
   document.getElementById(id).classList.add('active');
   document.getElementById('app').scrollTop=0;
 }
+const activeScreenId=()=>document.querySelector('.screen.active')?.id||'';
+const ACCESS_MODE='cloud-active',fmt=value=>value,v104CycleWeek=()=>2;
+const getSharedSessions=e=>e.sessions||[];
+const canUseCatalogVideos=()=>true,resolveExerciseVideoUrl=e=>e.videoUrl||'',extractYouTubeId=url=>url?url.split('/').at(-1):'';
+function openCatalogVideo(url,name){window.lastVideo={url,name};}
+function showScreen(id){showLayoutScreen(id);}
+function openWorkout(id){
+  CUR_WORKOUT=id;CUR_DAY='';
+  document.getElementById('day-folder-list').innerHTML=getWorkoutDays(getW(id)).map(day=>'<div class="day-folder-card" data-reorder-day="'+day.name+'"><div class="day-folder-info">'+day.name+'</div></div>').join('');
+  showScreen('screen-workout');
+}
+function openDay(name){CUR_DAY=name;renderDay();showScreen('screen-day');}
+function openCalendar(){showScreen('screen-calendar');}
+let getCalendarMonthData,openCalDay,openExerciseFromCalendar;
+${source('buildSessions')}
+window.openBattleFixture=()=>{
+  CURRENT_USER={uid:'s',role:'student',status:'active'};
+  tree[0].name='Protocolo da aluna';tree[0].isActive=true;tree[0].startDate='2026-11-01';
+  exercise.videoUrl='https://www.youtube.com/watch/abcd';
+  exercise.dayName='A';
+  if(!tree[0].exercises.some(e=>e.id==='remada'))tree[0].exercises.push({id:'remada',name:'Remada com apoio',dayName:'A',sessions:[]},{id:'terra',name:'Terra',dayName:'B',sessions:[]});
+  CUR_WORKOUT=null;CUR_EX=null;CUR_DAY='';
+  showScreen('screen-home');
+};
 window.openExerciseLayout=()=>{
   document.documentElement.classList.add('tb-student-home-v17');
   showLayoutScreen('screen-exercise');
@@ -106,7 +130,10 @@ window.openExerciseLayout=()=>{
   document.getElementById('hero-eyebrow').textContent='// sistema online · protocolo ativo';
   document.getElementById('home-stats').innerHTML=['Protocolos de treino','Protocolos de dieta'].map((label,i)=>
     '<div class="stat-cell"><span class="num">'+(i+2)+'</span><span class="lbl">'+label+'</span><span class="tb-v17-next">Atualização pendente desde <strong>20/10/2026</strong></span></div>').join('');
-  document.getElementById('home-stats').insertAdjacentHTML('afterend','<section id="home-daily-summary" class="home-daily-summary"><div class="home-daily-summary-head"><strong>Resumo de hoje</strong><span>11/11/2026</span></div><div class="home-daily-summary-grid"><div class="home-daily-summary-item"><strong>0</strong><span>Sessões registradas</span></div><div class="home-daily-summary-item"><strong>0/4</strong><span>Refeições concluídas</span></div></div></section>');
+  home.classList.add('student-battle-home');
+  const battle=document.getElementById('home-daily-summary');
+  battle.hidden=false;
+  battle.innerHTML='<div class="home-daily-summary-head"><strong>Batalha do dia</strong><span>11/11/2026</span></div><div class="home-daily-summary-foot">Treino de hoje com nome longo para a largura dispon\u00edvel</div>';
   const title='Protocolo de treino com um nome longo para a largura disponível';
   document.getElementById('workout-screen-title').textContent=title;
   document.getElementById('student-protocol-summary').innerHTML='<div class="protocol-summary-title">'+title+'</div><div class="protocol-summary-meta">5 pastas · 39 exercícios · 106 registros</div><div class="protocol-cycle-strip"><span>Semana atual <b>8/8</b></span><span>02/11/2026–08/11/2026</span><span>Atualização <b>12/10/2026</b></span></div>';
@@ -117,8 +144,8 @@ window.openExerciseLayout=()=>{
 window.openProtocol=()=>{CURRENT_USER={uid:'t',role:'trainer'};VIEW_STUDENT={uid:'s',name:'Aluno de teste',workouts:tree};openEditWorkoutTs('w');document.getElementById('input-workout-start-date').value='2026-08-29';document.getElementById('input-workout-update-date').value='2026-10-24';};
 const baseSave=saveWorkout;saveWorkout=function(){return window.saveCompletion=baseSave();};window.fixtureReady=true;
 `;
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script><script src="/week.js"></script></body>');
-const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end([profileCss,homeCss,summaryCss].join('\n'));if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/week.js')return res.end(fs.readFileSync('modules/student-week-workout-layout-v10_10_40.js'));if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script><script src="/week.js"></script><script src="/battle.js"></script></body>');
+const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':pathname.endsWith('.js')?'text/javascript;charset=utf-8':'text/html;charset=utf-8');if(pathname==='/styles.css')return res.end(stylesheet);if(pathname==='/home.css')return res.end([profileCss,homeCss,summaryCss].join('\n'));if(pathname==='/fixture.js')return res.end(setup);if(pathname==='/battle.js')return res.end(calendarRuntime);if(pathname==='/week.js')return res.end(fs.readFileSync('modules/student-week-workout-layout-v10_10_40.js'));if(pathname==='/perf.js')return res.end(fs.readFileSync('modules/session-save-performance-v10_10_9.js'));if(pathname==='/')return res.end(fixture);res.statusCode=404;res.end();});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : ['google-chrome','chromium','chromium-browser'].map(name => spawnSync('which',[name],{encoding:'utf8'}).stdout?.trim()).find(Boolean));
@@ -161,7 +188,7 @@ async function assertPhoneScreens(width,scale){
       const screen=document.getElementById(${JSON.stringify(id)});
       const heading=screen.querySelector('.header-title');
       const nav=document.querySelector('.tb-v17-hotbar-shell');
-      const selectors=['.header-title','.home-hero-title','.stat-cell','.home-daily-summary-item','.protocol-summary-title','.protocol-cycle-strip','.day-folder-name','.prescription-range','.ger-pill'];
+      const selectors=['.header-title','.home-hero-title','.stat-cell','.home-daily-summary-foot','.protocol-summary-title','.protocol-cycle-strip','.day-folder-name','.prescription-range','.ger-pill'];
       const clipped=[...screen.querySelectorAll(selectors.join(','))].filter(el=>el.getClientRects().length&&el.scrollWidth-el.clientWidth>1).map(el=>el.className);
       return {clipped,overflow:app.scrollWidth-app.clientWidth,navOverlap:app.getBoundingClientRect().bottom-nav.getBoundingClientRect().top,
         headingFont:parseFloat(getComputedStyle(heading).fontSize)};
@@ -331,6 +358,54 @@ try{
   await evaluate(`olderRefresh();olderCompletion`);assert.equal(await evaluate(`VIEW_STUDENT.workouts[0].name`),'Nome final','An older reload cannot reapply its previous confirmed name after a newer save');
   assert.deepEqual(await evaluate('errors'),[]);passed++;
  }
+ await command('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+ const api='TeamBullsWorkoutCompletion';
+ const clickBattle=async name=>evaluate(`(()=>{const button=document.querySelector('.screen.active button[onclick*="${name}("]'); if(!button||button.disabled)return false;button.click();return true;})()`);
+ await evaluate(`document.documentElement.dataset.theme='light';openBattleFixture()`);
+ assert.equal(await evaluate(`document.getElementById('home-daily-summary').previousElementSibling.classList.contains('header')`),true,'Batalha do dia belongs directly below the home header');
+ assert.match(await evaluate(`document.getElementById('home-daily-summary').textContent`),/Batalha do dia.*semana 2/s);
+ assert.equal(await evaluate(`[...document.querySelectorAll('#home-stats :is(.num,.lbl)')].every(node=>getComputedStyle(node).display==='none')`),true);
+ assert(await evaluate(api+'.startGuidedFromHome()'));
+ assert.equal(await evaluate('activeScreenId()'),'screen-home');
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Supino Reto');
+ assert(await clickBattle('showGuidedVideo'));
+ assert.equal(await evaluate('lastVideo.name'),'Supino Reto');
+ assert(await clickBattle('showGuidedHistory'));
+ const history=await evaluate(`[...document.querySelectorAll('#battle-history-list .session-date-badge')].map(node=>node.textContent)`);
+ assert(history[0].includes('2026-11-10')&&history[1].includes('2026-11-01'),'History shows the latest sessions first');
+ await evaluate(`closeModal('modal-battle-history')`);
+ assert(await clickBattle('finishExercise'));
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Remada com apoio');
+ await evaluate(`openWorkout('w');openDay('B')`);
+ assert.equal(await evaluate(`document.querySelector('#student-workout-completion [onclick*="startGuidedWorkout"]')`),null,'Another day cannot start while a session is open');
+ await evaluate(`openWorkout('w')`);
+ assert.equal(await evaluate(`document.querySelector('#day-folder-list [data-reorder-day="A"]').dataset.battleState`),'active');
+ await evaluate(`openDay('A')`);
+ assert.equal(await evaluate(`document.querySelector('#student-workout-completion h3').textContent`),'Remada com apoio');
+ assert(await clickBattle('registerGuided'));
+ assert.equal(await evaluate(`SESSION_EID`),'remada');
+ assert.equal(await evaluate(`document.getElementById('input-session-week').value`),'2');
+ await evaluate(`closeModal('modal-session')`);
+ assert(await clickBattle('pauseGuided'));
+ assert.match(await evaluate(`document.getElementById('modal-confirm').textContent`),/Pausar treino/);
+ await evaluate(`document.getElementById('confirm-ok-btn').click()`);
+ assert.equal(await evaluate(`JSON.parse(localStorage.getItem('team_bulls_guided_workout_v1_s')).status`),'paused');
+ const previousOrigin=await evaluate('performance.timeOrigin');
+ await command('Page.reload');
+ for(let i=0;i<120;i++){try{if(await evaluate(`performance.timeOrigin!==${previousOrigin}&&!!window.TeamBullsWorkoutCompletion`))break;}catch{}await sleep(30);}
+ await evaluate(`openBattleFixture()`);
+ assert.match(await evaluate(`document.getElementById('home-daily-summary').textContent`),/Treino pausado/);
+ assert(await clickBattle('resumeGuided'));
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Remada com apoio');
+ assert(await clickBattle('finishGuided'));
+ assert.match(await evaluate(`document.getElementById('modal-confirm').textContent`),/Encerrar treino com exercícios pendentes/);
+ await evaluate(`closeModal('modal-confirm');document.querySelector('.student-guided-end').open=true`);
+ assert(await clickBattle('cancelGuided'));
+ await evaluate(`document.getElementById('confirm-ok-btn').click()`);
+ assert.equal(await evaluate(`localStorage.getItem('team_bulls_guided_workout_v1_s')`),null);
+ assert.equal(await evaluate(`exercise.sessions.some(item=>item.id==='old')`),true);
+ assert.deepEqual(await evaluate('errors'),[]);
+ console.log('PASS Batalha do dia in browser: stays on Home, preserves guide in Treino, highlights the day, shows history and video, uses existing register editor, restores after reload and confirms pause, partial finish and cancellation.');
  console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, immediate unlock after confirmation, technique names, optional status and help by week, and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
