@@ -15,14 +15,18 @@ const usability=read('modules/usability-checkup-v10_10_9.js');
 const profile=read('modules/student-home-profile-v10_10_12.js');
 const modal=read('modules/modal-stack-stability-v10_10_9.js');
 
-has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability9','Camada de usabilidade estabilizada não está carregada.');
+has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability10','Camada de usabilidade estabilizada não está carregada.');
 has(config,"setTimeout(()=>finish(false,'tempo limite')",'Loader opcional não possui limite de espera.');
 has(config,'const DEFERRED_YIELD_EVERY=2;','Loader deve devolver tempo de pintura em lotes curtos.');
 has(config,'deferredBatchCount%DEFERRED_YIELD_EVERY===0','Loader não usa a política explícita de yield entre lotes.');
 assert(config.indexOf('usability-checkup-v10_10_9.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Estabilidade de modais deve continuar sendo a última camada de UI.');
 
-has(usability,'scrollByHistoryKey','Navegação não preserva posição por entrada do histórico.');
-has(usability,"window.addEventListener('popstate'",'Restauração de scroll ao voltar está ausente.');
+const interaction=read('interaction_v10_10_9.js');
+const core=read('app_v10_10_9_core.js');
+assert(!usability.includes('scrollByHistoryKey'),'Navegação não deve recuperar a posição anterior ao entrar em outra tela.');
+has(interaction,"history.scrollRestoration='manual'",'Histórico nativo pode recolocar uma aba no meio da tela.');
+has(interaction,'if(!sameView)window.__TB_HISTORY_BASE_SHOW__?.(snapshot.screen)','Fechar o modal sobre a mesma tela não deve voltar ao topo.');
+has(core,'resetScreenScroll(target)','A entrada de telas deve zerar todos os contêineres de rolagem.');
 has(usability,'scrollActiveWeekIntoView','Semana ativa não é revelada automaticamente na grade.');
 has(usability,'min-height:44px','Alvos de toque móveis não foram ampliados.');
 has(usability,'content-visibility:auto','Listas móveis não usam renderização sob demanda.');

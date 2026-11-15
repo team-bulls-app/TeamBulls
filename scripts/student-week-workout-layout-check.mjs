@@ -73,7 +73,7 @@ assert(core.includes('function openDay(dayName)')&&core.includes("CUR_DAY=day.na
 assert(core.includes('dayWorkout={...w,exercises:items}')&&core.includes("'student-day-weekly-board'"),'Core deixou de construir o quadro semanal filtrado da pasta.');
 assert(index.includes('id="screen-workout"')&&index.includes('id="day-folder-list"'),'Página geral de treino deixou de manter a navegação por pastas.');
 assert(index.includes('id="screen-day"')&&index.includes('id="student-day-summary"')&&index.includes('id="student-day-weekly-board"'),'Página DIA // pasta deixou de conter resumo e quadro semanal próprios.');
-assert(index.includes('somente os exercícios desta pasta'),'Escopo visual da página da pasta foi perdido.');
+assert(index.includes('Prescrição semanal')&&!index.slice(index.indexOf('id="screen-day"'),index.indexOf('id="screen-exercise"')).includes('Exercícios desta pasta'),'A tela do aluno voltou a exibir o cabeçalho duplicado.');
 
 if(failures.length){console.error('\nFALHA — layout semanal dentro da pasta do treino\n- '+failures.join('\n- '));process.exit(1);}
 console.log('APROVADO — página geral mantém somente a navegação dos treinos; o novo Exercício | Prescrição aparece em DIA // pasta, filtra CUR_DAY, navega 8 semanas, migra cache antigo e preserva a comparação completa sem Firebase extra.');

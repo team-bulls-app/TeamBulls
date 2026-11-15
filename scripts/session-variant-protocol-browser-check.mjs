@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
 const names=[...variantFunctions,'openLogSessionModal','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
-const techniqueNames=['studentTechniqueLabels','studentTechniqueGuide','openTechniqueDetail'];
+const techniqueNames=['studentTechniqueLabels','studentTechniqueGuide','openTechniqueDetail',...(core.includes('function studentMyoRepGuide(')?['studentMyoRepBand','studentMyoRepGuide','studentGerGuide']:[])];
 const hasTechniqueGuide=core.includes('function studentTechniqueGuide(');
 if(hasTechniqueGuide)names.push(...techniqueNames);
 const renderSessionGuide=hasTechniqueGuide?core.match(/^renderSessionPrescriptionSummary=function\(exercise,week,elId\)\{\r?\n[\s\S]+?^\};/m)?.[0]:'';
@@ -52,6 +52,8 @@ const TECHNIQUE_CATALOG={items:[
 ]};
 const weekTechniqueSummary=()=> '<span>UNL</span>';
 const techniqueItemsForExercise=(_exercise,week)=>TECHNIQUE_CATALOG.items.filter((_,index)=>index===Number(week)-1);
+const exerciseHasTechnique=(_exercise,id,week)=>id==='mp'&&week===2;
+const getGerDefinition=level=>level===2?{level,text:'Execução controlada'}:null;
 const exerciseHasOptionalTechnique=(_exercise,id,week)=>id==='mp'&&week===2;
 const exerciseTimerPresets=()=>[60,90,120,150,180],findSupersetPartner=()=>null,workoutContainingExercise=()=>tree[0];
 const getWorkoutDays=()=>[{name:'A'}],exercisesForDay=w=>w.exercises;

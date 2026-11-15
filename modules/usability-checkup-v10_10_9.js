@@ -4,52 +4,8 @@
   if(window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__)return;
   window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__=true;
 
-  const VERSION='10.10.21-usability9';
-  const scrollByHistoryKey=new Map();
-  let scrollFrame=0;
+  const VERSION='10.10.21-usability10';
   let profileLogoutHooks=false;
-
-  function appScroller(){return document.getElementById('app');}
-  function historyKey(state=history.state){return state?.teamBulls&&state?.key?String(state.key):'';}
-  function rememberScroll(){
-    const key=historyKey();
-    const app=appScroller();
-    if(!key||!app)return;
-    scrollByHistoryKey.set(key,Math.max(0,Number(app.scrollTop)||0));
-    if(scrollByHistoryKey.size>80){
-      const first=scrollByHistoryKey.keys().next().value;
-      if(first)scrollByHistoryKey.delete(first);
-    }
-  }
-  function restoreScrollForState(state){
-    const key=historyKey(state),app=appScroller();
-    if(!key||!app||!scrollByHistoryKey.has(key))return false;
-    const top=Math.max(0,Number(scrollByHistoryKey.get(key))||0);
-    const apply=()=>{
-      const target=appScroller();
-      if(!target||historyKey()!==key)return;
-      target.scrollTop=Math.min(top,Math.max(0,target.scrollHeight-target.clientHeight));
-    };
-    requestAnimationFrame(()=>{apply();requestAnimationFrame(apply);});
-    setTimeout(apply,90);
-    return true;
-  }
-
-  function installHistoryScroll(){
-    const app=appScroller();
-    if(!app||app.dataset.tbHistoryScroll==='1')return;
-    app.dataset.tbHistoryScroll='1';
-    app.addEventListener('scroll',()=>{
-      if(scrollFrame)return;
-      scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;rememberScroll();});
-    },{passive:true});
-    window.addEventListener('popstate',event=>{
-      if(!event.state?.teamBulls)return;
-      requestAnimationFrame(()=>restoreScrollForState(event.state));
-    },{passive:true});
-    window.addEventListener('pagehide',rememberScroll,{passive:true});
-    document.addEventListener('visibilitychange',()=>{if(document.hidden)rememberScroll();},{passive:true});
-  }
 
   function scrollActiveWeekIntoView(root=document.querySelector('.screen.active')){
     const board=root?.querySelector?.('.weekly-plan-scroll');
@@ -67,7 +23,6 @@
     const base=window.showScreen;
     if(typeof base!=='function'||base.__tbUsabilityCheckup)return;
     const wrapped=function(){
-      rememberScroll();
       const result=base.apply(this,arguments);
       if(result!==false){
         requestAnimationFrame(()=>requestAnimationFrame(()=>scrollActiveWeekIntoView()));
@@ -181,16 +136,13 @@
 
   function install(){
     installStyles();
-    installHistoryScroll();
     wrapShowScreen();
     wrapActionFeedback();
     installStudentProfileLogout();
     window.addEventListener('pagehide',releaseMediaUrls,{passive:true});
-    window.addEventListener('pageshow',()=>{installHistoryScroll();wrapShowScreen();wrapActionFeedback();installStudentProfileLogout();},{passive:true});
+    window.addEventListener('pageshow',()=>{wrapShowScreen();wrapActionFeedback();installStudentProfileLogout();},{passive:true});
     window.TeamBullsUsability=Object.freeze({
       version:VERSION,
-      rememberScroll,
-      restoreScroll:()=>restoreScrollForState(history.state),
       revealActiveWeek:()=>scrollActiveWeekIntoView(),
       ensureStudentProfileLogout
     });
@@ -280,8 +232,8 @@
 
 /* Carrega a suíte de inteligência somente depois que o papel do usuário já é conhecido. */
 (()=>{
-  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite12';
-  const EXPECTED_VERSION='10.10.58-intelsuite12';
+  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite13';
+  const EXPECTED_VERSION='10.10.58-intelsuite13';
   let loading=null;
   const supportedContext=()=>{try{return MODE==='cloud'&&(CURRENT_USER?.role==='trainer'||CURRENT_USER?.role==='student');}catch(error){return false;}};
   const ready=()=>window.TeamBullsIntelligenceSuiteLoader?.version===EXPECTED_VERSION;

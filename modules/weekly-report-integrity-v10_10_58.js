@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010587__)return;
   window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010587__=true;
 
-  const VERSION='10.10.58-weeklyintegrity7';
+  const VERSION='10.10.58-weeklyintegrity8';
   const READ_TIMEOUT=10000;
   const READ_RETRIES=2;
   const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -211,15 +211,28 @@
   }
   async function refreshCanonicalRequest(uid){
     if(!uid||typeof computeCheckinRequest!=='function')throw new Error('Não foi possível validar o período atual do relatório.');
-    // Leituras sequenciais evitam duas operações compat do Firestore concorrendo
-    // durante o preflight em aparelhos móveis/conexões instáveis. Ambas continuam
-    // exigindo fonte server; nenhuma resposta do cache pode autorizar o envio.
-    const scheduleDoc=await strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal');
-    const historySnap=await strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal');
+    const readWeeklyPeriod=window.TeamBullsStudentReportSubmitReconciliation?.readWeeklyPeriod;
+    let data,rows;
+    if(readWeeklyPeriod){
+      let fresh;
+      try{fresh=await readWeeklyPeriod(uid);}
+      catch(error){
+        if(!retryableServerRead(error)&&![429,500,502,503,504].includes(error?.status))throw error;
+        await delay(350);
+        fresh=await readWeeklyPeriod(uid);
+      }
+      data=fresh.schedule;rows=fresh.history;
+    }else{
+      const scheduleDoc=await strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal');
+      if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw new Error('A sessão do aluno mudou durante a confirmação.');
+      const historySnap=await strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal');
+      data=scheduleDoc?.exists?scheduleDoc.data():null;
+      rows=(historySnap?.docs||[]).map(doc=>({...doc.data(),id:doc.id}));
+    }
     if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw new Error('A sessão do aluno mudou durante a confirmação.');
-    if(!scheduleDoc?.exists)throw new Error('A programação semanal não está mais disponível.');
-    const schedule={...scheduleDoc.data(),studentId:uid};
-    const history=dedupeWeeklyCheckins((historySnap?.docs||[]).map(doc=>({...doc.data(),id:doc.id})));
+    if(!data)throw new Error('A programação semanal não está mais disponível.');
+    const schedule={...data,studentId:uid};
+    const history=dedupeWeeklyCheckins(rows);
     const requestHistory=historyForRequestCalculation(history);
     const request=computeCheckinRequest(schedule,requestHistory);
     if(!request||!String(request.requestKey||'').trim())throw new Error('Não há uma solicitação semanal válida para enviar agora.');
@@ -260,13 +273,15 @@
         if(pending===true||pending===false)return pending;
         const opened=formRequest;
         if(!opened||opened.studentId!==uid){notify('Abra o relatório novamente antes de enviar.',true);return false;}
+        const modal=document.getElementById('modal-weekly-checkin');
         try{
           const fresh=await refreshCanonicalRequest(uid);
+          if(formRequest!==opened||(modal&&!modal.classList.contains('open')))return false;
           if(!fresh.pending||identity(opened)!==identity(fresh)){formRequest=null;notify('Esta solicitação já foi atendida ou mudou. Suas respostas não foram enviadas para outro período. Feche e abra o relatório novamente.',true);return false;}
           submissionRequest=Object.freeze({...fresh,studentId:uid});
         }catch(error){
           console.warn('[Team Bulls] envio semanal bloqueado por estado não confirmado',error?.code||error?.message||error);
-          notify('Não foi possível confirmar o período atual do relatório no servidor. Nenhum envio foi feito; atualize o app e tente novamente.',true);
+          notify('A confirmação do período está indisponível. Suas respostas e fotos continuam neste formulário. Toque em Enviar novamente.',true);
           return false;
         }
         const result=await base.apply(this,arguments);

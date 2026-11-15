@@ -293,9 +293,20 @@
     const previousKey=String(state?.parentKey||'');
     return previousKey&&snapshots.has(previousKey)?[previousKey,snapshots.get(previousKey)]:null;
   }
-  function restoreState(state){const snapshot=snapshots.get(state?.key);if(!snapshot)return;restoring=true;try{const modal=topModal();if(modal)window.__TB_HISTORY_BASE_CLOSE__?.(modal.id);restoreContext(snapshot);window.__TB_HISTORY_BASE_SHOW__?.(snapshot.screen);}finally{restoring=false;}currentKey=state.key;}
+  function restoreState(state){
+    const snapshot=snapshots.get(state?.key);if(!snapshot)return;
+    const sameView=contextSignature(capture())===contextSignature(snapshot);
+    restoring=true;
+    try{
+      const modal=topModal();if(modal)window.__TB_HISTORY_BASE_CLOSE__?.(modal.id);
+      restoreContext(snapshot);
+      if(!sameView)window.__TB_HISTORY_BASE_SHOW__?.(snapshot.screen);
+    }finally{restoring=false;}
+    currentKey=state.key;
+  }
   function init(){
     if(initialized||typeof history==='undefined'||typeof window.showScreen!=='function')return;initialized=true;
+    if('scrollRestoration' in history)history.scrollRestoration='manual';
     const baseShow=window.showScreen,baseOpen=window.openModal,baseClose=window.closeModal;window.__TB_HISTORY_BASE_SHOW__=baseShow;window.__TB_HISTORY_BASE_CLOSE__=baseClose;
     const initial=capture(),sentinel=stateFor(initial,{sentinel:true,parentKey:''}),root=stateFor(initial,{root:true,parentKey:sentinel.key});sentinelKey=sentinel.key;rootKey=root.key;history.replaceState(sentinel,'',location.href);history.pushState(root,'',location.href);currentKey=root.key;
     window.showScreen=function(id,token=null){
