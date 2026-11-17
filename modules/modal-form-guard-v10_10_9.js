@@ -44,10 +44,18 @@
     root.querySelectorAll?.('.modal-backdrop').forEach(bindBackdrop);
   }
 
+  function topModal(){
+    const modals=[...document.querySelectorAll('.modal-backdrop.open')];
+    if(document.body.classList.contains('tb-workspace-wide')&&!document.body.classList.contains('tb-workspace-blocked')){
+      const focused=document.activeElement?.closest?.('.modal-backdrop.open');
+      if(focused)return focused;
+    }
+    return modals.sort((a,b)=>(Number(a.dataset.tbModalOpenSeq)||0)-(Number(b.dataset.tbModalOpenSeq)||0)).at(-1)||null;
+  }
+
   function closeTopModalWithEscape(event){
     if(event.key!=='Escape'||event.repeat)return;
-    const modals=[...document.querySelectorAll('.modal-backdrop.open')];
-    const modal=modals[modals.length-1];if(!modal)return;
+    const modal=topModal();if(!modal)return;
     try{
       if(typeof ACTION_LOCKS!=='undefined'&&ACTION_LOCKS?.size){
         event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
@@ -77,7 +85,7 @@
     window.TeamBullsModalFormGuard=Object.freeze({
       shouldProtect,
       refresh:()=>bindAll(document),
-      closeTopModal(){const modal=[...document.querySelectorAll('.modal-backdrop.open')].pop();if(modal?.id&&typeof closeModal==='function')closeModal(modal.id);},
+      closeTopModal(){const modal=topModal();if(modal?.id&&typeof closeModal==='function')closeModal(modal.id);},
       allowBackdropClose(id,allow=true){
         const modal=document.getElementById(String(id||''));
         if(modal?.classList.contains('modal-backdrop'))modal.dataset.tbBackdropClose=allow?'allow':'block';

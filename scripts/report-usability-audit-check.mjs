@@ -75,7 +75,7 @@ const lockIndex=config.indexOf('prescription-lock-bridge-v10_10_10.js?v=10.10.10
 const gerLockIndex=config.indexOf('ger-lock-bridge-v10_10_10.js?v=10.10.10-gerlock1');
 const reportIndex=config.indexOf('report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2');
 const auditIndex=config.indexOf('usability-audit-v10_10_10.js?v=10.10.10-audit1');
-const modalIndex=config.indexOf('modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1');
+const modalIndex=config.indexOf('modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1');
 assert(workflowIndex>=0&&lockIndex>workflowIndex&&gerLockIndex>lockIndex&&reportIndex>gerLockIndex&&auditIndex>reportIndex&&modalIndex>auditIndex,'Ordem dos hotfixes de tranca/relatório/auditoria está incorreta.');
 
 for(const [name,source] of [['sw.js',sw],['sw_47.js',sw47]]){

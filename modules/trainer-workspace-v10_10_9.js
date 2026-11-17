@@ -16,6 +16,7 @@
   let reportLoadToken=0;
   let reportViewerTransition=false;
   let dockSyncFrame=0;
+  let workspaceActor='';
 
   function trainerStudent(){
     if(typeof CURRENT_USER==='undefined'||CURRENT_USER?.role!=='trainer')return null;
@@ -35,12 +36,76 @@
     }catch(error){return'—';}
   }
 
+
+  const REFERENCE_MODALS=new Set(['tb-trainer-reports-modal','tb-trainer-note-modal','modal-weekly-checkin-view','modal-view-quest','modal-photo-view','modal-compare-photos']);
+  const EDITOR_MODALS=new Set(['modal-exercise','modal-prescription','modal-day','modal-workout','modal-meal','modal-diet','modal-diet-variant']);
+  function wideWorkspace(){return !!trainerStudent()&&window.matchMedia('(min-width:1200px) and (pointer:fine)').matches;}
+  function syncWorkspaceLayout(){
+    const actor=typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'?CURRENT_USER.uid:'';
+    if(workspaceActor!==actor){
+      workspaceActor=actor;reportCache.clear();reportLoadToken++;
+      for(const id of REFERENCE_MODALS){
+        const modal=document.getElementById(id);
+        if(modal?.classList.contains('open'))(window.__TB_HISTORY_BASE_CLOSE__||window.closeModal)?.(id);
+        if(modal)delete modal.dataset.tbWorkspaceStudentUid;
+      }
+      const text=document.getElementById('tb-private-note-text');
+      if(text){text.value='';text.dataset.loaded='0';text.dataset.dirty='0';delete text.dataset.trainerUid;delete text.dataset.studentUid;}
+    }
+    const wide=wideWorkspace(),student=trainerStudent(),open=[...document.querySelectorAll('.modal-backdrop.open')];
+    const blocked=open.some(modal=>!REFERENCE_MODALS.has(modal.id)&&!EDITOR_MODALS.has(modal.id));
+    let hasReference=false,hasNote=false;
+    for(const modal of document.querySelectorAll('.modal-backdrop')){
+      const reference=REFERENCE_MODALS.has(modal.id),editor=EDITOR_MODALS.has(modal.id);
+      if(reference&&modal.classList.contains('open')&&!modal.dataset.tbWorkspaceStudentUid)modal.dataset.tbWorkspaceStudentUid=student?.uid||'';
+      const owned=modal.dataset.tbWorkspaceStudentUid===student?.uid;
+      const pane=wide&&reference&&owned;
+      modal.classList.toggle('tb-workspace-pane',pane);
+      modal.classList.toggle('tb-workspace-editor',wide&&editor);
+      if(reference){
+        modal.dataset.tbBackdropClose='block';modal.dataset.tbWorkspacePersistent='1';
+        const sheet=modal.querySelector('.modal-sheet');
+        if(sheet&&!sheet.querySelector('.tb-workspace-close')){
+          const button=document.createElement('button');button.type='button';button.className='tb-workspace-close';
+          button.textContent='FECHAR';button.setAttribute('aria-label','Fechar esta janela');
+          button.onclick=event=>{event.stopPropagation();closeModal(modal.id);};sheet.prepend(button);
+        }
+      }
+      if(modal.classList.contains('open')&&(reference||editor))modal.setAttribute('aria-modal',pane||wide&&editor?'false':'true');
+      if(modal.classList.contains('open')&&reference&&owned){
+        if(modal.id==='tb-trainer-note-modal')hasNote=true;else hasReference=true;
+      }
+    }
+    document.body.classList.toggle('tb-workspace-wide',wide);
+    document.body.classList.toggle('tb-workspace-has-reference',wide&&hasReference);
+    document.body.classList.toggle('tb-workspace-has-note',wide&&hasNote);
+    document.body.classList.toggle('tb-workspace-blocked',blocked);
+  }
+
   function ensureStyles(){
     if(document.getElementById('tb-trainer-workspace-style'))return;
     const style=document.createElement('style');style.id='tb-trainer-workspace-style';style.textContent=`
       .tb-trainer-tools{position:fixed;right:14px;bottom:18px;z-index:4200;display:none;gap:8px;align-items:center;padding:7px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(12,12,12,.94);box-shadow:0 12px 36px rgba(0,0,0,.45);backdrop-filter:blur(10px)}
       .tb-trainer-tools.visible{display:flex}.tb-trainer-tool{min-height:40px;border:1px solid rgba(198,61,61,.42);border-radius:10px;background:#211313;color:#fff;padding:0 11px;font:800 10px/1 'DM Mono',monospace;letter-spacing:.04em;cursor:pointer;white-space:nowrap}.tb-trainer-tool.secondary{background:#171717;border-color:rgba(255,255,255,.14)}
       .tb-workspace-sheet{max-width:720px}.tb-workspace-title-sub{margin:-5px 0 14px;color:#888;font:500 10px/1.4 'DM Mono',monospace}.tb-workspace-list{display:grid;gap:8px;max-height:min(58vh,560px);overflow:auto;padding-right:3px}.tb-workspace-section{margin:13px 0 7px;color:#aaa;font:800 10px/1.2 'DM Mono',monospace;letter-spacing:.07em}.tb-workspace-report{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;border:1px solid rgba(255,255,255,.09);border-radius:11px;background:#171717;color:#eee;padding:11px 12px}.tb-workspace-report[disabled]{opacity:.55}.tb-workspace-report strong{display:block;font-size:12px}.tb-workspace-report small{display:block;margin-top:4px;color:#888;font:500 9px/1.35 'DM Mono',monospace}.tb-workspace-status{flex:0 0 auto;color:#c7c7c7;font:800 9px/1 'DM Mono',monospace}.tb-workspace-empty{padding:16px;border:1px dashed rgba(255,255,255,.12);border-radius:10px;color:#777;font:500 10px/1.5 'DM Mono',monospace}.tb-private-note{width:100%;min-height:250px;resize:vertical}.tb-private-note-hint{margin:8px 0 14px;color:#777;font:500 9px/1.45 'DM Mono',monospace}.tb-note-status{min-height:18px;margin-top:8px;color:#888;font:600 9px/1.35 'DM Mono',monospace}
+
+      .tb-workspace-close{display:none}
+      @media(min-width:1200px) and (pointer:fine){
+        .tb-workspace-wide .tb-workspace-close{display:block;position:sticky;top:0;float:right;z-index:2;min-height:32px;margin:0 0 6px 8px;padding:6px 10px;border:1px solid var(--border-l);border-radius:6px;background:var(--surface);color:var(--text);font:700 10px 'DM Mono',monospace;cursor:pointer}
+        body.tb-workspace-wide{--tb-reference-width:clamp(340px,34vw,560px);--tb-note-height:min(38vh,330px)}
+        .tb-workspace-wide .modal-backdrop.tb-workspace-pane{left:auto;right:14px;top:14px;bottom:auto;width:var(--tb-reference-width);height:calc(100dvh - 94px);max-height:none;background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:stretch;pointer-events:auto!important}
+        .tb-workspace-wide .tb-workspace-pane>.modal-sheet{height:100%;max-height:100%;max-width:100%;width:100%;border-radius:14px;padding:16px;box-shadow:0 12px 32px #0008;animation:none}
+        .tb-workspace-wide.tb-workspace-has-note .tb-workspace-pane:not(#tb-trainer-note-modal){height:calc(100dvh - 110px - var(--tb-note-height))}
+        .tb-workspace-wide #tb-trainer-note-modal.tb-workspace-pane{top:auto;bottom:80px;height:var(--tb-note-height)}
+        .tb-workspace-wide .tb-workspace-pane .tb-private-note{min-height:100px;height:120px;resize:vertical}
+        .tb-workspace-wide .tb-workspace-pane .tb-workspace-list{max-height:none}
+        .tb-workspace-wide .tb-workspace-pane #photo-view-img{max-height:calc(100% - 130px);object-fit:contain}
+        .tb-workspace-wide:is(.tb-workspace-has-reference,.tb-workspace-has-note) .modal-backdrop.tb-workspace-editor{left:14px;right:calc(var(--tb-reference-width) + 28px);top:14px;bottom:auto;width:auto;max-width:none;height:calc(100dvh - 94px);background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:stretch;pointer-events:none!important}
+        .tb-workspace-wide:is(.tb-workspace-has-reference,.tb-workspace-has-note) .tb-workspace-editor>.modal-sheet{max-width:760px;max-height:100%;height:100%;margin-left:auto;pointer-events:auto!important;border-radius:14px;animation:none}
+        .tb-workspace-wide.tb-workspace-blocked .tb-workspace-pane{pointer-events:none!important}
+        .tb-workspace-wide.tb-workspace-blocked .tb-workspace-editor>.modal-sheet{pointer-events:none!important}
+      }
+
       @media(max-width:899px){.tb-trainer-tools{right:10px;bottom:74px;left:10px;justify-content:center}.tb-trainer-tool{flex:1;padding:0 7px}.tb-workspace-sheet{max-height:88vh}.tb-workspace-list{max-height:52vh}}
     `;document.head.appendChild(style);
   }
@@ -55,8 +120,8 @@
     return dock;
   }
   function syncDock(){
-    const dock=ensureDock(),student=trainerStudent();
-    const visible=!!student&&PRESCRIPTION_SCREENS.has(activeScreenId())&&!reportViewerTransition&&!anyOpenModal();
+    const dock=ensureDock(),student=trainerStudent();syncWorkspaceLayout();
+    const visible=!!student&&PRESCRIPTION_SCREENS.has(activeScreenId())&&!reportViewerTransition&&(!anyOpenModal()||wideWorkspace()&&!document.body.classList.contains('tb-workspace-blocked'));
     dock.classList.toggle('visible',visible);
     if(visible){dock.querySelector('#tb-open-private-note').title='Rascunho privado de '+studentName();dock.querySelector('#tb-open-student-reports').title='Relatórios e fotos de '+studentName();}
   }
@@ -94,9 +159,6 @@
       if(!reportViewerIsOpen(targetModalId))await Promise.resolve(result);
       else if(result&&typeof result.then==='function')result.catch(error=>console.error('[Team Bulls] Falha ao carregar conteúdo do relatório',error));
       if(!reportViewerIsOpen(targetModalId))throw new Error('Visualizador não abriu: '+targetModalId);
-      try{
-        if(document.getElementById('tb-trainer-reports-modal')?.classList.contains('open'))closeModal('tb-trainer-reports-modal');
-      }catch(error){document.getElementById('tb-trainer-reports-modal')?.classList.remove('open');}
       return true;
     }catch(error){reportViewerError(error);return false;}
     finally{requestAnimationFrame(()=>{reportViewerTransition=false;syncDock();});}
@@ -141,8 +203,14 @@
       renderQuickReports(weekly,questionnaires);
     }catch(error){if(token!==reportLoadToken)return;host.innerHTML='<div class="tb-workspace-empty">Não foi possível carregar os relatórios agora. Verifique a conexão e tente novamente.</div>';}
   }
+  function raiseReference(id){
+    const modal=document.getElementById(id);if(!modal?.classList.contains('open'))return;
+    const latest=Math.max(0,...[...document.querySelectorAll('.modal-backdrop.open')].map(item=>Number(item.dataset.tbModalOpenSeq)||0));
+    modal.dataset.tbModalOpenSeq=String(latest+1);
+    window.TeamBullsModalStackStability?.refresh?.();
+  }
   function openQuickReports(){
-    const student=trainerStudent();if(!student)return;ensureReportsModal();document.getElementById('tb-trainer-reports-title').textContent='Relatórios e fotos';document.getElementById('tb-trainer-reports-sub').textContent=studentName()+' · consulta rápida sem sair da prescrição';openModal('tb-trainer-reports-modal');syncDock();loadQuickReports(false);
+    const student=trainerStudent();if(!student)return;ensureReportsModal();document.getElementById('tb-trainer-reports-title').textContent='Relatórios e fotos';document.getElementById('tb-trainer-reports-sub').textContent=studentName()+' · consulta rápida sem sair da prescrição';openModal('tb-trainer-reports-modal');raiseReference('tb-trainer-reports-modal');syncDock();loadQuickReports(false);
   }
 
   function ensureNoteModal(){
@@ -155,14 +223,15 @@
     const ref=trainerPrivateRef();if(!ref)return'';const snap=await cloudGet(ref,'rascunho privado do treinador');if(!snap.exists)return'';const data=snap.data()||{},entry=data.studentNotes&&typeof data.studentNotes==='object'?data.studentNotes[studentUid]:null;return String(typeof entry==='string'?entry:entry?.text||'').slice(0,NOTE_MAX);
   }
   async function openPrivateNote(){
-    const student=trainerStudent();if(!student)return;ensureNoteModal();const text=document.getElementById('tb-private-note-text'),status=document.getElementById('tb-private-note-status');document.getElementById('tb-private-note-student').textContent=studentName()+' · rascunho individual deste aluno';text.value='';text.dataset.studentUid=student.uid;status.textContent='Carregando…';openModal('tb-trainer-note-modal');syncDock();
-    try{const value=await readPrivateNote(student.uid);if(text.dataset.studentUid!==student.uid)return;text.value=value;status.textContent=value?'Rascunho carregado.':'Nenhuma anotação salva ainda.';}catch(error){status.textContent='Não foi possível carregar agora.';}
+    const student=trainerStudent();if(!student)return;ensureNoteModal();const text=document.getElementById('tb-private-note-text'),status=document.getElementById('tb-private-note-status');if(text.dataset.trainerUid===CURRENT_USER.uid&&text.dataset.studentUid===student.uid&&(text.dataset.loaded==='1'||text.dataset.dirty==='1')){openModal('tb-trainer-note-modal');raiseReference('tb-trainer-note-modal');syncDock();return;}const actor=CURRENT_USER.uid;document.getElementById('tb-private-note-student').textContent=studentName()+' · rascunho individual deste aluno';text.value='';text.dataset.trainerUid=actor;text.dataset.studentUid=student.uid;text.dataset.loaded='0';text.dataset.dirty='0';text.oninput=()=>{text.dataset.dirty='1';};status.textContent='Carregando…';openModal('tb-trainer-note-modal');raiseReference('tb-trainer-note-modal');syncDock();
+    try{const value=await readPrivateNote(student.uid);if(text.dataset.studentUid!==student.uid||trainerStudent()?.uid!==student.uid||CURRENT_USER?.uid!==actor)return;text.dataset.loaded='1';if(text.dataset.dirty!=='1')text.value=value;status.textContent=value?'Rascunho carregado.':'Nenhuma anotação salva ainda.';}catch(error){status.textContent='Não foi possível carregar agora.';}
   }
   async function savePrivateNote(){
-    const student=trainerStudent(),text=document.getElementById('tb-private-note-text'),status=document.getElementById('tb-private-note-status'),ref=trainerPrivateRef();if(!student||!text||!ref)return;const targetUid=String(text.dataset.studentUid||'');if(targetUid!==student.uid){status.textContent='O aluno ativo mudou. Feche e abra o rascunho novamente.';return;}const value=String(text.value||'').normalize('NFKC').trim().slice(0,NOTE_MAX);
+    const student=trainerStudent(),text=document.getElementById('tb-private-note-text'),status=document.getElementById('tb-private-note-status'),ref=trainerPrivateRef();if(!student||!text||!ref)return;const actor=CURRENT_USER.uid,targetUid=String(text.dataset.studentUid||'');if(targetUid!==student.uid||text.dataset.trainerUid!==actor){status.textContent='O aluno ativo mudou. Feche e abra o rascunho novamente.';return;}const value=String(text.value||'').normalize('NFKC').trim().slice(0,NOTE_MAX);
     if(typeof beginAction==='function'&&!beginAction('trainer-private-note','tb-trainer-note-modal'))return;status.textContent='Salvando…';
     try{
       const snap=await cloudGet(ref,'verificar rascunhos privados'),now=new Date().toISOString();
+      if(CURRENT_USER?.uid!==actor||trainerStudent()?.uid!==targetUid||text.dataset.trainerUid!==actor)return;
       if(snap.exists){const data=snap.data()||{},notes=data.studentNotes&&typeof data.studentNotes==='object'?{...data.studentNotes}:{},previous=notes[targetUid]&&typeof notes[targetUid]==='object'?notes[targetUid]:{};notes[targetUid]={...previous,text:value,updatedAt:now};await cloudWrite(ref.set({trainerId:CURRENT_USER.uid,studentNotes:notes,updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true}),'salvar rascunho privado');}
       else{await cloudWrite(ref.set({trainerId:CURRENT_USER.uid,items:[],studentNotes:{[targetUid]:{text:value,updatedAt:now}},updatedAt:firebase.firestore.FieldValue.serverTimestamp()}),'criar rascunho privado');}
       status.textContent='✓ Rascunho salvo. Apenas você pode acessá-lo.';if(typeof showToast==='function')showToast('✓ Rascunho privado salvo');
@@ -172,7 +241,13 @@
 
   function wrapUiFunction(name){
     const base=window[name];if(typeof base!=='function'||base.__tbTrainerWorkspace)return;
-    const wrapped=function(){const result=base.apply(this,arguments);scheduleDockSync();return result;};
+    const wrapped=function(){
+      if(name==='openModal'){
+        const modal=document.getElementById(String(arguments[0]||''));
+        if(modal&&REFERENCE_MODALS.has(modal.id)&&!modal.classList.contains('open'))modal.dataset.tbWorkspaceStudentUid=trainerStudent()?.uid||'';
+      }
+      const result=base.apply(this,arguments);scheduleDockSync();return result;
+    };
     wrapped.__tbTrainerWorkspace=true;window[name]=wrapped;
   }
   function observeModal(modal){
@@ -190,6 +265,6 @@
     const additionsObserver=new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node instanceof HTMLElement)bindModalObservers(node);}))); 
     additionsObserver.observe(document.body,{subtree:true,childList:true});
   }
-  function install(){ensureStyles();ensureDock();ensureReportsModal();ensureNoteModal();['showScreen','openModal','closeModal'].forEach(wrapUiFunction);watchModalState();syncDock();window.addEventListener('pageshow',scheduleDockSync,{passive:true});window.TeamBullsTrainerWorkspace=Object.freeze({version:'10.10.9-workspace3',sync:syncDock,openReports:openQuickReports,openNote:openPrivateNote,refreshReports:()=>loadQuickReports(true)});}
+  function install(){ensureStyles();ensureDock();ensureReportsModal();ensureNoteModal();['showScreen','openModal','closeModal'].forEach(wrapUiFunction);watchModalState();syncDock();window.addEventListener('pageshow',scheduleDockSync,{passive:true});window.addEventListener('resize',scheduleDockSync,{passive:true});window.TeamBullsTrainerWorkspace=Object.freeze({version:'10.10.9-workspace4',sync:syncDock,openReports:openQuickReports,openNote:openPrivateNote,refreshReports:()=>loadQuickReports(true)});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();

@@ -39,7 +39,7 @@ has(profile,'data-tb-profile-logout="1"','Perfil prioritário não cria o botão
 has(profile,'TeamBullsStudentHome.logout()','Botão SAIR não usa o fluxo canônico do perfil.');
 
 has(modal,'const HEALTH_CHECK_MS=1900','Intervalo otimizado do monitor de modais ausente.');
-has(modal,"runtime:'health2'",'Runtime otimizado de modais não identificado.');
+has(modal,"runtime:'health3'",'Runtime otimizado de modais não identificado.');
 has(modal,'if(document.hidden||!openModals().length)return;','Monitor de modais continua trabalhando com a página oculta.');
 has(modal,"window.addEventListener('pagehide',pauseHealthCheck",'Monitor de modais não é pausado ao sair da página.');
 const recovery=modal.indexOf('function recoverOrphanedTop()');

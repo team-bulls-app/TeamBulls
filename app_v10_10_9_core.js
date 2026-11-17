@@ -8914,11 +8914,12 @@ const V106_MODAL_RETURN_FOCUS=new WeakMap();
 const V106_BASE_OPEN_MODAL=openModal,V106_BASE_CLOSE_MODAL=closeModal;
 openModal=function(id){
   const modal=document.getElementById(id);if(!modal)return;
-  if(!modal.classList.contains('open'))V106_MODAL_RETURN_FOCUS.set(modal,document.activeElement);
+  const alreadyOpen=modal.classList.contains('open');
+  if(!alreadyOpen)V106_MODAL_RETURN_FOCUS.set(modal,document.activeElement);
   modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
   V106_BASE_OPEN_MODAL(id);
   requestAnimationFrame(()=>{
-    if(!shouldAutoFocusEditor())return;
+    if(alreadyOpen||!shouldAutoFocusEditor())return;
     const target=modal.querySelector('input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),[tabindex="0"]');
     target?.focus?.({preventScroll:true});
   });

@@ -133,7 +133,7 @@
   function wrapModalFunctions(){
     const baseOpen=window.openModal,baseClose=window.closeModal;
     if(typeof baseOpen==='function'&&!baseOpen.__tbModalStackStability){
-      const wrappedOpen=function(id){const result=baseOpen.apply(this,arguments),modal=document.getElementById(String(id||''));if(modal?.classList.contains('open'))markOpened(modal);afterUiChange();return result;};
+      const wrappedOpen=function(id){const modal=document.getElementById(String(id||'')),alreadyOpen=modal?.classList.contains('open');const result=baseOpen.apply(this,arguments);if(modal?.classList.contains('open')&&!alreadyOpen)markOpened(modal);afterUiChange();return result;};
       wrappedOpen.__tbModalStackStability=true;window.openModal=wrappedOpen;
     }
     if(typeof baseClose==='function'&&!baseClose.__tbModalStackStability){
@@ -169,7 +169,7 @@
     window.visualViewport?.addEventListener('resize',afterUiChange,{passive:true});
     document.addEventListener('visibilitychange',()=>{if(document.hidden)pauseHealthCheck();else settleOpenModalAnimations();},{passive:true});
     document.addEventListener('animationend',event=>{if(event.target instanceof Element&&event.target.closest(MODAL_SELECTOR+'.open'))afterUiChange();},true);
-    window.TeamBullsModalStackStability=Object.freeze({version:'10.10.9-modal2',patch:'freeze1',runtime:'health2',refresh:afterUiChange,recover:recoverOrphanedTop});
+    window.TeamBullsModalStackStability=Object.freeze({version:'10.10.9-modal2',patch:'freeze1',runtime:'health3',refresh:afterUiChange,recover:recoverOrphanedTop});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();

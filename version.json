@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111702,
-  "revision": "photo-return-diet-save-day-copy-1",
+  "build": 2026111703,
+  "revision": "trainer-reference-workspace-1",
   "publishedAt": "2026-11-17T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Retorno da foto ao relatório, correção do cálculo privado e cópia das refeições entre dias da dieta."
+  "message": "Fotos e rascunhos durante a edição, correção do cálculo privado, cópia entre dias e grupos musculares."
 }
