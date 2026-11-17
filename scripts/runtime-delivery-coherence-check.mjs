@@ -43,7 +43,7 @@ assert(updater.includes('./'+styleRefs[0])&&sw.includes('./'+styleRefs[0]),'CSS 
 const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1&photoReturn=1&muscles=groups2&panes=independent1&reports=monthly-priority1';
 const dayCopyRef='./modules/diet-copy-v10_10_28.js?v=10.10.28-dietcopy2';
 assert(config.includes(dayCopyRef)&&sw.includes(dayCopyRef)&&updater.includes(dayCopyRef),'A copia de refeicoes entre dias deve chegar pelo loader, cache e atualizador.');
-const workspaceRef='./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace5';
+const workspaceRef='./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace6';
 assert(config.includes(workspaceRef)&&sw.includes(workspaceRef)&&updater.includes(workspaceRef),'As janelas de referencia devem chegar pela revisao atual do workspace.');
 const privateDietRef='./modules/diet-calculation-evolution-v10_10_9.js?v=10.10.10-dietcalc2';
 assert(config.includes(privateDietRef)&&sw.includes(privateDietRef)&&updater.includes(privateDietRef),'O salvamento privado deve chegar pelo loader, cache e atualizador.');
@@ -53,7 +53,7 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='monthly-priority-previous-workout-1','Release precisa identificar as correções de fotos e dieta.');
+assert(version.revision==='trainer-report-window-drag-scroll-1','Release precisa identificar a movimentação e a rolagem das janelas de relatório.');
 const weekLayoutRef='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
 assert(usability.includes(weekLayoutRef)&&updater.includes(weekLayoutRef)&&sw.includes(weekLayoutRef),'Layout semanal deve usar a mesma revisão no loader, atualizador e cache.');
 const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar6';
