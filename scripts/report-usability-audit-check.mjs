@@ -36,7 +36,7 @@ has(report,"resolvePhotoSource(p,{full:false})",'Visualizador não antecipa a mi
 has(report,"openModal('modal-photo-view')",'Visualizador de foto não abre imediatamente.');
 assert(!report.includes("Promise.all((checkin.photoIds||[]).slice(0,6).map")&&!report.includes("resolvePhotoSource(record,{full:CURRENT_USER?.role==='trainer'})"),'Relatório voltou a carregar seis fotos originais simultaneamente.');
 
-has(submit,"const VERSION='10.10.57-submitstate9'",'Envio canônico não usa a revisão atual que corrige o permission-denied semanal.');
+has(submit,"const VERSION='10.10.57-submitstate10'",'Envio canônico não usa a revisão atual que corrige o permission-denied semanal.');
 has(submit,'async function preparePhoto(file,{userId,extra})','Envio canônico perdeu a preparação isolada de cada fotografia.');
 has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório deixou de usar o payload Firestore/dataURL canônico.');
 assert(!submit.includes("uploadCloudPhoto('progressPhotos'")&&!submit.includes("uploadCloudPhoto('progressPhotoThumbs'"),'Relatório voltou a depender de Firebase Storage antes do commit Firestore.');
@@ -75,7 +75,7 @@ const lockIndex=config.indexOf('prescription-lock-bridge-v10_10_10.js?v=10.10.10
 const gerLockIndex=config.indexOf('ger-lock-bridge-v10_10_10.js?v=10.10.10-gerlock1');
 const reportIndex=config.indexOf('report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2');
 const auditIndex=config.indexOf('usability-audit-v10_10_10.js?v=10.10.10-audit1');
-const modalIndex=config.indexOf('modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1');
+const modalIndex=config.indexOf('modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1');
 assert(workflowIndex>=0&&lockIndex>workflowIndex&&gerLockIndex>lockIndex&&reportIndex>gerLockIndex&&auditIndex>reportIndex&&modalIndex>auditIndex,'Ordem dos hotfixes de tranca/relatório/auditoria está incorreta.');
 
 for(const [name,source] of [['sw.js',sw],['sw_47.js',sw47]]){

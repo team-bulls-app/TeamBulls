@@ -300,7 +300,9 @@
     try{
       const expected=new Set(sameView?snapshot.modals||[]:[]);
       for(const modal of openModals().reverse()){
-        if(!expected.has(modal.id))window.__TB_HISTORY_BASE_CLOSE__?.(modal.id);
+        const reference=!sameView&&modal.dataset?.tbWorkspacePersistent==='1'&&typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'&&
+          String(snapshot.viewStudent?.uid||'')===modal.dataset.tbWorkspaceStudentUid;
+        if(!expected.has(modal.id)&&!reference)window.__TB_HISTORY_BASE_CLOSE__?.(modal.id);
       }
       restoreContext(snapshot);
       if(!sameView)window.__TB_HISTORY_BASE_SHOW__?.(snapshot.screen);

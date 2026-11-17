@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__)return;
   window.__TEAM_BULLS_STUDENT_HOME_PROFILE_1__=true;
 
-  const VERSION='10.10.45-studenthome8';
+  const VERSION='10.10.45-studenthome9';
   const PROFILE_PREFIX='studentProfiles';
   const NICK_MAX=24;
   const BADGE_REFRESH_TTL=120000;
@@ -333,6 +333,7 @@
     value(1)?.docs.forEach(doc=>{const data=doc.data();items.push({id:doc.id,source:'feedback',title:data.title||'Mensagem da central',body:data.message||'',createdAt:data.createdAt,read:!!data.read,type:data.feedbackType||'central'});});
     const monthly=window.TeamBullsMonthlyReports,protocol=value(5),schedule=protocol?.exists?{...protocol.data(),studentId:uid}:null;
     if(protocol)monthly?.remember(uid,schedule);
+    if(value(2))monthly?.rememberReports(uid,value(2).docs.map(doc=>({...doc.data(),id:doc.id})));
     value(2)?.docs.forEach(doc=>{
       const data={...doc.data(),id:doc.id};if(data.answered||data.cancelledAt)return;
       const isMonthly=data.reportType==='monthly';
@@ -340,7 +341,7 @@
       items.push({id:doc.id,source:'questionnaire',title:isMonthly?'Relatório mensal pendente':data.reportType==='standard-extra'?'Relatório extra pendente':'Relatório pendente',body:isMonthly?('Relatório completo de '+fmt(data.dueDate)+', com todas as perguntas e 6 fotos.'):'Seu treinador solicitou um novo relatório.',createdAt:data.createdAt,read:false,type:isMonthly?'relatório mensal':'relatório',action:'questionnaire'});
     });
     const weekly=value(3),history=value(4);
-    if(weekly?.exists&&history&&results[6].status==='fulfilled'){
+    if(weekly?.exists&&history&&protocol&&value(2)&&results[6].status==='fulfilled'){
       const data=weekly.data(),request=computeCheckinRequest(data,history.docs.map(doc=>({...doc.data(),id:doc.id})));
       if(request?.pending)items.push({id:'weekly-checkin',source:'virtual',title:request.kind==='manual'?'Relatório extra solicitado':'Relatório semanal pendente',body:request.kind==='manual'?'Seu treinador solicitou um relatório extra com as fotos obrigatórias.':('Seu relatório semanal de '+fmt(request.dueDate)+' está pendente.'),createdAt:data.updatedAt||0,read:false,type:'relatório semanal',action:'weekly'});
     }

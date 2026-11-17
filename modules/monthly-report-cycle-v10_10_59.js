@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsMonthlyReports)return;
-  const VERSION='10.10.59-monthly2';
+  const VERSION='10.10.59-monthly3';
   const schedules=new Map();
   let syncPromise=null,syncTrainer='',syncedTrainer='',syncedAt=0;
   const iso=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||''));
@@ -41,6 +41,53 @@
     const schedule=doc.exists?{...doc.data(),studentId:uid}:null;
     remember(uid,schedule);return schedule;
   }
+
+  const reportHistory=new Map();
+  function rememberReports(uid,rows){reportHistory.set(String(uid),(Array.isArray(rows)?rows:[]).filter(report=>monthly(report)&&report.studentId===uid));}
+  function answeredDate(report){
+    const stamp=report?.answeredAt;
+    const date=stamp?.toDate?.()||(stamp?.seconds?new Date(stamp.seconds*1000):typeof stamp==='string'?new Date(stamp):null);
+    if(date instanceof Date&&!Number.isNaN(date.getTime()))return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+    return iso(report?.submittedDate)?String(report.submittedDate):iso(report?.dueDate)?String(report.dueDate):'';
+  }
+  function prioritizeWeekly(request,weeklySchedule={},date=today()){
+    if(!request)return request;
+    const uid=String(weeklySchedule.studentId||(CURRENT_USER?.role==='student'?CURRENT_USER.uid:'')||'');
+    if(!uid)return request;
+    if(!schedules.has(uid)||!reportHistory.has(uid)){
+      return CURRENT_USER?.role==='student'?{...request,pending:false,suppressedByMonthly:true,monthlyContextLoading:true}:request;
+    }
+    const schedule=schedules.get(uid),current=cycle(schedule),rows=reportHistory.get(uid);
+    const currentReport=current?rows.find(report=>report.id===current.id&&report.monthlyCycleKey===current.key):null;
+    const completed=rows.filter(report=>report.answered===true&&!report.cancelledAt).map(answeredDate).filter(iso).sort().at(-1)||'';
+    const resumeDate=completed?addDaysIso(completed,7):'';
+    if(current&&current.dueDate<=date&&currentReport?.answered!==true&&!currentReport?.cancelledAt){
+      return{...request,pending:false,suppressedByMonthly:true,monthlyDueDate:current.dueDate,monthlyReportId:current.id};
+    }
+    if(resumeDate&&date<resumeDate){
+      const due=request.dueDate<resumeDate?resumeDate:request.dueDate;
+      return{...request,pending:false,suppressedByMonthly:true,resumeDate,...(request.kind==='scheduled'?{dueDate:due,requestKey:'scheduled:'+due}: {})};
+    }
+    if(request.kind==='manual')return request;
+    let due=request.dueDate;
+    if(resumeDate&&due<resumeDate)due=resumeDate;
+    if(current&&!currentReport?.cancelledAt&&currentReport?.answered!==true&&current.dueDate>date&&due>=current.dueDate&&due<addDaysIso(current.dueDate,7))due=addDaysIso(current.dueDate,7);
+    if(due===request.dueDate)return request;
+    const {documentKey,recovery,...rest}=request;
+    return{...rest,dueDate:due,requestKey:'scheduled:'+due,pending:due<=date};
+  }
+  async function loadWeeklyContext(uid){
+    if(!student(uid)&&!trainer())throw new Error('A sessão mudou. Entre novamente.');
+    const actor=CURRENT_USER.uid;
+    const [schedule,history]=await Promise.all([
+      loadSchedule(uid),
+      read(db.collection('questionnaires').where('studentId','==',uid).where('reportType','==','monthly'),'confirmar histórico mensal')
+    ]);
+    if(CURRENT_USER?.uid!==actor||auth?.currentUser?.uid!==actor)throw new Error('A sessão mudou durante a consulta.');
+    rememberReports(uid,history.docs.map(doc=>({...doc.data(),id:doc.id})));
+    return schedule;
+  }
+
   async function pending(rows,uid){
     if(rows.some(monthly))await loadSchedule(uid);
     return rows.filter(report=>report.answered!==true&&status(report)==='pending');
@@ -134,7 +181,7 @@
     if(trainer()&&(syncedTrainer!==CURRENT_USER.uid||Date.now()-syncedAt>60000))sync();
     else if(CURRENT_USER?.role==='student')window.TeamBullsStudentRequestRealtime?.recompute?.('monthly-ready');
   }
-  window.TeamBullsMonthlyReports=Object.freeze({version:VERSION,cycle,status,remember,pending,loadSchedule,assertAvailable,ensureForStudent,sync,refreshVisibleReports});
+  window.TeamBullsMonthlyReports=Object.freeze({version:VERSION,cycle,status,remember,rememberReports,prioritizeWeekly,loadWeeklyContext,pending,loadSchedule,assertAvailable,ensureForStudent,sync,refreshVisibleReports});
   window.addEventListener('team-bulls-runtime-ready',resume);
   window.addEventListener('team-bulls-runtime-state',resume);
   window.addEventListener('team-bulls-intelligence-ready',resume);

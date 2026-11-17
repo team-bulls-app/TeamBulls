@@ -54,14 +54,14 @@ const config=read('config_v10_7.js');
   ['modules/app-update-v10_10_9.js','Loader não inclui a atualização de UX/performance.'],
   ['modules/diet-scroll-fix-v10_10_9.js','Loader não inclui a correção de scroll da dieta.'],
   ['modules/modal-form-guard-v10_10_9.js','Loader não inclui a proteção de modais.'],
-  ['modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace3','Loader não usa workspace3 do visualizador de relatórios.'],
+  ['modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace5','Loader não usa workspace5 do visualizador de relatórios.'],
   ['modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','Loader não inclui o cronômetro corrigido.'],
   ['modules/global-performance-v10_10_9.js?v=10.10.9-perf2','Loader não inclui perf2.'],
   ['modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2','Loader não inclui o hotfix de treino.'],
   ['modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','Loader não inclui a otimização desktop.'],
   ['modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1','Loader não inclui GER em lote.'],
   ['modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','Loader não inclui actions2.'],
-  ['modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1','Loader não inclui modal2/freeze1.']
+  ['modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1','Loader não inclui modal2/freeze1.']
 ].forEach(([needle,message])=>has(config,needle,message));
 assert(config.indexOf('global-performance-v10_10_9.js')<config.indexOf('workout-ux-fix-v10_10_9.js'),'Hotfix de treino precisa executar depois da camada global.');
 assert(config.indexOf('workout-ux-fix-v10_10_9.js')<config.indexOf('desktop-performance-v10_10_9.js'),'Otimização desktop precisa executar depois do hotfix de treino.');
@@ -125,8 +125,8 @@ const transitionEnd=workspace.indexOf('function renderQuickReports',transitionSt
 const transition=transitionStart>=0&&transitionEnd>transitionStart?workspace.slice(transitionStart,transitionEnd):'';
 has(transition,'if(!reportViewerIsOpen(targetModalId))await Promise.resolve(result)','Transição não aguarda viewer assíncrono quando necessário.');
 has(transition,"if(!reportViewerIsOpen(targetModalId))throw new Error('Visualizador não abriu: '+targetModalId)",'Transição não confirma a abertura do modal definitivo.');
-assert(transition.indexOf("throw new Error('Visualizador não abriu: '+targetModalId)")<transition.indexOf("closeModal('tb-trainer-reports-modal')"),'Consulta rápida fecha antes de confirmar o visualizador definitivo.');
-has(workspace,"version:'10.10.9-workspace3'",'Workspace não identifica workspace3.');
+lacks(transition,"closeModal('tb-trainer-reports-modal')",'Abrir um relatório deve preservar a consulta rápida aberta pelo treinador.');
+has(workspace,"version:'10.10.9-workspace5'",'Workspace não identifica workspace5.');
 has(workspace,"['showScreen','openModal','closeModal'].forEach(wrapUiFunction)",'Workspace não sincroniza pelas funções reais de UI.');
 has(workspace,"observer.observe(modal,{attributes:true,attributeFilter:['class']})",'Observação individual dos modais ausente.');
 has(workspace,"additionsObserver.observe(document.body,{subtree:true,childList:true})",'Workspace não acompanha modais adicionados.');
@@ -281,15 +281,15 @@ has(sw,'async function cachePathsWithLimit','Preparação de shell com limite au
 [
   './modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1',
   './modules/diet-scroll-fix-v10_10_9.js?v=10.10.9&scroll=top1',
-  './modules/modal-form-guard-v10_10_9.js?v=10.10.9',
-  './modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace3',
+  './modules/modal-form-guard-v10_10_9.js?v=10.10.9&independent=1',
+  './modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace5',
   './modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1',
   './modules/global-performance-v10_10_9.js?v=10.10.9-perf2',
   './modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2',
   './modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1',
   './modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1',
   './modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2',
-  './modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1'
+  './modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1'
 ].forEach(asset=>has(sw,`'${asset}'`,`Shell offline não inclui ${asset}.`));
 assert(bridge.replace('ponte de migração para instalações controladas pelo antigo sw_47.js','Service Worker estável e atualização sem reinstalação')===sw,'sw_47.js divergiu do Service Worker principal.');
 const requiredShellBlock=sw.slice(sw.indexOf('const REQUIRED_SHELL=['),sw.indexOf('const OPTIONAL_SHELL=['));

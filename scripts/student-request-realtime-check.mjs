@@ -18,7 +18,7 @@ for(const modulePath of ['modules/student-request-realtime-v10_10_32.js',submitP
   assert(syntax.status===0,`Módulo possui JavaScript inválido (${modulePath}): ${String(syntax.stderr||'').trim()}`);
 }
 
-const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime5';
+const moduleUrl='./modules/student-request-realtime-v10_10_32.js?v=10.10.32-studentrealtime6';
 assert(config.includes(`'${moduleUrl}'`),'Loader prioritário do aluno não inclui a sincronização realtime atual.');
 const priority=config.match(/const studentPriorityModules=\[([\s\S]*?)\n  \];/)?.[1]||'';
 assert(priority.includes(moduleUrl),'Sincronização realtime precisa estar no runtime prioritário do aluno.');
@@ -62,12 +62,12 @@ const bootstrapUrlVersion=bootstrapSrc?new URL(bootstrapSrc,'https://team-bulls.
 const loaderVersion=loader.match(/const VERSION='([^']+)'/)?.[1]||'';
 const weeklyVersion=weeklyIntegrity.match(/const VERSION='([^']+)'/)?.[1]||'';
 assert(!!bootstrapVersion&&bootstrapVersion===bootstrapUrlVersion&&bootstrapVersion===loaderVersion,'Loader mutável perdeu compatibilidade com o bootstrap publicado.');
-assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate9"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
+assert(loader.includes("student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate10"),'Aluno não carrega a revisão corrigida Firestore-only do envio de relatórios.');
 const studentWeeklySpec=[...loader.matchAll(/\[['"]\.\/modules\/weekly-report-integrity-v10_10_58\.js\?v=([^'"]+)['"],\s*\(\)=>window\.TeamBullsWeeklyReportIntegrity\?\.version===['"]([^'"]+)['"]\]/g)].at(-1);
 assert(!!studentWeeklySpec&&studentWeeklySpec[1]===weeklyVersion&&studentWeeklySpec[2]===weeklyVersion,'Aluno não carrega e valida a guarda semanal atual depois do transporte REST.');
 assert(loader.indexOf('student-trainer-activity-bridge-v10_10_47.js')<loader.indexOf('student-report-submit-reconciliation-v10_10_57.js'),'Ponte de atividade precisa existir antes da revisão de envio para ser reinstalada depois.');
 assert(loader.indexOf('student-report-submit-reconciliation-v10_10_57.js')<loader.lastIndexOf('weekly-report-integrity-v10_10_58.js'),'Guarda semanal precisa envolver o submit REST canônico, não antecedê-lo.');
-assert(submitState.includes("const VERSION='10.10.57-submitstate9'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
+assert(submitState.includes("const VERSION='10.10.57-submitstate10'"),'Reconciliação pós-envio está na revisão corrigida Firestore-only errada.');
 assert(submitState.includes('https://firestore.googleapis.com/v1/'),'Envio crítico não aponta para a API REST oficial do Firestore.');
 assert(submitState.includes("'Authorization':'Bearer '+idToken"),'REST do Firestore não usa o ID token Firebase do próprio aluno.');
 assert(submitState.includes("headers['X-Firebase-AppCheck']=tokenResult.token"),'REST crítico não preserva o token App Check.');

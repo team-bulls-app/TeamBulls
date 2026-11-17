@@ -2,14 +2,14 @@
 import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
 function fn(name){const start=core.indexOf(`function ${name}(`);assert(start>=0,name);const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));}
-const names=['normalizedName','renderWorkoutMuscleChoices','normalizeDietMeal','normalizeDietVariant','currentDiet','currentDietVariant','v104ActivateVariantMeals','renderDietVariantTabs','persistDietDocumentDraft','shouldAutoFocusEditor','capturePhotoReadContext','photoReadContextCurrent','beginPhotoViewRequest','photoViewRequestCurrent','openPhotoView','openComparePhotos','runComparePhotos','openModal','closeModal','showConfirm','beginAction','endAction','captureCatalogEditor','commitCatalogAction','catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','cacheGeneralInstructions','cacheTechniqueCatalog','saveInstructionFolder','saveInstructionItem','deleteInstructionItem','saveTechnique','deleteTechnique','renderInstructions','renderTechniques','instructionVideoAction','openInstructionFolderModal','openInstructionItemModal','openTechniqueEditor'];
+const names=['safeDayName','safeWorkoutGuidance','dayIdFromName','normalizeWorkoutDays','getWorkoutDays','normalizePrescriptionSet','normalizeWeeklyPlan','clonePrescriptionSets','resolveWeekPrescription','prescribedRangeLabel','formatGerLevel','prescriptionCompactSummary','hasManualOrder','createdMillis','exerciseOrderComparator','exercisesForDayUnsorted','exercisesForDay','normalizedName','renderWorkoutMuscleChoices','normalizeDietMeal','normalizeDietVariant','currentDiet','currentDietVariant','v104ActivateVariantMeals','renderDietVariantTabs','persistDietDocumentDraft','shouldAutoFocusEditor','capturePhotoReadContext','photoReadContextCurrent','beginPhotoViewRequest','photoViewRequestCurrent','openPhotoView','openComparePhotos','runComparePhotos','openModal','closeModal','showConfirm','beginAction','endAction','captureCatalogEditor','commitCatalogAction','catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','cacheGeneralInstructions','cacheTechniqueCatalog','saveInstructionFolder','saveInstructionItem','deleteInstructionItem','saveTechnique','deleteTechnique','renderInstructions','renderTechniques','instructionVideoAction','openInstructionFolderModal','openInstructionItemModal','openTechniqueEditor'];
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const muscleSource=core.slice(core.indexOf('const WORKOUT_MUSCLE_GROUPS='),core.indexOf('function safeWorkoutGuidance('));
 const focusWrappers=core.slice(core.indexOf('const V106_MODAL_RETURN_FOCUS='),core.indexOf("document.addEventListener('keydown',event=>",core.indexOf('const V106_MODAL_RETURN_FOCUS=')));
 assert(focusWrappers.includes("V106_MODAL_RETURN_FOCUS.set"));
 const setup=`<script>
 window.errors=[];window.addEventListener('error',e=>errors.push(e.message));window.alerts=[];window.alert=e=>alerts.push(String(e));
-let CURRENT_USER={uid:'coach',role:'trainer'},VIEW_STUDENT={uid:'student'},MODE='cloud',NAVIGATION_SEQ=1,PHOTOS_CACHE_UID='student',CUR_PHOTO_ID=null,PHOTO_VIEW_REQUEST=0,PHOTO_COMPARE_REQUEST=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
+let CURRENT_USER={uid:'coach',role:'trainer'},VIEW_STUDENT={uid:'student',name:'Aluno teste'},MODE='cloud',NAVIGATION_SEQ=1,PHOTOS_CACHE_UID='student',CUR_PHOTO_ID=null,PHOTO_VIEW_REQUEST=0,PHOTO_COMPARE_REQUEST=0,TRAINING_RECOMMENDATIONS_CONTEXT=null,MODAL_TARGET='student';
 let PHOTOS_CACHE=[{id:'a',userId:'student',date:'2026-11-02',weight:80,dataUrl:'/download-a.png'},{id:'b',userId:'student',date:'2026-10-01',weight:85,dataUrl:'/download-b.png'}];
 let GENERAL_INSTRUCTIONS={revision:1,folders:[{id:'f1',name:'Original',active:true,items:[{id:'i1',title:'Orientação',text:'Texto',active:true}]}]},TECHNIQUE_CATALOG={revision:1,items:[{id:'t1',code:'T',name:'Original',description:'Descrição'}]},EDIT_INSTRUCTION_FOLDER_ID='f1',EDIT_INSTRUCTION_ITEM_ID='i1',EDIT_TECHNIQUE_ID='t1',INSTRUCTIONS_FORCED=false;
 const CATALOG_EDITOR_CONTEXTS={};const GENERAL_INSTRUCTIONS_CACHE_KEY='fixture-instructions',TECHNIQUE_CATALOG_CACHE_KEY='fixture-techniques',ACTION_LOCKS=new Set();
@@ -21,7 +21,16 @@ function resolvePhotoSource(record,{full=false}={}){if(full)return new Promise(r
 window.release=(id,thumb=false)=>{const queue=thumb?pendingThumb:pendingHigh;const resolve=queue[id]?.shift();if(!resolve)throw new Error('Missing photo request '+id);resolve('/'+(thumb?'thumb-':'full-')+id+'.png');};
 const ensureStorageService=async()=>null,withTimeout=p=>p,safePhotoPath=()=>'',safePhotoDataUrl=s=>s||'';
 window.downloads=[];window.fetch=async url=>{downloads.push(String(url));return {ok:true,blob:async()=>new Blob(['fake'],{type:'image/jpeg'})};};HTMLAnchorElement.prototype.click=function(){downloads.push(this.download);};
-window.failWrites=false;window.writes=0;let remoteLibraries={};const firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}},cloudWrite=async p=>p,db={collection:collection=>({doc:()=>({collection})}),runTransaction:async task=>{let staged;await task({get:async ref=>({exists:true,data:()=>remoteLibraries[ref.collection]||structuredClone(ref.collection==='trainingInstructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG)}),set:(ref,payload)=>{staged={ref,payload};}});if(staged){if(failWrites)throw new Error('Sem conexão (simulada)');remoteLibraries[staged.ref.collection]=structuredClone(staged.payload);delete remoteLibraries[staged.ref.collection].updatedAt;writes++;}}};
+window.failWrites=false;window.writes=0;let remoteLibraries={};const firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}},cloudWrite=async p=>p,db={collection:collection=>({where:()=>({collection}),doc:()=>({collection})}),runTransaction:async task=>{let staged;await task({get:async ref=>({exists:true,data:()=>remoteLibraries[ref.collection]||structuredClone(ref.collection==='trainingInstructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG)}),set:(ref,payload)=>{staged={ref,payload};}});if(staged){if(failWrites)throw new Error('Sem conexão (simulada)');remoteLibraries[staged.ref.collection]=structuredClone(staged.payload);delete remoteLibraries[staged.ref.collection].updatedAt;writes++;}}};
+
+
+let VIEW_STUDENT_WORKOUT={id:'current-w',name:'Treino atual',startDate:'2026-11-16',exercises:[]};
+VIEW_STUDENT.workouts=[VIEW_STUDENT_WORKOUT,
+{id:'old-early',name:'Treino anterior antigo',startDate:'2026-10-01',updateDate:'2026-11-26',days:[],exercises:[]},
+{id:'old-recent',name:'Treino anterior recente',startDate:'2026-11-02',updateDate:'2026-12-28',days:[{id:'old-day',name:'Inferiores',order:0}],exercises:[
+{id:'old-ex',name:'Agachamento',dayName:'Inferiores',order:0,instructions:'Controlar a descida',techniqueIds:['t1'],weeklyPlan:{w1:[{targetMin:8,targetMax:12,ger:3}],w2:[{targetMin:6,targetMax:8,ger:4}]}}]},
+{id:'future-w',name:'Próximo treino',startDate:'2026-12-01',exercises:[]}];
+const resolveWeekTechniqueConfig=exercise=>({techniqueIds:exercise.techniqueIds||[]});
 
 let DIET_CONTEXT={targetUid:'student',trainer:true,local:false},CURRENT_DIET_ID='diet-fixture',CURRENT_DIET_VARIANT_ID='training',AUTH_STATE_REVISION=1;
 const DIET_SECTION_DEFS=[],MEAL_PLAN_CACHE={meals:[]},MEAL_CTX={};
@@ -49,14 +58,17 @@ ${focusWrappers}
 function showScreen(id){document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id===id));}
 function viewWeeklyCheckin(){}
 function viewQuestionnaire(){}
-const CHECKIN_POSES=['Frente','Costas'],WEEKLY_CHECKINS=[{id:'weekly',studentId:'student',weight:80,submittedDate:'2026-11-17',photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
-const TS_QUEST_CACHE=[{id:'quest',studentId:'student',answered:true,photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
+const CHECKIN_POSES=['Frente','Costas'];let WEEKLY_CHECKINS=[{id:'weekly',studentId:'student',weight:80,submittedDate:'2026-11-17',photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
+let TS_QUEST_CACHE=[{id:'quest',studentId:'student',answered:true,photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
+const fetchWeeklyCheckins=async()=>WEEKLY_CHECKINS;
+function cloudGet(reference){return Promise.resolve(reference.collection==='questionnaires'?{docs:TS_QUEST_CACHE.map(item=>({id:item.id,data:()=>item}))}:{exists:true,data:()=>({studentNotes:{student:{text:'Rascunho salvo'}}})});}
 cacheGeneralInstructions();cacheTechniqueCatalog();document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));document.getElementById('screen-photos').classList.add('active');
 </script><script src="/quality.js"></script><script src="/photo-ux.js"></script>`;
 const setupScript=setup.slice(8,setup.indexOf('</script>'));new vm.Script(setupScript);
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script></body>');
-const routes=new Map([['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
-const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(setupScript);}if(pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(fixture);}if(pathname.endsWith('.png')){res.setHeader('Content-Type','image/png');return res.end(fs.readFileSync('icon-192-v9-8.png'));}const file=routes.get(pathname);if(!file){res.writeHead(404);return res.end();}res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/preopen.js"></script><script src="/workspace.js"></script></body>');
+const routes=new Map([['/form-guard.js','modules/modal-form-guard-v10_10_9.js'],['/workspace.js','modules/trainer-workspace-v10_10_9.js'],['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
+const preopenScript='if(new URLSearchParams(location.search).has("late-reference"))document.addEventListener("DOMContentLoaded",()=>openModal("modal-weekly-checkin-view"),{once:true});';
+const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/preopen.js'){res.setHeader('Content-Type','text/javascript');return res.end(preopenScript);}if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(setupScript);}if(pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(fixture);}if(pathname.endsWith('.png')){res.setHeader('Content-Type','image/png');return res.end(fs.readFileSync('icon-192-v9-8.png'));}const file=routes.get(pathname);if(!file){res.writeHead(404);return res.end();}res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : ['google-chrome','chromium','chromium-browser'].map(name => spawnSync('which',[name],{encoding:'utf8'}).stdout?.trim()).find(Boolean));
@@ -221,12 +233,72 @@ try {
     await evaluate('CURRENT_USER.role="trainer"');
 
     await evaluate('renderWorkoutMuscleChoices(["Bíceps","Tríceps","Ombros","Trapézio"]);openModal("modal-day")');await sleep(300);
-    assert.deepEqual(await evaluate('[...document.querySelectorAll("#day-muscle-group-options input")].map(el=>el.dataset.muscleGroup)'),['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Abdutores']);
+    assert.deepEqual(await evaluate('[...document.querySelectorAll("#day-muscle-group-options input")].map(el=>el.dataset.muscleGroup)'),['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Adutores']);
     assert.deepEqual(await evaluate('[...document.querySelectorAll("#day-muscle-group-options input:checked")].map(el=>el.dataset.muscleGroup)'),['Ombros e trapézios','Braços']);
     await evaluate('closeModal("modal-day")');await sleep(80);
+
+    await evaluate('showScreen("screen-ts-day");openModal("modal-exercise");TeamBullsTrainerWorkspace.sync();TeamBullsTrainerWorkspace.openNote()');await sleep(100);
+    await evaluate('document.getElementById("tb-private-note-text").value="Rascunho em edição";document.getElementById("tb-private-note-text").dispatchEvent(new Event("input"));TeamBullsTrainerWorkspace.openReports()');await sleep(100);
+    await evaluate('document.querySelector("#tb-trainer-reports-content [data-tb-weekly]").click()');await sleep(120);
+    assert(await evaluate('document.getElementById("tb-trainer-reports-modal").classList.contains("open")'),'Opening a report must preserve the reference list');
+    await evaluate('void openPhotoView("a",true)');await sleep(60);await evaluate('release("a");openModal("modal-exercise");TeamBullsTrainerWorkspace.sync()');await sleep(350);
+    for(const id of ['tb-trainer-note-modal','tb-trainer-reports-modal','modal-weekly-checkin-view','modal-photo-view','modal-exercise'])assert(await evaluate('document.getElementById('+JSON.stringify(id)+').classList.contains("open")'),'All requested windows must stay open: '+id);
+    if(width>=1200){
+      assert(await evaluate('document.getElementById("tb-trainer-tools").classList.contains("visible")'),'Reference tools must stay accessible while editing');
+      const panels=await evaluate('(()=>{const ids=["modal-exercise","modal-photo-view","tb-trainer-note-modal"];return ids.map(id=>{const modal=document.getElementById(id),r=modal.querySelector(".modal-sheet").getBoundingClientRect();return{id,left:r.left,right:r.right,top:r.top,bottom:r.bottom,pointer:getComputedStyle(modal).pointerEvents};});})()');
+      assert(panels.every(r=>r.left>=0&&r.right<=width&&r.top>=0&&r.bottom<=height),JSON.stringify(panels));
+      assert(panels[0].right<=panels[1].left&&panels[1].bottom<=panels[2].top,'Editor, photo and note must occupy separate areas');
+      const point=await evaluate('(()=>{const el=document.getElementById("tb-private-note-text"),r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+20,hit:document.elementFromPoint(r.left+r.width/2,r.top+20)===el};})()');
+      assert(point.hit,'Draft must remain clickable while the exercise editor is open');
+      await command('Input.dispatchMouseEvent',{type:'mousePressed',x:point.x,y:point.y,button:'left',clickCount:1});
+      await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:point.x,y:point.y,button:'left',clickCount:1});
+      if(screenshotDir){const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(screenshotDir,'workspace-'+width+'.png'),Buffer.from(shot.data,'base64'));}
+    }
+    if(width>=1200){
+      await evaluate('document.querySelector("#modal-exercise .form-input").focus()');
+      await command('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+      await command('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+    }else await evaluate('closeModal("modal-exercise")');
+    await sleep(120);
+    assert(await evaluate('!document.getElementById("modal-exercise").classList.contains("open")'),'Closing the editor must affect that editor alone');
+    for(const id of ['tb-trainer-note-modal','tb-trainer-reports-modal','modal-weekly-checkin-view','modal-photo-view'])assert(await evaluate('document.getElementById('+JSON.stringify(id)+').classList.contains("open")'),'Closing editor must preserve reference: '+id);
+    await evaluate(width>=1200?'document.querySelector("#modal-photo-view .tb-workspace-close").click()':'closeModal("modal-photo-view")');await sleep(120);
+    assert(await evaluate('document.getElementById("tb-trainer-note-modal").classList.contains("open")&&document.getElementById("modal-weekly-checkin-view").classList.contains("open")'));
+    assert.equal(await evaluate('document.getElementById("tb-private-note-text").value'),'Rascunho em edição');
+    await evaluate(width>=1200?'document.querySelector("#tb-trainer-note-modal .tb-workspace-close").click()':'closeModal("tb-trainer-note-modal")');await sleep(100);
+    assert(await evaluate('document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Closing the note must preserve the report');
+    await evaluate('TeamBullsTrainerWorkspace.openNote()');await sleep(80);
+    assert.equal(await evaluate('document.getElementById("tb-private-note-text").value'),'Rascunho em edição','Reopening a draft must preserve unsaved text');
+    await evaluate('showScreen("screen-ts-exercise")');await sleep(80);await evaluate('history.back()');await sleep(150);
+    assert(await evaluate('document.getElementById("tb-trainer-note-modal").classList.contains("open")&&document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Changing prescription screens and returning must preserve references for the same student');
+    await evaluate('closeModal("tb-trainer-note-modal");closeModal("modal-weekly-checkin-view");closeModal("tb-trainer-reports-modal")');await sleep(150);
+    await evaluate('TeamBullsTrainerWorkspace.openNote()');await sleep(80);
+    await evaluate('CURRENT_USER.role="student";TeamBullsTrainerWorkspace.sync()');await sleep(100);
+    assert(await evaluate('!document.getElementById("tb-trainer-note-modal").classList.contains("open")&&document.getElementById("tb-private-note-text").value===""'),'Private draft must be cleared when the trainer session ends');
+    await evaluate('CURRENT_USER.role="trainer";TeamBullsTrainerWorkspace.sync()');
+
+
+
+    await evaluate('showScreen("screen-ts-workout");TeamBullsTrainerWorkspace.sync();window.originalWorkouts=JSON.stringify(VIEW_STUDENT.workouts);window.originalCurrent=VIEW_STUDENT_WORKOUT;document.getElementById("tb-open-previous-workout").click()');await sleep(200);
+    assert.equal(await evaluate('document.getElementById("tb-previous-workout-select").value'),'old-recent','The closest earlier protocol must be selected by date');
+    assert.deepEqual(await evaluate('[...document.getElementById("tb-previous-workout-select").options].map(o=>o.value)'),['old-recent','old-early']);
+    assert.equal(await evaluate('document.getElementById("tb-previous-workout-week").options.length'),8);
+    assert((await evaluate('document.getElementById("tb-previous-workout-content").textContent')).includes('Agachamento'));
+    assert((await evaluate('document.getElementById("tb-previous-workout-content").textContent')).includes('8–12'));
+    await evaluate('document.getElementById("tb-previous-workout-week").value="2";document.getElementById("tb-previous-workout-week").dispatchEvent(new Event("change"))');
+    assert((await evaluate('document.getElementById("tb-previous-workout-content").textContent')).includes('6–8'));
+    assert(await evaluate('JSON.stringify(VIEW_STUDENT.workouts)===originalWorkouts&&VIEW_STUDENT_WORKOUT===originalCurrent'),'Comparing a prior protocol cannot modify either prescription or the current editor context');
+    await evaluate('closeModal("tb-trainer-previous-workout-modal")');await sleep(100);
+    await evaluate('CURRENT_USER.role="student"');assert.equal(await evaluate('TeamBullsTrainerWorkspace.openPreviousWorkout()'),false);await evaluate('CURRENT_USER.role="trainer"');
+
     assert.deepEqual(await evaluate('window.errors'),[]);results.push({width,height});
   }
-  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry and new-day scheduling.');
+  await command('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?late-reference=1'});
+  for(let i=0;i<60;i++){if(await evaluate('location.search.includes("late-reference")&&document.readyState==="complete"&&!!window.TeamBullsTrainerWorkspace&&!!window.TeamBullsNavigation'))break;await sleep(50);}
+  await sleep(150);
+  assert(await evaluate('document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Loading the workspace after a report opened must preserve that report');
+  assert.deepEqual(await evaluate('window.errors'),[]);
+  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows and prior-protocol comparison across eight weeks.');
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

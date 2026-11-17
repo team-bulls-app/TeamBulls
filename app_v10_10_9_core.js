@@ -435,15 +435,15 @@ let INACTIVE_UID = '';            // uid preservado para marcar alterações off
 
 function localGeneratedId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function safeDayName(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').slice(0,60)||'Treino geral';}
-const WORKOUT_MUSCLE_GROUPS=['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Abdutores'];
+const WORKOUT_MUSCLE_GROUPS=['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Adutores'];
 function normalizeMuscleGroups(value){
   const aliases=new Map([
     ...WORKOUT_MUSCLE_GROUPS.map(group=>[normalizedName(group),group]),
     ['ombros','Ombros e trapézios'],['trapézio','Ombros e trapézios'],['trapézios','Ombros e trapézios'],
     ['bíceps','Braços'],['tríceps','Braços'],['antebraços','Braços'],['antebraço','Braços'],
-    ['adutores','Adutores']
+    ['abdutores','Abdutores']
   ]);
-  // Mantém a leitura do grupo antigo em históricos já salvos.
+  // Mantém a leitura dos grupos antigos em históricos já salvos.
   const groups=(Array.isArray(value)?value:[]).map(item=>aliases.get(normalizedName(item))).filter(Boolean);
   return [...new Set(groups)];
 }
@@ -7141,7 +7141,8 @@ async function loadWeeklyCheckinState(force=false){
   if(WEEKLY_CHECKIN_LOAD_PROMISE&&!force)return WEEKLY_CHECKIN_LOAD_PROMISE;
   WEEKLY_CHECKIN_LOAD_PROMISE=(async()=>{
     try{
-      const [scheduleDoc,checkins]=await Promise.all([cloudGet(db.collection('checkinSchedules').doc(studentUid),'programação do relatório'),fetchWeeklyCheckins(studentUid)]);
+      await ensureReportCycleRuntime();
+      const [scheduleDoc,checkins]=await Promise.all([cloudGet(db.collection('checkinSchedules').doc(studentUid),'programação do relatório'),fetchWeeklyCheckins(studentUid),window.TeamBullsMonthlyReports.loadWeeklyContext(studentUid)]);
       if(CURRENT_USER?.uid!==studentUid)return null;
       WEEKLY_CHECKIN_SCHEDULE=scheduleDoc.exists?{...scheduleDoc.data(),studentId:studentUid}:null;WEEKLY_CHECKINS=checkins;WEEKLY_CHECKIN_REQUEST=computeCheckinRequest(WEEKLY_CHECKIN_SCHEDULE,WEEKLY_CHECKINS);WEEKLY_CHECKIN_STATE_UID=studentUid;renderWeeklyCheckinCard();return WEEKLY_CHECKIN_REQUEST;
     }catch(error){console.error('loadWeeklyCheckinState',error);renderWeeklyCheckinCard(true);return null;}
@@ -7153,6 +7154,7 @@ function renderWeeklyCheckinCard(loadError=false){
   const card=document.getElementById('weekly-checkin-card'),homeBanner=document.getElementById('weekly-checkin-home-banner');if(!card)return;
   card.style.display=MODE==='cloud'&&CURRENT_USER?.role==='student'?'block':'none';
   if(MODE!=='cloud'||CURRENT_USER?.role!=='student'){if(homeBanner)homeBanner.style.display='none';return;}
+  if(WEEKLY_CHECKIN_REQUEST?.suppressedByMonthly){card.style.display='none';if(homeBanner)homeBanner.style.display='none';return;}
   const title=document.getElementById('weekly-checkin-title'),status=document.getElementById('weekly-checkin-status'),meta=document.getElementById('weekly-checkin-meta'),action=document.getElementById('weekly-checkin-action');
   if(loadError){title.textContent='Relatório + 6 fotos';status.textContent='OFFLINE';status.className='quest-status pending';meta.textContent='Não foi possível consultar a programação agora. Tente novamente quando a conexão estabilizar.';action.disabled=true;if(homeBanner)homeBanner.style.display='none';return;}
   if(!WEEKLY_CHECKIN_SCHEDULE||!WEEKLY_CHECKIN_REQUEST){title.textContent='Aguardando programação';status.textContent='NÃO PROGRAMADO';status.className='quest-status';meta.textContent='O treinador ainda não definiu a primeira data do relatório semanal.';action.disabled=true;if(homeBanner)homeBanner.style.display='none';return;}
@@ -8914,11 +8916,12 @@ const V106_MODAL_RETURN_FOCUS=new WeakMap();
 const V106_BASE_OPEN_MODAL=openModal,V106_BASE_CLOSE_MODAL=closeModal;
 openModal=function(id){
   const modal=document.getElementById(id);if(!modal)return;
-  if(!modal.classList.contains('open'))V106_MODAL_RETURN_FOCUS.set(modal,document.activeElement);
+  const alreadyOpen=modal.classList.contains('open');
+  if(!alreadyOpen)V106_MODAL_RETURN_FOCUS.set(modal,document.activeElement);
   modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
   V106_BASE_OPEN_MODAL(id);
   requestAnimationFrame(()=>{
-    if(!shouldAutoFocusEditor())return;
+    if(alreadyOpen||!shouldAutoFocusEditor())return;
     const target=modal.querySelector('input:not([type="hidden"]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),[tabindex="0"]');
     target?.focus?.({preventScroll:true});
   });

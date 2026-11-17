@@ -15,7 +15,7 @@ const usability=read('modules/usability-checkup-v10_10_9.js');
 const profile=read('modules/student-home-profile-v10_10_12.js');
 const modal=read('modules/modal-stack-stability-v10_10_9.js');
 
-has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability10','Camada de usabilidade estabilizada não está carregada.');
+has(config,'./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability11','Camada de usabilidade estabilizada não está carregada.');
 has(config,"setTimeout(()=>finish(false,'tempo limite')",'Loader opcional não possui limite de espera.');
 has(config,'const DEFERRED_YIELD_EVERY=2;','Loader deve devolver tempo de pintura em lotes curtos.');
 has(config,'deferredBatchCount%DEFERRED_YIELD_EVERY===0','Loader não usa a política explícita de yield entre lotes.');
@@ -39,7 +39,7 @@ has(profile,'data-tb-profile-logout="1"','Perfil prioritário não cria o botão
 has(profile,'TeamBullsStudentHome.logout()','Botão SAIR não usa o fluxo canônico do perfil.');
 
 has(modal,'const HEALTH_CHECK_MS=1900','Intervalo otimizado do monitor de modais ausente.');
-has(modal,"runtime:'health2'",'Runtime otimizado de modais não identificado.');
+has(modal,"runtime:'health3'",'Runtime otimizado de modais não identificado.');
 has(modal,'if(document.hidden||!openModals().length)return;','Monitor de modais continua trabalhando com a página oculta.');
 has(modal,"window.addEventListener('pagehide',pauseHealthCheck",'Monitor de modais não é pausado ao sair da página.');
 const recovery=modal.indexOf('function recoverOrphanedTop()');

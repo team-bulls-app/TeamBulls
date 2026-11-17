@@ -22,7 +22,7 @@ has(index,'id="my-weekly-checkin-list"','Histórico semanal não está presente 
 has(core,'openMyQuestionnaires=async function()','Fluxo de abertura dos relatórios do aluno não está disponível.');
 has(core,"renderWeeklyCheckinHistory(checkins,'my-weekly-checkin-list')",'Histórico semanal deixou de ser preservado.');
 
-has(config,'./modules/student-weekly-report-entry-v10_10_35.js?v=10.10.35-weeklyentry1','Entrada do relatório semanal atual não está no runtime do aluno.');
+has(config,'./modules/student-weekly-report-entry-v10_10_35.js?v=10.10.35-weeklyentry2','Entrada do relatório semanal atual não está no runtime do aluno.');
 const realtimeAt=config.indexOf('student-request-realtime-v10_10_32.js');
 const entryAt=config.indexOf('student-weekly-report-entry-v10_10_35.js');
 const workoutAt=config.indexOf('student-workout-library-v10_10_24.js');

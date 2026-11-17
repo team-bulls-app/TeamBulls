@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010579__)return;
   window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010579__=true;
 
-  const VERSION='10.10.57-submitstate9';
+  const VERSION='10.10.57-submitstate10';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -139,9 +139,22 @@
     const rows=await fetchJson(url,{method:'POST',headers,body},REST_GET_TIMEOUT,'confirmar histórico semanal');
     assertOwner();
     if(!Array.isArray(rows))throw new Error('O histórico semanal não foi confirmado pelo servidor.');
-    return {schedule:decodeRestReportFields(schedule.fields),history:rows.filter(row=>row.document).map(({document})=>({
+    const monthlyBody=JSON.stringify({structuredQuery:{from:[{collectionId:'questionnaires'}],
+      where:{compositeFilter:{op:'AND',filters:[
+        {fieldFilter:{field:{fieldPath:'studentId'},op:'EQUAL',value:{stringValue:uid}}},
+        {fieldFilter:{field:{fieldPath:'reportType'},op:'EQUAL',value:{stringValue:'monthly'}}}
+      ]}}}});
+    const [protocol,monthlyRows]=await Promise.all([
+      restGet('protocolReviewSchedules',uid,headers),
+      fetchJson(url,{method:'POST',headers,body:monthlyBody},REST_GET_TIMEOUT,'confirmar histórico mensal')
+    ]);
+    assertOwner();
+    if(!Array.isArray(monthlyRows))throw new Error('O histórico mensal não foi confirmado pelo servidor.');
+    const decodeRows=list=>list.filter(row=>row.document).map(({document})=>({
       ...decodeRestReportFields(document.fields),id:document.name.split('/').at(-1)
-    }))};
+    }));
+    return {schedule:decodeRestReportFields(schedule.fields),history:decodeRows(rows),
+      protocolSchedule:protocol?{...decodeRestReportFields(protocol.fields),studentId:uid}:null,monthlyReports:decodeRows(monthlyRows)};
   }
 
   async function restCommit(writes,label,scope){
@@ -434,6 +447,7 @@
       const checkinData={studentId:uid,requestKey:request.requestKey,requestKind:request.kind,dueDate:request.dueDate,submittedDate:typeof today==='function'?today():new Date().toISOString().slice(0,10),weight:Math.round(weight*10)/10,questions,sectionAt,answers,photoIds};
       if(answers.length!==questions.length)throw Object.assign(new Error('As perguntas mudaram. Abra o relatório novamente.'),{definite:true});
       if(!scope.current()||WEEKLY_CHECKIN_FILES!==selectedFiles)throw Object.assign(new Error('A sessão ou o formulário mudou durante o preparo.'),{definite:true});
+      await window.TeamBullsWeeklyReportIntegrity?.assertSubmissionCurrent?.(request);
       writes.push(createWrite('weeklyCheckins',checkinId,checkinData));
       return await deliver({kind:'w',id:checkinId,key:attemptKey('w',checkinId,uid),scope,writes,
         viewCurrent:()=>typeof WEEKLY_CHECKIN_FILES!=='undefined'&&WEEKLY_CHECKIN_FILES===selectedFiles,
