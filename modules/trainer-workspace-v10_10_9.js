@@ -39,6 +39,79 @@
 
   const REFERENCE_MODALS=new Set(['tb-trainer-reports-modal','tb-trainer-note-modal','modal-weekly-checkin-view','modal-view-quest','modal-photo-view','modal-compare-photos','tb-trainer-previous-workout-modal']);
   const EDITOR_MODALS=new Set(['modal-exercise','modal-prescription','modal-day','modal-workout','modal-meal','modal-diet','modal-diet-variant']);
+  const REPORT_WINDOWS=new Set(['modal-weekly-checkin-view','modal-view-quest']);
+  const reportPositions=new WeakMap();
+  let reportDrag=null;
+  // The pane can change size after the viewport or a private note changes layout.
+  // Observe only its dimensions; moving it does not trigger another layout sync.
+  const reportResizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(entries=>{
+    if(wideWorkspace()&&entries.some(entry=>entry.target.classList.contains('open')))scheduleDockSync();
+  }):null;
+  function floatingFeedback(modal){return modal.id==='modal-feedback'&&modal.classList.contains('tb-feedback-float');}
+  function prepareReportWindow(modal){
+    reportPositions.set(modal,{centered:!PRESCRIPTION_SCREENS.has(activeScreenId()),manual:false});
+  }
+  function reportPosition(modal,left,top){
+    const rect=modal.getBoundingClientRect(),margin=14;
+    return{left:Math.max(margin,Math.min(window.innerWidth-rect.width-margin,left)),
+      top:Math.max(margin,Math.min(window.innerHeight-rect.height-margin,top))};
+  }
+  function moveReportWindow(modal,left,top){
+    const pos=reportPosition(modal,left,top),state=reportPositions.get(modal);
+    if(state)Object.assign(state,pos);
+    modal.style.setProperty('--tb-report-left',pos.left+'px');
+    modal.style.setProperty('--tb-report-top',pos.top+'px');
+  }
+  function syncReportPosition(modal){
+    if(!reportPositions.has(modal))prepareReportWindow(modal);
+    const state=reportPositions.get(modal),rect=modal.getBoundingClientRect();
+    moveReportWindow(modal,state.manual?state.left:state.centered?(window.innerWidth-rect.width)/2:window.innerWidth-rect.width-14,
+      state.manual?state.top:state.centered?(window.innerHeight-rect.height)/2:14);
+  }
+  function startReportDrag(event){
+    if(event.button!==0||!wideWorkspace()||document.body.classList.contains('tb-workspace-blocked'))return;
+    const modal=event.currentTarget.closest('.modal-backdrop'),rect=modal.getBoundingClientRect();
+    const state=reportPositions.get(modal);if(!state)return;
+    state.manual=true;raiseReference(modal.id);
+    reportDrag={modal,handle:event.currentTarget,pointerId:event.pointerId,dx:event.clientX-rect.left,dy:event.clientY-rect.top};
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+  function endReportDrag(event){
+    if(!reportDrag||event&&event.pointerId!==reportDrag.pointerId)return;
+    const {handle,pointerId}=reportDrag;reportDrag=null;
+    if(handle.hasPointerCapture?.(pointerId))handle.releasePointerCapture(pointerId);
+  }
+  function ensureReportWindowBar(modal){
+    const sheet=modal.querySelector('.modal-sheet');if(!sheet||sheet.querySelector('.tb-report-windowbar'))return;
+    const bar=document.createElement('div');bar.className='tb-report-windowbar';
+    const move=document.createElement('button');move.type='button';move.className='tb-report-move';
+    move.textContent='⠿ MOVER RELATÓRIO';
+    move.title='Arraste para mover. Com o botão selecionado, use as setas do teclado.';
+    move.setAttribute('aria-label','Mover relatório. Arraste ou use as setas do teclado.');
+    move.addEventListener('pointerdown',startReportDrag);
+    move.addEventListener('lostpointercapture',endReportDrag);
+    move.addEventListener('keydown',event=>{
+      if(!wideWorkspace()||document.body.classList.contains('tb-workspace-blocked'))return;
+      const delta={ArrowLeft:[-20,0],ArrowRight:[20,0],ArrowUp:[0,-20],ArrowDown:[0,20]}[event.key];
+      if(!delta)return;
+      event.preventDefault();const state=reportPositions.get(modal);if(!state)return;
+      state.manual=true;raiseReference(modal.id);
+      const rect=modal.getBoundingClientRect();moveReportWindow(modal,rect.left+delta[0],rect.top+delta[1]);
+    });
+    bar.append(move);const close=sheet.querySelector('.tb-workspace-close');if(close)bar.append(close);
+    sheet.prepend(bar);reportResizeObserver?.observe(modal);
+  }
+  function bindReportDragging(){
+    document.addEventListener('pointermove',event=>{
+      if(!reportDrag||event.pointerId!==reportDrag.pointerId)return;
+      if(!wideWorkspace()||!reportDrag.modal.classList.contains('open')||document.body.classList.contains('tb-workspace-blocked')){endReportDrag();return;}
+      moveReportWindow(reportDrag.modal,event.clientX-reportDrag.dx,event.clientY-reportDrag.dy);
+    });
+    document.addEventListener('pointerup',endReportDrag);
+    document.addEventListener('pointercancel',endReportDrag);
+    window.addEventListener('blur',()=>endReportDrag());
+  }
   function wideWorkspace(){return !!trainerStudent()&&window.matchMedia('(min-width:1200px) and (pointer:fine)').matches;}
   function syncWorkspaceLayout(){
     const actor=typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'?CURRENT_USER.uid:'';
@@ -54,7 +127,7 @@
       if(text){text.value='';text.dataset.loaded='0';text.dataset.dirty='0';delete text.dataset.trainerUid;delete text.dataset.studentUid;}
     }
     const wide=wideWorkspace(),student=trainerStudent(),open=[...document.querySelectorAll('.modal-backdrop.open')];
-    const blocked=open.some(modal=>!REFERENCE_MODALS.has(modal.id)&&!EDITOR_MODALS.has(modal.id));
+    const blocked=open.some(modal=>!REFERENCE_MODALS.has(modal.id)&&!EDITOR_MODALS.has(modal.id)&&!(wide&&floatingFeedback(modal)));
     let hasReference=false,hasNote=false;
     for(const modal of document.querySelectorAll('.modal-backdrop')){
       const reference=REFERENCE_MODALS.has(modal.id),editor=EDITOR_MODALS.has(modal.id);
@@ -63,6 +136,9 @@
       const pane=wide&&reference&&owned;
       modal.classList.toggle('tb-workspace-pane',pane);
       modal.classList.toggle('tb-workspace-editor',wide&&editor);
+      modal.classList.toggle('tb-workspace-feedback',wide&&floatingFeedback(modal));
+      modal.classList.toggle('tb-workspace-report-window',pane&&REPORT_WINDOWS.has(modal.id));
+      if(!modal.classList.contains('open')&&REPORT_WINDOWS.has(modal.id))reportPositions.delete(modal);
       if(reference){
         modal.dataset.tbBackdropClose='block';modal.dataset.tbWorkspacePersistent='1';
         const sheet=modal.querySelector('.modal-sheet');
@@ -72,7 +148,8 @@
           button.onclick=event=>{event.stopPropagation();closeModal(modal.id);};sheet.prepend(button);
         }
       }
-      if(modal.classList.contains('open')&&(reference||editor))modal.setAttribute('aria-modal',pane||wide&&editor?'false':'true');
+      if(REPORT_WINDOWS.has(modal.id))ensureReportWindowBar(modal);
+      if(modal.classList.contains('open')&&(reference||editor||floatingFeedback(modal)))modal.setAttribute('aria-modal',pane||wide&&(editor||floatingFeedback(modal))?'false':'true');
       if(modal.classList.contains('open')&&reference&&owned){
         if(modal.id==='tb-trainer-note-modal')hasNote=true;else hasReference=true;
       }
@@ -81,6 +158,8 @@
     document.body.classList.toggle('tb-workspace-has-reference',wide&&hasReference);
     document.body.classList.toggle('tb-workspace-has-note',wide&&hasNote);
     document.body.classList.toggle('tb-workspace-blocked',blocked);
+    for(const modal of document.querySelectorAll('.tb-workspace-report-window.open'))syncReportPosition(modal);
+    if(reportDrag&&(!wide||blocked||!reportDrag.modal.classList.contains('open')))endReportDrag();
   }
 
   function ensureStyles(){
@@ -90,7 +169,7 @@
       .tb-trainer-tools.visible{display:flex}.tb-trainer-tool{min-height:40px;border:1px solid rgba(198,61,61,.42);border-radius:10px;background:#211313;color:#fff;padding:0 11px;font:800 10px/1 'DM Mono',monospace;letter-spacing:.04em;cursor:pointer;white-space:nowrap}.tb-trainer-tool.secondary{background:#171717;border-color:rgba(255,255,255,.14)}
       .tb-workspace-sheet{max-width:720px}.tb-workspace-title-sub{margin:-5px 0 14px;color:#888;font:500 10px/1.4 'DM Mono',monospace}.tb-workspace-list{display:grid;gap:8px;max-height:min(58vh,560px);overflow:auto;padding-right:3px}.tb-workspace-section{margin:13px 0 7px;color:#aaa;font:800 10px/1.2 'DM Mono',monospace;letter-spacing:.07em}.tb-workspace-report{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;border:1px solid rgba(255,255,255,.09);border-radius:11px;background:#171717;color:#eee;padding:11px 12px}.tb-workspace-report[disabled]{opacity:.55}.tb-workspace-report strong{display:block;font-size:12px}.tb-workspace-report small{display:block;margin-top:4px;color:#888;font:500 9px/1.35 'DM Mono',monospace}.tb-workspace-status{flex:0 0 auto;color:#c7c7c7;font:800 9px/1 'DM Mono',monospace}.tb-workspace-empty{padding:16px;border:1px dashed rgba(255,255,255,.12);border-radius:10px;color:#777;font:500 10px/1.5 'DM Mono',monospace}.tb-private-note{width:100%;min-height:250px;resize:vertical}.tb-private-note-hint{margin:8px 0 14px;color:#777;font:500 9px/1.45 'DM Mono',monospace}.tb-note-status{min-height:18px;margin-top:8px;color:#888;font:600 9px/1.35 'DM Mono',monospace}
 
-      .tb-workspace-close{display:none}
+      .tb-workspace-close,.tb-report-windowbar{display:none}
       @media(min-width:1200px) and (pointer:fine){
         .tb-workspace-wide .tb-workspace-close{display:block;position:sticky;top:0;float:right;z-index:2;min-height:32px;margin:0 0 6px 8px;padding:6px 10px;border:1px solid var(--border-l);border-radius:6px;background:var(--surface);color:var(--text);font:700 10px 'DM Mono',monospace;cursor:pointer}
         body.tb-workspace-wide{--tb-reference-width:clamp(340px,34vw,560px);--tb-note-height:min(38vh,330px)}
@@ -103,6 +182,17 @@
         .tb-workspace-wide .tb-workspace-pane #photo-view-img{max-height:calc(100% - 130px);object-fit:contain}
         .tb-workspace-wide:is(.tb-workspace-has-reference,.tb-workspace-has-note) .modal-backdrop.tb-workspace-editor{left:14px;right:calc(var(--tb-reference-width) + 28px);top:14px;bottom:auto;width:auto;max-width:none;height:calc(100dvh - 94px);background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none;align-items:stretch;pointer-events:none!important}
         .tb-workspace-wide:is(.tb-workspace-has-reference,.tb-workspace-has-note) .tb-workspace-editor>.modal-sheet{max-width:760px;max-height:100%;height:100%;margin-left:auto;pointer-events:auto!important;border-radius:14px;animation:none}
+        .tb-workspace-wide .modal-backdrop.tb-workspace-report-window{left:var(--tb-report-left,14px);top:var(--tb-report-top,14px);right:auto;bottom:auto}
+        .tb-workspace-wide .tb-workspace-report-window>.modal-sheet{overflow-y:auto;overscroll-behavior:contain}
+        .tb-workspace-wide .tb-workspace-report-window .modal-handle{display:none}
+        .tb-workspace-wide .tb-report-windowbar{display:flex;align-items:center;gap:8px;position:sticky;top:-16px;z-index:3;margin:-16px -16px 12px;padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border-l)}
+        .tb-workspace-wide .tb-report-windowbar .tb-workspace-close{position:static;float:none;flex:0 0 auto;margin:0}
+        .tb-workspace-wide .tb-report-move{flex:1;min-width:0;min-height:32px;padding:6px 8px;text-align:left;border:0;background:transparent;color:var(--text-dim);font:700 10px 'DM Mono',monospace;cursor:grab;touch-action:none;user-select:none}
+        .tb-workspace-wide .tb-report-move:active{cursor:grabbing}
+        .tb-workspace-wide .tb-report-move:focus-visible{outline:2px solid var(--accent,#e11d48);outline-offset:1px}
+        .tb-workspace-wide #modal-feedback.tb-workspace-feedback{pointer-events:none!important;backdrop-filter:none;-webkit-backdrop-filter:none}
+        .tb-workspace-wide #modal-feedback.tb-workspace-feedback>.feedback-editor-sheet{pointer-events:auto!important}
+        .tb-workspace-wide.tb-workspace-blocked #modal-feedback.tb-workspace-feedback>.feedback-editor-sheet{pointer-events:none!important}
         .tb-workspace-wide.tb-workspace-blocked .tb-workspace-pane{pointer-events:none!important}
         .tb-workspace-wide.tb-workspace-blocked .tb-workspace-editor>.modal-sheet{pointer-events:none!important}
       }
@@ -297,9 +387,15 @@
     const wrapped=function(){
       if(name==='openModal'){
         const modal=document.getElementById(String(arguments[0]||''));
-        if(modal&&REFERENCE_MODALS.has(modal.id)&&!modal.classList.contains('open'))modal.dataset.tbWorkspaceStudentUid=trainerStudent()?.uid||'';
+        if(modal&&REFERENCE_MODALS.has(modal.id)&&!modal.classList.contains('open')){
+          modal.dataset.tbWorkspaceStudentUid=trainerStudent()?.uid||'';
+          if(REPORT_WINDOWS.has(modal.id))prepareReportWindow(modal);
+        }
       }
-      const result=base.apply(this,arguments);scheduleDockSync();return result;
+      const result=base.apply(this,arguments);
+      if(name==='openModal'&&REPORT_WINDOWS.has(String(arguments[0]||'')))syncDock();
+      else scheduleDockSync();
+      return result;
     };
     wrapped.__tbTrainerWorkspace=true;window[name]=wrapped;
   }
@@ -318,6 +414,6 @@
     const additionsObserver=new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node instanceof HTMLElement)bindModalObservers(node);}))); 
     additionsObserver.observe(document.body,{subtree:true,childList:true});
   }
-  function install(){ensureStyles();ensureDock();ensureReportsModal();ensureNoteModal();['showScreen','openModal','closeModal'].forEach(wrapUiFunction);watchModalState();syncDock();window.addEventListener('pageshow',scheduleDockSync,{passive:true});window.addEventListener('resize',scheduleDockSync,{passive:true});window.TeamBullsTrainerWorkspace=Object.freeze({version:'10.10.9-workspace5',sync:syncDock,openReports:openQuickReports,openNote:openPrivateNote,openPreviousWorkout,refreshReports:()=>loadQuickReports(true)});}
+  function install(){ensureStyles();ensureDock();ensureReportsModal();ensureNoteModal();['showScreen','openModal','closeModal'].forEach(wrapUiFunction);watchModalState();bindReportDragging();syncDock();window.addEventListener('pageshow',scheduleDockSync,{passive:true});window.addEventListener('resize',scheduleDockSync,{passive:true});window.TeamBullsTrainerWorkspace=Object.freeze({version:'10.10.9-workspace6',sync:syncDock,openReports:openQuickReports,openNote:openPrivateNote,openPreviousWorkout,refreshReports:()=>loadQuickReports(true)});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();

@@ -56,6 +56,8 @@ ${muscleSource}
 ${names.map(fn).join('\n')}
 ${focusWrappers}
 function showScreen(id){document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id===id));}
+function openFeedbackModal(){}
+function updateFeedbackCharacterCount(){}
 function viewWeeklyCheckin(){}
 function viewQuestionnaire(){}
 const CHECKIN_POSES=['Frente','Costas'];let WEEKLY_CHECKINS=[{id:'weekly',studentId:'student',weight:80,submittedDate:'2026-11-17',photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
@@ -65,8 +67,8 @@ function cloudGet(reference){return Promise.resolve(reference.collection==='ques
 cacheGeneralInstructions();cacheTechniqueCatalog();document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));document.getElementById('screen-photos').classList.add('active');
 </script><script src="/quality.js"></script><script src="/photo-ux.js"></script>`;
 const setupScript=setup.slice(8,setup.indexOf('</script>'));new vm.Script(setupScript);
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/preopen.js"></script><script src="/workspace.js"></script></body>');
-const routes=new Map([['/form-guard.js','modules/modal-form-guard-v10_10_9.js'],['/workspace.js','modules/trainer-workspace-v10_10_9.js'],['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/workflow.js"></script><script src="/preopen.js"></script><script src="/workspace.js"></script></body>');
+const routes=new Map([['/workflow.js','modules/workflow-controls-v10_10_10.js'],['/form-guard.js','modules/modal-form-guard-v10_10_9.js'],['/workspace.js','modules/trainer-workspace-v10_10_9.js'],['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
 const preopenScript='if(new URLSearchParams(location.search).has("late-reference"))document.addEventListener("DOMContentLoaded",()=>openModal("modal-weekly-checkin-view"),{once:true});';
 const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/preopen.js'){res.setHeader('Content-Type','text/javascript');return res.end(preopenScript);}if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(setupScript);}if(pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(fixture);}if(pathname.endsWith('.png')){res.setHeader('Content-Type','image/png');return res.end(fs.readFileSync('icon-192-v9-8.png'));}const file=routes.get(pathname);if(!file){res.writeHead(404);return res.end();}res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
@@ -100,6 +102,34 @@ async function evaluate(expression) {
   const result = await command('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
   assert(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));
   return result.result.value;
+}
+async function mouseClick(point){
+  await command('Input.dispatchMouseEvent',{type:'mousePressed',x:point.x,y:point.y,button:'left',clickCount:1});
+  await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:point.x,y:point.y,button:'left',clickCount:1});
+}
+async function drag(selector,dx,dy){
+  const point=await evaluate('(()=>{const r=document.querySelector('+JSON.stringify(selector)+').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};})()');
+  await command('Input.dispatchMouseEvent',{type:'mouseMoved',...point});
+  await command('Input.dispatchMouseEvent',{type:'mousePressed',...point,button:'left',clickCount:1});
+  await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:point.x+dx,y:point.y+dy,button:'left',buttons:1});
+  await command('Input.dispatchMouseEvent',{type:'mouseReleased',x:point.x+dx,y:point.y+dy,button:'left',clickCount:1});
+  await sleep(80);
+}
+async function waitForUi(expression,label){
+  for(let i=0;i<60;i++){
+    await evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    if(await evaluate(expression))return;
+    await sleep(25);
+  }
+  assert.fail(label+': '+await evaluate('JSON.stringify({width:innerWidth,height:innerHeight,body:document.body.className,report:window.activeReport?.getBoundingClientRect().toJSON()})'));
+}
+async function resizeDesktop(width,height){
+  await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false,screenOrientation:{type:'landscapePrimary',angle:90}});
+  await waitForUi('innerWidth==='+width+'&&innerHeight==='+height+'&&document.body.classList.contains("tb-workspace-wide")==='+String(width>=1200)+'&&matchMedia("(min-width:1200px) and (pointer:fine)").matches==='+String(width>=1200)+'&&(!window.activeReport||!activeReport.classList.contains("open")||'+(width>=1200?'(()=>{const r=activeReport.getBoundingClientRect();return r.width<innerWidth/2&&r.left>=14&&r.top>=14&&r.right<=innerWidth-14&&r.bottom<=innerHeight-14;})()':'getComputedStyle(activeReport.querySelector(".tb-report-windowbar")).display==="none"')+')','The browser did not settle the requested viewport '+width+'x'+height);
+
+}
+async function reportBounds(id){
+  return evaluate('document.getElementById('+JSON.stringify(id)+').getBoundingClientRect().toJSON()');
 }
 const screenshotIndex = process.argv.indexOf('--screenshots');
 const screenshotDir = screenshotIndex < 0 ? null : path.resolve(process.argv[screenshotIndex+1]);
@@ -272,6 +302,67 @@ try {
     await evaluate('showScreen("screen-ts-exercise")');await sleep(80);await evaluate('history.back()');await sleep(150);
     assert(await evaluate('document.getElementById("tb-trainer-note-modal").classList.contains("open")&&document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Changing prescription screens and returning must preserve references for the same student');
     await evaluate('closeModal("tb-trainer-note-modal");closeModal("modal-weekly-checkin-view");closeModal("tb-trainer-reports-modal")');await sleep(150);
+    if(width>=1200){
+      for(const [openReport,modalId] of [['viewWeeklyCheckin("weekly")','modal-weekly-checkin-view'],['viewQuestionnaire("quest",true)','modal-view-quest']]){
+        for(const screen of ['screen-ts-quest','screen-ts-day','screen-ts-diet-detail']){
+          await evaluate('showScreen('+JSON.stringify(screen)+');'+openReport+';window.activeReport=document.getElementById('+JSON.stringify(modalId)+')');
+          await waitForUi('activeReport.classList.contains("tb-workspace-report-window")&&'+(screen==='screen-ts-quest'?'Math.abs(activeReport.getBoundingClientRect().left+activeReport.getBoundingClientRect().width/2-innerWidth/2)<2':'Math.abs(activeReport.getBoundingClientRect().right-(innerWidth-14))<2'),'Report position must settle for '+screen);
+          const initial=await reportBounds(modalId);
+          if(screen==='screen-ts-quest')assert(Math.abs(initial.left+initial.width/2-width/2)<2,'Reports must open centered on the reports screen');
+          else assert(Math.abs(initial.right-(width-14))<2,'Training and diet must open reports on the right');
+          await evaluate('window.activeReport=document.getElementById('+JSON.stringify(modalId)+');activeReport.querySelector(".modal-sheet").insertAdjacentHTML("beforeend",Array.from({length:30},(_,i)=>\'<div class="quest-view-qa" style="min-height:80px"><div class="q">\'+(i+2)+\'. Como foi o acompanhamento?</div><div class="a">Resposta de teste para conferir a leitura completa do relatório.</div></div>\').join(""));openFeedbackForWeeklyReport("weekly")');
+          await sleep(150);
+          // Move the real floating feedback to the left, as in the reported workflow.
+          await drag('#modal-feedback .modal-handle',-(width-560),-60);
+          const field=await evaluate('(()=>{const r=document.getElementById("input-feedback").getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+30};})()');
+          await mouseClick(field);await command('Input.insertText',{text:'Feedback preservado durante a leitura'});
+          const point=await evaluate('(()=>{const r=activeReport.getBoundingClientRect();return{x:r.right-32,y:r.top+r.height*.6,hit:document.elementFromPoint(r.right-32,r.top+r.height*.6)?.closest(".modal-backdrop")?.id};})()');
+          assert.equal(point.hit,modalId,'Report content must receive the pointer while feedback is open');
+          await evaluate('activeReport.querySelector(".modal-sheet").scrollTop=0');
+          await command('Input.dispatchMouseEvent',{type:'mouseWheel',x:point.x,y:point.y,deltaX:0,deltaY:550});
+          await sleep(180);
+          assert(await evaluate('activeReport.querySelector(".modal-sheet").scrollTop>100'),'Mouse wheel must scroll the report while editing feedback');
+          await command('Input.dispatchMouseEvent',{type:'mouseWheel',x:point.x,y:point.y,deltaX:0,deltaY:10000});
+          await sleep(180);
+          assert(await evaluate('(()=>{const s=activeReport.querySelector(".modal-sheet");return s.scrollTop>=s.scrollHeight-s.clientHeight-2;})()'),'The end of the report must remain reachable');
+          assert.equal(await evaluate('document.getElementById("input-feedback").value'),'Feedback preservado durante a leitura');
+          assert(await evaluate('activeReport.classList.contains("open")&&document.getElementById("modal-feedback").classList.contains("open")&&!document.body.classList.contains("tb-workspace-blocked")'));
+          await evaluate('showConfirm("Confirmar ação","Aviso de teste",()=>false)');await sleep(100);
+          assert(await evaluate('getComputedStyle(activeReport).pointerEvents==="none"&&getComputedStyle(document.querySelector("#modal-feedback .feedback-editor-sheet")).pointerEvents==="none"'),'A genuine confirmation must still block both windows');
+          await evaluate('closeModal("modal-confirm")');await sleep(100);
+          assert.equal(await evaluate('document.getElementById("input-feedback").value'),'Feedback preservado durante a leitura');
+          if(screenshotDir&&screen==='screen-ts-quest'){const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(screenshotDir,'report-feedback-'+modalId+'.png'),Buffer.from(shot.data,'base64'));}
+          await resizeDesktop(1000,780);
+          assert(await evaluate('getComputedStyle(activeReport.querySelector(".tb-report-windowbar")).display==="none"&&document.getElementById("modal-feedback").getAttribute("aria-modal")==="true"'),'A narrow viewport must return to normal stacked dialogs');
+          await resizeDesktop(width,height);
+          await evaluate('closeModal("modal-feedback")');await sleep(100);
+          assert(await evaluate('activeReport.classList.contains("open")'),'Closing feedback must keep the report open');
+
+          const beforeDrag=await reportBounds(modalId);
+          await drag('#'+modalId+' .tb-report-move',-120,12);
+          const moved=await reportBounds(modalId);
+          assert(Math.abs(moved.left-(beforeDrag.left-120))<2&&Math.abs(moved.top-(beforeDrag.top+12))<2,'Dragging the visible header must move the window without scrolling the report '+JSON.stringify({screen,modalId,beforeDrag,moved,bar:await evaluate('activeReport.querySelector(".tb-report-move").getBoundingClientRect().toJSON()'),css:await evaluate('activeReport.style.cssText')}));
+          await evaluate('openModal('+JSON.stringify(modalId)+')');await sleep(100);
+          assert(Math.abs((await reportBounds(modalId)).left-moved.left)<2,'Reopening for late report content must not reset the dragged position');
+          await drag('#'+modalId+' .tb-report-move',-3000,-3000);
+          const clamped=await reportBounds(modalId);
+          assert(clamped.left>=14&&clamped.top>=14,'Dragging past the screen edge must keep the whole report accessible');
+          await evaluate('activeReport.querySelector(".tb-report-move").focus({preventScroll:true})');
+          await command('Input.dispatchKeyEvent',{type:'keyDown',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+          await command('Input.dispatchKeyEvent',{type:'keyUp',key:'ArrowRight',code:'ArrowRight',windowsVirtualKeyCode:39});
+          await waitForUi('Math.abs(activeReport.getBoundingClientRect().left-'+(clamped.left+20)+')<2','Keyboard movement must settle');const keyboardBounds=await reportBounds(modalId);assert(Math.abs(keyboardBounds.left-clamped.left-20)<2,'The report must also be movable using the keyboard '+JSON.stringify({screen,modalId,clamped,keyboardBounds,focus:await evaluate('document.activeElement.outerHTML'),blocked:await evaluate('document.body.className')}));
+          await drag('#'+modalId+' .tb-report-move',3000,3000);
+          await resizeDesktop(1200,720);
+          const resized=await reportBounds(modalId);
+          assert(resized.left>=14&&resized.top>=14&&resized.right<=1186&&resized.bottom<=706,'Resizing must retain access to the entire dragged report');
+          await resizeDesktop(width,height);
+          if(screenshotDir&&screen==='screen-ts-quest'){const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(screenshotDir,'report-drag-'+modalId+'.png'),Buffer.from(shot.data,'base64'));}
+          const close=await evaluate('(()=>{const b=activeReport.querySelector(".tb-workspace-close"),r=b.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};})()');
+          await mouseClick(close);await sleep(120);
+          assert(await evaluate('!activeReport.classList.contains("open")'),'The sticky close button must remain usable after scrolling and dragging');
+        }
+      }
+    }
     await evaluate('TeamBullsTrainerWorkspace.openNote()');await sleep(80);
     await evaluate('CURRENT_USER.role="student";TeamBullsTrainerWorkspace.sync()');await sleep(100);
     assert(await evaluate('!document.getElementById("tb-trainer-note-modal").classList.contains("open")&&document.getElementById("tb-private-note-text").value===""'),'Private draft must be cleared when the trainer session ends');
@@ -298,7 +389,7 @@ try {
   await sleep(150);
   assert(await evaluate('document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Loading the workspace after a report opened must preserve that report');
   assert.deepEqual(await evaluate('window.errors'),[]);
-  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows and prior-protocol comparison across eight weeks.');
+  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows, prior-protocol comparison across eight weeks, contextual report placement, bounded pointer/keyboard dragging, resize and report wheel scrolling during floating feedback with confirmation protection.');
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

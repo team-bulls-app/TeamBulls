@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111704,
-  "revision": "monthly-priority-previous-workout-1",
+  "build": 2026111705,
+  "revision": "trainer-report-window-drag-scroll-1",
   "publishedAt": "2026-11-17T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Atualização mensal prioritária, agenda semanal automática, consulta ao treino anterior e seleção de Adutores."
+  "message": "Relatórios com posição ajustável no computador e leitura independente durante a edição do feedback."
 }
