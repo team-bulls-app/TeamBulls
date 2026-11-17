@@ -109,4 +109,25 @@ assert.equal(fatalClient.readinessCalls(),1,'Falha fatal não deve forçar nova 
 assert.equal(fatalClient.workout.days[0].name,'Peito A','Falha fatal não deve simular sucesso no estado local.');
 assert.equal(fatalClient.modalOpen(),true,'Falha fatal mantém o formulário aberto até conferência/reinício.');
 
+
+{
+  const groupsSource=core.slice(core.indexOf('const WORKOUT_MUSCLE_GROUPS='),core.indexOf('function safeWorkoutGuidance('));
+  const host={innerHTML:''};
+  const muscleContext={document:{getElementById:()=>host},normalizedName:value=>String(value||'').normalize('NFKC').trim().toLocaleLowerCase('pt-BR'),esc:value=>String(value)};
+  vm.createContext(muscleContext);
+  const renderStart=core.indexOf('function renderWorkoutMuscleChoices('),renderEnd=core.indexOf('function dayListAfterRename(',renderStart);
+  vm.runInContext(groupsSource+'\n'+core.slice(renderStart,renderEnd),muscleContext);
+  const original=['Bíceps','Tríceps','Antebraços','Ombros','Trapézio','Adutores','Abdutores'];
+  const normalized=muscleContext.normalizeMuscleGroups(original);
+  assert.deepEqual(Array.from(normalized),['Braços','Ombros e trapézios','Adutores','Abdutores']);
+  assert.deepEqual(original,['Bíceps','Tríceps','Antebraços','Ombros','Trapézio','Adutores','Abdutores'],'Legacy records cannot be mutated while reading');
+  assert.deepEqual(Array.from(muscleContext.normalizeMuscleGroups(['Braços','braços','Ombros e trapézios','Ombros','Inválido'])),['Braços','Ombros e trapézios']);
+  muscleContext.renderWorkoutMuscleChoices(original);
+  for(const removed of ['Adutores','Trapézio','Bíceps','Tríceps','Antebraços'])assert(!host.innerHTML.includes('data-muscle-group="'+removed+'"'));
+  assert.match(host.innerHTML,/data-muscle-group="Braços" checked/);
+  assert.match(host.innerHTML,/data-muscle-group="Ombros e trapézios" checked/);
+  assert.match(host.innerHTML,/data-muscle-group="Abdutores"/);
+  assert.equal((host.innerHTML.match(/data-muscle-group=/g)||[]).length,10);
+}
+
 console.log('APROVADO — edição preservada após falha, retry sem pasta duplicada e reconciliação transacional de commit incerto com isolamento de aluno/protocolo.');

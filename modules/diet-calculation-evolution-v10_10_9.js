@@ -1,7 +1,7 @@
 (()=>{
   'use strict';
 
-  const VERSION='10.10.10-dietcalc1';
+  const VERSION='10.10.10-dietcalc2';
   const STORAGE_COLLECTION='dietCalculations';
   const MAX_EVOLUTION_POINTS=12;
   const profileCache=new Map();
@@ -152,12 +152,58 @@
   }
 
   async function saveCalculator(){
-    const uid=selectedStudentUid(),body=document.getElementById('tb-diet-calc-body');if(!trainer()||!uid||!body||!math())return;
-    const values=valuesFromBody(body),validation=validate(values);if(validation){toast(validation,true);return;}const result=math().calculate(values),status=document.getElementById('tb-calc-status');if(status)status.textContent='Salvando...';
+    const uid=selectedStudentUid(),body=document.getElementById('tb-diet-calc-body'),shell=document.getElementById('tb-diet-calculator');
+    if(!trainer()||!uid||!body||!math()||shell?.dataset.studentUid!==uid)return false;
+    const actor=CURRENT_USER.uid,revision=typeof AUTH_STATE_REVISION==='number'?AUTH_STATE_REVISION:null;
+    const current=()=>trainer()&&CURRENT_USER.uid===actor&&selectedStudentUid()===uid&&shell.isConnected&&shell.dataset.studentUid===uid&&
+      (revision===null||revision===AUTH_STATE_REVISION);
+    const values=valuesFromBody(body),validation=validate(values);
+    if(validation){toast(validation,true);return false;}
+    const result=math().calculate(values),status=document.getElementById('tb-calc-status');
+    const action='save-diet-calculation';
+    if(!beginAction(action))return false;
+    const button=body.querySelector('.tb-calc-save');
+    if(button)button.disabled=true;
+    if(status)status.textContent='Salvando...';
+    const changes={
+      sex:result.sex,actualWeightKg:result.actualWeightKg,heightCm:result.heightCm,ageYears:result.ageYears,
+      activityFactor:result.activityFactor,referenceMode:result.referenceMode,
+      manualReferenceWeightKg:values.referenceMode==='manual'?result.referenceWeightKg:0,
+      manualAdjustmentKcal:result.manualAdjustmentKcal,
+      macros:{animalProtein:values.macros.animalProtein,plantProtein:values.macros.plantProtein,carbs:values.macros.carbs,fat:values.macros.fat},
+      updatedAt:timestamp()
+    };
     try{
-      const existing=await loadProfile(uid),payload={schemaVersion:1,studentId:uid,trainerId:CURRENT_USER.uid,sex:result.sex,actualWeightKg:result.actualWeightKg,heightCm:result.heightCm,ageYears:result.ageYears,activityFactor:result.activityFactor,referenceMode:result.referenceMode,manualReferenceWeightKg:values.referenceMode==='manual'?result.referenceWeightKg:0,manualAdjustmentKcal:result.manualAdjustmentKcal,macros:{animalProtein:values.macros.animalProtein,plantProtein:values.macros.plantProtein,carbs:values.macros.carbs,fat:values.macros.fat},createdAt:existing?._exists&&existing.createdAt?existing.createdAt:timestamp(),updatedAt:timestamp()};
-      const ref=db.collection(STORAGE_COLLECTION).doc(uid),task=ref.set(payload);if(typeof cloudWrite==='function')await cloudWrite(task,'salvar cálculo privado da dieta');else await task;profileCache.set(uid,{...payload,_exists:true});if(status)status.textContent='✓ Cálculo privado salvo para este aluno.';toast('✓ Cálculo da dieta salvo');
-    }catch(error){console.error('save diet calculation',error);if(status)status.textContent='Falha ao salvar. Nenhum dado da dieta do aluno foi alterado.';toast(typeof cloudWriteError==='function'?cloudWriteError(error,'salvar o cálculo privado'):'Erro ao salvar o cálculo.',true);}
+      const ref=db.collection(STORAGE_COLLECTION).doc(uid);
+      const task=db.runTransaction(async transaction=>{
+        const snapshot=await transaction.get(ref);
+        if(!current())throw new Error('O aluno ou a sessão mudou. Abra o cálculo novamente.');
+        if(snapshot.exists){
+          const previous=snapshot.data();
+          if(previous.studentId!==uid||previous.trainerId!==actor)throw new Error('O cálculo pertence a outro vínculo de treinador.');
+          // A data de criação pertence ao documento já confirmado pelo servidor.
+          transaction.update(ref,changes);
+        }else{
+          transaction.set(ref,{schemaVersion:1,studentId:uid,trainerId:actor,createdAt:timestamp(),...changes});
+        }
+      });
+      if(typeof cloudWrite==='function')await cloudWrite(task,'salvar cálculo privado da dieta');else await task;
+      profileCache.delete(uid);
+      if(!current())return true;
+      if(status)status.textContent='✓ Cálculo privado salvo para este aluno.';
+      toast('✓ Cálculo da dieta salvo');
+      return true;
+    }catch(error){
+      console.error('save diet calculation',error);
+      if(current()){
+        if(status)status.textContent='Falha ao salvar. Os campos continuam disponíveis para tentar novamente.';
+        toast(typeof cloudWriteError==='function'?cloudWriteError(error,'salvar o cálculo privado'):'Erro ao salvar o cálculo.',true);
+      }
+      return false;
+    }finally{
+      if(button?.isConnected)button.disabled=false;
+      endAction(action);
+    }
   }
 
   function prefillDietField(kind){
