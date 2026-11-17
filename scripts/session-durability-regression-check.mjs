@@ -59,7 +59,7 @@ export function app(options={}){
     requestAnimationFrame:fn=>frames.push(fn),
     MODE:options.mode||'cloud',CURRENT_USER:{uid:'student-a',role:'student',...(options.offlineRegistered?{offlineRegistered:true}:{})},
     navigator:{onLine:options.online!==false},
-    CUR_WORKOUT:'workout-a',CUR_EX:'exercise-a',SESSION_WID:'workout-a',SESSION_EID:'exercise-a',SESSION_CREATE_ID:'',LAST_SESSION_WEEK:2,LOCAL_OWNER_UID:'student-a',INACTIVE_UID:'',NAVIGATION_SEQ:1,
+    CUR_WORKOUT:'workout-a',CUR_EX:'exercise-a',SESSION_WID:'workout-a',SESSION_EID:'exercise-a',SESSION_CREATE_ID:'',LAST_SESSION_WEEK:2,LOCAL_OWNER_UID:'student-a',INACTIVE_UID:'',NAVIGATION_SEQ:1,SESSION_DRAFT_CONTEXT:null,
     EDIT_SESSION_ID:'',EDIT_SESSION_WID:'workout-a',EDIT_SESSION_EID:'exercise-a',
     storageGet:key=>local.get(key)??null,
     storageSet:(key,value)=>{if(options.failLocal)return false;local.set(key,value);return true;},
@@ -72,7 +72,7 @@ export function app(options={}){
     },
     firebase:{firestore:{Timestamp:{fromMillis:ms=>({ms})},FieldPath:{documentId:()=> '__name__'}}},
     draftId:()=>`draft-${++counter}`,
-    selectedVariantData:()=>({variantId:'',variantName:'',performedExerciseItemId:'',performedExerciseName:'Supino reto'}),
+    selectedVariantData:exercise=>({variantId:'',variantName:'',performedExerciseItemId:'',performedExerciseName:exercise?.name||''}),
     selectedPerformedTechniqueMode:()=>'',selectedEditPerformedTechniqueMode:()=>'',normalizePrescriptionSet:()=>null,
     getE:(wid,eid)=>tree.find(w=>w.id===wid)?.exercises.find(e=>e.id===eid),
     getW:wid=>tree.find(w=>w.id===wid),getWorkouts:()=>tree,
@@ -93,7 +93,7 @@ export function app(options={}){
       },
       querySelectorAll:selector=>selector.startsWith('#edit-sets-editor')?editRows:rows
     },
-    openLogSessionModal:()=>{modal.open=true;context.SESSION_CREATE_ID=context.draftId();},
+    openLogSessionModal:()=>{modal.open=true;context.SESSION_CREATE_ID=context.draftId();context.SESSION_DRAFT_CONTEXT=context.captureSessionDraftContext?.(context.SESSION_WID,context.SESSION_EID)||null;},
     saveSession:async()=>{throw new Error('Registered students must use the durable queue.');},
     saveEditSession:async()=>{throw new Error('Pending edits must use the durable queue.');},
     performDeleteSession:async()=>false,renderExercisePrescription:()=>{},
@@ -135,7 +135,7 @@ export function app(options={}){
   context.firebase=options.firebase||context.firebase;
   vm.createContext(context);
   const coreFunction=name=>{const start=core.indexOf(`function ${name}(`);if(start<0)return '';const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));};
-  vm.runInContext(['filterDeletedSessions','performDeleteSession','deleteSession','deleteEditedSession'].map(coreFunction).join('\n'),context);
+  vm.runInContext(['captureSessionDraftContext','sessionExerciseForSave','filterDeletedSessions','performDeleteSession','deleteSession','deleteEditedSession'].map(coreFunction).join('\n'),context);
   vm.runInContext(perfSource,context);
   vm.runInContext(integritySource,context);
   vm.runInContext(mutationSource,context);
@@ -146,6 +146,35 @@ export function app(options={}){
     async save(){context.openLogSessionModal();const id=context.SESSION_CREATE_ID;const result=await context.saveSession();return{id,result};}
   };
 }
+
+// The form must keep the original prescribed exercise even if a refreshed
+// cloud/offline structure no longer contains it. No workout is recreated.
+async function exerciseContextRegressions(){
+  const a=app({online:false});await a.ready();
+  const chair=a.tree[0].exercises[0];chair.name='Cadeira flexora';chair.techniqueIds=['bos'];chair.weeklyPlan={w2:[{targetMin:6,targetMax:8,ger:3}]};
+  a.rows[0].dataset.backoff='1';a.context.openLogSessionModal();
+  const id=a.context.SESSION_CREATE_ID;
+  chair.weeklyPlan.w2[0].ger=5;a.tree=[];
+  a.context.CUR_WORKOUT='other-workout';a.context.CUR_EX='other-exercise';
+  assert.equal(await a.context.saveSession(),true,'Save the prescribed chair after a structure refresh');
+  const queued=a.api.getPending(id,'student-a');
+  assert.equal(queued.exerciseName,'Cadeira flexora');assert.equal(queued.exerciseId,'exercise-a');assert.equal(queued.workoutId,'workout-a');
+  assert.equal(queued.performedExerciseName,'Cadeira flexora');assert.equal(queued.sets[0].backoff,true);
+  assert.equal(a.context.SESSION_DRAFT_CONTEXT.exercise.weeklyPlan.w2[0].ger,3,'The prescription snapshot cannot drift while the form is open');
+  assert.equal(a.context.SESSION_DRAFT_CONTEXT.exercise.sessions.length,0,'Do not duplicate the growing history when opening a form');
+  a.frames();assert.equal(a.tree.length,0,'Saving history must never recreate a removed workout');
+  a.context.navigator.onLine=true;await a.api.flush();assert(a.remote.has(id));
+
+  const b=app({online:false});await b.ready();b.context.openLogSessionModal();
+  b.context.CURRENT_USER={uid:'another-student',role:'student'};
+  assert.notEqual(await b.context.saveSession(),true,'A prior account form must not save under the next account');
+  assert.equal(b.api.pending(),0);assert.equal(b.modal.open,true);assert.equal(b.calls.length,0);
+
+  const c=app({online:false});await c.ready();c.context.openLogSessionModal();c.tree[0].exercises=[];
+  c.context.MODE='local';c.context.CURRENT_USER.offlineRegistered=true;
+  assert.equal(await c.context.saveSession(),true,'The same registered owner may finish a form after going offline');
+}
+await exerciseContextRegressions();
 
 const tests=[];
 async function check(name,test){await test();tests.push(name);}

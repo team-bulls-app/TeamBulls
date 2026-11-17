@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.63-sessionperf6';
+  const VERSION='10.10.63-sessionperf7';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   const SYNC_DIAGNOSTIC_PREFIX='team_bulls_session_sync_diag_v1_';
   const SESSION_SNAPSHOT_VERSION=3;
@@ -556,7 +556,7 @@
       const week=parseInt(document.getElementById('input-session-week')?.value,10);
       if(!week||week<1||week>8){alert('Selecione a semana de treino!');return;}
       const note=String(document.getElementById('input-session-note')?.value||'').trim();
-      const exercise=getE(wid,eid);
+      const exercise=typeof sessionExerciseForSave==='function'?sessionExerciseForSave(wid,eid):getE(wid,eid);
       if(!exercise){alert('Erro: exercício não encontrado. Atualize a tela e tente novamente.');return;}
       const variant=selectedVariantData(exercise,'input-session-variant');
       const performedTechniqueMode=selectedPerformedTechniqueMode(exercise);

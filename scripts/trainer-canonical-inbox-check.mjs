@@ -62,7 +62,7 @@ assert(legacyWindow.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__===loaderVers
 const listenerCount=upgradeListeners.length;
 runLoader(legacyWindow);
 assert(upgradeListeners.length===listenerCount,'Reavaliar o mesmo loader não pode duplicar listeners de runtime.');
-const newerVersion='10.10.58-intelsuite14';
+const newerVersion='10.10.58-intelsuite15';
 const newerWindow={__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__:newerVersion,TeamBullsIntelligenceSuiteLoader:{version:newerVersion},addEventListener(){},dispatchEvent(){}};
 runLoader(newerWindow);
 assert(newerWindow.TeamBullsIntelligenceSuiteLoader.version===newerVersion,'Um loader atrasado não pode substituir uma revisão mais nova já registrada.');

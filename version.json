@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111706,
-  "revision": "feedback-protocol-start-return-1",
+  "build": 2026111707,
+  "revision": "extreme-session-runtime-stability-1",
   "publishedAt": "2026-11-17T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Novas opções de feedback para início dos protocolos e retorno de alunos à consultoria."
+  "message": "Proteção dos registros durante atualizações, recuperação de leitura e otimização da entrada e sincronização."
 }
