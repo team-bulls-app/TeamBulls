@@ -22,7 +22,12 @@ const report=vm.createContext({
     return{ok:true,json:async()=>body};
   }
 });
-vm.runInContext(read('modules/student-report-submit-reconciliation-v10_10_57.js'),report);
+const reportModule=read('modules/student-report-submit-reconciliation-v10_10_57.js').replace(
+  "  install();[120,500,1400].forEach(delay=>setTimeout(install,delay));",
+  `  window.testWeeklyReceipt=async id=>readWeeklyReceipt(id,reportScope(),await authHeaders());
+  window.testReportCommit=()=>restCommit([{}],'teste',reportScope());`
+);
+vm.runInContext(reportModule,report);
 const readPeriod=report.window.TeamBullsStudentReportSubmitReconciliation.readWeeklyPeriod;
 const fresh=await readPeriod('student');
 assert.equal(fresh.schedule.intervalDays,7);
@@ -34,6 +39,28 @@ assert.equal(reportCalls[0][1].headers.Authorization,'Bearer synthetic-id-token'
 assert.equal(JSON.parse(reportCalls[1][1].body).structuredQuery.where.fieldFilter.value.stringValue,'student');
 await assert.rejects(readPeriod('other'),/sessão/);
 assert.equal(reportCalls.length,2);
+
+// The receipt query can establish absence without reading a missing document.
+const receipt=await report.window.testWeeklyReceipt('w');
+assert.equal(receipt.name,'projects/example/databases/(default)/documents/weeklyCheckins/w');
+const receiptQuery=JSON.parse(reportCalls.at(-1)[1].body).structuredQuery;
+assert.deepEqual(receiptQuery.where.compositeFilter.filters,[
+  {fieldFilter:{field:{fieldPath:'studentId'},op:'EQUAL',value:{stringValue:'student'}}},
+  {fieldFilter:{field:{fieldPath:'__name__'},op:'EQUAL',value:{referenceValue:receipt.name}}}
+]);
+assert.equal(reportCalls.at(-1)[1].headers['X-Firebase-AppCheck'],'synthetic-app-check');
+report.fetch=async()=>({ok:true,json:async()=>[{readTime:'2026-11-01T10:30:00Z'}]});
+assert.equal(await report.window.testWeeklyReceipt('w'),null);
+report.fetch=async()=>({ok:true,json:async()=>[]});
+await assert.rejects(report.window.testWeeklyReceipt('w'),/não foi confirmada/);
+for(const [status,definite] of [[403,true],[409,true],[408,false],[429,false],[503,false]]){
+  report.fetch=async()=>({ok:false,status,json:async()=>({error:{message:'synthetic'}})});
+  await assert.rejects(report.window.testReportCommit(),error=>error.status===status&&error.definite===definite);
+}
+report.fetch=async()=>({ok:true,json:async()=>({})});
+await assert.rejects(report.window.testReportCommit(),error=>error.definite===false,'An incomplete success response must be reconciled');
+report.fetch=async()=>({ok:true,json:async()=>({writeResults:[{}],commitTime:'2026-11-01T10:30:00Z'})});
+await report.window.testReportCommit();
 
 const currentDay={id:'day',name:'Dia A'};
 const priorDay={id:'prior',name:'Anterior'},laterDay={id:'later',name:'Dia B'};

@@ -47,7 +47,7 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='student-workout-start-guidance-1','Release precisa identificar a versão da Batalha do Dia.');
+assert(version.revision==='student-report-confirmation-recovery-1','Release precisa identificar a versão da Batalha do Dia.');
 const weekLayoutRef='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
 assert(usability.includes(weekLayoutRef)&&updater.includes(weekLayoutRef)&&sw.includes(weekLayoutRef),'Layout semanal deve usar a mesma revisão no loader, atualizador e cache.');
 const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar6';
@@ -68,7 +68,8 @@ const scheduleRef='./modules/report-schedule-consistency-v10_10_11.js?v=10.10.11
 const monthlyRef='./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly2';
 assert(config.includes(scheduleRef)&&sw.includes(scheduleRef)&&updater.includes(scheduleRef),'A camada de calendário deve usar a mesma revisão no loader, cache e atualização.');
 assert(intelligence.includes(monthlyRef)&&sw.includes(monthlyRef)&&updater.includes(monthlyRef),'O relatório mensal deve chegar com o mesmo cálculo do ciclo no app instalado.');
-assert(intelligence.includes('student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate8'),'Suíte não entrega a correção atual do envio semanal.');
+const reportReconciliationRef='./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate9';
+assert(intelligence.includes(reportReconciliationRef)&&sw.includes(reportReconciliationRef)&&updater.includes(reportReconciliationRef),'A recuperação de relatórios deve chegar pelo loader, atualizador e cache.');
 const trainerSpec=intelligence.slice(intelligence.indexOf('trainer:['),intelligence.indexOf('],\n    student:['));
 assert(trainerSpec.includes('foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3'),'A retomada segura do Firestore precisa ser carregada também no fluxo do treinador.');
 assert(core.includes('firebasejs/13.1.0/firebase-firestore-compat.js')&&!core.includes('firebasejs/10.7.1/'),'O runtime ainda usa uma versão antiga/inconsistente do Firebase.');

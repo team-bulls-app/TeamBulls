@@ -87,7 +87,7 @@ has(core,"return stableEntityId('weekly-checkin',studentUid,requestKey).slice(0,
 has(submit,"currentDocument:{exists:false}",'Submit perdeu a precondição contra sobrescrita/duplicação do ID canônico.');
 has(submit,"writes.push(createWrite('weeklyCheckins',checkinId,checkinData))",'Relatório semanal não continua no commit atômico canônico.');
 const weeklyStart=submit.indexOf('async function robustWeeklySubmit()');
-const commitStart=submit.indexOf("try{await restCommit(writes,'enviar relatório semanal');}",weeklyStart);
+const commitStart=submit.indexOf("return await deliver({kind:'w'",weeklyStart);
 const preCommit=weeklyStart>=0&&commitStart>weeklyStart?submit.slice(weeklyStart,commitStart):'';
 lacks(preCommit,"restGet('weeklyCheckins',checkinId)",'Submit voltou a fazer GET do documento inexistente antes do create.');
 
