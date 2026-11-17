@@ -16,3 +16,21 @@ Para o caminho Cloud Functions:
 5. Em um Android e, separadamente, em um iPhone com o app adicionado à Tela de Início, autorizar avisos, enviar um feedback de teste e verificar a barra com o app aberto e fechado. Rejeitar a permissão e sair da conta devem impedir novos avisos naquele aparelho.
 
 Sem um dos serviços de envio publicado ou sem a chave pública Web Push, a interface permanece funcional e o aviso do aparelho funciona enquanto o app está aberto, mas não há entrega com o app fechado. O desktop não pede permissão.
+
+
+## Início e retorno aos protocolos
+
+O editor também oferece protocol_start (Início dos protocolos) e
+protocol_return (Retorno aos protocolos). No Firestore, ambos mantêm
+feedbackType: 'extra' e acrescentam feedbackCategory com um desses dois
+valores. Isso preserva a compatibilidade com as Rules 28 atuais, sem publicar
+novas regras, migrar documentos ou alterar ciclos de treino, dieta e relatórios.
+Títulos personalizados continuam salvos em title.
+
+O app e as duas versões do histórico reconhecem essa categoria. Firebase
+Functions e a ponte Cloudflare traduzem somente esses dois valores conhecidos
+para o tipo do aviso FCM, sem enviar a mensagem ou o título livre do treinador.
+Servidores ainda não atualizados continuam enviando o aviso genérico de feedback
+extra; a mensagem e o título corretos continuam disponíveis dentro do app.
+Os títulos específicos nas notificações com o app fechado exigem publicar o
+código atualizado no serviço de push utilizado. Este PR não faz esse deploy.

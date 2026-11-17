@@ -5,7 +5,7 @@ const DOCUMENTS = `projects/${PROJECT}/databases/(default)/documents`;
 const FIRESTORE = `https://firestore.googleapis.com/v1/${DOCUMENTS}`;
 const FCM = `https://fcm.googleapis.com/v1/projects/${PROJECT}/messages:send`;
 const TOKEN_URI = 'https://oauth2.googleapis.com/token';
-const TYPES = new Set(['weekly_report', 'monthly_full', 'weekly_diet', 'weekly_training', 'extra']);
+const TYPES = new Set(['weekly_report', 'monthly_full', 'weekly_diet', 'weekly_training', 'protocol_start', 'protocol_return', 'extra']);
 const QUERY_LIMIT = 20;
 const DELIVERY_LIMIT = 2;
 const DEVICE_PAGE_SIZE = 15;
@@ -57,7 +57,7 @@ export function feedbackQuery(cursor) {
   if (cursor.document_name) values.push({ referenceValue: cursor.document_name });
   return { structuredQuery: {
     from: [{ collectionId: 'feedback' }],
-    select: { fields: ['studentId', 'trainerId', 'feedbackType', 'createdAt'].map(fieldPath => ({ fieldPath })) },
+    select: { fields: ['studentId', 'trainerId', 'feedbackType', 'feedbackCategory', 'createdAt'].map(fieldPath => ({ fieldPath })) },
     orderBy: ['createdAt', '__name__'].map(fieldPath => ({ field: { fieldPath }, direction: 'ASCENDING' })),
     startAt: { values, before: false }, limit: QUERY_LIMIT
   } };
@@ -74,7 +74,8 @@ async function ingest(db, token, fetcher) {
     (feedback_id, student_id, trainer_id, feedback_type, created_at) VALUES (?, ?, ?, ?, ?)`).bind(
       doc.name.slice(doc.name.lastIndexOf('/') + 1),
       doc.fields.studentId?.stringValue || '', doc.fields.trainerId?.stringValue || '',
-      TYPES.has(doc.fields.feedbackType?.stringValue) ? doc.fields.feedbackType.stringValue : 'extra',
+      doc.fields.feedbackType?.stringValue === 'extra' && ['protocol_start', 'protocol_return'].includes(doc.fields.feedbackCategory?.stringValue)
+        ? doc.fields.feedbackCategory.stringValue : TYPES.has(doc.fields.feedbackType?.stringValue) ? doc.fields.feedbackType.stringValue : 'extra',
       doc.fields.createdAt.timestampValue));
   const last = documents.at(-1);
   statements.push(db.prepare('UPDATE cursor_state SET created_at = ?, document_name = ? WHERE id = 1')

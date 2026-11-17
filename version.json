@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111705,
-  "revision": "trainer-report-window-drag-scroll-1",
+  "build": 2026111706,
+  "revision": "feedback-protocol-start-return-1",
   "publishedAt": "2026-11-17T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Relatórios com posição ajustável no computador e leitura independente durante a edição do feedback."
+  "message": "Novas opções de feedback para início dos protocolos e retorno de alunos à consultoria."
 }

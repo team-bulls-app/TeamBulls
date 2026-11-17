@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101037__)return;
   window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101037__=true;
 
-  const VERSION='10.10.37-feedbackarchive1';
+  const VERSION='10.10.37-feedbackarchive2';
   const SCREEN_ID='screen-trainer-feedback-archive';
   const DETAIL_ID='modal-trainer-feedback-detail';
   const ENTRY_ID='tb-trainer-feedback-archive-entry';
@@ -24,8 +24,11 @@
   const millis=value=>{try{if(value?.toMillis)return value.toMillis();if(value?.seconds)return Number(value.seconds)*1000;const n=Number(value);return Number.isFinite(n)?n:0;}catch(error){return 0;}};
   const formatDate=value=>{const time=millis(value);if(!time)return'Data indisponível';try{return new Date(time).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});}catch(error){return new Date(time).toLocaleString('pt-BR');}};
   const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-  const typeOf=item=>['general','weekly_report','protocol_update','monthly_full','weekly_diet','weekly_training','extra'].includes(String(item?.feedbackType))?String(item.feedbackType):'general';
-  const typeLabel=item=>({weekly_report:'Relatório semanal',protocol_update:'Relatório mensal completo',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',extra:'Feedback extra',general:'Feedback extra'})[typeOf(item)];
+  const typeOf=item=>{
+    const type=item?.feedbackType==='extra'&&['protocol_start','protocol_return'].includes(item?.feedbackCategory)?item.feedbackCategory:item?.feedbackType;
+    return ['general','weekly_report','protocol_update','monthly_full','weekly_diet','weekly_training','protocol_start','protocol_return','extra'].includes(String(type))?String(type):'general';
+  };
+  const typeLabel=item=>({weekly_report:'Relatório semanal',protocol_update:'Relatório mensal completo',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',protocol_start:'Início dos protocolos',protocol_return:'Retorno aos protocolos',extra:'Feedback extra',general:'Feedback extra'})[typeOf(item)];
   const titleOf=item=>String(item?.title||'').trim()||(typeOf(item)==='weekly_report'?'Feedback do relatório semanal':typeOf(item)==='protocol_update'?'Feedback da atualização completa':'Transmissão enviada');
   const preview=value=>{const text=String(value||'').replace(/\s+/g,' ').trim();return text.length>180?text.slice(0,177)+'...':text;};
 

@@ -17,7 +17,7 @@ for(const file of [moduleFile,runtimeFile]){
 
 assert(module.includes("const VERSION='10.10.52-sentreports5'"),'Arquivo de relatórios enviados está na revisão errada.');
 assert(runtime.includes("trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports5"),'Runtime do treinador não entrega o arquivo por propriedade histórica.');
-assert(runtime.includes("const VERSION='10.10.53-trainer4'"),'Runtime do treinador não foi cache-bustado.');
+assert(runtime.includes("const VERSION='10.10.53-trainer5'"),'Runtime do treinador não foi cache-bustado.');
 
 // O arquivo deve existir mesmo se o aluno sumir do roster atual: trainerId do
 // questionário é a fonte histórica e imutável de propriedade.

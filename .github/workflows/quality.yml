@@ -49,6 +49,7 @@ jobs:
           node scripts/device-access-check.mjs
           node scripts/app-support-controls-check.mjs
           node scripts/feedback-notice-cancellation-check.mjs
+          node scripts/feedback-protocol-categories-check.mjs
           node scripts/cloudflare-feedback-push-check.mjs
           node scripts/student-session-delete-shared-history-check.mjs
           node scripts/session-durability-regression-check.mjs

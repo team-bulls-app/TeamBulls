@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_WORKFLOW_CONTROLS_V101010__)return;
   window.__TEAM_BULLS_WORKFLOW_CONTROLS_V101010__=true;
 
-  const VERSION='10.10.10-workflow1';
+  const VERSION='10.10.10-workflow2';
   const LOCK_FIELD='weeklyEditLocks';
   const WEEK_KEYS=Array.from({length:8},(_,i)=>'w'+(i+1));
   let feedbackContext=null;
@@ -517,7 +517,7 @@
       if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;
       try{
         const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='monthly_full'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule&&typeof v109ProtocolState==='function'?v109ProtocolState(schedule):null;
-        const payload={studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,feedbackType:type,message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.lastCompletedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false};
+        const payload={studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,...(typeof v1010FeedbackFields==='function'?v1010FeedbackFields(type):{feedbackType:type}),message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.lastCompletedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false};
         if(feedbackContext){
           payload.sourceType=String(feedbackContext.sourceType||'').slice(0,40);
           payload.sourceId=String(feedbackContext.sourceId||'').slice(0,190);
