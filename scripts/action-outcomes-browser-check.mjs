@@ -56,9 +56,10 @@ function cloudGet(reference){return Promise.resolve(reference.collection==='ques
 cacheGeneralInstructions();cacheTechniqueCatalog();document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));document.getElementById('screen-photos').classList.add('active');
 </script><script src="/quality.js"></script><script src="/photo-ux.js"></script>`;
 const setupScript=setup.slice(8,setup.indexOf('</script>'));new vm.Script(setupScript);
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/workspace.js"></script></body>');
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/preopen.js"></script><script src="/workspace.js"></script></body>');
 const routes=new Map([['/form-guard.js','modules/modal-form-guard-v10_10_9.js'],['/workspace.js','modules/trainer-workspace-v10_10_9.js'],['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
-const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(setupScript);}if(pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(fixture);}if(pathname.endsWith('.png')){res.setHeader('Content-Type','image/png');return res.end(fs.readFileSync('icon-192-v9-8.png'));}const file=routes.get(pathname);if(!file){res.writeHead(404);return res.end();}res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
+const preopenScript='if(new URLSearchParams(location.search).has("late-reference"))document.addEventListener("DOMContentLoaded",()=>openModal("modal-weekly-checkin-view"),{once:true});';
+const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/preopen.js'){res.setHeader('Content-Type','text/javascript');return res.end(preopenScript);}if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(setupScript);}if(pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(fixture);}if(pathname.endsWith('.png')){res.setHeader('Content-Type','image/png');return res.end(fs.readFileSync('icon-192-v9-8.png'));}const file=routes.get(pathname);if(!file){res.writeHead(404);return res.end();}res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
   ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
   : ['google-chrome','chromium','chromium-browser'].map(name => spawnSync('which',[name],{encoding:'utf8'}).stdout?.trim()).find(Boolean));
@@ -270,6 +271,11 @@ try {
 
     assert.deepEqual(await evaluate('window.errors'),[]);results.push({width,height});
   }
+  await command('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?late-reference=1'});
+  for(let i=0;i<60;i++){if(await evaluate('location.search.includes("late-reference")&&document.readyState==="complete"&&!!window.TeamBullsTrainerWorkspace&&!!window.TeamBullsNavigation'))break;await sleep(50);}
+  await sleep(150);
+  assert(await evaluate('document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Loading the workspace after a report opened must preserve that report');
+  assert.deepEqual(await evaluate('window.errors'),[]);
   console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows.');
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}

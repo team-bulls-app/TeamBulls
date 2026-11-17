@@ -16,7 +16,7 @@
   let reportLoadToken=0;
   let reportViewerTransition=false;
   let dockSyncFrame=0;
-  let workspaceActor='';
+  let workspaceActor=null;
 
   function trainerStudent(){
     if(typeof CURRENT_USER==='undefined'||CURRENT_USER?.role!=='trainer')return null;
@@ -42,6 +42,7 @@
   function wideWorkspace(){return !!trainerStudent()&&window.matchMedia('(min-width:1200px) and (pointer:fine)').matches;}
   function syncWorkspaceLayout(){
     const actor=typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer'?CURRENT_USER.uid:'';
+    if(workspaceActor===null&&actor)workspaceActor=actor;
     if(workspaceActor!==actor){
       workspaceActor=actor;reportCache.clear();reportLoadToken++;
       for(const id of REFERENCE_MODALS){
