@@ -70,7 +70,7 @@ const fetcher = async (url, options = {}) => {
   if (url.endsWith(':runQuery')) {
     const query = JSON.parse(options.body).structuredQuery;
     queried.push(query);
-    assert.deepEqual(query.select.fields.map(item => item.fieldPath), ['studentId', 'trainerId', 'feedbackType', 'createdAt']);
+    assert.deepEqual(query.select.fields.map(item => item.fieldPath), ['studentId', 'trainerId', 'feedbackType', 'feedbackCategory', 'createdAt']);
     return result(docs.map(document => ({ document })));
   }
   if (url.endsWith('/users/student-a')) return result({ fields: {
@@ -114,4 +114,13 @@ assert.equal(db.deliveries.get('one:device-2').status, 'sent');
 assert.equal(sent.length, 3, 'a retry must not re-send to a successful device');
 assert.equal(queried.at(-1).startAt.values[1].referenceValue, name('two'), 'cursor must include document ID');
 assert.equal(sent.at(-1).message.data.feedbackType, 'weekly_diet');
+for(const [index,category] of ['protocol_start','protocol_return'].entries()){
+  const item=feedback('protocol-'+index,'student-a','trainer-a','extra','2026-09-29T00:0'+(index+3)+':00Z');
+  item.fields.feedbackCategory={stringValue:category};docs.push(item);
+}
+await run(env(db),fetcher);
+for(const [index,category] of ['protocol_start','protocol_return'].entries()){
+  assert.equal(db.outbox.get('protocol-'+index).feedback_type,category);
+  assert(sent.some(payload=>payload.message.data.feedbackId==='protocol-'+index&&payload.message.data.feedbackType===category),'The safe category must survive ingestion and FCM delivery');
+}
 console.log('APROVADO — Cloudflare: cursor transacional, isolamento do aluno, conteúdo privado e retry.');

@@ -2,17 +2,17 @@
 'use strict';
 (()=>{
   if(window.TeamBullsDeviceNotices)return;
-  const VERSION='10.10.62-device-notices2';
+  const VERSION='10.10.62-device-notices3';
   const KEY='team-bulls-push-device';
   const disabledKey=uid=>`team-bulls-push-disabled:${uid}`;
   const pendingKey=uid=>`team-bulls-push-disable-pending:${uid}`;
   let registrationPromise=null,registerPromise=null,disablePromise=null,foregroundUnsubscribe=null;
   const delivered=new Map(),inFlight=new Set();
-  const labels={weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',extra:'Feedback extra',protocol_update:'Relatório mensal completo',general:'Feedback extra'};
+  const labels={weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',protocol_start:'Início dos protocolos',protocol_return:'Retorno aos protocolos',extra:'Feedback extra',protocol_update:'Relatório mensal completo',general:'Feedback extra'};
   const mobile=()=>/Android|iPhone|iPod/i.test(navigator.userAgent)&&matchMedia('(pointer:coarse)').matches;
   const student=()=>CURRENT_USER?.role==='student'&&MODE==='cloud'&&ACCESS_MODE==='cloud-active'&&auth?.currentUser?.uid===CURRENT_USER.uid?String(CURRENT_USER.uid):'';
   const publicKey=()=>String(window.TEAM_BULLS_PUBLIC_CONFIG?.webPushVapidKey||'').trim();
-  const title=type=>labels[String(type||'')]||labels.extra;
+  const title=data=>labels[data?.feedbackType==='extra'&&['protocol_start','protocol_return'].includes(data?.feedbackCategory)?data.feedbackCategory:String(data?.feedbackType||'')]||labels.extra;
   const status=message=>{const el=document.getElementById('tb-device-notice-status');if(el)el.textContent=message;};
   const toast=(message,error=false)=>{if(typeof showToast==='function')showToast(message,error);};
   const saved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null');}catch(error){return null;}};
@@ -128,7 +128,7 @@
       const reg=await navigator.serviceWorker.ready;
       if(!student())return;
       if(student()!==uid||optedOut(uid))return;
-      await reg.showNotification(title(data?.feedbackType),{body:'Você recebeu um novo feedback do treinador.',icon:'./icon-192-v9-8.png',badge:'./icon-192-v9-8.png',tag:'team-bulls-feedback-'+id,renotify:false,data:{url:new URL('./index.html',location.href).href}});
+      await reg.showNotification(title(data),{body:'Você recebeu um novo feedback do treinador.',icon:'./icon-192-v9-8.png',badge:'./icon-192-v9-8.png',tag:'team-bulls-feedback-'+id,renotify:false,data:{url:new URL('./index.html',location.href).href}});
       delivered.set(key,Date.now());if(delivered.size>60)for(const [oldId,at] of delivered)if(Date.now()-at>600000)delivered.delete(oldId);
     }catch(error){console.warn('[Team Bulls] aviso de feedback no aparelho',error);}finally{inFlight.delete(key);}
   }

@@ -70,7 +70,7 @@ has(gerBridge,'if(locked(exercise,current)){protectedWeeks++;continue;}','GER da
 has(gerBridge,"resolveWeekPrescription(snapshot,current)",'GER das semanas destrancadas não materializa corretamente prescrições herdadas ao redor de uma semana protegida.');
 has(gerBridge,"closest('#tb-save-series-only')",'Salvar somente séries pode sugerir gravação em semana trancada.');
 
-const workflowIndex=config.indexOf('workflow-controls-v10_10_10.js?v=10.10.10-workflow1');
+const workflowIndex=config.indexOf('workflow-controls-v10_10_10.js?v=10.10.10-workflow2');
 const lockIndex=config.indexOf('prescription-lock-bridge-v10_10_10.js?v=10.10.10-lockbridge1');
 const gerLockIndex=config.indexOf('ger-lock-bridge-v10_10_10.js?v=10.10.10-gerlock1');
 const reportIndex=config.indexOf('report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2');

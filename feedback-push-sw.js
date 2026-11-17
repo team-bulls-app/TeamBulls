@@ -3,7 +3,7 @@
 importScripts('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/13.1.0/firebase-messaging-compat.js');
 firebase.initializeApp({apiKey:'AIzaSyAdaKNItJ66v0Po_VpQue9huFf_psLmV54',authDomain:'teamms-app.firebaseapp.com',projectId:'teamms-app',messagingSenderId:'57870273303',appId:'1:57870273303:web:1de3016167b9a69dfd4552'});
-const labels={weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',extra:'Feedback extra'};
+const labels={weekly_report:'Relatório semanal',monthly_full:'Relatório mensal completo',weekly_diet:'Relatório semanal dieta',weekly_training:'Relatório semanal treino',protocol_start:'Início dos protocolos',protocol_return:'Retorno aos protocolos',extra:'Feedback extra'};
 firebase.messaging().onBackgroundMessage(payload=>{
   const data=payload?.data||{};
   if(data.kind!=='feedback'||!data.feedbackId)return;

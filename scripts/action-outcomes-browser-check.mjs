@@ -1,8 +1,12 @@
 // Click-level regression on real app markup, photo wrappers and catalog actions.
 import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
+const feedbackSender=core.split('\n').find(line=>line.startsWith('sendFeedback=async function(){const message='));
+const feedbackBanner=core.split('\n').find(line=>line.startsWith('showFeedbackBanner=function(fid,data)'));
+assert(feedbackSender&&feedbackBanner,'Canonical feedback sender/banner are required');
+
 function fn(name){const start=core.indexOf(`function ${name}(`);assert(start>=0,name);const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));}
-const names=['safeDayName','safeWorkoutGuidance','dayIdFromName','normalizeWorkoutDays','getWorkoutDays','normalizePrescriptionSet','normalizeWeeklyPlan','clonePrescriptionSets','resolveWeekPrescription','prescribedRangeLabel','formatGerLevel','prescriptionCompactSummary','hasManualOrder','createdMillis','exerciseOrderComparator','exercisesForDayUnsorted','exercisesForDay','normalizedName','renderWorkoutMuscleChoices','normalizeDietMeal','normalizeDietVariant','currentDiet','currentDietVariant','v104ActivateVariantMeals','renderDietVariantTabs','persistDietDocumentDraft','shouldAutoFocusEditor','capturePhotoReadContext','photoReadContextCurrent','beginPhotoViewRequest','photoViewRequestCurrent','openPhotoView','openComparePhotos','runComparePhotos','openModal','closeModal','showConfirm','beginAction','endAction','captureCatalogEditor','commitCatalogAction','catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','cacheGeneralInstructions','cacheTechniqueCatalog','saveInstructionFolder','saveInstructionItem','deleteInstructionItem','saveTechnique','deleteTechnique','renderInstructions','renderTechniques','instructionVideoAction','openInstructionFolderModal','openInstructionItemModal','openTechniqueEditor'];
+const names=['v1010FeedbackType','v1010FeedbackFields','v1010FeedbackDataType','v1010FeedbackLabel','syncFeedbackEditorType','updateFeedbackCharacterCount','validIsoDate','safeDayName','safeWorkoutGuidance','dayIdFromName','normalizeWorkoutDays','getWorkoutDays','normalizePrescriptionSet','normalizeWeeklyPlan','clonePrescriptionSets','resolveWeekPrescription','prescribedRangeLabel','formatGerLevel','prescriptionCompactSummary','hasManualOrder','createdMillis','exerciseOrderComparator','exercisesForDayUnsorted','exercisesForDay','normalizedName','renderWorkoutMuscleChoices','normalizeDietMeal','normalizeDietVariant','currentDiet','currentDietVariant','v104ActivateVariantMeals','renderDietVariantTabs','persistDietDocumentDraft','shouldAutoFocusEditor','capturePhotoReadContext','photoReadContextCurrent','beginPhotoViewRequest','photoViewRequestCurrent','openPhotoView','openComparePhotos','runComparePhotos','openModal','closeModal','showConfirm','beginAction','endAction','captureCatalogEditor','commitCatalogAction','catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','cacheGeneralInstructions','cacheTechniqueCatalog','saveInstructionFolder','saveInstructionItem','deleteInstructionItem','saveTechnique','deleteTechnique','renderInstructions','renderTechniques','instructionVideoAction','openInstructionFolderModal','openInstructionItemModal','openTechniqueEditor'];
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const muscleSource=core.slice(core.indexOf('const WORKOUT_MUSCLE_GROUPS='),core.indexOf('function safeWorkoutGuidance('));
 const focusWrappers=core.slice(core.indexOf('const V106_MODAL_RETURN_FOCUS='),core.indexOf("document.addEventListener('keydown',event=>",core.indexOf('const V106_MODAL_RETURN_FOCUS=')));
@@ -21,7 +25,18 @@ function resolvePhotoSource(record,{full=false}={}){if(full)return new Promise(r
 window.release=(id,thumb=false)=>{const queue=thumb?pendingThumb:pendingHigh;const resolve=queue[id]?.shift();if(!resolve)throw new Error('Missing photo request '+id);resolve('/'+(thumb?'thumb-':'full-')+id+'.png');};
 const ensureStorageService=async()=>null,withTimeout=p=>p,safePhotoPath=()=>'',safePhotoDataUrl=s=>s||'';
 window.downloads=[];window.fetch=async url=>{downloads.push(String(url));return {ok:true,blob:async()=>new Blob(['fake'],{type:'image/jpeg'})};};HTMLAnchorElement.prototype.click=function(){downloads.push(this.download);};
-window.failWrites=false;window.writes=0;let remoteLibraries={};const firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}},cloudWrite=async p=>p,db={collection:collection=>({where:()=>({collection}),doc:()=>({collection})}),runTransaction:async task=>{let staged;await task({get:async ref=>({exists:true,data:()=>remoteLibraries[ref.collection]||structuredClone(ref.collection==='trainingInstructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG)}),set:(ref,payload)=>{staged={ref,payload};}});if(staged){if(failWrites)throw new Error('Sem conexão (simulada)');remoteLibraries[staged.ref.collection]=structuredClone(staged.payload);delete remoteLibraries[staged.ref.collection].updatedAt;writes++;}}};
+window.feedbackWrites=[];window.feedbackDraft=0;
+const idempotentDraftId=()=> 'feedback-fixture-'+feedbackDraft,clearIdempotentDraft=()=>{feedbackDraft++;},cloudWriteError=error=>error.message;
+const V109_PROTOCOL_REVIEW_SCHEDULE={startDate:'2026-11-01',intervalWeeks:4},v109ProtocolState=()=>({pendingCycle:2});
+function fixtureCollection(collection){
+  const reference={collection,where:()=>reference,limit:()=>reference,get:()=>cloudGet(reference),doc:id=>({collection,set:async data=>{
+    if(failWrites)throw new Error('Sem conexão (simulada)');
+    if(CURRENT_USER?.role!=='trainer'||data.studentId!==VIEW_STUDENT.uid||data.trainerId!==CURRENT_USER.uid)throw new Error('permission-denied');
+    if(collection!=='feedback'||!['general','weekly_report','protocol_update','monthly_full','weekly_diet','weekly_training','extra'].includes(data.feedbackType))throw new Error('Unsupported stored feedback type');
+    feedbackWrites.push({id,...structuredClone(data)});
+  }})};return reference;
+}
+window.failWrites=false;window.writes=0;let remoteLibraries={};const firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}},cloudWrite=async p=>p,db={collection:fixtureCollection,runTransaction:async task=>{let staged;await task({get:async ref=>({exists:true,data:()=>remoteLibraries[ref.collection]||structuredClone(ref.collection==='trainingInstructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG)}),set:(ref,payload)=>{staged={ref,payload};}});if(staged){if(failWrites)throw new Error('Sem conexão (simulada)');remoteLibraries[staged.ref.collection]=structuredClone(staged.payload);delete remoteLibraries[staged.ref.collection].updatedAt;writes++;}}};
 
 
 let VIEW_STUDENT_WORKOUT={id:'current-w',name:'Treino atual',startDate:'2026-11-16',exercises:[]};
@@ -54,21 +69,27 @@ function openEditDietVariantModal(id){document.getElementById('input-diet-varian
 
 ${muscleSource}
 ${names.map(fn).join('\n')}
+${feedbackSender}
+${feedbackBanner}
 ${focusWrappers}
 function showScreen(id){document.querySelectorAll('.screen').forEach(el=>el.classList.toggle('active',el.id===id));}
 function openFeedbackModal(){}
-function updateFeedbackCharacterCount(){}
+
 function viewWeeklyCheckin(){}
 function viewQuestionnaire(){}
 const CHECKIN_POSES=['Frente','Costas'];let WEEKLY_CHECKINS=[{id:'weekly',studentId:'student',weight:80,submittedDate:'2026-11-17',photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
 let TS_QUEST_CACHE=[{id:'quest',studentId:'student',answered:true,photoIds:['a','b'],questions:['Como foi?'],answers:['Bem']}];
 const fetchWeeklyCheckins=async()=>WEEKLY_CHECKINS;
-function cloudGet(reference){return Promise.resolve(reference.collection==='questionnaires'?{docs:TS_QUEST_CACHE.map(item=>({id:item.id,data:()=>item}))}:{exists:true,data:()=>({studentNotes:{student:{text:'Rascunho salvo'}}})});}
+function cloudGet(reference){
+  if(reference.collection==='users')return Promise.resolve({docs:[{id:VIEW_STUDENT.uid,data:()=>({...VIEW_STUDENT,role:'student',status:'active',trainerId:CURRENT_USER.uid})}]});
+  if(reference.collection==='feedback')return Promise.resolve({docs:feedbackWrites.map(item=>({id:item.id,data:()=>item}))});
+  return Promise.resolve(reference.collection==='questionnaires'?{docs:TS_QUEST_CACHE.map(item=>({id:item.id,data:()=>item}))}:{exists:true,data:()=>({studentNotes:{student:{text:'Rascunho salvo'}}})});
+}
 cacheGeneralInstructions();cacheTechniqueCatalog();document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));document.getElementById('screen-photos').classList.add('active');
 </script><script src="/quality.js"></script><script src="/photo-ux.js"></script>`;
 const setupScript=setup.slice(8,setup.indexOf('</script>'));new vm.Script(setupScript);
-const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/workflow.js"></script><script src="/preopen.js"></script><script src="/workspace.js"></script></body>');
-const routes=new Map([['/workflow.js','modules/workflow-controls-v10_10_10.js'],['/form-guard.js','modules/modal-form-guard-v10_10_9.js'],['/workspace.js','modules/trainer-workspace-v10_10_9.js'],['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
+const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles_v10_10_9.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/quality.js"></script><script src="/photo-ux.js"></script><script src="/diet-copy.js"></script><script src="/modal-stack.js"></script><script src="/interaction.js"></script><script src="/form-guard.js"></script><script src="/workflow.js"></script><script src="/feedback-archive.js"></script><script src="/preopen.js"></script><script src="/workspace.js"></script></body>');
+const routes=new Map([['/feedback-archive.js','modules/trainer-feedback-archive-v10_10_46.js'],['/workflow.js','modules/workflow-controls-v10_10_10.js'],['/form-guard.js','modules/modal-form-guard-v10_10_9.js'],['/workspace.js','modules/trainer-workspace-v10_10_9.js'],['/diet-copy.js','modules/diet-copy-v10_10_28.js'],['/quality.js','modules/photo-quality-download-v10_10_9.js'],['/photo-ux.js','modules/report-photo-ux-v10_10_10.js'],['/modal-stack.js','modules/modal-stack-stability-v10_10_9.js'],['/interaction.js','interaction_v10_10_9.js'],['/styles_v10_10_9.css','styles_v10_10_9.css']]);
 const preopenScript='if(new URLSearchParams(location.search).has("late-reference"))document.addEventListener("DOMContentLoaded",()=>openModal("modal-weekly-checkin-view"),{once:true});';
 const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;if(pathname==='/preopen.js'){res.setHeader('Content-Type','text/javascript');return res.end(preopenScript);}if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(setupScript);}if(pathname==='/'){res.setHeader('Content-Type','text/html; charset=utf-8');return res.end(fixture);}if(pathname.endsWith('.png')){res.setHeader('Content-Type','image/png');return res.end(fs.readFileSync('icon-192-v9-8.png'));}const file=routes.get(pathname);if(!file){res.writeHead(404);return res.end();}res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(fs.readFileSync(file));});
 const executable = process.env.CHROME_BIN || (process.platform === 'win32'
@@ -382,6 +403,44 @@ try {
     await evaluate('closeModal("tb-trainer-previous-workout-modal")');await sleep(100);
     await evaluate('CURRENT_USER.role="student"');assert.equal(await evaluate('TeamBullsTrainerWorkspace.openPreviousWorkout()'),false);await evaluate('CURRENT_USER.role="trainer"');
 
+    for(const [type,label] of [['protocol_start','Início dos protocolos'],['protocol_return','Retorno aos protocolos']]){
+      const priorScreen=await evaluate('({id:document.querySelector(".screen.active").id,key:history.state.key})');
+      await evaluate('showScreen("screen-ts-quest")');
+      await waitForUi('document.querySelector(".screen.active").id==="screen-ts-quest"'+(priorScreen.id==='screen-ts-quest'?'':'&&history.state.key!=='+JSON.stringify(priorScreen.key)),'Returning to reports must settle before clicking another feedback');
+      await evaluate('openFeedbackModal("extra")');
+      await waitForUi('document.getElementById("modal-feedback").classList.contains("open")','The feedback editor must be ready before selection');
+      await evaluate('document.getElementById("input-feedback-type").value='+JSON.stringify(type)+';document.getElementById("input-feedback-type").dispatchEvent(new Event("change"))');
+      assert.equal(await evaluate('document.getElementById("input-feedback-title").value'),label);
+      assert.equal(await evaluate('document.getElementById("modal-feedback-title").textContent'),label);
+      if(type==='protocol_return'){
+        await evaluate('document.getElementById("input-feedback-title").value="Seu retorno à consultoria";document.getElementById("input-feedback-type").value="extra";syncFeedbackEditorType();document.getElementById("input-feedback-type").value="protocol_return";syncFeedbackEditorType()');
+        assert.equal(await evaluate('document.getElementById("input-feedback-title").value'),'Seu retorno à consultoria','Keep a custom title when changing feedback category');
+      }
+      const before=await evaluate('feedbackWrites.length');
+      await evaluate('document.getElementById("input-feedback").value="Orientação privada para a próxima etapa";failWrites=true;document.querySelector("#modal-feedback .btn-primary").click()');await sleep(60);
+      assert.equal(await evaluate('feedbackWrites.length'),before);
+      assert(await evaluate('document.getElementById("modal-feedback").classList.contains("open")&&!document.querySelector("#modal-feedback .btn-primary").disabled'),'Failed send must preserve the editor and allow retry '+JSON.stringify({width,type,state:await evaluate('({open:document.getElementById("modal-feedback").classList.contains("open"),disabled:document.querySelector("#modal-feedback .btn-primary").disabled,locks:[...ACTION_LOCKS],alerts:alerts.slice(-4),errors:window.errors,writes:feedbackWrites.length})')}));
+      assert.equal(await evaluate('document.getElementById("input-feedback-type").value'),type);
+      assert.equal(await evaluate('document.getElementById("input-feedback").value'),'Orientação privada para a próxima etapa');
+      if(screenshotDir){const shot=await command('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(screenshotDir,'feedback-'+type+'-'+width+'.png'),Buffer.from(shot.data,'base64'));}
+      await evaluate('failWrites=false;document.querySelector("#modal-feedback .btn-primary").click()');
+      await waitForUi('feedbackWrites.length==='+String(before+1)+'&&!document.getElementById("modal-feedback").classList.contains("open")','Feedback send must finish and close only its editor');
+      const payload=await evaluate('feedbackWrites.at(-1)');
+      assert.equal(payload.feedbackType,'extra','Store the new categories using the type already allowed by current Firebase rules');
+      assert.equal(payload.feedbackCategory,type);assert.equal(payload.protocolCycle,0);assert.equal(payload.protocolStartDate,'');
+      await evaluate('showFeedbackBanner("fixture",feedbackWrites.at(-1))');
+      assert.equal(await evaluate('document.getElementById("feedback-banner-label").textContent'),payload.title,'The student must see the correct feedback title');
+      await evaluate('TeamBullsTrainerFeedbackArchive.open()');
+      await waitForUi('!!document.querySelector(\'[data-tb-open-feedback="'+payload.id+'"]\')','The saved feedback must appear in trainer history');
+      const card=await evaluate('document.querySelector(\'[data-tb-open-feedback="'+payload.id+'"]\').closest("article").textContent');
+      assert(card.includes(label)&&card.includes(payload.title),'History must preserve both the category and the trainer title');
+      await evaluate('document.querySelector(\'[data-tb-open-feedback="'+payload.id+'"]\').click()');await sleep(60);
+      assert((await evaluate('document.getElementById("tb-feedback-detail-meta").textContent')).includes(label));
+      const detailKey=await evaluate('history.state.key');
+      await evaluate('closeModal("modal-trainer-feedback-detail")');
+      await waitForUi('!document.getElementById("modal-trainer-feedback-detail").classList.contains("open")&&history.state.key!=='+JSON.stringify(detailKey),'Closing the detail must settle navigation before opening the next editor');
+    }
+
     assert.deepEqual(await evaluate('window.errors'),[]);results.push({width,height});
   }
   await command('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?late-reference=1'});
@@ -389,7 +448,7 @@ try {
   await sleep(150);
   assert(await evaluate('document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Loading the workspace after a report opened must preserve that report');
   assert.deepEqual(await evaluate('window.errors'),[]);
-  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows, prior-protocol comparison across eight weeks, contextual report placement, bounded pointer/keyboard dragging, resize and report wheel scrolling during floating feedback with confirmation protection.');
+  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows, prior-protocol comparison across eight weeks, contextual report placement, bounded pointer/keyboard dragging, resize and report wheel scrolling during floating feedback with confirmation protection, plus protocol start/return feedback saved with current-rule compatibility, retry, custom titles, student banner and trainer history.');
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

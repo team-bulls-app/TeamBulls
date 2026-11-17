@@ -8,7 +8,7 @@ const notice=read('modules/student-feedback-device-notices-v10_10_62.js');
 const studentCenter=read('modules/student-home-profile-v10_10_12.js');
 const realtime=read('modules/student-request-realtime-v10_10_32.js');
 const cycle=read('modules/monthly-report-cycle-v10_10_59.js');
-for(const type of ['weekly_report','monthly_full','weekly_diet','weekly_training','extra'])assert.match(index,new RegExp(`<option value="${type}">`));
+for(const type of ['weekly_report','monthly_full','weekly_diet','weekly_training','protocol_start','protocol_return','extra'])assert.match(index,new RegExp(`<option value="${type}">`));
 assert.match(notice,/Notification\.requestPermission\(\)/);
 assert.match(notice,/mobile\(\).*Notification\.permission/s);
 assert.match(notice,/getToken\(\{vapidKey,serviceWorkerRegistration:registration\}\)/);
@@ -46,7 +46,15 @@ assert.equal(sent[0].data.feedbackType,'weekly_diet');
 assert.equal(sent[0].data.feedbackId,'feedback-1');
 assert.equal(JSON.stringify(sent[0]).includes(feedback.message),false,'conteúdo privado não deve ir ao push');
 assert.deepEqual(removed,['two']);
+for(const feedbackCategory of ['protocol_start','protocol_return']){
+  await trigger({params:{feedbackId:feedbackCategory},data:{data:()=>({...feedback,feedbackType:'extra',feedbackCategory})}});
+  assert.equal(sent.at(-1).data.feedbackType,feedbackCategory);
+  assert.equal(JSON.stringify(sent.at(-1)).includes(feedback.message),false);
+}
+await trigger({params:{feedbackId:'unknown-category'},data:{data:()=>({...feedback,feedbackType:'extra',feedbackCategory:'Texto privado'})}});
+assert.equal(sent.at(-1).data.feedbackType,'extra','Unknown categories cannot become notification titles');
+const sentBeforeMismatch=sent.length;
 user={...user,trainerId:'outro-treinador'};
 await trigger({params:{feedbackId:'feedback-2'},data:{data:()=>feedback}});
-assert.equal(sent.length,1,'o servidor não envia aviso fora do vínculo treinador-aluno');
-console.log('APROVADO — cinco categorias, push privado do aluno e cancelamento apenas de pedidos pendentes.');
+assert.equal(sent.length,sentBeforeMismatch,'o servidor não envia aviso fora do vínculo treinador-aluno');
+console.log('APROVADO — sete categorias, push privado do aluno e cancelamento apenas de pedidos pendentes.');
