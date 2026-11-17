@@ -2,7 +2,7 @@
   'use strict';
   if(window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__)return;
   window.__TEAM_BULLS_STUDENT_REQUEST_REALTIME_101032__=true;
-  const VERSION='10.10.32-studentrealtime5';
+  const VERSION='10.10.32-studentrealtime6';
   const MAX_DUE_TIMER_MS=2000000000;
   let activeUid='';
   let unsubs=[];
@@ -11,7 +11,7 @@
   let questionnairePrimed=false,weeklyPrimed=false,protocolPrimed=false,feedbackPrimed=false,notificationPrimed=false;
   let lastQuestionnaireSignature='',lastWeeklySignature='',lastProtocolKey='',lastFeedbackSignature='',lastNotificationSignature='';
   let liveSchedule=null,liveCheckins=[],scheduleReady=false,checkinsReady=false,liveProtocolSchedule=null;
-  let weeklyFutureDue='',protocolFutureDue='',questionnaireSnapshot=null;
+  let weeklyFutureDue='',protocolFutureDue='',questionnaireSnapshot=null,liveMonthlyReports=null;
   const counts={questionnaires:0,weekly:0,protocol:0,feedback:0,notifications:0};
 
   const studentCloud=()=>{
@@ -101,7 +101,7 @@
     activeUid='';questionnairePrimed=false;weeklyPrimed=false;protocolPrimed=false;feedbackPrimed=false;notificationPrimed=false;
     lastQuestionnaireSignature='';lastWeeklySignature='';lastProtocolKey='';lastFeedbackSignature='';lastNotificationSignature='';
     questionnaireSnapshot=null;
-    liveSchedule=null;liveCheckins=[];scheduleReady=false;checkinsReady=false;liveProtocolSchedule=null;weeklyFutureDue='';protocolFutureDue='';
+    liveSchedule=null;liveCheckins=[];scheduleReady=false;checkinsReady=false;liveProtocolSchedule=null;liveMonthlyReports=null;weeklyFutureDue='';protocolFutureDue='';
     Object.keys(counts).forEach(key=>{counts[key]=0;});
     clearTimeout(centerRefreshTimer);clearTimeout(dueTimer);dueTimer=0;
     try{badgeObserver?.disconnect();}catch(error){}badgeObserver=null;badgeTarget=null;updateBadge();
@@ -132,6 +132,7 @@
 
   function applyWeekly(uid){
     if(!isCurrent(uid)||!scheduleReady||!checkinsReady)return;
+    if(liveMonthlyReports)window.TeamBullsMonthlyReports?.rememberReports(uid,liveMonthlyReports);
     let request=null;
     try{
       WEEKLY_CHECKIN_SCHEDULE=liveSchedule;
@@ -144,7 +145,7 @@
     const changed=changedAfterPrime(weeklyPrimed,lastWeeklySignature,signature),nextCount=request?.pending?1:0;
     if(changed&&nextCount>counts.weekly)toast(request?.kind==='manual'?'Seu treinador solicitou um relatório semanal extra.':'Seu relatório semanal está pendente.');
     counts.weekly=nextCount;lastWeeklySignature=signature;weeklyPrimed=true;
-    weeklyFutureDue=request&&!request.pending&&validIso(request.dueDate)?String(request.dueDate):'';
+    weeklyFutureDue=request&&!request.pending&&validIso(request.resumeDate||request.dueDate)?String(request.resumeDate||request.dueDate):'';
     updateBadge();scheduleDueBoundary();if(changed)refreshOpenCenter();
   }
   function attachWeekly(uid){
@@ -160,10 +161,21 @@
     unsubs.push(scheduleUnsub,checkinsUnsub);
   }
 
+  function attachMonthlyHistory(uid){
+    const release=listen('monthly-history',uid,db.collection('questionnaires').where('studentId','==',uid).where('reportType','==','monthly'),snapshot=>{
+      if(!isCurrent(uid))return;
+      liveMonthlyReports=snapshot.docs.map(doc=>({...doc.data(),id:doc.id}));
+      window.TeamBullsMonthlyReports?.rememberReports(uid,liveMonthlyReports);
+      applyWeekly(uid);
+    });
+    unsubs.push(release);
+  }
+
   function renderProtocol(schedule,uid){
     if(!isCurrent(uid))return;
     liveProtocolSchedule=schedule;
     window.TeamBullsMonthlyReports?.remember(uid,schedule);
+    applyWeekly(uid);
     if(questionnaireSnapshot)showQuestionnaireSnapshot(questionnaireSnapshot,uid);
     if(document.querySelector('.screen.active')?.id==='screen-my-quest'&&typeof MY_QUEST_CACHE!=='undefined')renderQuestList(MY_QUEST_CACHE,'my-quest-list','my-quest-empty',false);
     try{
@@ -230,7 +242,7 @@
     const uid=currentUid();if(!uid)return false;
     if(activeUid===uid&&unsubs.length){resumeFailed();recomputeDueStates('resume');return true;}
     stopFirestore();activeUid=uid;
-    try{attachQuestionnaires(uid);attachWeekly(uid);attachProtocol(uid);attachFeedback(uid);attachNotifications(uid);return true;}
+    try{attachQuestionnaires(uid);attachWeekly(uid);attachProtocol(uid);attachMonthlyHistory(uid);attachFeedback(uid);attachNotifications(uid);return true;}
     catch(error){console.warn('[Team Bulls] sincronização em tempo real não iniciada',error);stopFirestore();return false;}
   }
   function sync(){const uid=currentUid();if(!uid){stopFirestore();return false;}return start();}

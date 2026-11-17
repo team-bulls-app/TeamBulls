@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010587__)return;
   window.__TEAM_BULLS_WEEKLY_REPORT_INTEGRITY_1010587__=true;
 
-  const VERSION='10.10.58-weeklyintegrity8';
+  const VERSION='10.10.58-weeklyintegrity9';
   const READ_TIMEOUT=10000;
   const READ_RETRIES=2;
   const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -111,12 +111,13 @@
     return prepared;
   }
 
+  const prioritize=(request,schedule)=>window.TeamBullsMonthlyReports?.prioritizeWeekly?.(request,schedule)||request;
   function canonicalRequest(schedule,rows){
     if(!schedule||schedule.enabled===false||!isoDate(schedule.nextDueDate))return null;
     const history=historyForRequestCalculation((rows||[]).map(normalizeWeeklyRow));
     const completed=new Set(history.map(row=>String(row.requestKey||'')));
     const manualKey='manual:'+String(schedule.extraRequestId||'');
-    if(schedule.extraRequestId&&!completed.has(manualKey))return{kind:'manual',requestId:String(schedule.extraRequestId),dueDate:String(schedule.extraRequestedAt||today()),requestKey:manualKey,pending:true};
+    if(schedule.extraRequestId&&!completed.has(manualKey))return prioritize({kind:'manual',requestId:String(schedule.extraRequestId),dueDate:String(schedule.extraRequestedAt||today()),requestKey:manualKey,pending:true},schedule);
     const scheduled=history.filter(row=>row.requestKind!=='manual'&&isoDate(row.submittedDate)).sort((a,b)=>b.submittedDate.localeCompare(a.submittedDate));
     const last=scheduled[0],interval=Math.max(1,Math.min(31,Number(schedule.intervalDays)||7));
     let due=String(schedule.nextDueDate);
@@ -125,6 +126,9 @@
       // Otherwise count from the actual submission, never from an early duplicate's dueDate.
       if(!(due>last.submittedDate&&!completed.has('scheduled:'+due)))due=addDaysIso(last.submittedDate,interval);
     }
+    const aligned=prioritize({kind:'scheduled',requestId:'',dueDate:due,requestKey:'scheduled:'+due,pending:due<=today()},schedule);
+    if(aligned.suppressedByMonthly)return aligned;
+    due=aligned.dueDate;
     const requestKey='scheduled:'+due;
     const occupied=history.filter(row=>row.requestKey===requestKey);
     const recovery=occupied.length>0&&occupied.every(row=>isoDate(row.submittedDate)&&row.submittedDate<due);
@@ -153,7 +157,7 @@
         const pending=await window.TeamBullsStudentReportSubmitReconciliation?.reconcileWeeklyPending?.();
         if(pending===true||pending===false)return pending;
         const uid=String(CURRENT_USER.uid),request=await refreshCanonicalRequest(uid);
-        if(!request.pending){notify('O próximo relatório estará disponível em '+request.dueDate+'. Para um envio adicional, peça um relatório extra ao treinador.');return false;}
+        if(!request.pending){notify(request.suppressedByMonthly?'A atualização mensal tem prioridade. Abra a aba Relatórios para responder ao mensal.':'O próximo relatório estará disponível em '+request.dueDate+'. Para um envio adicional, peça um relatório extra ao treinador.');return false;}
         formRequest=Object.freeze({...request,studentId:uid});
         return base.apply(this,arguments);
       }catch(error){formRequest=null;notify('Não foi possível confirmar a solicitação no servidor. Tente abrir o relatório novamente.',true);return false;}
@@ -211,6 +215,7 @@
   }
   async function refreshCanonicalRequest(uid){
     if(!uid||typeof computeCheckinRequest!=='function')throw new Error('Não foi possível validar o período atual do relatório.');
+    if(typeof ensureReportCycleRuntime==='function')await ensureReportCycleRuntime();
     const readWeeklyPeriod=window.TeamBullsStudentReportSubmitReconciliation?.readWeeklyPeriod;
     let data,rows;
     if(readWeeklyPeriod){
@@ -222,12 +227,19 @@
         fresh=await readWeeklyPeriod(uid);
       }
       data=fresh.schedule;rows=fresh.history;
+      const monthly=window.TeamBullsMonthlyReports;
+      if(monthly){
+        if(Object.prototype.hasOwnProperty.call(fresh,'protocolSchedule')&&Array.isArray(fresh.monthlyReports)){
+          monthly.remember(uid,fresh.protocolSchedule);monthly.rememberReports(uid,fresh.monthlyReports);
+        }else await monthly.loadWeeklyContext(uid);
+      }
     }else{
       const scheduleDoc=await strictServerGet(db.collection('checkinSchedules').doc(uid),'confirmar programação semanal');
       if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw new Error('A sessão do aluno mudou durante a confirmação.');
       const historySnap=await strictServerGet(db.collection('weeklyCheckins').where('studentId','==',uid),'confirmar histórico semanal');
       data=scheduleDoc?.exists?scheduleDoc.data():null;
       rows=(historySnap?.docs||[]).map(doc=>({...doc.data(),id:doc.id}));
+      await window.TeamBullsMonthlyReports?.loadWeeklyContext?.(uid);
     }
     if(CURRENT_USER?.uid!==uid||auth?.currentUser?.uid!==uid)throw new Error('A sessão do aluno mudou durante a confirmação.');
     if(!data)throw new Error('A programação semanal não está mais disponível.');
@@ -327,6 +339,11 @@
     fingerprint:legacyFingerprint,
     canOpenForm:()=>!!formRequest&&student()&&formRequest.studentId===CURRENT_USER.uid,
     submissionRequest:()=>submissionRequest,
+    assertSubmissionCurrent:async opened=>{
+      const fresh=await refreshCanonicalRequest(String(opened?.studentId||''));
+      if(!fresh.pending||identity(opened)!==identity(fresh))throw new Error('A programação mudou. A atualização mensal tem prioridade quando estiver disponível. Suas respostas continuam neste formulário.');
+      return true;
+    },
     state:()=>({fetchInstalled,submitInstalled,suppressedDuplicates,suppressedLegacyDuplicates,recoveredDates,recoveredRequestKeys})
   });
 })();

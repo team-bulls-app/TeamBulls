@@ -123,10 +123,10 @@ assert.equal(fatalClient.modalOpen(),true,'Falha fatal mantém o formulário abe
   assert.deepEqual(original,['Bíceps','Tríceps','Antebraços','Ombros','Trapézio','Adutores','Abdutores'],'Legacy records cannot be mutated while reading');
   assert.deepEqual(Array.from(muscleContext.normalizeMuscleGroups(['Braços','braços','Ombros e trapézios','Ombros','Inválido'])),['Braços','Ombros e trapézios']);
   muscleContext.renderWorkoutMuscleChoices(original);
-  for(const removed of ['Adutores','Trapézio','Bíceps','Tríceps','Antebraços'])assert(!host.innerHTML.includes('data-muscle-group="'+removed+'"'));
+  for(const removed of ['Abdutores','Trapézio','Bíceps','Tríceps','Antebraços'])assert(!host.innerHTML.includes('data-muscle-group="'+removed+'"'));
   assert.match(host.innerHTML,/data-muscle-group="Braços" checked/);
   assert.match(host.innerHTML,/data-muscle-group="Ombros e trapézios" checked/);
-  assert.match(host.innerHTML,/data-muscle-group="Abdutores"/);
+  assert.match(host.innerHTML,/data-muscle-group="Adutores"/);
   assert.equal((host.innerHTML.match(/data-muscle-group=/g)||[]).length,10);
 }
 

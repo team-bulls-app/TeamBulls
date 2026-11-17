@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_WEEKLY_REPORT_ENTRY_101035__)return;
   window.__TEAM_BULLS_STUDENT_WEEKLY_REPORT_ENTRY_101035__=true;
 
-  const VERSION='10.10.35-weeklyentry1';
+  const VERSION='10.10.35-weeklyentry2';
   const HOST_ID='tb-weekly-report-current';
   const STYLE_ID='tb-weekly-report-current-style';
   let loading=false;
@@ -57,7 +57,7 @@
 
   function renderCurrent(){
     const host=ensureHost();if(!host)return false;
-    if(!studentCloud()||!enabledForStudent()){host.hidden=true;host.innerHTML='';return true;}
+    if(!studentCloud()||!enabledForStudent()||requestState()?.suppressedByMonthly){host.hidden=true;host.innerHTML='';return true;}
     host.hidden=false;
     if(loading){host.dataset.state='loading';host.innerHTML='<div class="tb-weekly-current-loading">Carregando relatório semanal...</div>';return true;}
     const schedule=scheduleState(),request=requestState();

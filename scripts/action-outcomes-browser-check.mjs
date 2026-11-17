@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 const core=fs.readFileSync('app_v10_10_9_core.js','utf8');
 function fn(name){const start=core.indexOf(`function ${name}(`);assert(start>=0,name);const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));}
-const names=['normalizedName','renderWorkoutMuscleChoices','normalizeDietMeal','normalizeDietVariant','currentDiet','currentDietVariant','v104ActivateVariantMeals','renderDietVariantTabs','persistDietDocumentDraft','shouldAutoFocusEditor','capturePhotoReadContext','photoReadContextCurrent','beginPhotoViewRequest','photoViewRequestCurrent','openPhotoView','openComparePhotos','runComparePhotos','openModal','closeModal','showConfirm','beginAction','endAction','captureCatalogEditor','commitCatalogAction','catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','cacheGeneralInstructions','cacheTechniqueCatalog','saveInstructionFolder','saveInstructionItem','deleteInstructionItem','saveTechnique','deleteTechnique','renderInstructions','renderTechniques','instructionVideoAction','openInstructionFolderModal','openInstructionItemModal','openTechniqueEditor'];
+const names=['safeDayName','safeWorkoutGuidance','dayIdFromName','normalizeWorkoutDays','getWorkoutDays','normalizePrescriptionSet','normalizeWeeklyPlan','clonePrescriptionSets','resolveWeekPrescription','prescribedRangeLabel','formatGerLevel','prescriptionCompactSummary','hasManualOrder','createdMillis','exerciseOrderComparator','exercisesForDayUnsorted','exercisesForDay','normalizedName','renderWorkoutMuscleChoices','normalizeDietMeal','normalizeDietVariant','currentDiet','currentDietVariant','v104ActivateVariantMeals','renderDietVariantTabs','persistDietDocumentDraft','shouldAutoFocusEditor','capturePhotoReadContext','photoReadContextCurrent','beginPhotoViewRequest','photoViewRequestCurrent','openPhotoView','openComparePhotos','runComparePhotos','openModal','closeModal','showConfirm','beginAction','endAction','captureCatalogEditor','commitCatalogAction','catalogPreserveFields','persistSharedCatalog','persistGeneralInstructions','persistTechniqueCatalog','cacheGeneralInstructions','cacheTechniqueCatalog','saveInstructionFolder','saveInstructionItem','deleteInstructionItem','saveTechnique','deleteTechnique','renderInstructions','renderTechniques','instructionVideoAction','openInstructionFolderModal','openInstructionItemModal','openTechniqueEditor'];
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const muscleSource=core.slice(core.indexOf('const WORKOUT_MUSCLE_GROUPS='),core.indexOf('function safeWorkoutGuidance('));
 const focusWrappers=core.slice(core.indexOf('const V106_MODAL_RETURN_FOCUS='),core.indexOf("document.addEventListener('keydown',event=>",core.indexOf('const V106_MODAL_RETURN_FOCUS=')));
@@ -22,6 +22,15 @@ window.release=(id,thumb=false)=>{const queue=thumb?pendingThumb:pendingHigh;con
 const ensureStorageService=async()=>null,withTimeout=p=>p,safePhotoPath=()=>'',safePhotoDataUrl=s=>s||'';
 window.downloads=[];window.fetch=async url=>{downloads.push(String(url));return {ok:true,blob:async()=>new Blob(['fake'],{type:'image/jpeg'})};};HTMLAnchorElement.prototype.click=function(){downloads.push(this.download);};
 window.failWrites=false;window.writes=0;let remoteLibraries={};const firebase={firestore:{FieldValue:{serverTimestamp:()=>123}}},cloudWrite=async p=>p,db={collection:collection=>({where:()=>({collection}),doc:()=>({collection})}),runTransaction:async task=>{let staged;await task({get:async ref=>({exists:true,data:()=>remoteLibraries[ref.collection]||structuredClone(ref.collection==='trainingInstructions'?GENERAL_INSTRUCTIONS:TECHNIQUE_CATALOG)}),set:(ref,payload)=>{staged={ref,payload};}});if(staged){if(failWrites)throw new Error('Sem conexão (simulada)');remoteLibraries[staged.ref.collection]=structuredClone(staged.payload);delete remoteLibraries[staged.ref.collection].updatedAt;writes++;}}};
+
+
+let VIEW_STUDENT_WORKOUT={id:'current-w',name:'Treino atual',startDate:'2026-11-16',exercises:[]};
+VIEW_STUDENT.workouts=[VIEW_STUDENT_WORKOUT,
+{id:'old-early',name:'Treino anterior antigo',startDate:'2026-10-01',updateDate:'2026-11-26',days:[],exercises:[]},
+{id:'old-recent',name:'Treino anterior recente',startDate:'2026-11-02',updateDate:'2026-12-28',days:[{id:'old-day',name:'Inferiores',order:0}],exercises:[
+{id:'old-ex',name:'Agachamento',dayName:'Inferiores',order:0,instructions:'Controlar a descida',techniqueIds:['t1'],weeklyPlan:{w1:[{targetMin:8,targetMax:12,ger:3}],w2:[{targetMin:6,targetMax:8,ger:4}]}}]},
+{id:'future-w',name:'Próximo treino',startDate:'2026-12-01',exercises:[]}];
+const resolveWeekTechniqueConfig=exercise=>({techniqueIds:exercise.techniqueIds||[]});
 
 let DIET_CONTEXT={targetUid:'student',trainer:true,local:false},CURRENT_DIET_ID='diet-fixture',CURRENT_DIET_VARIANT_ID='training',AUTH_STATE_REVISION=1;
 const DIET_SECTION_DEFS=[],MEAL_PLAN_CACHE={meals:[]},MEAL_CTX={};
@@ -224,7 +233,7 @@ try {
     await evaluate('CURRENT_USER.role="trainer"');
 
     await evaluate('renderWorkoutMuscleChoices(["Bíceps","Tríceps","Ombros","Trapézio"]);openModal("modal-day")');await sleep(300);
-    assert.deepEqual(await evaluate('[...document.querySelectorAll("#day-muscle-group-options input")].map(el=>el.dataset.muscleGroup)'),['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Abdutores']);
+    assert.deepEqual(await evaluate('[...document.querySelectorAll("#day-muscle-group-options input")].map(el=>el.dataset.muscleGroup)'),['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Adutores']);
     assert.deepEqual(await evaluate('[...document.querySelectorAll("#day-muscle-group-options input:checked")].map(el=>el.dataset.muscleGroup)'),['Ombros e trapézios','Braços']);
     await evaluate('closeModal("modal-day")');await sleep(80);
 
@@ -269,6 +278,19 @@ try {
     await evaluate('CURRENT_USER.role="trainer";TeamBullsTrainerWorkspace.sync()');
 
 
+
+    await evaluate('showScreen("screen-ts-workout");TeamBullsTrainerWorkspace.sync();window.originalWorkouts=JSON.stringify(VIEW_STUDENT.workouts);window.originalCurrent=VIEW_STUDENT_WORKOUT;document.getElementById("tb-open-previous-workout").click()');await sleep(200);
+    assert.equal(await evaluate('document.getElementById("tb-previous-workout-select").value'),'old-recent','The closest earlier protocol must be selected by date');
+    assert.deepEqual(await evaluate('[...document.getElementById("tb-previous-workout-select").options].map(o=>o.value)'),['old-recent','old-early']);
+    assert.equal(await evaluate('document.getElementById("tb-previous-workout-week").options.length'),8);
+    assert((await evaluate('document.getElementById("tb-previous-workout-content").textContent')).includes('Agachamento'));
+    assert((await evaluate('document.getElementById("tb-previous-workout-content").textContent')).includes('8–12'));
+    await evaluate('document.getElementById("tb-previous-workout-week").value="2";document.getElementById("tb-previous-workout-week").dispatchEvent(new Event("change"))');
+    assert((await evaluate('document.getElementById("tb-previous-workout-content").textContent')).includes('6–8'));
+    assert(await evaluate('JSON.stringify(VIEW_STUDENT.workouts)===originalWorkouts&&VIEW_STUDENT_WORKOUT===originalCurrent'),'Comparing a prior protocol cannot modify either prescription or the current editor context');
+    await evaluate('closeModal("tb-trainer-previous-workout-modal")');await sleep(100);
+    await evaluate('CURRENT_USER.role="student"');assert.equal(await evaluate('TeamBullsTrainerWorkspace.openPreviousWorkout()'),false);await evaluate('CURRENT_USER.role="trainer"');
+
     assert.deepEqual(await evaluate('window.errors'),[]);results.push({width,height});
   }
   await command('Page.navigate',{url:'http://127.0.0.1:'+server.address().port+'/?late-reference=1'});
@@ -276,7 +298,7 @@ try {
   await sleep(150);
   assert(await evaluate('document.getElementById("modal-weekly-checkin-view").classList.contains("open")'),'Loading the workspace after a report opened must preserve that report');
   assert.deepEqual(await evaluate('window.errors'),[]);
-  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows.');
+  console.log('PASS real click flows on mobile/desktop: photo selection/close/download/late thumbnail, nested weekly/questionnaire close/back with preserved scroll, focus and history, chronological comparison, catalog failure+retry, delete confirmation, technique save and full diet-day copy with replacement, retry, new-day scheduling and independent trainer photo/draft/editor windows and prior-protocol comparison across eight weeks.');
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

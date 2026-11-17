@@ -54,7 +54,7 @@ const config=read('config_v10_7.js');
   ['modules/app-update-v10_10_9.js','Loader não inclui a atualização de UX/performance.'],
   ['modules/diet-scroll-fix-v10_10_9.js','Loader não inclui a correção de scroll da dieta.'],
   ['modules/modal-form-guard-v10_10_9.js','Loader não inclui a proteção de modais.'],
-  ['modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace4','Loader não usa workspace4 do visualizador de relatórios.'],
+  ['modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace5','Loader não usa workspace5 do visualizador de relatórios.'],
   ['modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','Loader não inclui o cronômetro corrigido.'],
   ['modules/global-performance-v10_10_9.js?v=10.10.9-perf2','Loader não inclui perf2.'],
   ['modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2','Loader não inclui o hotfix de treino.'],
@@ -126,7 +126,7 @@ const transition=transitionStart>=0&&transitionEnd>transitionStart?workspace.sli
 has(transition,'if(!reportViewerIsOpen(targetModalId))await Promise.resolve(result)','Transição não aguarda viewer assíncrono quando necessário.');
 has(transition,"if(!reportViewerIsOpen(targetModalId))throw new Error('Visualizador não abriu: '+targetModalId)",'Transição não confirma a abertura do modal definitivo.');
 lacks(transition,"closeModal('tb-trainer-reports-modal')",'Abrir um relatório deve preservar a consulta rápida aberta pelo treinador.');
-has(workspace,"version:'10.10.9-workspace4'",'Workspace não identifica workspace4.');
+has(workspace,"version:'10.10.9-workspace5'",'Workspace não identifica workspace5.');
 has(workspace,"['showScreen','openModal','closeModal'].forEach(wrapUiFunction)",'Workspace não sincroniza pelas funções reais de UI.');
 has(workspace,"observer.observe(modal,{attributes:true,attributeFilter:['class']})",'Observação individual dos modais ausente.');
 has(workspace,"additionsObserver.observe(document.body,{subtree:true,childList:true})",'Workspace não acompanha modais adicionados.');
@@ -282,7 +282,7 @@ has(sw,'async function cachePathsWithLimit','Preparação de shell com limite au
   './modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1',
   './modules/diet-scroll-fix-v10_10_9.js?v=10.10.9&scroll=top1',
   './modules/modal-form-guard-v10_10_9.js?v=10.10.9&independent=1',
-  './modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace4',
+  './modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace5',
   './modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1',
   './modules/global-performance-v10_10_9.js?v=10.10.9-perf2',
   './modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2',

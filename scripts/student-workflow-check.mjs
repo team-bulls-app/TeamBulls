@@ -38,7 +38,15 @@ assert.equal(reportCalls[0][1].headers['X-Firebase-AppCheck'],'synthetic-app-che
 assert.equal(reportCalls[0][1].headers.Authorization,'Bearer synthetic-id-token');
 assert.equal(JSON.parse(reportCalls[1][1].body).structuredQuery.where.fieldFilter.value.stringValue,'student');
 await assert.rejects(readPeriod('other'),/sessão/);
-assert.equal(reportCalls.length,2);
+assert.equal(reportCalls.length,4);
+assert(reportCalls.some(([url])=>url.endsWith('/protocolReviewSchedules/student')));
+const monthlyQuery=reportCalls.map(([,options])=>options.body?JSON.parse(options.body).structuredQuery:null).find(query=>query?.from?.[0]?.collectionId==='questionnaires');
+assert.deepEqual(monthlyQuery.where.compositeFilter.filters,[
+  {fieldFilter:{field:{fieldPath:'studentId'},op:'EQUAL',value:{stringValue:'student'}}},
+  {fieldFilter:{field:{fieldPath:'reportType'},op:'EQUAL',value:{stringValue:'monthly'}}}
+]);
+assert.equal(fresh.monthlyReports.length,1);
+assert(reportCalls.every(([,options])=>options.headers.Authorization==='Bearer synthetic-id-token'&&options.headers['X-Firebase-AppCheck']==='synthetic-app-check'));
 
 // The receipt query can establish absence without reading a missing document.
 const receipt=await report.window.testWeeklyReceipt('w');

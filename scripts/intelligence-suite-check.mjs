@@ -24,10 +24,10 @@ for(const [name,code] of Object.entries(src)){
   new vm.Script(code,{filename:files[name]});
 }
 
-assert(src.bootstrap.includes("intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite13"),'bootstrap: PWA precisa solicitar o loader auditado com nova chave de cache');
-assert(src.bootstrap.includes("EXPECTED_VERSION='10.10.58-intelsuite13'"),'bootstrap: versão esperada do loader auditado está incorreta');
-assert(src.loader.includes("VERSION='10.10.58-intelsuite13'"),'loader: revisão auditada não está ativa');
-assert(src.loader.includes('weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity8'),'loader: guarda semanal com retry seguro não está ativa');
+assert(src.bootstrap.includes("intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite14"),'bootstrap: PWA precisa solicitar o loader auditado com nova chave de cache');
+assert(src.bootstrap.includes("EXPECTED_VERSION='10.10.58-intelsuite14'"),'bootstrap: versão esperada do loader auditado está incorreta');
+assert(src.loader.includes("VERSION='10.10.58-intelsuite14'"),'loader: revisão auditada não está ativa');
+assert(src.loader.includes('weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity9'),'loader: guarda semanal com retry seguro não está ativa');
 for(const version of ['inteldata4','contextguard5','command3','studentinsights4','studentprogress3'])assert(src.loader.includes(version),`loader: módulo auditado ausente — ${version}`);
 assert(src.loader.indexOf('trainer-intelligence-data-v10_10_42.js')<src.loader.indexOf('trainer-command-center-v10_10_42.js'),'loader: dados precisam carregar antes da central');
 assert(src.loader.indexOf('trainer-canonical-context-guard-v10_10_42.js')<src.loader.indexOf('trainer-student-insights-v10_10_42.js'),'loader: guarda canônica deve carregar antes das telas do treinador');

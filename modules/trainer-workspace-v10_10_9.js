@@ -37,7 +37,7 @@
   }
 
 
-  const REFERENCE_MODALS=new Set(['tb-trainer-reports-modal','tb-trainer-note-modal','modal-weekly-checkin-view','modal-view-quest','modal-photo-view','modal-compare-photos']);
+  const REFERENCE_MODALS=new Set(['tb-trainer-reports-modal','tb-trainer-note-modal','modal-weekly-checkin-view','modal-view-quest','modal-photo-view','modal-compare-photos','tb-trainer-previous-workout-modal']);
   const EDITOR_MODALS=new Set(['modal-exercise','modal-prescription','modal-day','modal-workout','modal-meal','modal-diet','modal-diet-variant']);
   function wideWorkspace(){return !!trainerStudent()&&window.matchMedia('(min-width:1200px) and (pointer:fine)').matches;}
   function syncWorkspaceLayout(){
@@ -114,17 +114,21 @@
   function ensureDock(){
     ensureStyles();let dock=document.getElementById('tb-trainer-tools');if(dock)return dock;
     dock=document.createElement('div');dock.id='tb-trainer-tools';dock.className='tb-trainer-tools';dock.setAttribute('aria-label','Ferramentas privadas do treinador');
-    dock.innerHTML='<button type="button" class="tb-trainer-tool" id="tb-open-student-reports">📋 RELATÓRIOS / FOTOS</button><button type="button" class="tb-trainer-tool secondary" id="tb-open-private-note">✎ RASCUNHO</button>';
+    dock.innerHTML='<button type="button" class="tb-trainer-tool" id="tb-open-student-reports">📋 RELATÓRIOS / FOTOS</button><button type="button" class="tb-trainer-tool secondary" id="tb-open-private-note">✎ RASCUNHO</button><button type="button" class="tb-trainer-tool secondary" id="tb-open-previous-workout">TREINO ANTERIOR</button>';
     document.body.appendChild(dock);
     dock.querySelector('#tb-open-student-reports').addEventListener('click',openQuickReports);
     dock.querySelector('#tb-open-private-note').addEventListener('click',openPrivateNote);
+    dock.querySelector('#tb-open-previous-workout').addEventListener('click',openPreviousWorkout);
     return dock;
   }
   function syncDock(){
     const dock=ensureDock(),student=trainerStudent();syncWorkspaceLayout();
     const visible=!!student&&PRESCRIPTION_SCREENS.has(activeScreenId())&&!reportViewerTransition&&(!anyOpenModal()||wideWorkspace()&&!document.body.classList.contains('tb-workspace-blocked'));
     dock.classList.toggle('visible',visible);
-    if(visible){dock.querySelector('#tb-open-private-note').title='Rascunho privado de '+studentName();dock.querySelector('#tb-open-student-reports').title='Relatórios e fotos de '+studentName();}
+    if(visible){
+      const previous=dock.querySelector('#tb-open-previous-workout');
+      previous.hidden=typeof VIEW_STUDENT_WORKOUT==='undefined'||!VIEW_STUDENT_WORKOUT||!(student.workouts||[]).some(workout=>workout.id===VIEW_STUDENT_WORKOUT.id);
+      dock.querySelector('#tb-open-private-note').title='Rascunho privado de '+studentName();dock.querySelector('#tb-open-student-reports').title='Relatórios e fotos de '+studentName();}
   }
   function scheduleDockSync(){
     if(dockSyncFrame)cancelAnimationFrame(dockSyncFrame);
@@ -214,6 +218,54 @@
     const student=trainerStudent();if(!student)return;ensureReportsModal();document.getElementById('tb-trainer-reports-title').textContent='Relatórios e fotos';document.getElementById('tb-trainer-reports-sub').textContent=studentName()+' · consulta rápida sem sair da prescrição';openModal('tb-trainer-reports-modal');raiseReference('tb-trainer-reports-modal');syncDock();loadQuickReports(false);
   }
 
+
+  let previousWorkoutContext=null;
+  function previousWorkoutOptions(){
+    const student=trainerStudent(),current=typeof VIEW_STUDENT_WORKOUT!=='undefined'?VIEW_STUDENT_WORKOUT:null;
+    if(!student||!current||!(student.workouts||[]).some(workout=>workout.id===current.id))return[];
+    return(student.workouts||[]).filter(workout=>workout.id!==current.id&&(!current.startDate||!workout.startDate||workout.startDate<=current.startDate))
+      .slice().sort((a,b)=>String(b.startDate||'').localeCompare(String(a.startDate||''))||(Number(b.createdAt?.seconds)||0)-(Number(a.createdAt?.seconds)||0));
+  }
+  function renderPreviousWorkout(){
+    const context=previousWorkoutContext,student=trainerStudent();
+    if(!context||!student||context.studentUid!==student.uid||context.trainerUid!==CURRENT_USER.uid)return false;
+    const select=document.getElementById('tb-previous-workout-select'),week=Number(document.getElementById('tb-previous-workout-week')?.value)||1;
+    const workout=(student.workouts||[]).find(item=>String(item.id)===String(select.value));
+    const host=document.getElementById('tb-previous-workout-content');
+    if(!workout){host.innerHTML='<div class="tb-workspace-empty">Este aluno ainda não tem outro protocolo anterior salvo.</div>';return false;}
+    const days=getWorkoutDays(workout);
+    host.innerHTML='<div class="plan-help form-group">'+safe(workout.name)+' · início '+safe(dateLabel(workout.startDate))+' · atualização '+safe(dateLabel(workout.updateDate))+'</div>'+
+      days.map(day=>'<section class="form-group"><h3 class="modal-title">'+safe(day.name)+'</h3>'+exercisesForDay(workout,day.name).map(exercise=>{
+        const summary=prescriptionCompactSummary(exercise,week),techniques=resolveWeekTechniqueConfig(exercise,week).techniqueIds;
+        const names=techniques.map(id=>TECHNIQUE_CATALOG.items.find(item=>item.id===id)).filter(Boolean).map(item=>item.code+' · '+item.name);
+        return'<article class="tb-workspace-empty"><strong>'+safe(exercise.name)+'</strong><p>'+safe(summary.reps)+(summary.ger?' · '+safe(summary.ger):'')+'</p>'+
+          (names.length?'<p>'+safe(names.join(' / '))+'</p>':'')+
+          (exercise.instructions?'<p>'+safe(exercise.instructions).replace(/\n/g,'<br>')+'</p>':'')+'</article>';
+      }).join('')+'</section>').join('');
+    return true;
+  }
+  function openPreviousWorkout(){
+    const student=trainerStudent();if(!student||typeof VIEW_STUDENT_WORKOUT==='undefined'||!VIEW_STUDENT_WORKOUT||!(student.workouts||[]).some(workout=>workout.id===VIEW_STUDENT_WORKOUT.id))return false;
+    previousWorkoutContext={studentUid:student.uid,trainerUid:CURRENT_USER.uid};
+    let modal=document.getElementById('tb-trainer-previous-workout-modal');
+    if(!modal){
+      modal=document.createElement('div');modal.id='tb-trainer-previous-workout-modal';modal.className='modal-backdrop';
+      modal.innerHTML='<div class="modal-sheet tb-workspace-sheet"><div class="modal-handle"></div><div class="modal-title">Treino anterior</div><div class="tb-workspace-title-sub" id="tb-previous-workout-student"></div><div class="form-group"><label class="form-label" for="tb-previous-workout-select">Protocolo para consultar</label><select class="form-input" id="tb-previous-workout-select"></select></div><div class="form-group"><label class="form-label" for="tb-previous-workout-week">Semana da prescrição</label><select class="form-input" id="tb-previous-workout-week"></select></div><div id="tb-previous-workout-content"></div><button type="button" class="btn-ghost" onclick="closeModal(\'tb-trainer-previous-workout-modal\')">FECHAR</button></div>';
+      document.body.appendChild(modal);
+      modal.querySelector('#tb-previous-workout-select').addEventListener('change',renderPreviousWorkout);
+      const weeks=modal.querySelector('#tb-previous-workout-week');
+      for(let week=1;week<=8;week++){const option=document.createElement('option');option.value=String(week);option.textContent='Semana '+week;weeks.appendChild(option);}
+      weeks.addEventListener('change',renderPreviousWorkout);
+    }
+    document.getElementById('tb-previous-workout-student').textContent=studentName()+' · comparação com '+VIEW_STUDENT_WORKOUT.name;
+    const select=document.getElementById('tb-previous-workout-select');select.replaceChildren();
+    for(const workout of previousWorkoutOptions()){
+      const option=document.createElement('option');option.value=String(workout.id);option.textContent=workout.name+(workout.startDate?' · '+dateLabel(workout.startDate):'');select.appendChild(option);
+    }
+    document.getElementById('tb-previous-workout-week').value='1';
+    renderPreviousWorkout();openModal(modal.id);raiseReference(modal.id);syncDock();return true;
+  }
+
   function ensureNoteModal(){
     let modal=document.getElementById('tb-trainer-note-modal');if(modal)return modal;
     modal=document.createElement('div');modal.id='tb-trainer-note-modal';modal.className='modal-backdrop';modal.dataset.tbBackdropClose='block';modal.innerHTML=`<div class="modal-sheet tb-workspace-sheet"><div class="modal-handle"></div><div class="modal-title">Rascunho privado</div><div class="tb-workspace-title-sub" id="tb-private-note-student"></div><textarea id="tb-private-note-text" class="form-input tb-private-note" maxlength="${NOTE_MAX}" rows="10" placeholder="Ex.: pontos observados nas fotos, ajustes para próximo treino, estratégia da dieta, lembretes para a próxima revisão…"></textarea><div class="tb-private-note-hint">Somente sua conta de treinador pode acessar este rascunho. O aluno não recebe nem consegue consultar este conteúdo.</div><button type="button" class="btn-primary" id="tb-private-note-save">SALVAR RASCUNHO</button><button type="button" class="btn-ghost" onclick="closeModal('tb-trainer-note-modal')">FECHAR</button><div class="tb-note-status" id="tb-private-note-status"></div></div>`;
@@ -266,6 +318,6 @@
     const additionsObserver=new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node instanceof HTMLElement)bindModalObservers(node);}))); 
     additionsObserver.observe(document.body,{subtree:true,childList:true});
   }
-  function install(){ensureStyles();ensureDock();ensureReportsModal();ensureNoteModal();['showScreen','openModal','closeModal'].forEach(wrapUiFunction);watchModalState();syncDock();window.addEventListener('pageshow',scheduleDockSync,{passive:true});window.addEventListener('resize',scheduleDockSync,{passive:true});window.TeamBullsTrainerWorkspace=Object.freeze({version:'10.10.9-workspace4',sync:syncDock,openReports:openQuickReports,openNote:openPrivateNote,refreshReports:()=>loadQuickReports(true)});}
+  function install(){ensureStyles();ensureDock();ensureReportsModal();ensureNoteModal();['showScreen','openModal','closeModal'].forEach(wrapUiFunction);watchModalState();syncDock();window.addEventListener('pageshow',scheduleDockSync,{passive:true});window.addEventListener('resize',scheduleDockSync,{passive:true});window.TeamBullsTrainerWorkspace=Object.freeze({version:'10.10.9-workspace5',sync:syncDock,openReports:openQuickReports,openNote:openPrivateNote,openPreviousWorkout,refreshReports:()=>loadQuickReports(true)});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
