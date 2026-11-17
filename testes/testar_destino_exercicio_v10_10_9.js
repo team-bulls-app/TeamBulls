@@ -7,7 +7,8 @@ const marker='/* Team Bulls v10.10.9 — navegação móvel integrada ao histór
 const navigation=marker+source.split(marker)[1];
 
 let activeScreen='screen-ts-day';
-let modalOpen=false;
+const modals=new Set();
+let refuseClose=false;
 const listeners={};
 const stack=[];
 let stackIndex=-1;
@@ -25,7 +26,7 @@ const context={
   document:{
     readyState:'complete',
     querySelector(selector){return selector==='.screen.active'?{id:activeScreen}:null;},
-    querySelectorAll(selector){return selector==='.modal-backdrop.open'&&modalOpen?[{id:'modal-exercise'}]:[];},
+    querySelectorAll(selector){return selector==='.modal-backdrop.open'?[...modals].map(id=>({id})):[];},
     addEventListener(){}
   },
   addEventListener(type,fn){(listeners[type]??=[]).push(fn);},
@@ -36,8 +37,8 @@ const context={
     back(){if(stackIndex<=0)return;stackIndex--;this.state=stack[stackIndex];for(const fn of listeners.popstate||[])fn({state:this.state});}
   },
   showScreen(id){activeScreen=id;},
-  openModal(){modalOpen=true;},
-  closeModal(){modalOpen=false;}
+  openModal(id){modals.add(id);},
+  closeModal(id){if(refuseClose)return false;modals.delete(id);}
 };
 context.window=context;
 vm.createContext(context);
@@ -61,6 +62,43 @@ assert(activeScreen==='screen-ts-day','a tela do dia não foi preservada');
 context.history.back();
 assert(context.VIEW_STUDENT_DAY==='Dia A','o gesto voltar não recuperou o contexto anterior');
 
+
+
+// A foto tem uma etapa própria. Fechar ou voltar preserva o relatório por baixo.
+context.openModal('modal-view-quest');
+const reportEntry=context.history.state.key;
+context.openModal('modal-photo-view');
+const photoEntry=context.history.state.key,historyLength=stack.length;
+context.openModal('modal-photo-view');
+assert(context.history.state.key===photoEntry&&stack.length===historyLength,'reabrir a foto já visível criou outra etapa no histórico');
+context.closeModal('modal-photo-view');
+assert(modals.has('modal-view-quest'),'fechar a foto também fechou o relatório');
+assert(!modals.has('modal-photo-view'),'foto continuou aberta');
+assert(context.history.state.key===reportEntry,'o retorno não ficou na etapa do relatório');
+context.openModal('modal-photo-view');
+context.history.back();
+assert(modals.has('modal-view-quest')&&!modals.has('modal-photo-view'),'voltar deve fechar só a foto');
+context.history.back();
+assert(!modals.has('modal-view-quest'),'o segundo voltar deve fechar o relatório');
+context.openModal('modal-view-quest');
+const beforeRefusal=context.history.state.key;
+refuseClose=true;
+context.closeModal('modal-view-quest');
+assert(context.history.state.key===beforeRefusal&&modals.has('modal-view-quest'),'fechamento recusado deve preservar histórico e relatório');
+refuseClose=false;
+context.closeModal('modal-view-quest');
+context.openModal('modal-view-quest');
+context.openModal('modal-photo-view');
+let backCalls=0;
+const originalBack=context.history.back;
+context.history.back=function(){backCalls++;};
+context.closeModal('modal-photo-view');
+context.closeModal('modal-photo-view');
+assert(backCalls===1,'toque repetido consumiu duas etapas do histórico');
+context.history.back=originalBack;
+context.history.back();
+assert(modals.has('modal-view-quest'),'toque repetido fechou o relatório');
+context.closeModal('modal-view-quest');
 
 const core=fs.readFileSync(path.join(__dirname,'..','app_v10_10_9_core.js'),'utf8');
 const trainerSync=core.indexOf("syncExerciseDestinationBeforeClose('student',localWorkout,dayName)");

@@ -435,8 +435,18 @@ let INACTIVE_UID = '';            // uid preservado para marcar alterações off
 
 function localGeneratedId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function safeDayName(value){return String(value||'').normalize('NFKC').trim().replace(/\s+/g,' ').slice(0,60)||'Treino geral';}
-const WORKOUT_MUSCLE_GROUPS=['Peito','Costas','Ombros','Bíceps','Tríceps','Antebraços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Trapézio','Adutores','Abdutores'];
-function normalizeMuscleGroups(value){const allowed=new Set(WORKOUT_MUSCLE_GROUPS.map(normalizedName));const seen=new Set();return(Array.isArray(value)?value:[]).map(item=>String(item||'').trim()).filter(item=>{const key=normalizedName(item);if(!allowed.has(key)||seen.has(key))return false;seen.add(key);return true;}).slice(0,WORKOUT_MUSCLE_GROUPS.length);}
+const WORKOUT_MUSCLE_GROUPS=['Peito','Costas','Ombros e trapézios','Braços','Abdômen','Quadríceps','Posteriores','Glúteos','Panturrilhas','Abdutores'];
+function normalizeMuscleGroups(value){
+  const aliases=new Map([
+    ...WORKOUT_MUSCLE_GROUPS.map(group=>[normalizedName(group),group]),
+    ['ombros','Ombros e trapézios'],['trapézio','Ombros e trapézios'],['trapézios','Ombros e trapézios'],
+    ['bíceps','Braços'],['tríceps','Braços'],['antebraços','Braços'],['antebraço','Braços'],
+    ['adutores','Adutores']
+  ]);
+  // Mantém a leitura do grupo antigo em históricos já salvos.
+  const groups=(Array.isArray(value)?value:[]).map(item=>aliases.get(normalizedName(item))).filter(Boolean);
+  return [...new Set(groups)];
+}
 function safeWorkoutGuidance(value){return String(value||'').normalize('NFKC').trim().replace(/[<>]/g,'').slice(0,160);}
 function dayIdFromName(value){
   const source=normalizedName(safeDayName(value));let hash=2166136261;
@@ -8904,7 +8914,7 @@ const V106_MODAL_RETURN_FOCUS=new WeakMap();
 const V106_BASE_OPEN_MODAL=openModal,V106_BASE_CLOSE_MODAL=closeModal;
 openModal=function(id){
   const modal=document.getElementById(id);if(!modal)return;
-  V106_MODAL_RETURN_FOCUS.set(modal,document.activeElement);
+  if(!modal.classList.contains('open'))V106_MODAL_RETURN_FOCUS.set(modal,document.activeElement);
   modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
   V106_BASE_OPEN_MODAL(id);
   requestAnimationFrame(()=>{

@@ -268,11 +268,11 @@
 /* Team Bulls v10.10.9 — navegação móvel integrada ao histórico e ao contexto interno. */
 (()=>{
   'use strict';
-  const snapshots=new Map();let sequence=0,currentKey='',sentinelKey='',rootKey='',restoring=false,initialized=false;
+  const snapshots=new Map();let sequence=0,currentKey='',sentinelKey='',rootKey='',restoring=false,initialized=false,pendingModalBack='';
   const activeScreen=()=>document.querySelector('.screen.active')?.id||'screen-loading';
   const entityId=value=>String(value?.uid||value?.id||value||'');
   function capture(screen=activeScreen()){
-    return{screen,curWorkout:typeof CUR_WORKOUT!=='undefined'?CUR_WORKOUT:null,curDay:typeof CUR_DAY!=='undefined'?CUR_DAY:'',curEx:typeof CUR_EX!=='undefined'?CUR_EX:null,viewStudent:typeof VIEW_STUDENT!=='undefined'?VIEW_STUDENT:null,viewStudentWorkout:typeof VIEW_STUDENT_WORKOUT!=='undefined'?VIEW_STUDENT_WORKOUT:null,viewStudentDay:typeof VIEW_STUDENT_DAY!=='undefined'?VIEW_STUDENT_DAY:'',viewStudentExercise:typeof VIEW_STUDENT_EXERCISE!=='undefined'?VIEW_STUDENT_EXERCISE:null,currentDietId:typeof CURRENT_DIET_ID!=='undefined'?CURRENT_DIET_ID:'',dietVariantId:typeof CURRENT_DIET_VARIANT_ID!=='undefined'?CURRENT_DIET_VARIANT_ID:''};
+    return{screen,modals:[...document.querySelectorAll('.modal-backdrop.open')].map(modal=>modal.id),curWorkout:typeof CUR_WORKOUT!=='undefined'?CUR_WORKOUT:null,curDay:typeof CUR_DAY!=='undefined'?CUR_DAY:'',curEx:typeof CUR_EX!=='undefined'?CUR_EX:null,viewStudent:typeof VIEW_STUDENT!=='undefined'?VIEW_STUDENT:null,viewStudentWorkout:typeof VIEW_STUDENT_WORKOUT!=='undefined'?VIEW_STUDENT_WORKOUT:null,viewStudentDay:typeof VIEW_STUDENT_DAY!=='undefined'?VIEW_STUDENT_DAY:'',viewStudentExercise:typeof VIEW_STUDENT_EXERCISE!=='undefined'?VIEW_STUDENT_EXERCISE:null,currentDietId:typeof CURRENT_DIET_ID!=='undefined'?CURRENT_DIET_ID:'',dietVariantId:typeof CURRENT_DIET_VARIANT_ID!=='undefined'?CURRENT_DIET_VARIANT_ID:''};
   }
   function contextSignature(snapshot){
     if(!snapshot)return'';
@@ -283,7 +283,7 @@
     ].join('|');
   }
   function restoreContext(snapshot){if(!snapshot)return;try{if(typeof CUR_WORKOUT!=='undefined')CUR_WORKOUT=snapshot.curWorkout;if(typeof CUR_DAY!=='undefined')CUR_DAY=snapshot.curDay||'';if(typeof CUR_EX!=='undefined')CUR_EX=snapshot.curEx;if(typeof VIEW_STUDENT!=='undefined')VIEW_STUDENT=snapshot.viewStudent;if(typeof VIEW_STUDENT_WORKOUT!=='undefined')VIEW_STUDENT_WORKOUT=snapshot.viewStudentWorkout;if(typeof VIEW_STUDENT_DAY!=='undefined')VIEW_STUDENT_DAY=snapshot.viewStudentDay||'';if(typeof VIEW_STUDENT_EXERCISE!=='undefined')VIEW_STUDENT_EXERCISE=snapshot.viewStudentExercise;if(typeof CURRENT_DIET_ID!=='undefined')CURRENT_DIET_ID=snapshot.currentDietId||'';if(typeof CURRENT_DIET_VARIANT_ID!=='undefined')CURRENT_DIET_VARIANT_ID=snapshot.dietVariantId||'';}catch(error){}}
-  const topModal=()=>[...document.querySelectorAll('.modal-backdrop.open')].pop()||null;
+  const openModals=()=>[...document.querySelectorAll('.modal-backdrop.open')].sort((a,b)=>(Number(a.dataset?.tbModalOpenSeq)||0)-(Number(b.dataset?.tbModalOpenSeq)||0));
   function stateFor(snapshot,extra={}){const key='tb-'+(++sequence),parentKey=Object.prototype.hasOwnProperty.call(extra,'parentKey')?extra.parentKey:(currentKey||'');snapshots.set(key,snapshot);return{teamBulls:true,key,parentKey,...extra};}
   function syncCurrentSnapshot(snapshot=capture()){
     if(currentKey&&snapshots.has(currentKey))snapshots.set(currentKey,snapshot);
@@ -298,7 +298,10 @@
     const sameView=contextSignature(capture())===contextSignature(snapshot);
     restoring=true;
     try{
-      const modal=topModal();if(modal)window.__TB_HISTORY_BASE_CLOSE__?.(modal.id);
+      const expected=new Set(sameView?snapshot.modals||[]:[]);
+      for(const modal of openModals().reverse()){
+        if(!expected.has(modal.id))window.__TB_HISTORY_BASE_CLOSE__?.(modal.id);
+      }
       restoreContext(snapshot);
       if(!sameView)window.__TB_HISTORY_BASE_SHOW__?.(snapshot.screen);
     }finally{restoring=false;}
@@ -326,23 +329,36 @@
       const next=stateFor(snapshot);history.pushState(next,'',location.href);currentKey=next.key;return result;
     };
     window.openModal=function(id){
+      const alreadyOpen=openModals().some(modal=>modal.id===id);
       syncCurrentSnapshot(capture());
       const result=baseOpen.call(this,id);
-      if(!restoring&&id){const state=stateFor(capture(),{modal:id});history.pushState(state,'',location.href);currentKey=state.key;}
+      if(!restoring&&id&&!alreadyOpen&&result!==false&&openModals().some(modal=>modal.id===id)){
+        const replacing=pendingModalBack===history.state?.key;
+        const state=stateFor(capture(),{modal:id,...(replacing?{parentKey:history.state.parentKey}:{})});
+        if(replacing){pendingModalBack='';history.replaceState(state,'',location.href);}
+        else history.pushState(state,'',location.href);
+        currentKey=state.key;
+      }
       return result;
     };
     window.closeModal=function(id){
-      const isHistoryModal=!restoring&&history.state?.teamBulls&&history.state.modal===id;
+      const opened=openModals().some(modal=>modal.id===id);
+      const isHistoryModal=opened&&!restoring&&history.state?.teamBulls&&history.state.modal===id&&pendingModalBack!==history.state.key;
+      const result=baseClose.call(this,id);
+      if(result===false||openModals().some(modal=>modal.id===id))return result;
       if(isHistoryModal){
         const snapshot=capture(activeScreen()),prior=previousEntry(history.state);
         if(prior)snapshots.set(prior[0],snapshot);
         syncCurrentSnapshot(snapshot);
+        const closingKey=history.state.key;
+        pendingModalBack=closingKey;
+        setTimeout(()=>{
+          if(pendingModalBack===closingKey&&history.state?.key===closingKey)history.back();
+        },0);
       }
-      const result=baseClose.call(this,id);
-      if(isHistoryModal)history.back();
       return result;
     };
-    addEventListener('popstate',event=>{const state=event.state;if(!state?.teamBulls){const guard=stateFor(capture(activeScreen()),{root:true});history.pushState(guard,'',location.href);currentKey=guard.key;return;}if(state.sentinel){const guard=stateFor(snapshots.get(state.key)||capture(activeScreen()),{root:true});history.pushState(guard,'',location.href);currentKey=guard.key;return;}restoreState(state);});
+    addEventListener('popstate',event=>{pendingModalBack='';const state=event.state;if(!state?.teamBulls){const guard=stateFor(capture(activeScreen()),{root:true});history.pushState(guard,'',location.href);currentKey=guard.key;return;}if(state.sentinel){const guard=stateFor(snapshots.get(state.key)||capture(activeScreen()),{root:true});history.pushState(guard,'',location.href);currentKey=guard.key;return;}restoreState(state);});
     window.TeamBullsNavigation=Object.freeze({back:()=>history.back(),current:()=>history.state,syncCurrent:()=>syncCurrentSnapshot(capture()),signature:()=>contextSignature(capture())});
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});else setTimeout(init,0);
