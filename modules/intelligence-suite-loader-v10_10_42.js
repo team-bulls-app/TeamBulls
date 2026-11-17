@@ -1,7 +1,7 @@
 /* Team Bulls v10.10.57 — carregador isolado da suíte de inteligência, progresso e relatórios. */
 'use strict';
 (()=>{
-  const VERSION='10.10.58-intelsuite14';
+  const VERSION='10.10.58-intelsuite15';
   const registeredVersion=String(window.TeamBullsIntelligenceSuiteLoader?.version||'');
   const revision=value=>Number(/-intelsuite(\d+)$/.exec(String(value||''))?.[1]||0);
   if(registeredVersion===VERSION||revision(registeredVersion)>revision(VERSION))return;
@@ -25,7 +25,7 @@
       ['./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly3',()=>window.TeamBullsMonthlyReports?.version==='10.10.59-monthly3'],
       ['./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3',()=>window.TeamBullsForegroundWriteResilience?.version==='10.10.50-foregroundwrite3'],
       ['./modules/student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2',()=>window.TeamBullsStudentTrainerActivityBridge?.version==='10.10.47-activitybridge2'],
-      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate10',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate10'],
+      ['./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate11',()=>window.TeamBullsStudentReportSubmitReconciliation?.version==='10.10.57-submitstate11'],
       ['./modules/weekly-report-integrity-v10_10_58.js?v=10.10.58-weeklyintegrity9',()=>window.TeamBullsWeeklyReportIntegrity?.version==='10.10.58-weeklyintegrity9'],
       ['./modules/student-progress-hub-v10_10_42.js?v=10.10.66-studentprogress3',()=>window.TeamBullsStudentProgressHub?.version==='10.10.66-studentprogress3']
     ]

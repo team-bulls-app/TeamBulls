@@ -2,7 +2,7 @@
 // All accounts/data are synthetic; external requests are blocked.
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
-const names=[...variantFunctions,'openLogSessionModal','showConfirm','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
+const names=[...variantFunctions,'captureSessionDraftContext','sessionExerciseForSave','openLogSessionModal','showConfirm','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
 const techniqueNames=['studentTechniqueLabels','studentTechniqueGuide','openTechniqueDetail',...(core.includes('function studentMyoRepGuide(')?['studentMyoRepBand','studentMyoRepGuide','studentGerGuide']:[])];
 const hasTechniqueGuide=core.includes('function studentTechniqueGuide(');
 if(hasTechniqueGuide)names.push(...techniqueNames);
@@ -29,7 +29,7 @@ const stylesheet=baseline<0?fs.readFileSync('styles_v10_10_9.css'):spawnSync('gi
 const markup=fs.readFileSync('index.html','utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace(/<link\b[^>]*>/g,'');
 const setup=`
 let CURRENT_USER={uid:'s',role:'student'},MODE='cloud',LOCAL_OWNER_UID='',INACTIVE_UID='',LOCAL_DB={},AUTH_STATE_REVISION=1;
-let SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',CUR_WORKOUT='w',CUR_EX='e',CUR_DAY='A',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',LAST_SESSION_WEEK=2,SESSION_EDITOR_WEEK=2,SET_COUNT=0,EDIT_SET_COUNT=0,VARIANT_LOAD_SEQ=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
+let SESSION_DRAFT_CONTEXT=null;let SESSION_WID='w',SESSION_EID='e',SESSION_CREATE_ID='',CUR_WORKOUT='w',CUR_EX='e',CUR_DAY='A',EDIT_SESSION_ID='',EDIT_SESSION_WID='',EDIT_SESSION_EID='',LAST_SESSION_WEEK=2,SESSION_EDITOR_WEEK=2,SET_COUNT=0,EDIT_SET_COUNT=0,VARIANT_LOAD_SEQ=0,TRAINING_RECOMMENDATIONS_CONTEXT=null;
 let V109_PROTOCOL_REVIEW_SCHEDULE=null,MODAL_TARGET='student',EDIT_W='w',SEL_COLOR='#a855f7',WORKOUT_CREATE_ID=null;const PALETTE=['#e11d48','#a855f7'],ACTION_LOCKS=new Set();
 window.errors=[];window.messages=[];window.reads=[];window.writes=[];window.slowCatalog=false;window.holdRefresh=false;window.failRefresh=false;window.failWrites=false;window.holdWrite=false;window.releaseWrite=null;window.releaseCatalog=null;window.refreshed=0;
 window.alert=m=>messages.push(String(m));window.addEventListener('error',e=>errors.push(e.message));window.addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});
@@ -37,7 +37,7 @@ const group={id:'g',name:'Supino Reto',items:[{id:'dumbbell',name:'Supino reto c
 const exercise={id:'e',name:'Supino Reto',sessions:[{id:'old',userId:'s',date:'2026-11-01',week:1,performedExerciseItemId:'removed',performedExerciseName:'Supino autorizado antigo',sets:[{weight:60,reps:8}]}]};let tree=[{id:'w',userId:'s',name:'Treino antigo',color:'#e11d48',startDate:'2026-08-29',updateDate:'2026-10-24',isActive:false,exercises:[exercise]}];
 let VIEW_STUDENT={uid:'s',name:'Aluno de teste',workouts:tree},VIEW_STUDENT_WORKOUT=tree[0];const originalHistory=JSON.stringify(exercise.sessions);let count=0;
 const getE=(w,e)=>tree.find(x=>x.id===w)?.exercises.find(x=>x.id===e),getW=w=>tree.find(x=>x.id===w),getWorkouts=()=>tree;
-const auth={currentUser:{uid:'t'}},firebase={firestore:{FieldValue:{serverTimestamp:()=>123},Timestamp:{fromMillis:ms=>({ms})},FieldPath:{documentId:()=> '__name__'}}};
+const auth={currentUser:{uid:'s'}},firebase={firestore:{FieldValue:{serverTimestamp:()=>123},Timestamp:{fromMillis:ms=>({ms})},FieldPath:{documentId:()=> '__name__'}}};
 window.remote={'workouts/w':{userId:'s',name:'Treino antigo',color:'#e11d48',startDate:'2026-08-29',updateDate:'2026-10-24',isActive:false},'protocolReviewSchedules/s':{studentId:'s',trainerId:'t',sourceWorkoutId:'active',startDate:'2026-10-01',intervalWeeks:4,lastCompletedCycle:2,lastCompletedDate:'2026-10-29'}};
 function ref(collection,id){return{key:collection+'/'+id,collection,id};}const db={collection:collection=>({where:()=>({get:async()=>({docs:Object.entries(remote).filter(([k,v])=>k.startsWith(collection+'/')&&v.userId==='s').map(([k,v])=>({id:k.split('/')[1],data:()=>structuredClone(v)}))})}),doc:id=>ref(collection,id)}),runTransaction:async run=>{const staged=[];const result=await run({get:async r=>{reads.push(r.key);if(r.collection==='protocolReviewSchedules')throw new Error('schedule unavailable');return{exists:!!remote[r.key],data:()=>structuredClone(remote[r.key])};},update:(r,p)=>staged.push({key:r.key,p:structuredClone(p)}),set:(r,p)=>staged.push({key:r.key,p:structuredClone(p)})});if(holdWrite)await new Promise(r=>releaseWrite=r);if(failWrites)throw new Error('simulated write failure');for(const row of staged){remote[row.key]={...remote[row.key],...row.p};writes.push(row);}return result;}};
 const cloudWrite=p=>p,cloudGet=r=>r.get(),showToast=m=>messages.push(m),today=()=> '2026-11-10',draftId=()=> 'new-session-'+(++count),uid=draftId,validIsoDate=s=>/^\\d{4}-\\d{2}-\\d{2}$/.test(s||''),addDaysIso=(s,n)=>{const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
@@ -157,7 +157,7 @@ window.openExerciseLayout=()=>{
   prepareFontScaleRules();
 };
 
-window.openProtocol=()=>{CURRENT_USER={uid:'t',role:'trainer'};VIEW_STUDENT={uid:'s',name:'Aluno de teste',workouts:tree};openEditWorkoutTs('w');document.getElementById('input-workout-start-date').value='2026-08-29';document.getElementById('input-workout-update-date').value='2026-10-24';};
+window.openProtocol=()=>{CURRENT_USER={uid:'t',role:'trainer'};auth.currentUser={uid:'t'};VIEW_STUDENT={uid:'s',name:'Aluno de teste',workouts:tree};openEditWorkoutTs('w');document.getElementById('input-workout-start-date').value='2026-08-29';document.getElementById('input-workout-update-date').value='2026-10-24';};
 const baseSave=saveWorkout;saveWorkout=function(){return window.saveCompletion=baseSave();};window.fixtureReady=true;
 `;
 const fixture=markup.replace('</head>','<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/home.css"></head>').replace('</body>','<script src="/fixture.js"></script><script src="/perf.js"></script><script src="/week.js"></script><script src="/battle.js"></script></body>');
@@ -372,6 +372,15 @@ try{
   await evaluate(`failRefresh=false;holdRefresh=true;openProtocol();document.getElementById('input-workout-name').value='Intermediário';document.querySelector('#modal-workout [onclick="saveWorkoutFromButton()"]').click();void 0`);await sleep(30);
   await evaluate(`window.olderCompletion=saveCompletion;window.olderRefresh=releaseRefresh;holdRefresh=false;openProtocol();document.getElementById('input-workout-name').value='Nome final';document.querySelector('#modal-workout [onclick="saveWorkoutFromButton()"]').click();saveCompletion`);
   await evaluate(`olderRefresh();olderCompletion`);assert.equal(await evaluate(`VIEW_STUDENT.workouts[0].name`),'Nome final','An older reload cannot reapply its previous confirmed name after a newer save');
+  await evaluate('window.beforeChairTree=tree;CURRENT_USER={uid:"s",role:"student"};auth.currentUser={uid:"s"};MODE="cloud";CUR_WORKOUT="chair-w";CUR_EX="flexora";tree=[{id:"chair-w",userId:"s",name:"Inferior",exercises:[{id:"flexora",name:"Cadeira flexora",sessions:[],techniqueIds:["bos"]}]}];slowCatalog=false;openLogSessionModal();document.querySelector(\'#sets-editor [data-f="w"]\').value="45";document.querySelector(\'#sets-editor [data-f="r"]\').value="8";document.querySelector("#sets-editor .performed-set-row").dataset.backoff="1";window.chairSessionId=SESSION_CREATE_ID;tree[0].exercises=[]');
+  await evaluate('document.querySelector(\'#modal-session [onclick="saveSession()"]\').click()');
+  for(let i=0;i<100;i++){if(await evaluate('!document.getElementById("modal-session").classList.contains("open")'))break;await sleep(20);}
+  const chair=await evaluate('TeamBullsSessionPerformance.sessions().find(row=>row.id===chairSessionId)');
+  assert(chair,'A real chair form must save after its live exercise disappears during refresh');
+  assert.equal(chair.exerciseId,'flexora');assert.equal(chair.workoutId,'chair-w');assert.equal(chair.exerciseName,'Cadeira flexora');
+  assert.equal(chair.sets[0].weight,45);assert.equal(chair.sets[0].reps,8);assert.equal(chair.sets[0].backoff,true);
+  assert.equal(await evaluate('tree[0].exercises.length'),0,'The save must not recreate an exercise in the protocol');
+  await evaluate('tree=beforeChairTree;CUR_WORKOUT="w";CUR_EX="e"');
   assert.deepEqual(await evaluate('errors'),[]);passed++;
  }
  await command('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
@@ -457,7 +466,7 @@ try{
  assert.equal(await evaluate(`exercise.sessions.some(item=>item.id==='old')`),true);
  assert.deepEqual(await evaluate('errors'),[]);
  console.log('PASS Batalha do dia in browser: stays on Home, preserves guide in Treino, highlights the day, shows history and video, uses existing register editor, restores after reload and preserves legacy data and allows a confirmed repeat without adding a duplicate completion with full localStorage.');
- console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, real protocol rename with schedule unavailable, immediate unlock after confirmation, technique names, optional status and help by week, and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
+ console.log(`PASS ${passed} browser combinations: legacy/cached alternatives, real durable session payload and preserved sets/week/history, late catalog choice, historical removed alternative, stale account callback, prescribed Cadeira flexora with backoff surviving a structure refresh without recreating exercises, real protocol rename with schedule unavailable, immediate unlock after confirmation, technique names, optional status and help by week, and automatic mobile proportions for home, training, exercise and session forms at 256–1440 px in both themes.`);
 } finally {
   if(socket?.readyState===1){try{await command('Browser.close');}catch{}socket.close();}
   chrome.kill();

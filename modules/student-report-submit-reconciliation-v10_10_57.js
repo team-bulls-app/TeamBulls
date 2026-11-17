@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010579__)return;
   window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010579__=true;
 
-  const VERSION='10.10.57-submitstate10';
+  const VERSION='10.10.57-submitstate11';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -81,6 +81,17 @@
   }
 
   async function fetchJson(url,options={},timeoutMs=REST_GET_TIMEOUT,label='comunicação com Firestore'){
+    const method=String(options.method||'GET').toUpperCase(),readOnly=method==='GET'||method==='POST'&&String(url).endsWith(':runQuery');
+    const user=typeof auth==='undefined'?null:auth?.currentUser,started=Date.now();
+    try{return await fetchJsonOnce(url,options,timeoutMs,label);}
+    catch(error){
+      const transient=[408,500,502,503,504].includes(error?.status)||['team-bulls/rest-network','team-bulls/rest-timeout'].includes(error?.code);
+      // Retry one failed-fast read, never a commit, permission denial or a long timeout.
+      if(!readOnly||!transient||Date.now()-started>1500||navigator.onLine===false||!user||auth?.currentUser!==user)throw error;
+      return fetchJsonOnce(url,options,timeoutMs,label);
+    }
+  }
+  async function fetchJsonOnce(url,options={},timeoutMs=REST_GET_TIMEOUT,label='comunicação com Firestore'){
     const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
     try{
       const response=await fetch(url,{...options,signal:controller.signal,cache:'no-store'});

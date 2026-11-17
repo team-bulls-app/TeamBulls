@@ -35,6 +35,7 @@ jobs:
           node scripts/session-variant-protocol-browser-check.mjs
           node scripts/runtime-home-recovery-browser-check.mjs
           node scripts/runtime-stability-behavior-check.mjs
+          node scripts/extreme-stability-audit-check.mjs
           node scripts/runtime-idle-browser-check.mjs
           node scripts/action-outcomes-check.mjs
           node scripts/action-outcomes-browser-check.mjs

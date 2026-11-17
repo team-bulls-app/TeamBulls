@@ -379,6 +379,7 @@ let CUR_WORKOUT=null;
 let CUR_DAY='';
 let CUR_EX=null;
 let SESSION_WID=null;  // ID do treino travado ao abrir modal de nova sessão
+let SESSION_DRAFT_CONTEXT=null;
 let SESSION_EID=null;  // ID do exercício travado ao abrir modal de nova sessão
 let LAST_SESSION_WEEK=1; // lembra a última semana selecionada, para não ter que reescolher a cada série
 let TRAINER_ACTIVE_WEEK=1; // semana selecionada ao treinador visualizar/prescrever
@@ -1927,6 +1928,7 @@ function openCalDay(dateStr){
 ══════════════════════════════════════════════════ */
 let CLOUD_WORKOUTS=[];
 let CLOUD_LOAD_SEQ=0;
+let CLOUD_HOME_FLIGHT=null;
 
 // Arquivo local independente do desenho atual dos treinos. Ele preserva as
 // sessões por aluno mesmo quando um exercício é movido, recriado, renomeado ou
@@ -2110,7 +2112,7 @@ async function fetchCloudStructure(userId){
     queryServerFirst(db.collection('workouts').where('userId','==',userId),'treinos'),
     queryServerFirst(db.collection('exercises').where('userId','==',userId),'exercícios')
   ]);
-  return{workouts:buildCloudStructure(workoutResult.snapshot,exerciseResult.snapshot),source:workoutResult.source==='server'||exerciseResult.source==='server'?'server':'cache'};
+  return{workouts:buildCloudStructure(workoutResult.snapshot,exerciseResult.snapshot),source:workoutResult.source==='server'&&exerciseResult.source==='server'?'server':'cache'};
 }
 function pendingSessionHistory(userId){
   if(!userId||CURRENT_USER?.role!=='student'||CURRENT_USER.uid!==userId)return[];
@@ -2161,6 +2163,13 @@ async function hydrateHomeSessions(userId,loadSeq){
   }catch(error){console.warn('Histórico será mantido pelo arquivo local:',error?.code||error?.message);return false;}
 }
 async function loadCloudHome(){
+  const userId=CURRENT_USER?.uid;if(!userId)return false;
+  if(CLOUD_HOME_FLIGHT?.userId===userId)return CLOUD_HOME_FLIGHT.promise;
+  const flight={userId,promise:null};CLOUD_HOME_FLIGHT=flight;
+  flight.promise=loadCloudHomeOnce().finally(()=>{if(CLOUD_HOME_FLIGHT===flight)CLOUD_HOME_FLIGHT=null;});
+  return flight.promise;
+}
+async function loadCloudHomeOnce(){
   if(!CURRENT_USER)return false;
   const userId=CURRENT_USER.uid,loadSeq=++CLOUD_LOAD_SEQ;
   await withTimeout(warmSessionArchive(userId),900,'abrir arquivo local').catch(()=>{});
@@ -2168,13 +2177,18 @@ async function loadCloudHome(){
   if(!CLOUD_WORKOUTS.length){
     CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));if(CLOUD_WORKOUTS.length)hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);renderHome();
   }
+  if(typeof navigator!=='undefined'&&navigator.onLine===false){renderHome();return false;}
   try{
     const structure=await fetchCloudStructure(userId);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId||MODE!=='cloud')return false;
-    const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));CLOUD_WORKOUTS=hydrateWorkoutSessions(structure.workouts,archived);HISTORY_BY_NAME=buildHistoryByName(archived);saveCloudBackup();renderHome();
+    const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));
+    // An incomplete cache is not authoritative evidence that exercises were deleted.
+    if(structure.source==='server'||!CLOUD_WORKOUTS.length)CLOUD_WORKOUTS=hydrateWorkoutSessions(structure.workouts,archived);
+    else hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);
+    HISTORY_BY_NAME=buildHistoryByName(archived);saveCloudBackup();renderHome();
     // Não bloqueia a navegação: histórico e banners são tarefas de fundo.
     runWhenIdle(()=>hydrateHomeSessions(userId,loadSeq),1800);
-    return true;
+    return structure.source==='server';
   }catch(e){
     console.error('loadCloudHome error:',e.code,e.message);
     if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId)return false;
@@ -2233,6 +2247,21 @@ function loadFeedbackBanner(force=false){
 function getWorkouts(){return (MODE==='local')?LOCAL_DB.workouts:CLOUD_WORKOUTS;}
 function getW(id){return getWorkouts().find(w=>w.id===id);}
 function getE(wid,eid){const w=getW(wid);return w?w.exercises.find(e=>e.id===eid):null;}
+function captureSessionDraftContext(wid,eid){
+  const userId=String(CURRENT_USER?.uid||LOCAL_OWNER_UID||''),workout=getW(wid),exercise=getE(wid,eid);
+  if(!userId||!exercise||workout?.userId&&String(workout.userId)!==userId)return null;
+  // Do not clone the growing session history into the open form.
+  const metadata=JSON.parse(JSON.stringify({...exercise,sessions:[]}));
+  return{userId,workoutId:String(wid),exerciseId:String(eid),exercise:metadata};
+}
+function sessionExerciseForSave(wid,eid){
+  const context=SESSION_DRAFT_CONTEXT,userId=String(CURRENT_USER?.uid||LOCAL_OWNER_UID||'');
+  if(!context){const workout=getW(wid);return workout?.userId&&String(workout.userId)!==userId?null:getE(wid,eid);}
+  if(context.userId!==userId||context.workoutId!==String(wid)||context.exerciseId!==String(eid))return null;
+  if(typeof auth!=='undefined'&&auth?.currentUser?.uid&&MODE==='cloud'&&auth.currentUser.uid!==userId)return null;
+  return context.exercise;
+}
+
 
 /* ── Histórico compartilhado por nome ─────────────────────────────────
    Agrega sessões de TODOS os exercícios com o mesmo nome (case-insensitive)
@@ -5300,13 +5329,14 @@ async function saveExercise(){
 function openLogSessionModal(){
   SESSION_WID=CUR_WORKOUT;
   SESSION_EID=CUR_EX;
+  SESSION_DRAFT_CONTEXT=captureSessionDraftContext(SESSION_WID,SESSION_EID);
   SESSION_CREATE_ID=draftId('sessions');
   document.getElementById('input-session-date').value=today();
   document.getElementById('input-session-week').value=LAST_SESSION_WEEK;
   SESSION_EDITOR_WEEK=LAST_SESSION_WEEK;
   document.getElementById('input-session-note').value='';
   populateSessionEditorForWeek(SESSION_EDITOR_WEEK);
-  const exercise=getE(SESSION_WID,SESSION_EID);populateVariantSelect(exercise,'input-session-variant','session-variant-group');
+  const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);populateVariantSelect(exercise,'input-session-variant','session-variant-group');
   renderOptionalTechniqueMode(exercise);
   resetRestTimer();
   openModal('modal-session');
@@ -5319,7 +5349,7 @@ function renderSessionPrescriptionSummary(exercise,week,elId){
     :`<strong>Semana ${week}:</strong> sem prescrição cadastrada. O registro continuará disponível, mas confirme a orientação com o treinador.`;
 }
 function populateSessionEditorForWeek(week){
-  const exercise=getE(SESSION_WID,SESSION_EID);
+  const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);
   SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';
   const rx=resolveWeekPrescription(exercise,week);
   if(rx.sets.length)rx.sets.forEach(set=>addSetRow('','',set));
@@ -5462,7 +5492,7 @@ async function saveSession(){
   const week=parseInt(document.getElementById('input-session-week').value);
   if(!week||week<1||week>8){alert('Selecione a semana de treino!');return;}
   const note=document.getElementById('input-session-note').value.trim();
-  const exerciseForVariant=getE(wid,eid);const variant=selectedVariantData(exerciseForVariant,'input-session-variant');const performedTechniqueMode=selectedPerformedTechniqueMode(exerciseForVariant);
+  const exerciseForVariant=sessionExerciseForSave(wid,eid);const variant=selectedVariantData(exerciseForVariant,'input-session-variant');const performedTechniqueMode=selectedPerformedTechniqueMode(exerciseForVariant);
   // A prescrição/GER fica travada na linha; o aluno informa apenas o realizado.
   const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')];const sets=[];
   for(const row of rows){
@@ -5497,7 +5527,7 @@ async function saveSession(){
       if(verify) showToast('✓ Sessão salva offline');
       else showToast('Erro ao salvar!',true);
     }else{
-      const e=getE(wid,eid);
+      const e=getE(wid,eid)||sessionExerciseForSave(wid,eid);
       const exerciseName=e?e.name:'';
       if(!e){alert('Erro: exercício não encontrado. Atualize a tela e tente novamente.');return;}
       const sessionId=SESSION_CREATE_ID||(SESSION_CREATE_ID=draftId('sessions'));
@@ -5662,14 +5692,16 @@ async function renderTrainerStudent(s){
   try{
     const structure=await fetchCloudStructure(studentUid);
     if(loadSeq!==TRAINER_STUDENT_LOAD_SEQ||VIEW_STUDENT?.uid!==studentUid)return;
-    const archived=loadSessionArchive(studentUid),workouts=hydrateWorkoutSessions(normalizeWorkoutCollection(structure.workouts),archived);
+    const previous=VIEW_STUDENT.workouts||[];
+    const selected=structure.source==='server'||!previous.length?structure.workouts:previous;
+    const archived=loadSessionArchive(studentUid),workouts=hydrateWorkoutSessions(normalizeWorkoutCollection(selected),archived);
     VIEW_STUDENT={...VIEW_STUDENT,workouts};
     HISTORY_BY_NAME=buildHistoryByName(archived);
     // O histórico completo é carregado depois da lista de protocolos, sem segurar a tela.
     runWhenIdle(async()=>{try{const history=await fetchCloudSessions(studentUid);if(loadSeq!==TRAINER_STUDENT_LOAD_SEQ||VIEW_STUDENT?.uid!==studentUid)return;hydrateWorkoutSessions(VIEW_STUDENT.workouts,history.sessions);HISTORY_BY_NAME=buildHistoryByName(history.sessions);refreshVisibleSessionHistory('trainer');if(history.recoveredSessionCount>0)showToast(`✓ ${history.recoveredSessionCount} registro${history.recoveredSessionCount===1?'':'s'} recuperado${history.recoveredSessionCount===1?'':'s'} para este aluno`);}catch(error){console.warn('Histórico do aluno mantido em cache',error);}},1800);
     const list=document.getElementById('ts-workout-list');
     const empty=document.getElementById('ts-workout-empty');
-    if(!workouts.length){list.innerHTML='';empty.style.display='block';return;}
+    if(!workouts.length){list.innerHTML='';empty.style.display='block';return structure.source==='server';}
     empty.style.display='none';
     const nameCounts={};
     workouts.forEach(w=>{const key=normalizedName(w.name);nameCounts[key]=(nameCounts[key]||0)+1;});
@@ -5693,9 +5725,11 @@ async function renderTrainerStudent(s){
         </div>
       </div>`;
     }).join('');
+    return structure.source==='server';
   }catch(e){
     console.error('renderTrainerStudent',e);
     if(loadSeq===TRAINER_STUDENT_LOAD_SEQ&&VIEW_STUDENT?.uid===studentUid)showToast('Não foi possível atualizar os dados do aluno.',true);
+    return false;
   }
 }
 
@@ -7237,7 +7271,7 @@ async function loadTrainerCheckinSchedule(studentUid){
   }catch(error){document.getElementById('trainer-checkin-state').textContent='ERRO';document.getElementById('trainer-checkin-help').textContent='Não foi possível carregar a programação. Tente novamente.';const cancelButton=document.getElementById('trainer-cancel-extra-checkin');if(cancelButton)cancelButton.style.display='none';}
 }
 const V102_RENDER_TRAINER_STUDENT=renderTrainerStudent;
-renderTrainerStudent=async function(student){await V102_RENDER_TRAINER_STUDENT(student);if(student&&VIEW_STUDENT?.uid===student.uid)await loadTrainerCheckinSchedule(student.uid);};
+renderTrainerStudent=async function(student){const result=await V102_RENDER_TRAINER_STUDENT(student);if(student&&VIEW_STUDENT?.uid===student.uid)await loadTrainerCheckinSchedule(student.uid);return result;};
 async function saveTrainerCheckinSchedule(){
   const studentUid=VIEW_STUDENT?.uid,date=document.getElementById('trainer-checkin-date').value;if(!studentUid||CURRENT_USER?.role!=='trainer')return;if(!validIsoDate(date)){alert('Escolha uma data válida.');return;}
   if(!beginAction('save-checkin-schedule'))return;
@@ -9523,7 +9557,7 @@ async function loadTrainerProtocolReviewAlerts(){
 function focusFirstPendingProtocolReview(){const first=V109_PENDING_PROTOCOL_STUDENTS[0];if(!first)return;const card=document.querySelector(`.student-card[data-student-uid="${CSS.escape(first.studentId)}"]`);card?.scrollIntoView({behavior:'smooth',block:'center'});card?.classList.add('protocol-due-focus');setTimeout(()=>card?.classList.remove('protocol-due-focus'),1800);}
 
 const V109_RENDER_TRAINER_STUDENT=renderTrainerStudent;
-renderTrainerStudent=async function(student){await V109_RENDER_TRAINER_STUDENT(student);if(student&&VIEW_STUDENT?.uid===student.uid)await loadTrainerProtocolReview(student.uid);};
+renderTrainerStudent=async function(student){const result=await V109_RENDER_TRAINER_STUDENT(student);if(student&&VIEW_STUDENT?.uid===student.uid)await loadTrainerProtocolReview(student.uid);return result;};
 const V109_RENDER_TRAINER=renderTrainer;
 renderTrainer=async function(){const result=await V109_RENDER_TRAINER.apply(this,arguments);if(CURRENT_USER?.role==='trainer')await loadTrainerProtocolReviewAlerts();return result;};
 const V109_RENDER_HOME=renderHome;
