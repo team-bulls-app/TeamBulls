@@ -132,7 +132,7 @@ submitContext.WEEKLY_CHECKIN_FILES=photos.map(()=>new submitContext.File());
 vm.createContext(submitContext);
 let submit=read('modules/student-report-submit-reconciliation-v10_10_57.js');
 submit=submit.replace('  install();[120,500,1400].forEach(delay=>setTimeout(install,delay));',`  window.testSubmit=robustWeeklySubmit;
-  window.configure=(commit,get)=>{restCommit=commit;restGet=get;preparePhoto=async(file,options)=>({data:{userId:options.userId,dataUrl:'new-photo',...options.extra}});};`);
+  window.configure=(commit,get)=>{restCommit=commit;restGet=get;authHeaders=async()=>({});readWeeklyReceipt=id=>get('weeklyCheckins',id);preparePhoto=async(file,options)=>({data:{userId:options.userId,dataUrl:'new-photo',...options.extra}});};`);
 vm.runInContext(submit,submitContext);
 let reads=0;
 submitContext.window.configure(async()=>{throw {definite:true,status:409};},async()=>{reads++;return {fields:{}};});
@@ -146,6 +146,10 @@ assert.ok(saved.every(write=>write.currentDocument.exists===false),'all atomic c
 submitContext.WEEKLY_CHECKIN_FILES=photos.map(()=>new submitContext.File());
 submitContext.window.configure(async writes=>{saved=writes;throw {definite:false};},async(collection,id)=>{const w=saved.find(w=>w.update.name.endsWith('/'+collection+'/'+id));return {name:w.update.name,fields:{...w.update.fields,dataUrl:{stringValue:'old-photo'}}};});
 assert.equal(await submitContext.window.testSubmit(),false,'same IDs with old photos are not confirmation');
+// Start a separate ambiguous attempt with an unavailable receipt.
+submitContext.WEEKLY_CHECKIN_FILES=photos.map(()=>new submitContext.File());
+submitContext.window.configure(async()=>{throw {definite:false};},async()=>{throw {status:503};});
+assert.equal(await submitContext.window.testSubmit(),false);
 // A realtime period change cannot turn an unconfirmed attempt into a new create.
 let commits=0;
 submitContext.WEEKLY_CHECKIN_REQUEST={requestKey:'scheduled:2026-09-27',kind:'scheduled',dueDate:'2026-09-27'};

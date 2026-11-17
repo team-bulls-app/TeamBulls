@@ -77,7 +77,7 @@ has(photos,"request.resource.data.get('dataUrl', '').size() <= 950000",'Teto Fir
 has(photos,"(request.resource.data.get('dataUrl', '') != '' || request.resource.data.get('photoPath', '') != '')",'Rules voltaram a aceitar foto vazia.');
 has(submit,'const FIRESTORE_DATA_URL_MAX=620000','Cliente perdeu o teto conservador de dataURL abaixo das Rules.');
 has(submit,'const MAX_COMMIT_BODY=7*1024*1024','Commit REST perdeu limite preventivo de payload.');
-has(submit,"const VERSION='10.10.57-submitstate8'",'Envio canônico não usa a revisão que corrige permission-denied semanal.');
+has(submit,"const VERSION='10.10.57-submitstate9'",'Envio canônico não usa a revisão que corrige permission-denied semanal.');
 has(submit,'data.dataUrl=await firestorePhotoData(file,variants.full)','Foto do relatório não é preparada diretamente para Firestore.');
 lacks(submit,"uploadCloudPhoto('progressPhotos'",'Relatório voltou a tentar Firebase Storage antes do Firestore.');
 lacks(submit,"uploadCloudPhoto('progressPhotoThumbs'",'Relatório voltou a criar miniatura em Storage sem necessidade.');
@@ -88,11 +88,11 @@ lacks(submit,'createdPaths','Fluxo Firestore-only voltou a manter estado de uplo
 // reconciliado por leitura; não existe retry automático/cego de escrita.
 has(submit,"writes.push(patchWrite('questionnaires'",'Questionário não conclui no mesmo conjunto atômico das fotos.');
 has(submit,"writes.push(createWrite('weeklyCheckins'",'Semanal não conclui no mesmo conjunto atômico das fotos.');
-has(submit,"return fetchJson(commitUrl(),{method:'POST'",'Envio canônico deixou de usar commit REST único.');
+has(submit,"await fetchJson(commitUrl(),{method:'POST'",'Envio canônico deixou de usar commit REST único.');
 has(submit,"currentDocument:{exists:false}",'Criação de foto/semanal perdeu precondição contra sobrescrita.');
 has(submit,"currentDocument:{exists:true}",'Update do questionário perdeu precondição de existência.');
-has(submit,"uncertain.set('q:'",'Questionário perdeu estado de confirmação para resultado de rede incerto.');
-has(submit,"uncertain.set('w:'",'Semanal perdeu estado de confirmação para resultado de rede incerto.');
+has(submit,"uncertain.set(attempt.key,attempt)",'Envio com resposta incerta precisa manter o contexto até a confirmação.');
+has(submit,"result==='absent'&&Date.now()>=attempt.until",'Reenvio só pode ser liberado depois de ausência confirmada e da janela de proteção.');
 has(submit,"O app não fará reenvio automático",'Fluxo não deixa explícita a ausência de retry cego.');
 lacks(submit,'setInterval(','Envio de relatórios não pode introduzir polling.');
 
@@ -100,7 +100,7 @@ lacks(submit,'setInterval(','Envio de relatórios não pode introduzir polling.'
 // weeklyCheckins/{id} antes do create faz a regra de leitura negar o documento
 // inexistente. Duplicação já é barrada atomicamente por currentDocument.exists:false.
 const weeklySubmitStart=submit.indexOf('async function robustWeeklySubmit()');
-const weeklyCommitStart=submit.indexOf("try{await restCommit(writes,'enviar relatório semanal');}",weeklySubmitStart);
+const weeklyCommitStart=submit.indexOf("return await deliver({kind:'w'",weeklySubmitStart);
 const weeklyPreCommit=weeklySubmitStart>=0&&weeklyCommitStart>weeklySubmitStart?submit.slice(weeklySubmitStart,weeklyCommitStart):'';
 assert(weeklyPreCommit.length>0,'Não foi possível isolar o preflight do envio semanal.');
 lacks(weeklyPreCommit,"restGet('weeklyCheckins',checkinId)",'Semanal voltou a ler o documento inexistente antes do create e pode receber permission-denied.');
