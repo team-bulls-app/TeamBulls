@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111707,
-  "revision": "extreme-session-runtime-stability-1",
-  "publishedAt": "2026-11-17T00:00:00Z",
+  "build": 2026111801,
+  "revision": "diet-builder-audit-1",
+  "publishedAt": "2026-11-18T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Proteção dos registros durante atualizações, recuperação de leitura e otimização da entrada e sincronização."
+  "message": "Montagem da dieta: Carboidrato na tabela, proteção das instruções e alimentos personalizados, cálculos atualizados após exclusões."
 }

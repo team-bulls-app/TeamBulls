@@ -6,9 +6,12 @@ for(const file of files){if(!fs.existsSync(file)){fail.push('Arquivo ausente: '+
 const diet=read(files[0]),training=read(files[1]),schedule=read(files[2]),cardio=read(files[3]),workflow=read('modules/workflow-controls-v10_10_10.js'),core=read('app_v10_10_9_core.js'),rules=read('firebase/firestore_27_compacto.rules'),config=read('config_v10_7.js'),sw=read('sw.js'),bridge=read('sw_47.js');
 has(diet,'Porção de Carboidrato','Tabela não corrige Carbo para Carboidrato.');
 has(diet,"const CATALOG_FIELD='dietPortionItems'",'Alimentos personalizados não possuem campo privado próprio.');
-has(diet,"db.collection(CATALOG_COLLECTION).doc(CURRENT_USER.uid).set(payload,{merge:true})",'Alimentos personalizados não são salvos de forma compatível com o workspace privado do treinador.');
+has(diet,"db.collection(CATALOG_COLLECTION).doc(actor)",'Alimentos personalizados devem usar o catálogo do treinador capturado.');
+has(diet,'const snapshot=await transaction.get(ref);','Alimentos e instruções devem ler o documento dentro da transação.');
+has(diet,'transaction.set(ref,{trainerId:actor,[CATALOG_FIELD]:clean,updatedAt:serverTime()},{merge:true})','Catálogo deve preservar os demais campos do workspace privado.');
 has(diet,"individualInstructions:text",'Instruções individuais da dieta não são persistidas.');
-has(diet,"db.collection('mealPlans').doc(uid).set(payload,{merge:true})",'Instruções individuais não usam a dieta do próprio aluno.');
+has(diet,"db.collection('mealPlans').doc(uid)",'Instruções individuais não usam a dieta do próprio aluno.');
+has(diet,'transaction.set(ref,payload,{merge:true})','Instruções devem atualizar apenas seus campos com confirmação transacional.');
 has(rules,'match /trainerSupplementCatalog/{trainerUid}','Catálogo privado do treinador não está protegido nas regras atuais.');
 has(rules,'allow read: if isTrainer() && request.auth.uid == trainerUid','Aluno poderia ler a tabela privada do treinador.');
 has(rules,'match /mealPlans/{uid}','mealPlans ausente nas regras.');
@@ -32,8 +35,8 @@ has(cardio,'alreadyAlerted(key)','Alarme pode repetir indefinidamente para o mes
 has(cardio,'return{...state,completedAt:Date.now()}','Alerta configurável não suprime a duplicação do aviso legado.');
 lacks(cardio,'setInterval(','Alerta não deve criar um segundo ticker de cardio.');
 for(const file of files){has(config,'./'+file+'?v=',`Loader não inclui ${file}.`);has(sw,'./'+file+'?v=',`Service Worker não prepara ${file} para uso offline.`);has(bridge,'./'+file+'?v=',`Ponte legada não prepara ${file} para uso offline.`);}
-has(sw,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2",'Service Worker deixou de preparar o workspace da dieta.');
-has(bridge,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2",'Ponte legada deixou de preparar o workspace da dieta.');
+has(sw,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace3",'Service Worker deixou de preparar o workspace da dieta.');
+has(bridge,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace3",'Ponte legada deixou de preparar o workspace da dieta.');
 const order=['diet-portion-presets-v10_10_9.js','diet-personalization-v10_10_11.js','diet-live-calories-v10_10_11.js','training-integrity-v10_10_11.js','report-schedule-consistency-v10_10_11.js','cardio-finish-alert-v10_10_11.js','release-coherence-v10_10_10.js','trainer-diet-workspace-v10_10_11.js'];
 for(let i=1;i<order.length;i++)if(config.indexOf(order[i-1])<0||config.indexOf(order[i])<=config.indexOf(order[i-1]))fail.push('Ordem do loader incorreta: '+order[i-1]+' → '+order[i]);
 if(fail.length){console.error('FALHA — trainer workflow 10.10.11\n- '+fail.join('\n- '));process.exit(1);}console.log('APROVADO — tabela personalizável, macros automáticos, GER, trava total, instruções individuais, agendas, alerta do cardio e workspace contínuo do treinador validados.');

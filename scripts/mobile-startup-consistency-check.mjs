@@ -61,7 +61,7 @@ for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"worker-src 'self' blob:",`${name} CSP bloqueia workers locais necessários ao app.`);
   has(text,"type:'TEAM_BULLS_SW_ACTIVATED',version:APP_VERSION,build:BUILD_REVISION",`${name} não anuncia o build ativado.`);
   has(text,"if(relativePath==='/version.json')",`${name} deixou de tratar version.json como mutável.`);
-  has(text,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace2",`${name} não prepara o workspace do treinador para uso offline.`);
+  has(text,"./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace3",`${name} não prepara o workspace do treinador para uso offline.`);
 }
 has(photo,"const VERSION='10.10.9-photoquality3'",'Revisão móvel de fotos não está ativa.');
 has(photo,"createImageBitmap(file,{imageOrientation:'from-image'})",'Decoder móvel perdeu a primeira tentativa orientada.');
