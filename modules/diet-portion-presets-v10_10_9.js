@@ -1,16 +1,16 @@
 (()=>{
   'use strict';
 
-  const VERSION='10.10.13-portions2';
+  const VERSION='10.10.13-portions3';
   const BASE_PRESETS=Object.freeze([
-    {id:'carb-05',group:'carbo',label:'0,5 Porção de Carbo',protein:1,carbs:14,fat:0.1},
-    {id:'carb-10',group:'carbo',label:'1 Porção de Carbo',protein:3,carbs:28,fat:0.2},
-    {id:'carb-15',group:'carbo',label:'1,5 Porção de Carbo',protein:4,carbs:42,fat:0.3},
-    {id:'carb-20',group:'carbo',label:'2 Porção de Carbo',protein:5,carbs:56,fat:0.4},
-    {id:'carb-25',group:'carbo',label:'2,5 Porção de Carbo',protein:6,carbs:70,fat:0.5},
-    {id:'carb-30',group:'carbo',label:'3 Porção de Carbo',protein:8,carbs:84,fat:0.6},
-    {id:'carb-35',group:'carbo',label:'3,5 Porção de Carbo',protein:9,carbs:98,fat:0.7},
-    {id:'carb-40',group:'carbo',label:'4 Porção de Carbo',protein:10,carbs:112,fat:0.8},
+    {id:'carb-05',group:'carbo',label:'0,5 Porção de Carboidrato',protein:1,carbs:14,fat:0.1},
+    {id:'carb-10',group:'carbo',label:'1 Porção de Carboidrato',protein:3,carbs:28,fat:0.2},
+    {id:'carb-15',group:'carbo',label:'1,5 Porção de Carboidrato',protein:4,carbs:42,fat:0.3},
+    {id:'carb-20',group:'carbo',label:'2 Porção de Carboidrato',protein:5,carbs:56,fat:0.4},
+    {id:'carb-25',group:'carbo',label:'2,5 Porção de Carboidrato',protein:6,carbs:70,fat:0.5},
+    {id:'carb-30',group:'carbo',label:'3 Porção de Carboidrato',protein:8,carbs:84,fat:0.6},
+    {id:'carb-35',group:'carbo',label:'3,5 Porção de Carboidrato',protein:9,carbs:98,fat:0.7},
+    {id:'carb-40',group:'carbo',label:'4 Porção de Carboidrato',protein:10,carbs:112,fat:0.8},
     {id:'fruit-05',group:'fruta',label:'0,5 Porção de Fruta',protein:1,carbs:11.9,fat:0},
     {id:'fruit-10',group:'fruta',label:'1 Porção de Fruta',protein:1,carbs:23.8,fat:0.1},
     {id:'fruit-15',group:'fruta',label:'1,5 Porção de Fruta',protein:2,carbs:35.7,fat:0.2},
@@ -38,6 +38,7 @@
   ].map(item=>Object.freeze({...item})));
 
   const LEGACY_ALIASES=Object.freeze([
+    ...BASE_PRESETS.filter(item=>item.group==='carbo').map(item=>({...item,id:'legacy-'+item.id,group:'legacy',label:item.label.replace('Carboidrato','Carbo'),hidden:true})),
     {id:'legacy-tomato-60',group:'legacy',label:'60g Tomate',protein:0,carbs:1.65,fat:0,hidden:true},
     {id:'legacy-tomato-90',group:'legacy',label:'90g Tomate',protein:0,carbs:2.5,fat:0,hidden:true},
     {id:'legacy-tomato-120',group:'legacy',label:'120g Tomate',protein:0,carbs:3.3,fat:0,hidden:true},
@@ -46,7 +47,7 @@
   ].map(item=>Object.freeze({...item})));
 
   const GROUPS=Object.freeze({
-    carbo:{label:'Carbo',className:'carbo'},fruta:{label:'Fruta',className:'fruta'},proteina:{label:'Proteína',className:'proteina'},vegetais:{label:'Vegetais',className:'vegetais'},gordura:{label:'Gordura',className:'gordura'},creme:{label:'Creme de Milho',className:'creme'},custom:{label:'Personalizado',className:'custom'}
+    carbo:{label:'Carboidrato',className:'carbo'},fruta:{label:'Fruta',className:'fruta'},proteina:{label:'Proteína',className:'proteina'},vegetais:{label:'Vegetais',className:'vegetais'},gordura:{label:'Gordura',className:'gordura'},creme:{label:'Creme de Milho',className:'creme'},custom:{label:'Personalizado',className:'custom'}
   });
   const PRESETS=[...BASE_PRESETS,...LEGACY_ALIASES];
   let customItems=[];
@@ -68,7 +69,7 @@
 
   function isTrainer(){return typeof CURRENT_USER!=='undefined'&&CURRENT_USER?.role==='trainer';}
   function canEditMeal(){return isTrainer()&&typeof MEAL_CTX!=='undefined'&&MEAL_CTX?.canEditContent===true;}
-  function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));}
+  function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
   function br(value){return(Number(value)||0).toLocaleString('pt-BR',{maximumFractionDigits:2});}
   function kcal(item){return Math.round(num(item?.protein)*4+num(item?.carbs)*4+num(item?.fat)*9);}
   function toast(message,error=false){if(typeof showToast==='function')showToast(message,error);}
@@ -84,7 +85,7 @@
     return list.map(item=>`<tr class="tb-portion-row ${escapeHtml(GROUPS[item.group]?.className||'')}"><td><span class="tb-portion-label">${escapeHtml(item.label)}</span></td><td class="tb-portion-macro">${br(item.protein)}</td><td class="tb-portion-macro">${br(item.carbs)}</td><td class="tb-portion-macro">${br(item.fat)}</td><td class="tb-portion-kcal">${br(kcal(item))}</td><td class="tb-portion-macro">${escapeHtml(GROUPS[item.group]?.label||item.group)}</td><td><div class="tb-portion-actions">${mode==='add'?`<button class="primary" type="button" onclick="TeamBullsDietPortions.add('${item.id}')">ADICIONAR</button>`:''}<button type="button" onclick="TeamBullsDietPortions.copy('${item.id}')">COPIAR</button></div></td></tr>`).join('');
   }
   function tableHtml(mode='add',query=''){return`<div class="tb-portion-scroll"><table class="tb-portion-table"><thead><tr><th>Prescrição</th><th>P (g)</th><th>C (g)</th><th>G (g)</th><th>kcal</th><th>Grupo</th><th>Ação</th></tr></thead><tbody data-portion-rows="${escapeHtml(mode)}">${rowsHtml(mode,query)}</tbody></table></div><div class="tb-portion-note">Os valores P/C/G reproduzem a tabela enviada pelo treinador. Ao adicionar, somente o texto da porção entra na dieta do aluno; os números permanecem como referência de prescrição.</div>`;}
-  function toolHtml(){return`<section class="tb-portion-tool" id="tb-meal-portion-tool"><div class="tb-portion-tool-head"><div><span class="tb-portion-tool-kicker">ATALHO DE PRESCRIÇÃO</span><strong class="tb-portion-tool-title">Tabela de porções pré-estabelecidas</strong><small class="tb-portion-tool-sub">Escolha uma linha e insira diretamente na refeição.</small></div><button class="tb-portion-toggle" type="button" onclick="TeamBullsDietPortions.toggleMealTable()">ABRIR TABELA</button></div><div class="tb-portion-tool-body" id="tb-meal-portion-body" hidden><div class="tb-portion-filter"><input id="tb-meal-portion-search" type="search" placeholder="Buscar carbo, fruta, proteína, vegetais..." oninput="TeamBullsDietPortions.filterMealTable(this.value)"><button type="button" onclick="TeamBullsDietPortions.clearMealSearch()">LIMPAR</button></div>${tableHtml('add')}</div></section>`;}
+  function toolHtml(){return`<section class="tb-portion-tool" id="tb-meal-portion-tool"><div class="tb-portion-tool-head"><div><span class="tb-portion-tool-kicker">ATALHO DE PRESCRIÇÃO</span><strong class="tb-portion-tool-title">Tabela de porções pré-estabelecidas</strong><small class="tb-portion-tool-sub">Escolha uma linha e insira diretamente na refeição.</small></div><button class="tb-portion-toggle" type="button" onclick="TeamBullsDietPortions.toggleMealTable()">ABRIR TABELA</button></div><div class="tb-portion-tool-body" id="tb-meal-portion-body" hidden><div class="tb-portion-filter"><input id="tb-meal-portion-search" type="search" placeholder="Buscar carboidrato, fruta, proteína, vegetais..." oninput="TeamBullsDietPortions.filterMealTable(this.value)"><button type="button" onclick="TeamBullsDietPortions.clearMealSearch()">LIMPAR</button></div>${tableHtml('add')}</div></section>`;}
   function ensureMealTool(){const modal=document.getElementById('modal-meal'),items=document.getElementById('input-meal-items');if(!modal||!items)return null;const old=document.getElementById('tb-meal-portion-tool');if(!canEditMeal()){old?.remove();return null;}if(old)return old;const group=items.closest('.form-group');if(!group)return null;group.insertAdjacentHTML('afterend',toolHtml());return document.getElementById('tb-meal-portion-tool');}
   function toggleMealTable(){const tool=ensureMealTool(),body=document.getElementById('tb-meal-portion-body');if(!tool||!body)return;body.hidden=!body.hidden;const button=tool.querySelector('.tb-portion-toggle');if(button)button.textContent=body.hidden?'ABRIR TABELA':'FECHAR TABELA';}
   function filterMealTable(value){const body=document.getElementById('tb-meal-portion-body'),tbody=body?.querySelector('[data-portion-rows="add"]');if(tbody)tbody.innerHTML=rowsHtml('add',value);}

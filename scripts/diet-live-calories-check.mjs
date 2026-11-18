@@ -22,7 +22,7 @@ for(const path of Object.values(files)){
 }
 const portions=read(files.portions),calories=read(files.calories),custom=read(files.custom),deficit=read(files.deficit),workspace=read(files.workspace);
 
-has(portions,"const VERSION='10.10.13-portions2'",'Tabela canônica não está na revisão nova.');
+has(portions,"const VERSION='10.10.13-portions3'",'Tabela canônica não está na revisão nova.');
 has(portions,"group:'vegetais',label:'120g Vegetais'",'120g Vegetais não é canônico na tabela-base.');
 has(portions,"label:'120g Tomate'",'Compatibilidade de leitura com dietas antigas de Tomate foi removida.');
 has(portions,'hidden:true','Alias legado de Tomate deve ser invisível na tabela de prescrição.');
@@ -31,7 +31,7 @@ has(portions,'get presets(){return presetSnapshot();}','Presets públicos devem 
 has(portions,'const PRESETS=[...BASE_PRESETS,...LEGACY_ALIASES]','Fonte canônica não separa base, aliases e personalizados.');
 lacks(portions,"group:'tomate',label:'120g Tomate'",'Tomate ainda está sendo usado como item canônico/visível.');
 
-has(custom,"const VERSION='10.10.13-customfood5'",'Sincronização dos alimentos personalizados não está na revisão estrutural.');
+has(custom,"const VERSION='10.10.13-customfood6'",'Sincronização dos alimentos personalizados não está na revisão estrutural.');
 has(custom,"db.collection(COLLECTION).doc(uid)",'Catálogo persistido do treinador não é carregado.');
 has(custom,"typeof api?.setCustomItems!=='function'",'Sincronização não usa o registro canônico da tabela.');
 has(custom,'api.setCustomItems(cached)','Alimentos personalizados não são entregues ao registro canônico.');

@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_TRAINER_DIET_WORKSPACE_101011__)return;
   window.__TEAM_BULLS_TRAINER_DIET_WORKSPACE_101011__=true;
 
-  const VERSION='10.10.11-dietworkspace2';
+  const VERSION='10.10.11-dietworkspace3';
   let formSnapshot='';
   let editorRevision=0;
   let navigating=false;
@@ -188,6 +188,7 @@
       #modal-meal.tb-trainer-diet-workspace .tb-workspace-editor{display:flex;min-width:0;min-height:0;flex-direction:column;border-right:1px solid rgba(255,255,255,.07);background:linear-gradient(180deg,#0d0d0d,#0a0a0a)}
       #modal-meal.tb-trainer-diet-workspace .tb-workspace-editor-body{min-height:0;overflow:auto;padding:14px 18px 22px;overscroll-behavior:contain}
       #modal-meal.tb-trainer-diet-workspace .tb-workspace-editor-body>.modal-handle{margin-top:0}
+      #modal-meal.tb-trainer-diet-workspace .modal-title{color:#eee}
       #modal-meal.tb-trainer-diet-workspace .tb-workspace-nav{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:#111;position:sticky;top:0;z-index:12}
       #modal-meal.tb-trainer-diet-workspace .tb-workspace-nav button{border:1px solid rgba(255,255,255,.1);border-radius:8px;background:#181818;color:#c9c1bb;min-height:36px;padding:8px 11px;font:800 8px 'DM Mono',monospace;letter-spacing:.45px;cursor:pointer}
       #modal-meal.tb-trainer-diet-workspace .tb-workspace-nav button:not(:disabled):hover{border-color:rgba(225,29,72,.48);color:#fff}#modal-meal.tb-trainer-diet-workspace .tb-workspace-nav button:disabled{opacity:.28;cursor:not-allowed}

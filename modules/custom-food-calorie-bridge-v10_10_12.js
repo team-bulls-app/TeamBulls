@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_CUSTOM_FOOD_CALORIE_BRIDGE_2__)return;
   window.__TEAM_BULLS_CUSTOM_FOOD_CALORIE_BRIDGE_2__=true;
 
-  const VERSION='10.10.13-customfood5';
+  const VERSION='10.10.13-customfood6';
   const COLLECTION='trainerSupplementCatalog';
   const FIELD='dietPortionItems';
   const PDF_MODULE='./modules/pdf-export-v10_10_12.js?v=10.10.12-pdf1';
@@ -53,6 +53,11 @@
     })();return entry.promise;
   }
   function tableItems(){
+    const user=trainer(),uid=String(user?.uid||'');
+    if(cachedTrainer&&cachedTrainer!==uid){cached=[];cachedTrainer='';registry()?.setCustomItems?.([]);}
+    if(!user)return[];
+    const api=window.TeamBullsDietPersonalization;
+    if(typeof api?.catalogItems==='function'){const items=api.catalogItems();if(Array.isArray(items)){cachedTrainer=uid;return normalize(items);}return null;}
     const rows=[...document.querySelectorAll('[data-custom-food-list] .tb-custom-table tbody tr')];if(!rows.length)return null;
     return normalize(rows.map((row,index)=>{const cells=row.querySelectorAll('td');return{id:`dom-${index}`,label:cells[0]?.textContent,protein:cells[1]?.textContent,carbs:cells[2]?.textContent,fat:cells[3]?.textContent};}));
   }

@@ -53,7 +53,7 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='extreme-session-runtime-stability-1','Release precisa identificar a correção de registros e estabilidade.');
+assert(version.revision==='diet-builder-audit-1','Release precisa identificar a revisão segura da montagem da dieta.');
 const weekLayoutRef='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
 assert(usability.includes(weekLayoutRef)&&updater.includes(weekLayoutRef)&&sw.includes(weekLayoutRef),'Layout semanal deve usar a mesma revisão no loader, atualizador e cache.');
 const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar6';
