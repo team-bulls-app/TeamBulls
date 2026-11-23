@@ -3,7 +3,7 @@
   if(window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__)return;
   window.__TEAM_BULLS_TRAINER_INBOX_PAYMENTS_101012__=true;
 
-  const VERSION='10.10.12-inboxpayments7';
+  const VERSION='10.10.12-inboxpayments8';
   const ACTIVITY_INDEX_VERSION=1;
   const PAYMENT_MAX_FILE=15*1024*1024;
   const ACTIVITY_LIMIT=200;
@@ -319,11 +319,36 @@
     catch(error){upload.cancel?.();throw error;}
     return path;
   }
+  const receiptScope=(id,record)=>({owner:record.trainerId,kind:'receipt',subject:record.studentId,id:'payment:'+id});
+  async function keepReceipt(id,record,file,job){
+    try{await window.TeamBullsWorkflowStorage?.put?.(receiptScope(id,record),{source:'payment',recordId:id,status:job.state,record:{...record,createdAt:null,updatedAt:null},path:job.path||'',files:[{blob:file,name:file.name||'comprovante',type:file.type}]});}catch{}
+  }
+  async function paymentSyncItems(){
+    if(!trainer())return[];const owner=CURRENT_USER.uid,records=await window.TeamBullsWorkflowStorage?.list?.('receipt')||[];
+    if(!trainer()||CURRENT_USER.uid!==owner)return[];
+    return[...paymentRecords.map(record=>({id:record.id,type:'payment',label:'Pagamento · '+studentName(record.studentId),date:record.validFrom,status:'confirmed'})),...records.filter(record=>record.source==='payment').map(record=>({id:record.recordId,type:'receipt',label:'Comprovante do pagamento',status:record.status==='uploading'?'pending':'failed'}))];
+  }
+  async function retryPaymentReceipt(id){
+    if(!trainer())return false;const owner=CURRENT_USER.uid;
+    if(receiptJobs.get(id)?.state==='uploading')return false;
+    const rows=await window.TeamBullsWorkflowStorage?.list?.('receipt')||[],metadata=rows.find(item=>item.source==='payment'&&item.recordId===id),saved=metadata?await window.TeamBullsWorkflowStorage.get(metadata):null;
+    if(!saved||!trainer()||CURRENT_USER.uid!==owner||!saved.files?.[0]?.blob)return false;
+    const ref=paymentCollection(owner).doc(id),snapshot=await cloudGet(ref,'conferir pagamento antes do comprovante');
+    if(!trainer()||CURRENT_USER.uid!==owner||!snapshot.exists)return false;const record=snapshot.data();
+    if(record.trainerId!==owner||record.studentId!==saved.subject)return false;
+    if(saved.path&&record.receiptPath===saved.path){await window.TeamBullsWorkflowStorage.remove(receiptScope(id,record));return true;}
+    if((record.receiptPath||'')!==(saved.record.receiptPath||''))throw new Error('O comprovante mudou em outro acesso. Consulte o pagamento antes de substituir.');
+    const file=new File([saved.files[0].blob],saved.files[0].name,{type:saved.files[0].type}),job={state:'uploading',path:saved.path||'',file};receiptJobs.set(id,job);
+    await attachPaymentReceipt(id,record,file,job);return !receiptJobs.has(id);
+  }
+
   async function attachPaymentReceipt(id,record,file,job){
     const owner=record.trainerId,studentId=record.studentId;
     const current=()=>trainer()&&CURRENT_USER.uid===owner&&receiptJobs.get(id)===job;
     try{
-      job.path=await uploadReceipt(owner,studentId,id,file,current);
+      await keepReceipt(id,record,file,job);
+      job.path=job.path||await uploadReceipt(owner,studentId,id,file,current);
+      await keepReceipt(id,record,file,job);
       if(!current())return;
       const ref=paymentCollection(owner).doc(id);
       const attachment={receiptPath:job.path,receiptName:file.name?.slice(0,180)||'',updatedAt:nowStamp()};
@@ -336,12 +361,13 @@
       }),'vincular comprovante ao pagamento');
       if(!current())return;
       receiptJobs.delete(id);
+      await window.TeamBullsWorkflowStorage?.remove?.(receiptScope(id,record));
       publishPayment(id,{...previous,...paymentRecords.find(item=>item.id===id),...attachment});
     }catch(error){
       if(!current())return;
       // A timed-out link can still commit. Never delete an uploaded file here.
       if(job.path&&paymentRecords.some(item=>item.id===id&&item.receiptPath===job.path))receiptJobs.delete(id);
-      else job.state='failed';
+      else {job.state='failed';await keepReceipt(id,record,file,job);}
       renderPayments();refreshPaymentDetails();
     }
   }
@@ -375,6 +401,7 @@
     const record={...previous,...payload};
     const job=file?{state:'uploading',path:''}:null;
     if(job)receiptJobs.set(id,job);
+    if(typeof window!=='undefined')await window.TeamBullsWorkflowDrafts?.confirmed?.('modal-trainer-payment');
     closeModal('modal-trainer-payment');
     paymentEditorId='';pendingPaymentId='';pendingPaymentStudentId='';paymentFile=null;revokePaymentPreview();
     publishPayment(id,record);
@@ -480,6 +507,9 @@
   }
   function boot(){installSubmissionHooks();installTrainerHooks();if(trainer()){ensureUi();initTrainer().catch(error=>console.warn('Central do treinador',error));}}
 
-  window.TeamBullsTrainerHub=Object.freeze({version:VERSION,openInbox,refreshInbox,markAllRead,openActivity,openProtocolStudent,openPayments,openPaymentEditor,savePayment,openPaymentDetails,addCalendarMonths,planMonths});
+  window.TeamBullsTrainerHub=Object.freeze({version:VERSION,syncItems:paymentSyncItems,retryReceipt:retryPaymentReceipt,
+    paymentDraftContext:()=>trainer()?{owner:CURRENT_USER.uid,id:paymentEditorId||pendingPaymentId,existing:!!paymentEditorId,studentId:document.getElementById('tb-payment-student')?.value||''}:null,
+    restorePaymentDraft:context=>{if(!trainer()||context?.owner!==CURRENT_USER.uid||context.existing)return false;pendingPaymentId=String(context.id||pendingPaymentId);pendingPaymentStudentId=String(context.studentId||'');return true;},
+    openInbox,refreshInbox,markAllRead,openActivity,openProtocolStudent,openPayments,openPaymentEditor,savePayment,openPaymentDetails,addCalendarMonths,planMonths});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

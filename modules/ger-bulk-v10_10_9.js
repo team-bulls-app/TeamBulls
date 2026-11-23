@@ -38,7 +38,7 @@
     return (Array.isArray(sets)?sets:[]).map(set=>({
       targetMin:Number(set.targetMin),
       targetMax:Number(set.targetMax),
-      ger
+      ger,...(['seconds','reps'].includes(set.unit)?{unit:set.unit}:{})
     }));
   }
   function samePlan(a,b){
@@ -205,7 +205,7 @@
     wrapEditorFunction('loadPrescriptionEditor');
     syncControls({resetGer:true});
     window.TeamBullsGerBulk=Object.freeze({
-      version:'10.10.9-ger1',
+      version:'10.10.9-ger2',
       applyWeek:applyGerToCurrentWeekAllExercises,
       applyExercise:applyGerToAllWeeksCurrentExercise,
       refresh:syncControls

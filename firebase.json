@@ -4,6 +4,6 @@
     "indexes": "firebase/firestore.indexes.json"
   },
   "storage": {
-    "rules": "firebase/storage_6.rules"
+    "rules": "firebase/storage_7.rules"
   }
 }

@@ -388,4 +388,13 @@ await check('retorno atrasado não fecha uma nova confirmação aberta durante o
   c.showConfirm('Confirmar atual','',()=>true);await button.onclick();assert.equal(closed,1);
 });
 
+
+await check('isometria de 240 segundos mantém unidade no backup e no envio original',async()=>{
+  const a=app({online:false});await a.ready();a.rows[0].dataset.unit='seconds';a.rows[0].dataset.targetMin='120';a.rows[0].dataset.targetMax='240';
+  a.rows[0].querySelector=selector=>({value:selector.includes('"w"')?'40':'240'});
+  const saved=await a.save();assert.equal(saved.result,true);
+  const pending=a.api.syncItems().find(item=>item.type==='session');assert(pending);
+  const entry=a.api.getPending(saved.id,'student-a');assert.equal(entry.sets[0].reps,240);assert.equal(entry.sets[0].unit,'seconds');
+});
+
 console.log(`APROVADO — ${tests.length} cenários executaram a lógica real de persistência, reabertura, sincronização, edição e isolamento de registros.`);

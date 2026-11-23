@@ -28,7 +28,7 @@ const context={
   document:{head:{appendChild(){}},createElement:()=>({}),getElementById:id=>map[id]||null,querySelectorAll:selector=>selector.includes('#sets-editor')?[sessionTarget]:[]},
   TECHNIQUE_CATALOG:{items:[{id:'custom-bc-42',code:'BC'},{id:'custom-other',code:'MP'}]},
   getPlanEditExercise:()=>exercise,exerciseTechniqueIds:(item,week)=>item?.techniqueIdsByWeek?.[week]||[],
-  exerciseUsesResistedTime:()=>false,getE:()=>exercise,SESSION_WID:'w1',SESSION_EID:'exercise-1',
+  exerciseUsesResistedTime:()=>false,getE:()=>exercise,sessionExerciseForSave:()=>exercise,SESSION_WID:'w1',SESSION_EID:'exercise-1',
   onWeekTechniqueSelectionChange(){minLabel.textContent='Reps mín.';maxLabel.textContent='Reps máx.';},
   loadPrescriptionEditor(){},addPrescriptionSetRow(){},removePrescriptionSet(){},copyPreviousPrescription(){},refreshBackoffPrescriptionRow(){},
   prescriptionCompactSummary:()=>({rx:{sets:[{targetMin:8,targetMax:12,ger:3}]},reps:'1×8–12 reps',ger:'GER 03'}),

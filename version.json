@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111801,
-  "revision": "diet-builder-audit-1",
+  "build": 2026111802,
+  "revision": "workflow-media-isometry-1",
   "publishedAt": "2026-11-18T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Montagem da dieta: Carboidrato na tabela, proteção das instruções e alimentos personalizados, cálculos atualizados após exclusões."
+  "message": "Isometria por tempo e cronômetro por série; recuperação de rascunhos, conferência de prescrições e feedbacks visuais."
 }

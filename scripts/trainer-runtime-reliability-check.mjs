@@ -42,7 +42,7 @@ has(sw,"'/modules/trainer-runtime-reliability-v10_10_46.js'",'Runtime do treinad
 
 has(runtime,"const VERSION='10.10.53-trainer5'",'Ponte do treinador está na revisão errada.');
 has(runtime,"const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports5'",'Ponte não cache-busta o arquivo de Relatórios enviados por propriedade.');
-has(runtime,"const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback4'",'Ponte não preserva Feedbacks enviados.');
+has(runtime,"const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback5'",'Ponte não preserva Feedbacks enviados.');
 const immediate=runtime.indexOf("showScreen('screen-trainer-student',navigation)");
 const network=runtime.indexOf('await renderTrainerStudent(VIEW_STUDENT)');
 assert(immediate>=0&&network>immediate,'ABRIR ALUNO ainda espera a rede antes de navegar para o arquivo.');
@@ -88,7 +88,7 @@ lacks(feedback,'cloudWrite(','Feedbacks não podem criar gravações Firebase.')
 
 has(radar,"if(typeof viewStudent==='function')await viewStudent",'Radar deixou de usar o fluxo global de abertura de aluno que recebe a correção resiliente.');
 assert(firebase?.firestore?.rules==='firebase/firestore_28_compacto.rules','Correção alterou o caminho da regra Firestore ativa.');
-assert(firebase?.storage?.rules==='firebase/storage_6.rules','Correção alterou o caminho da regra Storage ativa.');
+assert(firebase?.storage?.rules==='firebase/storage_7.rules','Correção alterou o caminho da regra Storage ativa.');
 
 if(failures.length){
   console.error('FALHA — confiabilidade do runtime do treinador\n- '+failures.join('\n- '));

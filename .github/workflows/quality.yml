@@ -42,6 +42,7 @@ jobs:
           node scripts/deep-action-state-check.mjs
           node testes/testar_destino_exercicio_v10_10_9.js
           node scripts/deep-action-browser-check.mjs
+          node scripts/workflow-reliability-check.mjs
           node scripts/quality-check.mjs
           node testes/testar_login_consultoria_mobile.js
           node scripts/login-mobile-glass-browser-check.mjs

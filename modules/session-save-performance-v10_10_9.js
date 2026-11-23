@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.63-sessionperf7';
+  const VERSION='10.10.63-sessionperf8';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   const SYNC_DIAGNOSTIC_PREFIX='team_bulls_session_sync_diag_v1_';
   const SESSION_SNAPSHOT_VERSION=3;
@@ -496,7 +496,7 @@
     // voltar ao app não dispara outra gravação enquanto esta estiver em voo.
     return cloudWrite(task,'sincronizar registro de série');
   }
-  async function flushPending({silent=true}={}){
+  async function flushPending({silent=true,onlyId=''}={}){
     if(flushing)return flushing;
     flushing=(async()=>{
       restorePendingSessions({rerender:false});
@@ -504,14 +504,14 @@
       const uidValue=String(CURRENT_USER.uid);
       await Promise.all([ensureQueueReady(uidValue),ensureDeletionsReady(uidValue)]);
       const startedAt=Date.now();let synced=0;
-      for(const entry of readDeletions(uidValue).entries.filter(item=>item.pending)){
+      for(const entry of readDeletions(uidValue).entries.filter(item=>item.pending&&(!onlyId||item.id===onlyId))){
         if(!networkReady()||CURRENT_USER?.uid!==uidValue)break;
         try{if(await syncDeletion(entry))synced++;}catch(error){
           markSyncFailure(uidValue,entry.id,error);
           if(!networkReady()||/timeout|unavailable|unauthenticated|deadline-exceeded/.test(String(error?.code||'')))break;
         }
       }
-      const queue=filterDeleted(readQueue(uidValue),uidValue);
+      const queue=filterDeleted(readQueue(uidValue),uidValue).filter(entry=>!onlyId||entry.id===onlyId);
       if(!queue.length){const pending=pendingCount(uidValue);recordSyncAttempt(uidValue,startedAt,Date.now()-startedAt,synced,pending);return pending===0;}
       for(const entry of queue){
         if(!networkReady()||CURRENT_USER?.uid!==uidValue)break;
@@ -566,10 +566,11 @@
         const rawReps=String(row.querySelector('[data-f="r"]')?.value||'').trim();
         if(rawWeight===''&&rawReps==='')continue;
         const weight=rawWeight===''?0:parseFloat(rawWeight),reps=parseInt(rawReps,10);
-        if(!Number.isFinite(weight)||!Number.isInteger(reps)||weight<0||weight>10000||reps<0||reps>100){alert('Confira a carga e as repetições das séries realizadas.');return;}
+        if(!Number.isFinite(weight)||!Number.isInteger(reps)||weight<0||weight>10000||reps<0||reps>(row.dataset.unit==='seconds'?3600:100)){alert('Confira a carga e as repetições das séries realizadas.');return;}
         const performed={weight,reps};
+        if(['seconds','reps'].includes(row.dataset.unit))performed.unit=row.dataset.unit;
         if(row.dataset.backoff==='1')performed.backoff=true;
-        const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger});
+        const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
         if(target)Object.assign(performed,target);
         sets.push(performed);
       }
@@ -591,6 +592,7 @@
         recordLocalSaveSuccess(ownerUid);
         if(CURRENT_USER?.uid!==ownerUid||!registeredStudent())return true;
         SESSION_CREATE_ID=null;
+        await window.TeamBullsWorkflowDrafts?.confirmed?.('modal-session');
         try{closeModal('modal-session');}catch(error){}
         try{resetRestTimer();}catch(error){}
         try{showToast('✓ Registro guardado no aparelho. Aguardando sincronização.');}catch(error){}
@@ -627,6 +629,11 @@
   function exposeApi(){
     window.TeamBullsSessionPerformance=Object.freeze({
       version:VERSION,
+      syncItems:()=>registeredStudent()?[
+        ...filterDeleted(readQueue(String(CURRENT_USER.uid)),String(CURRENT_USER.uid)).map(entry=>({id:entry.id,type:'session',label:entry.exerciseName||'Registro de séries',date:entry.date,status:syncFailureFor(entry.id)?'failed':'pending'})),
+        ...readDeletions(String(CURRENT_USER.uid)).entries.filter(entry=>entry.pending).map(entry=>({id:entry.id,type:'session',label:'Exclusão de registro',status:'pending'}))
+      ]:[],
+      retry:async id=>{if(!registeredStudent())return false;const owner=String(CURRENT_USER.uid);if(flushing)await flushing;if(CURRENT_USER?.uid!==owner)return false;return flushPending({silent:false,onlyId:String(id)});},
       pending:pendingCount,
       diagnostics:syncDiagnostics,
       failureFor:syncFailureFor,

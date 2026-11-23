@@ -874,6 +874,8 @@
   if(progressChannel)progressChannel.onmessage=event=>refreshFromStorage(event.data);
   window.addEventListener('pageshow',()=>refreshFromStorage(ownerUid()));
   window.TeamBullsWorkoutCompletion=Object.freeze({
+    syncItems:()=>{const owner=ownerUid();return owner?[...Object.entries(readLocal(owner).states),...Object.entries(readLocal(owner).completions)].map(([id,entry])=>({id,type:'workout',label:entry.dayName||'Progresso do protocolo',date:entry.completedDate,status:entry.pendingSync?(entry.syncError?'failed':'pending'):'confirmed'})):[];},
+    retry:async id=>{const owner=ownerUid(),data=readLocal(owner);if(!owner||!(data.states[id]||data.completions[id]))return false;return syncPending(owner);},
     currentWeek,renderStudentDay,retrySync,syncPending,diagnostics,
     startGuidedWorkout,startGuidedFromHome,resumeGuided,pauseGuided,cancelGuided,finishGuided,
     registerGuided,finishExercise,postponeExercise,showGuidedVideo,showGuidedHistory,showFullDay,dayState

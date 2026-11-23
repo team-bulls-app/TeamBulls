@@ -1,0 +1,3 @@
+tests/mobile/node_modules/
+tests/mobile/test-results/
+tests/mobile/playwright-report/

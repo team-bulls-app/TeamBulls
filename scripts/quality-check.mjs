@@ -59,7 +59,7 @@ const config=read('config_v10_7.js');
   ['modules/global-performance-v10_10_9.js?v=10.10.9-perf2','Loader não inclui perf2.'],
   ['modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2','Loader não inclui o hotfix de treino.'],
   ['modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','Loader não inclui a otimização desktop.'],
-  ['modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1','Loader não inclui GER em lote.'],
+  ['modules/ger-bulk-v10_10_9.js?v=10.10.9-ger2','Loader não inclui GER em lote.'],
   ['modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','Loader não inclui actions2.'],
   ['modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1','Loader não inclui modal2/freeze1.']
 ].forEach(([needle,message])=>has(config,needle,message));
@@ -287,7 +287,7 @@ has(sw,'async function cachePathsWithLimit','Preparação de shell com limite au
   './modules/global-performance-v10_10_9.js?v=10.10.9-perf2',
   './modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2',
   './modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1',
-  './modules/ger-bulk-v10_10_9.js?v=10.10.9-ger1',
+  './modules/ger-bulk-v10_10_9.js?v=10.10.9-ger2',
   './modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2',
   './modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1'
 ].forEach(asset=>has(sw,`'${asset}'`,`Shell offline não inclui ${asset}.`));

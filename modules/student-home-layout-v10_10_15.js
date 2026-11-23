@@ -10,7 +10,7 @@
   window.__TEAM_BULLS_STUDENT_HOME_LAYOUT_10_10_17__=true;
   window.__TEAM_BULLS_STUDENT_HOME_LAYOUT_10_10_15__=true;
 
-  const VERSION='10.10.21-home6';
+  const VERSION='10.10.21-home7';
   const REFRESH_TTL=30000;
   const MAX_FEEDBACKS=5;
   const MAX_WEIGHT_POINTS=10;
@@ -318,7 +318,7 @@
       const idx=document.createElement('span');idx.className='tb-v17-feedback-index';idx.textContent=String(index+1).padStart(2,'0');
       const copy=document.createElement('span');copy.className='tb-v17-feedback-copy';const title=document.createElement('strong'),meta=document.createElement('small');title.textContent=feedbackTitle(item);copy.append(title,meta);
       const chevron=document.createElement('span');chevron.className='tb-v17-feedback-chevron';chevron.textContent='▸';
-      const body=document.createElement('div');body.className='tb-v17-feedback-body';body.textContent=String(item.message||'');
+      const body=document.createElement('div');body.className='tb-v17-feedback-body';body.textContent=String(item.message||'');window.TeamBullsFeedbackMedia?.render?.(body,item,id);
       toggle.append(idx,copy,chevron);card.append(toggle,body);host.appendChild(card);
       const initiallyOpen=openIds.has(id);
       if(initiallyOpen){card.classList.add('is-open');toggle.setAttribute('aria-expanded','true');chevron.textContent='▾';}

@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices8',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_',DIAGNOSTICS_PREFIX='team_bulls_food_choices_diag_v1_';
+  const VERSION='10.10.64-foodchoices9',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_',DIAGNOSTICS_PREFIX='team_bulls_food_choices_diag_v1_';
   const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set(),diagnosticCache=new Map();
   let loaded='',loading=null,epoch=0;
   const FOOD_SYNC_ERROR_CATEGORIES=new Set(['network','permission','storage','conflict','other']);
@@ -604,7 +604,9 @@
     window.addEventListener('storage',event=>{if(event.key===PREFIX+context()?.studentUid)paint();});
     paint();
   }
-  window.TeamBullsStudentFoodChoices=Object.freeze({version:VERSION,parse,rows,scale,foods,items,save,refresh,flush,diagnostics});
+  window.TeamBullsStudentFoodChoices=Object.freeze({version:VERSION,parse,rows,scale,foods,items,save,refresh,flush,diagnostics,
+    syncItems:()=>{const owner=String(CURRENT_USER?.role==='student'?CURRENT_USER.uid:'');return owner?Object.entries(recordsFor(owner)).filter(([,entry])=>entry.studentUid===owner).map(([id,entry])=>({id,type:'food',label:'Escolha de alimento',date:entry.date,dietId:entry.dietId,variantId:entry.variantId,status:entry.pending?'pending':'confirmed'})):[];},
+    retry:async id=>{const owner=String(CURRENT_USER?.role==='student'?CURRENT_USER.uid:'');if(!owner)return false;const entry=read(owner)[String(id)];return entry?.studentUid===owner&&entry.pending&&valid(entry,entry)?sync(entry):false;}});
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
   window.addEventListener('team-bulls-runtime-ready',install);
 })();

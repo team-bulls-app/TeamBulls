@@ -32,7 +32,7 @@ const activeStorage=String(firebaseJson?.storage?.rules||'').replace(/\\/g,'/');
 assert(/^firebase\/firestore_\d+_compacto\.rules$/.test(activeRules),'firebase.json não aponta para uma regra Firestore versionada esperada.');
 assert(exists(activeRules),`Regra ativa não existe no repositório: ${activeRules}`);
 assert(activeRules==='firebase/firestore_28_compacto.rules','Release atual deve usar Firestore Rules 28.');
-assert(activeStorage==='firebase/storage_6.rules'&&exists(activeStorage),'Release atual deve usar Storage Rules 6 existente.');
+assert(activeStorage==='firebase/storage_7.rules'&&exists(activeStorage),'Release atual deve usar Storage Rules 7 existente.');
 
 if(exists(activeRules)){
   const firestore=read(activeRules);

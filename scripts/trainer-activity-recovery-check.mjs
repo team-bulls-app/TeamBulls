@@ -31,7 +31,7 @@ const sw=read('sw.js');
 
 /* Causa original: os hooks de aluno seguem no módulo antigo, que continua trainer-only. */
 has(oldInbox,'function installSubmissionHooks()','Central antiga deixou de conter o caminho cuja regressão estamos cobrindo.');
-has(config,"MODULE_ROOT+'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments7'",'Loader antigo mudou; revisar a regressão da Central.');
+has(config,"MODULE_ROOT+'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments8'",'Loader antigo mudou; revisar a regressão da Central.');
 
 /* Entrega atual: aluno tenta criar índice futuro; treinador não depende dele para enxergar o relatório. */
 has(loader,'student-trainer-activity-bridge-v10_10_47.js?v=10.10.47-activitybridge2','Loader não entrega a ponte ao aluno.');
@@ -79,7 +79,7 @@ has(rules,'activeOwner(request.resource.data.studentId)','Rules 28 não permitem
 has(rules,"allow read: if trainerOwns(resource.data.studentId)\n        || activeOwner(resource.data.studentId)\n        || (isTrainer() && resource.data.trainerId == request.auth.uid);",'Questionário não está limitado ao vínculo atual/aluno dono/treinador imutável.');
 has(rules,"immutable('studentId') && immutable('trainerId')",'Propriedade histórica do questionário poderia ser adulterada na resposta.');
 assert(firebase?.firestore?.rules==='firebase/firestore_28_compacto.rules','Correção alterou o caminho da Rules Firestore ativa.');
-assert(firebase?.storage?.rules==='firebase/storage_6.rules','Correção alterou o caminho da Rules Storage ativa.');
+assert(firebase?.storage?.rules==='firebase/storage_7.rules','Correção alterou o caminho da Rules Storage ativa.');
 
 if(failures.length){
   console.error('FALHA — recuperação das atualizações do treinador\n- '+failures.join('\n- '));

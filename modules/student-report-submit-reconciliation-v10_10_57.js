@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010579__)return;
   window.__TEAM_BULLS_STUDENT_REPORT_SUBMIT_RECONCILIATION_1010579__=true;
 
-  const VERSION='10.10.57-submitstate11';
+  const VERSION='10.10.57-submitstate12';
   const READ_TIMEOUT=9000;
   const REST_GET_TIMEOUT=12000;
   const REST_COMMIT_TIMEOUT=35000;
@@ -302,6 +302,28 @@
       return 'registered';
     }
   }
+  function receiptScope(attempt){return{owner:attempt.scope.uid,kind:'receipt',subject:attempt.scope.uid,id:'report:'+attempt.kind+':'+attempt.id};}
+  async function rememberAttempt(attempt,status='pending'){
+    try{return await window.TeamBullsWorkflowStorage?.put?.(receiptScope(attempt),{source:'report',reportKind:attempt.kind,recordId:attempt.id,status,until:attempt.until||Date.now()+UNCERTAIN_RETRY_DELAY,...(status==='confirmed'?{}:{writes:attempt.writes})});}catch{return null;}
+  }
+  async function recoverAttempts(){
+    const scope=reportScope();if(!scope.current())return[];
+    const records=await window.TeamBullsWorkflowStorage?.list?.('receipt')||[];
+    if(!scope.current())return[];
+    for(const metadata of records){
+      if(metadata.source!=='report'||metadata.status!=='pending')continue;
+      const record=await window.TeamBullsWorkflowStorage.get(metadata);if(!scope.current())return[];if(!record)continue;
+      if(record.source!=='report'||record.status!=='pending'||record.owner!==scope.uid||!['w','q'].includes(record.reportKind)||!Array.isArray(record.writes)||!record.writes.length)continue;
+      const key=attemptKey(record.reportKind,record.recordId,scope.uid);
+      if(!uncertain.has(key))uncertain.set(key,{kind:record.reportKind,id:record.recordId,key,scope,writes:record.writes,until:record.until||Date.now()+UNCERTAIN_RETRY_DELAY,viewCurrent:()=>false});
+    }return records.filter(record=>record.source==='report').map(record=>({id:record.reportKind+':'+record.recordId,type:'report',label:record.reportKind==='w'?'Relatório semanal':'Relatório solicitado',status:record.status,date:new Date(record.updatedAt).toISOString().slice(0,10)}));
+  }
+  async function retryReceipt(id){
+    await recoverAttempts();const scope=reportScope();if(!scope.current())return false;
+    const attempt=uncertain.get(attemptKey(String(id).split(':')[0],String(id).slice(2),scope.uid));
+    return attempt?checkAttempt(attempt):false;
+  }
+
   const attemptKey=(kind,id,uid)=>kind+':'+uid+':'+id;
   const questionnaireOpen=id=>typeof CUR_ANSWER_QUEST_ID!=='undefined'&&CUR_ANSWER_QUEST_ID===id;
   function attemptButton(attempt){
@@ -318,6 +340,8 @@
   async function settleDelivery(attempt,outcome,{previous=false}={}){
     const {kind,id,scope}=attempt;
     if(!scope.current())return false;
+    await rememberAttempt(attempt,'confirmed');
+    await window.TeamBullsWorkflowDrafts?.confirmed?.(kind==='q'?'modal-answer-quest':'modal-weekly-checkin');
     const button=attemptButton(attempt);
     if(button&&attempt.sendLabel)button.textContent=attempt.sendLabel;
     if(kind==='q'){
@@ -353,6 +377,7 @@
       }
       if(result==='absent'&&Date.now()>=attempt.until){
         uncertain.delete(attempt.key);
+        await rememberAttempt(attempt,'retry-available');
         const button=attemptButton(attempt);
         if(button&&attempt.sendLabel)button.textContent=attempt.sendLabel;
         if(!quiet)notify('O servidor confirmou que o relatório continua pendente. As fotos e respostas seguem no formulário. Toque em Enviar para tentar novamente.');
@@ -373,6 +398,7 @@
     return null;
   }
   async function deliver(attempt){
+    await rememberAttempt(attempt);
     try{
       await restCommit(attempt.writes,attempt.kind==='q'?'enviar relatório':'enviar relatório semanal',attempt.scope);
     }catch(error){
@@ -519,5 +545,5 @@
     if(document.visibilityState==='visible')resumeConfirmations();
   });
 
-  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,readWeeklyPeriod,weeklyReceipt:()=>weeklyReceipt,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
+  window.TeamBullsStudentReportSubmitReconciliation=Object.freeze({version:VERSION,install,syncItems:recoverAttempts,retry:retryReceipt,reconcile:reconcileQuestionnaires,reconcileWeeklyPending,readWeeklyPeriod,weeklyReceipt:()=>weeklyReceipt,state:()=>({pending:installedPending,questionnaire:installedQuestionnaire,weekly:installedWeekly,uncertain:uncertain.size,transport:'firestore-rest-commit'})});
 })();

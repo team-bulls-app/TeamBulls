@@ -1,0 +1,169 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function profile(uid) {
+      return firestore.get(/databases/(default)/documents/users/$(uid)).data;
+    }
+    function isTrainer() {
+      return signedIn() && profile(request.auth.uid).role == 'trainer';
+    }
+    function trainerOwns(uid) {
+      /* Duas leituras únicas no máximo: perfil do treinador + perfil do aluno.
+         Isso respeita o limite de documentos Firestore acessíveis por avaliação
+         das regras do Storage. Documento ausente faz a condição falhar/nega. */
+      return isTrainer()
+        && profile(uid).role == 'student'
+        && profile(uid).trainerId == request.auth.uid;
+    }
+    function activeOwner(uid) {
+      return signedIn() && request.auth.uid == uid
+        && profile(uid).role == 'student' && profile(uid).status == 'active';
+    }
+    function activeStudentOf(trainerUid) {
+      return signedIn()
+        && profile(request.auth.uid).role == 'student'
+        && profile(request.auth.uid).status == 'active'
+        && profile(request.auth.uid).trainerId == trainerUid;
+    }
+    function progressPhotoData(photoId) {
+      return firestore.get(/databases/(default)/documents/progressPhotos/$(photoId)).data;
+    }
+    function questionnaireData(questionnaireId) {
+      return firestore.get(/databases/(default)/documents/questionnaires/$(questionnaireId)).data;
+    }
+    function trainerCanReadProgressPhoto(uid, photoId) {
+      /* Este ramo é usado apenas quando quem lê NÃO é o próprio aluno.
+         Documento 1: metadado progressPhotos. Documento 2 é escolhido pelo ternário:
+         - questionário imutavelmente pertencente ao treinador, ou
+         - perfil atual do aluno para fotos semanais/legadas sem questionnaireId.
+         Nunca são consultados os três documentos na mesma avaliação. */
+      let photo = progressPhotoData(photoId);
+      let questionnaireId = photo.get('questionnaireId', '');
+      return photo.userId == uid
+        && (questionnaireId != ''
+          ? questionnaireData(questionnaireId).studentId == uid
+            && questionnaireData(questionnaireId).trainerId == request.auth.uid
+          : profile(uid).role == 'student'
+            && profile(uid).trainerId == request.auth.uid);
+    }
+    function canReadProgressPhoto(uid, photoId) {
+      return signedIn() && (
+        request.auth.uid == uid
+          ? profile(uid).role == 'student' && profile(uid).status == 'active'
+          : trainerCanReadProgressPhoto(uid, photoId)
+      );
+    }
+    function validOptimizedJpegUpload(maxBytes) {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= maxBytes
+        && request.resource.contentType == 'image/jpeg';
+    }
+    function validOriginalProgressPhoto(maxBytes) {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= maxBytes
+        && request.resource.contentType.matches('image/(jpeg|png|webp|gif|avif|heic|heif)');
+    }
+    function validPaymentReceipt(maxBytes) {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= maxBytes
+        && request.resource.contentType.matches('image/(jpeg|png|webp|heic|heif)');
+    }
+    function validStudentProfileJson() {
+      return request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024
+        && request.resource.contentType == 'application/json';
+    }
+
+    match /progressPhotos/{uid}/{photoId}.jpg {
+      allow read: if canReadProgressPhoto(uid, photoId);
+      allow create, update: if activeOwner(uid) && validOptimizedJpegUpload(2 * 1024 * 1024);
+      allow delete: if activeOwner(uid);
+    }
+    match /progressPhotoThumbs/{uid}/{photoId}.jpg {
+      allow read: if canReadProgressPhoto(uid, photoId);
+      allow create, update: if activeOwner(uid) && validOptimizedJpegUpload(350 * 1024);
+      allow delete: if activeOwner(uid);
+    }
+    match /progressPhotoOriginals/{uid}/{photoId} {
+      allow read: if canReadProgressPhoto(uid, photoId);
+      allow create, update: if activeOwner(uid) && validOriginalProgressPhoto(25 * 1024 * 1024);
+      allow delete: if activeOwner(uid);
+    }
+
+    // Perfil visual do aluno: preferências ficam isoladas do documento principal
+    // de autenticação. O aluno ativo edita o próprio perfil; somente o treinador
+    // vinculado pode ler/moderar. Outros alunos não têm acesso.
+    match /studentProfiles/{uid}/profile.json {
+      allow read: if trainerOwns(uid) || activeOwner(uid);
+      allow create, update: if (activeOwner(uid) || trainerOwns(uid)) && validStudentProfileJson();
+      allow delete: if activeOwner(uid) || trainerOwns(uid);
+    }
+    match /studentProfiles/{uid}/avatar.jpg {
+      allow read: if trainerOwns(uid) || activeOwner(uid);
+      allow create, update: if activeOwner(uid) && validOptimizedJpegUpload(800 * 1024);
+      allow delete: if activeOwner(uid) || trainerOwns(uid);
+    }
+
+    match /reportGuides/{trainerUid}/photo-guide.pdf {
+      allow read: if (isTrainer() && request.auth.uid == trainerUid) || activeStudentOf(trainerUid);
+      allow create, update: if isTrainer() && request.auth.uid == trainerUid
+        && request.resource != null
+        && request.resource.size > 0
+        && request.resource.size <= 25 * 1024 * 1024
+        && request.resource.contentType == 'application/pdf';
+      allow delete: if isTrainer() && request.auth.uid == trainerUid;
+    }
+    match /freeMealLogs/{uid}/{photoId}.jpg {
+      allow read: if trainerOwns(uid) || activeOwner(uid);
+      allow create, update: if activeOwner(uid) && validOptimizedJpegUpload(2 * 1024 * 1024);
+      allow delete: if activeOwner(uid);
+    }
+
+    // Comprovantes são documentação financeira interna. Somente o treinador
+    // vinculado ao aluno pode enviar, abrir, substituir ou excluir o arquivo.
+    match /paymentReceipts/{trainerUid}/{studentUid}/{fileName} {
+      allow read: if isTrainer()
+        && request.auth.uid == trainerUid
+        && trainerOwns(studentUid);
+      allow create, update: if isTrainer()
+        && request.auth.uid == trainerUid
+        && trainerOwns(studentUid)
+        && validPaymentReceipt(15 * 1024 * 1024);
+      allow delete: if isTrainer()
+        && request.auth.uid == trainerUid
+        && trainerOwns(studentUid);
+    }
+
+
+    // Cópias anotadas e vídeos de feedback. Caminhos imutáveis, sem sobrescrever originais.
+    function feedbackData(feedbackId) {
+      return firestore.get(/databases/(default)/documents/feedback/$(feedbackId)).data;
+    }
+    function studentCanReadFeedbackAttachment(trainerUid, studentUid, feedbackId, fileName) {
+      let feedback = feedbackData(feedbackId);
+      let path = 'feedbackAttachments/' + trainerUid + '/' + studentUid + '/' + feedbackId + '/' + fileName;
+      // Duas leituras: perfil do aluno ativo + feedback publicado.
+      return activeOwner(studentUid)
+        && feedback.studentId == studentUid && feedback.trainerId == trainerUid
+        && feedback.get('attachmentPaths', []).hasAny([path]);
+    }
+    match /feedbackAttachments/{trainerUid}/{studentUid}/{feedbackId}/{fileName} {
+      allow read: if signedIn() && (request.auth.uid == trainerUid
+        ? trainerOwns(studentUid)
+        : studentCanReadFeedbackAttachment(trainerUid, studentUid, feedbackId, fileName));
+      allow create: if signedIn() && request.auth.uid == trainerUid && trainerOwns(studentUid)
+        && request.resource != null && request.resource.size > 0
+        && ((request.resource.contentType == 'image/jpeg' && request.resource.size <= 2 * 1024 * 1024)
+          || (request.resource.contentType.matches('video/(mp4|webm)') && request.resource.size <= 60 * 1024 * 1024));
+      allow update: if false;
+      allow delete: if signedIn() && request.auth.uid == trainerUid && trainerOwns(studentUid);
+    }
+
+    match /{allPaths=**} { allow read, write: if false; }
+  }
+}

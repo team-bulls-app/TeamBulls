@@ -22,7 +22,7 @@ assert(updaterBuild===version.build,'Atualizador e version.json usam builds dife
 assert(workerBuild===version.build&&bridgeBuild===version.build,'Service Workers e version.json usam builds diferentes.');
 assert(swHotfix&&swHotfix===bridgeHotfix,'Service Workers usam revisões de cache diferentes.');
 assert(firebase?.firestore?.rules==='firebase/firestore_28_compacto.rules','firebase.json deixou de apontar para Firestore Rules 28.');
-assert(firebase?.storage?.rules==='firebase/storage_6.rules','firebase.json deixou de apontar para Storage Rules 6.');
+assert(firebase?.storage?.rules==='firebase/storage_7.rules','firebase.json deixou de apontar para Storage Rules 7.');
 
 has(boot,'function returningCloudSession()','Boot não diferencia uma sessão já conhecida.');
 /* Incidente 2026-09-01: a espera longa podia deixar o usuário preso em
@@ -39,7 +39,7 @@ has(config,'startBootWatchdog.__tbMobileSessionRestore','Watchdog móvel não es
 has(config,'const loadedModules=new Set(),failedModules=new Set()','Loader não rastreia módulos temporariamente falhos.');
 has(config,'const healFailedModules=async(manual=true)=>','Loader não possui autorreparo.');
 has(config,"window.addEventListener('online',()=>{healAttempts=0;scheduleHeal(500);contextChanged();})",'Ao recuperar conexão, o loader deve retentar módulos falhos e reavaliar o contexto atual.');
-has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments7','Loader não entrega a Central/Pagamentos atual.');
+has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments8','Loader não entrega a Central/Pagamentos atual.');
 has(config,'photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','Loader não entrega a correção móvel de fotos.');
 has(config,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Loader não entrega o fallback HEIC/HEIF atual.');
 assert(config.indexOf('heic-report-conversion-v10_10_12.js')>config.indexOf('photo-quality-download-v10_10_9.js'),'Conversor HEIC precisa carregar após a camada de qualidade de fotos.');
@@ -51,7 +51,7 @@ has(updater,'heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','Atualizador 
 has(updater,'heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','Atualizador não prepara o worker HEIC same-origin atual.');
 for(const [name,text] of [['sw.js',sw],['sw_47.js',bridge]]){
   has(text,"./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2",`${name} regrediu a integridade do cadastro.`);
-  has(text,"./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments7",`${name} não prepara a Central/Pagamentos.`);
+  has(text,"./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments8",`${name} não prepara a Central/Pagamentos.`);
   has(text,"./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3",`${name} não prepara a correção móvel de fotos.`);
   has(text,"./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4",`${name} não prepara o módulo HEIC atual.`);
   has(text,"./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4",`${name} não prepara o worker HEIC same-origin atual.`);
@@ -103,4 +103,4 @@ lacks(integrity,'doRegister=secured','registration-integrity voltou a sobrescrev
 has(integrity,"const VERSION='10.10.9-registration2'",'Camada passiva de integridade não está na revisão esperada.');
 assert(bridge.replace('ponte de migração para instalações controladas pelo antigo sw_47.js','Service Worker estável e atualização sem reinstalação')===sw,'sw_47.js divergiu do Service Worker principal.');
 if(fail.length){console.error('FALHA — mobile startup consistency\n- '+fail.join('\n- '));process.exit(1);}
-console.log(`APROVADO — build ${version.build}, auth fail-open, cadastro, Central/Pagamentos, 6 fotos + HEIC worker, App Check, Rules 28, Storage 6 e Service Workers coerentes.`);
+console.log(`APROVADO — build ${version.build}, auth fail-open, cadastro, Central/Pagamentos, 6 fotos + HEIC worker, App Check, Rules 28, Storage 7 e Service Workers coerentes.`);

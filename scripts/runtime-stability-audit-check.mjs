@@ -16,7 +16,7 @@ const files={
   workerLegacy:'sw_47.js',
   version:'version.json',
   rules:'firebase/firestore_28_compacto.rules',
-  storageRules:'firebase/storage_6.rules'
+  storageRules:'firebase/storage_7.rules'
 };
 for(const path of Object.values(files))assert(fs.existsSync(path),`Arquivo ausente: ${path}`);
 const src=Object.fromEntries(Object.entries(files).map(([name,path])=>[name,read(path)]));
