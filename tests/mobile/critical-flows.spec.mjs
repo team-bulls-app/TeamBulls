@@ -140,12 +140,27 @@ test('uncertain attachment upload retries the same immutable file and confirms a
 test('camera and microphone tracks stop when the editor closes or account changes',async({page})=>{
   await page.goto('/');await page.evaluate(async()=>{
     asTrainer();openFeedbackModal();await TeamBullsFeedbackMedia.editor();window.trackStops=0;
-    const stream=new MediaStream();
-    Object.defineProperty(stream,'getTracks',{value:()=>[{stop(){trackStops++;}}]});
+    // Headless WebKit on Windows has no MediaStream constructor. Mock the same
+    // capture and preview boundary in each browser while exercising app cleanup.
+    const stream={getTracks:()=>[{stop(){trackStops++;}}]};
+    Object.defineProperty(HTMLMediaElement.prototype,'srcObject',{configurable:true,set(value){this.dataset.capturePreview=String(value===stream);}});
     Object.defineProperty(navigator,'mediaDevices',{configurable:true,value:{getUserMedia:async()=>stream}});
     window.MediaRecorder=class{static isTypeSupported(){return true;}constructor(){this.state='inactive';}start(){this.state='recording';}stop(){this.state='inactive';this.onstop?.();}};
-  });await page.getByRole('button',{name:'GRAVAR VÍDEO',exact:true}).click();await expect.poll(()=>page.evaluate(()=>TeamBullsFeedbackMedia.state().recording)).toBe(true);
-  await page.evaluate(()=>{CURRENT_USER={uid:'different',role:'trainer'};dispatchEvent(new Event('team-bulls-runtime-state'));});expect(await page.evaluate(()=>TeamBullsFeedbackMedia.state().recording)).toBe(false);expect(await page.evaluate(()=>trackStops)).toBeGreaterThan(0);
+  });
+  async function start(){
+    await page.getByRole('button',{name:'GRAVAR VÍDEO',exact:true}).click();
+    await expect(page.locator('video[data-capture-preview="true"]')).toHaveCount(1);
+    expect(await page.evaluate(()=>TeamBullsFeedbackMedia.state().recording)).toBe(true);
+  }
+  await start();
+  await page.evaluate(()=>closeModal('modal-feedback'));
+  expect(await page.evaluate(()=>TeamBullsFeedbackMedia.state().recording)).toBe(false);
+  await expect.poll(()=>page.evaluate(()=>trackStops)).toBeGreaterThan(0);
+  await page.evaluate(async()=>{openFeedbackModal();await TeamBullsFeedbackMedia.editor();window.trackStops=0;});
+  await start();
+  await page.evaluate(()=>{CURRENT_USER={uid:'different',role:'trainer'};dispatchEvent(new Event('team-bulls-runtime-state'));});
+  expect(await page.evaluate(()=>TeamBullsFeedbackMedia.state().recording)).toBe(false);
+  await expect.poll(()=>page.evaluate(()=>trackStops)).toBeGreaterThan(0);
   expect(await page.evaluate(()=>errors)).toEqual([]);
 });
 
