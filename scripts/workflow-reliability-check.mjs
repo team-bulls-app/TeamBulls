@@ -41,7 +41,7 @@ await test('isometry detection follows each week, including custom technique nam
   assert.equal(c.exerciseUsesResistedTime({weeks:{1:['it'],2:['bos']}},2),false);
 });
 await test('seconds above 100 survive normalization, cloning and history; reps remain bounded',()=>{
-  const c=vm.createContext({});vm.runInContext(['sessionFingerprint','normalizePrescriptionSet','normalizePerformedSet','normalizePerformedSets','clonePrescriptionSets'].map(source).join('\n'),c);
+  const c=vm.createContext({});vm.runInContext(['validClusterReps','sessionFingerprint','normalizePrescriptionSet','normalizePerformedSet','normalizePerformedSets','clonePrescriptionSets'].map(source).join('\n'),c);
   const timed={weight:40,reps:240,targetMin:120,targetMax:240,ger:3,unit:'seconds'};
   assert.equal(c.normalizePerformedSet(timed).reps,240);assert.equal(c.normalizePerformedSet(timed).unit,'seconds');assert.equal(c.clonePrescriptionSets([timed])[0].unit,'seconds');
   assert.equal(c.normalizePerformedSet({...timed,unit:'reps'}),null);assert.equal(c.normalizePerformedSet({...timed,reps:3601}),null);

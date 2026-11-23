@@ -403,7 +403,7 @@ let VIDEO_EDIT_EXERCISE_ID=null;
 let SESSION_CREATE_ID=null;
 let SET_COUNT=0;
 let SESSION_VARIANT={itemId:'',name:''};
-let REST_INTERVAL=null, REST_REMAINING=0, REST_TOTAL=0, REST_PAUSED=false, REST_END_AT=0;
+let REST_INTERVAL=null, REST_REMAINING=0, REST_TOTAL=0, REST_PAUSED=false, REST_END_AT=0, REST_CLUSTER_CLOCK=null;
 let CAL_YEAR=null, CAL_MONTH=null;
 const MONTH_NAMES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 let CHART_MODE='weight';
@@ -679,9 +679,14 @@ function sessionFingerprint(s){
     Number.isFinite(Number(x.targetMin))?Number(x.targetMin):null,
     Number.isFinite(Number(x.targetMax))?Number(x.targetMax):null,
     Number.isFinite(Number(x.ger))?Number(x.ger):null,
-    x.backoff===true,String(x.unit||'')
+    x.backoff===true,String(x.unit||''),...(validClusterReps(x.clusterReps,x.reps,x.unit)?[x.clusterReps]:[])
   ]);
   return JSON.stringify([s.date||'',Number(s.week)||0,s.note||'',String(s.performedExerciseItemId||''),String(s.performedExerciseName||''),sets]);
+}
+function validClusterReps(blocks,reps,unit){
+  return unit!=='seconds'&&Array.isArray(blocks)&&blocks.length===2
+    &&blocks.every(value=>Number.isInteger(value)&&value>=0)
+    &&blocks[0]+blocks[1]===Number(reps)&&Number(reps)<=100;
 }
 function normalizePerformedSet(value){
   if(!value||typeof value!=='object')return null;
@@ -690,6 +695,7 @@ function normalizePerformedSet(value){
   const clean={weight:Math.round(weight*100)/100,reps};
   if(['seconds','reps'].includes(value.unit))clean.unit=value.unit;
   if(value.backoff===true)clean.backoff=true;
+  if(validClusterReps(value.clusterReps,reps,value.unit))clean.clusterReps=[...value.clusterReps];
   const prescription=normalizePrescriptionSet(value);
   if(prescription)Object.assign(clean,prescription);
   return clean;
@@ -1965,6 +1971,7 @@ function normalizeLegacyPerformedSets(value){
     const clean={weight:Math.round(weight*100)/100,reps};
     if(['seconds','reps'].includes(raw.unit))clean.unit=raw.unit;
     if(raw.backoff===true)clean.backoff=true;
+    if(validClusterReps(raw.clusterReps,reps,raw.unit))clean.clusterReps=[...raw.clusterReps];
     const prescription=normalizePrescriptionSet(raw);if(prescription)Object.assign(clean,prescription);
     result.push(clean);
   }
@@ -5361,6 +5368,7 @@ function populateSessionEditorForWeek(week){
 }
 function sessionEditorHasData(){
   if(globalThis.TeamBullsIsometrySeriesTimer?.hasActiveSeries?.())return true;
+  if(REST_CLUSTER_CLOCK?.isConnected&&REST_REMAINING>0)return true;
   return[...document.querySelectorAll('#sets-editor .performed-set-row')].some(row=>
     row.querySelector('[data-f="w"]').value!==''||row.querySelector('[data-f="r"]').value!==''
   );
@@ -5399,8 +5407,10 @@ function removeSet(btn){
 /* ══════════════════════════════════════════════════
    REST TIMER (dentro do modal Registrar Sessão)
 ══════════════════════════════════════════════════ */
-function startRestTimer(seconds){
-  clearInterval(REST_INTERVAL);
+function startRestTimer(seconds,clusterClock=null){
+  resetRestTimer();
+  REST_CLUSTER_CLOCK=clusterClock;
+  if(clusterClock)clusterClock.hidden=false;
   REST_TOTAL=seconds;REST_REMAINING=seconds;REST_PAUSED=false;REST_END_AT=Date.now()+seconds*1000;
   window.TeamBullsCardioAlert?.prime();
   document.getElementById('rest-timer-presets').style.display='none';
@@ -5413,7 +5423,7 @@ function startRestTimer(seconds){
 function restTick(){
   // Auto-limpa se o modal foi fechado (backdrop, ESC ou salvar) sem passar por resetRestTimer
   const modal=document.getElementById('modal-session');
-  if(!modal||!modal.classList.contains('open')){clearInterval(REST_INTERVAL);REST_INTERVAL=null;return;}
+  if(!modal||!modal.classList.contains('open')||(REST_CLUSTER_CLOCK&&!REST_CLUSTER_CLOCK.isConnected)){resetRestTimer();return;}
   REST_REMAINING=Math.max(0,Math.ceil((REST_END_AT-Date.now())/1000));
   if(REST_REMAINING<=0){
     REST_REMAINING=0;renderRestTick();
@@ -5427,7 +5437,13 @@ function restTick(){
 }
 function renderRestTick(){
   const m=Math.floor(REST_REMAINING/60),s=REST_REMAINING%60;
-  document.getElementById('rest-timer-display').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  const clock=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+  document.getElementById('rest-timer-display').textContent=clock;
+  if(REST_CLUSTER_CLOCK){
+    REST_CLUSTER_CLOCK.querySelector('output').textContent=clock;
+    REST_CLUSTER_CLOCK.querySelector('[role="status"]').textContent=REST_REMAINING?'':'Descanso concluído';
+    REST_CLUSTER_CLOCK.querySelector('button').hidden=!REST_REMAINING;
+  }
   const pct=REST_TOTAL?((REST_TOTAL-REST_REMAINING)/REST_TOTAL*100):0;
   document.getElementById('rest-timer-bar').style.width=pct+'%';
 }
@@ -5449,6 +5465,8 @@ function toggleRestTimer(){
 }
 function resetRestTimer(){
   clearInterval(REST_INTERVAL);REST_INTERVAL=null;
+  if(REST_CLUSTER_CLOCK)REST_CLUSTER_CLOCK.hidden=true;
+  REST_CLUSTER_CLOCK=null;
   REST_REMAINING=0;REST_TOTAL=0;REST_PAUSED=false;REST_END_AT=0;
   const disp=document.getElementById('rest-timer-display');
   if(disp){disp.textContent='00:00';disp.classList.remove('done');}
@@ -5486,6 +5504,41 @@ function selectedPerformedTechniqueMode(exercise){
 function renderEditOptionalTechniqueMode(exercise,current=''){const group=document.getElementById('edit-session-technique-mode-group'),select=document.getElementById('edit-session-technique-mode'),optional=exerciseHasOptionalTechnique(exercise,'mp');if(group)group.style.display=optional?'block':'none';if(select)select.value=current==='normal'?'normal':'myo';}
 function selectedEditPerformedTechniqueMode(exercise){if(!exerciseHasOptionalTechnique(exercise,'mp'))return '';return document.getElementById('edit-session-technique-mode')?.value==='normal'?'normal':'myo';}
 
+function clusterBlockInputs(row){
+  return row.classList?.contains('cluster-set-row')?[...row.querySelectorAll('[data-cluster-reps]')]:null;
+}
+
+function readSessionSetRows(editorId){
+  const sets=[];
+  for(const row of document.querySelectorAll('#'+editorId+' .performed-set-row')){
+    const loadInput=row.querySelector('[data-f="w"]');
+    const load=loadInput?.value.trim()||'';
+    const blocks=clusterBlockInputs(row);
+    const results=blocks||[row.querySelector('[data-f="r"]')];
+    const values=results.map(input=>input?.value.trim()||'');
+    const invalidResult=results.some(input=>input?.validity?.badInput);
+    const invalidLoad=loadInput?.validity?.badInput;
+    if(!load&&!invalidLoad&&!invalidResult&&!values.some(Boolean))continue;
+    const weight=Number(load),unit=row.dataset.unit;
+    const reps=values.reduce((total,value)=>total+Number(value),0);
+    const clusterReps=blocks?values.map(Number):null;
+    if(!values.some(Boolean)||invalidResult||invalidLoad||!Number.isFinite(weight)||weight<0||weight>10000
+      ||!Number.isInteger(reps)||reps<0||reps>(unit==='seconds'?3600:100)
+      ||(blocks&&!validClusterReps(clusterReps,reps,unit))){
+      alert(blocks?'Confira as repetições dos dois blocos e a carga da série.':'Confira a carga e as repetições das séries realizadas.');
+      return null;
+    }
+    const performed={weight,reps};
+    if(['seconds','reps'].includes(unit))performed.unit=unit;
+    if(clusterReps)performed.clusterReps=clusterReps;
+    if(row.dataset.backoff==='1')performed.backoff=true;
+    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,unit});
+    if(target)Object.assign(performed,target);
+    sets.push(performed);
+  }
+  return sets;
+}
+
 async function saveSession(){
   // Usa IDs travados no momento que o modal abriu — imune a navegação durante o preenchimento
   const wid = SESSION_WID || CUR_WORKOUT;
@@ -5498,21 +5551,8 @@ async function saveSession(){
   const note=document.getElementById('input-session-note').value.trim();
   const exerciseForVariant=sessionExerciseForSave(wid,eid);const variant=selectedVariantData(exerciseForVariant,'input-session-variant');const performedTechniqueMode=selectedPerformedTechniqueMode(exerciseForVariant);
   // A prescrição/GER fica travada na linha; o aluno informa apenas o realizado.
-  const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')];const sets=[];
-  for(const row of rows){
-    const rawWeight=row.querySelector('[data-f="w"]').value.trim();
-    const rawReps=row.querySelector('[data-f="r"]').value.trim();
-    if(rawWeight===''&&rawReps==='')continue; // série prescrita que não foi realizada
-    const w=rawWeight===''?0:parseFloat(rawWeight);
-    const r=parseInt(rawReps,10);
-    if(!Number.isFinite(w)||!Number.isInteger(r)||w<0||w>10000||r<0||r>(row.dataset.unit==='seconds'?3600:100)){alert('Confira a carga e as repetições das séries realizadas.');return;}
-    const performed={weight:w,reps:r};
-    if(['seconds','reps'].includes(row.dataset.unit))performed.unit=row.dataset.unit;
-    if(row.dataset.backoff==='1')performed.backoff=true;
-    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
-    if(target)Object.assign(performed,target);
-    sets.push(performed);
-  }
+  const sets=readSessionSetRows('sets-editor');
+  if(!sets)return;
   if(!sets.length){alert('Registre ao menos uma série realizada.');return;}
   LAST_SESSION_WEEK=week;
   if(!beginAction('save-session','modal-session'))return;
@@ -5957,7 +5997,10 @@ function openEditSession(sid){
   const editor = document.getElementById('edit-sets-editor');
   editor.innerHTML = '';
   const rx=resolveWeekPrescription(owner.exercise,sess.week||1);
-  sess.sets.forEach((s,index) => { addEditSetRow(s.weight,s.reps,normalizePrescriptionSet(s)||rx.sets[index]||null); });
+  sess.sets.forEach((s,index) => {
+    const cluster=validClusterReps(s.clusterReps,s.reps,s.unit)?s.clusterReps:null;
+    addEditSetRow(s.weight,s.reps,normalizePrescriptionSet(s)||rx.sets[index]||null,cluster);
+  });
   renderSessionPrescriptionSummary(owner.exercise,sess.week||1,'edit-session-prescription-summary');
   populateVariantSelect(owner.exercise,'edit-session-variant','edit-session-variant-group',sess.performedExerciseItemId,sess.performedExerciseName||sess.exerciseName||owner.exercise.name);
   renderEditOptionalTechniqueMode(owner.exercise,sess.performedTechniqueMode);
@@ -6004,22 +6047,8 @@ async function saveEditSession(){
   const week = parseInt(document.getElementById('edit-session-week').value);
   if(!week||week<1||week>8){ alert('Selecione a semana de treino!'); return; }
   const note = document.getElementById('edit-session-note').value.trim();
-  const rows = [...document.querySelectorAll('#edit-sets-editor .performed-set-row')];
-  const sets = [];
-  for(const row of rows){
-    const rawWeight=row.querySelector('[data-f="w"]').value.trim();
-    const rawReps=row.querySelector('[data-f="r"]').value.trim();
-    if(rawWeight===''&&rawReps==='')continue;
-    const w=rawWeight===''?0:parseFloat(rawWeight);
-    const r=parseInt(rawReps,10);
-    if(!Number.isFinite(w)||!Number.isInteger(r)||w<0||w>10000||r<0||r>(row.dataset.unit==='seconds'?3600:100)){alert('Confira a carga e as repetições das séries realizadas.');return;}
-    const performed={weight:w,reps:r};
-    if(['seconds','reps'].includes(row.dataset.unit))performed.unit=row.dataset.unit;
-    if(row.dataset.backoff==='1')performed.backoff=true;
-    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
-    if(target)Object.assign(performed,target);
-    sets.push(performed);
-  }
+  const sets=readSessionSetRows('edit-sets-editor');
+  if(!sets)return;
   if(!sets.length){deleteEditedSession();return;}
   // Usa IDs travados no momento da abertura do modal
   const wid = EDIT_SESSION_WID || CUR_WORKOUT;
@@ -6439,7 +6468,7 @@ Veja todos os vídeos para obter todas as orientações necessárias.
 EM CASO DE CANSAÇO EXTREMO, DESCANSE 2 DIAS SEGUIDOS.`;
 const DEFAULT_TECHNIQUE_DEFINITIONS=[
   {id:'ss',code:'SS',name:'Super set',description:'',videoUrl:'',locked:true,order:0},
-  {id:'cs',code:'CS',name:'Cluster Set',description:'',videoUrl:'',locked:true,order:1},
+  {id:'cs',code:'CS',name:'Cluster Set Tradicional',description:'Divida cada série em dois blocos de repetições, com 15 a 25 segundos de pausa entre eles. Os dois blocos contam como uma série. Por exemplo, 8 repetições ficam em 4 + 4. Se houver outra série, descanse cerca de 2 minutos antes de repeti-la.',videoUrl:'',locked:true,order:1},
   {id:'mp',code:'MP',name:'Myo Reps',description:'',videoUrl:'',locked:true,order:2},
   {id:'bos',code:'BOS',name:'Back off Set',description:'',videoUrl:'',locked:true,order:3},
   {id:'rest-pause',code:'RP',name:'Rest and Pause',description:'',videoUrl:'',locked:true,order:4},
@@ -6785,12 +6814,72 @@ collectPrescriptionRows=function(){const rows=[...document.querySelectorAll('#pr
 renderSessionPrescriptionSummary=function(exercise,week,elId){const el=document.getElementById(elId);if(!el)return;const summary=prescriptionCompactSummary(exercise,week),partner=findSupersetPartner(exercise);el.innerHTML=summary.rx.sets.length?`<strong>Semana ${week}:</strong> ${esc(summary.reps)} · ${esc(summary.ger)}.${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''}${exerciseHasOptionalTechnique(exercise,'mp')?' <b>Myo Reps opcional: ${esc(summary.reps)} em MP OU ${esc(summary.reps)} em séries normais.</b>':''} Preencha somente o que você conseguiu realizar.`:`<strong>Semana ${week}:</strong> sem prescrição cadastrada. O registro continuará disponível, mas confirme a orientação com o treinador.`;};
 populateSessionEditorForWeek=function(week){const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos'))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise);};
 function renumberPerformedSetRows(){const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')];rows.forEach((row,index)=>{const num=row.querySelector('.set-edit-num');if(num)num.innerHTML=`${index+1}${row.dataset.backoff==='1'?'<span class="backoff-label">BOS</span>':''}`;});SET_COUNT=rows.length;}
+function usesTraditionalCluster(exercise,week){
+  return exerciseHasTechnique(exercise,'cs',week)&&!exerciseUsesResistedTime(exercise,week);
+}
+
+function clusterBlockTarget(target,block){
+  if(!target||target.targetMin<2)return '';
+  const split=block===1?Math.floor:Math.ceil;
+  const min=split(target.targetMin/2),max=split(target.targetMax/2);
+  return (min===max?min:min+'–'+max)+' reps';
+}
+
+function renderClusterSetRow(row,target,values=[],withTimer=false){
+  row.classList.add('cluster-set-row');
+  row.dataset.unit='reps';
+  const number=row.querySelector('.set-edit-num'),prescribed=row.querySelector('.performed-target');
+  const ger=row.querySelector('.performed-ger'),remove=row.querySelector('.btn-rm-set');
+  const header=document.createElement('div');
+  header.className='cluster-set-head';
+  prescribed.textContent=target?prescribedRangeLabel(target)+' reps no total':'Série extra';
+  remove.type='button';
+  remove.setAttribute('aria-label','Remover série');
+  header.append(number,prescribed,ger,remove);
+  row.prepend(header);
+  row.querySelector('.performed-field-weight .performed-field-label').textContent='Carga da série (kg)';
+  const total=row.querySelector('[data-f="r"]');
+  total.closest('label').hidden=true;
+  const blocks=document.createElement('div');
+  blocks.className='cluster-blocks';
+  blocks.innerHTML=[1,2].map(block=>`<label><span>Bloco ${block} <small>${clusterBlockTarget(target,block)}</small></span><input class="set-edit-input" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="reps" data-f="cluster${block}" data-cluster-reps aria-label="Repetições do bloco ${block}"></label>`).join('');
+  const inputs=[...blocks.querySelectorAll('input')];
+  const updateTotal=()=>{
+    total.value=inputs.some(input=>input.value!=='')?String(inputs.reduce((sum,input)=>sum+Number(input.value),0)):'';
+  };
+  inputs.forEach((input,index)=>{
+    input.value=values[index]??'';
+    input.addEventListener('input',updateTotal);
+  });
+  updateTotal();
+  row.querySelector('.performed-field-weight').after(blocks);
+  if(!withTimer)return;
+  const intra=document.createElement('div'),between=document.createElement('div');
+  intra.className='cluster-rest cluster-between-blocks';
+  intra.innerHTML='<div class="cluster-rest-options"><span>Pausa entre blocos</span><div><button type="button" class="btn-ghost" data-seconds="15">15 s</button><button type="button" class="btn-ghost cluster-default-pause" data-seconds="20">20 s</button><button type="button" class="btn-ghost" data-seconds="25">25 s</button></div></div>';
+  between.className='cluster-rest cluster-between-sets';
+  between.innerHTML='<div class="cluster-rest-options"><span>Descanso entre séries</span><button type="button" class="btn-ghost" data-seconds="120">Iniciar 2 min</button></div>';
+  for(const rest of [intra,between]){
+    const clock=document.createElement('div');
+    clock.className='cluster-clock';
+    clock.hidden=true;
+    clock.innerHTML='<output aria-live="off"></output><span role="status"></span><button class="btn-ghost" type="button">Cancelar pausa</button>';
+    clock.querySelector('button').onclick=resetRestTimer;
+    for(const button of rest.querySelectorAll('[data-seconds]'))button.onclick=()=>startRestTimer(Number(button.dataset.seconds),clock);
+    rest.append(clock);
+  }
+  const card=document.createElement('div');
+  card.className='cluster-set-card';
+  card.append(...row.childNodes,intra);
+  row.append(card,between);
+}
 addSetRow=function(weight='',reps='',prescription=null){
   if(SET_COUNT>=30){alert('Limite de 30 séries por sessão.');return;}
   const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);
+  const week=Number(document.getElementById('input-session-week')?.value)||1;
   const target=normalizePrescriptionSet(prescription);
   const backoff=prescription?.backoff===true;
-  const time=exerciseUsesResistedTime(exercise);
+  const time=exerciseUsesResistedTime(exercise,week);
   const unit=time?'seg':'reps';
   const editor=document.getElementById('sets-editor');
   const row=document.createElement('div');
@@ -6819,6 +6908,7 @@ addSetRow=function(weight='',reps='',prescription=null){
   const existingBackoff=editor.querySelector('.performed-set-row[data-backoff="1"]');
   if(!backoff&&existingBackoff)editor.insertBefore(row,existingBackoff);
   else editor.appendChild(row);
+  if(!time&&usesTraditionalCluster(exercise,week))renderClusterSetRow(row,target,[],true);
   renumberPerformedSetRows();
   updateBackoffLoadSuggestion();
 };
@@ -6827,18 +6917,25 @@ function updateBackoffLoadSuggestion(){const rows=[...document.querySelectorAll(
 const openLogSessionModalV101=openLogSessionModal;
 openLogSessionModal=function(){const result=openLogSessionModalV101.apply(this,arguments);const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);renderRestTimerPresetsForExercise(exercise);return result;};
 
-function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const recorded=new Set((sess.sets||[]).map(set=>set.unit).filter(Boolean)),time=recorded.size===1?recorded.has('seconds'):exerciseUsesResistedTime(e,sess.week),unit=time?'s':'×';const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(time?Number(s.reps)||0:(Number(s.weight)||0)*(Number(s.reps)||0)),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo total (seg)':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
+function sessionPerformedResult(set,unit){
+  const total=Number(set.reps)||0;
+  return validClusterReps(set.clusterReps,total,set.unit)
+    ? total+' reps <small class="cluster-history-blocks">'+set.clusterReps.join(' + ')+'</small>'
+    : total+unit;
+}
+function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const recorded=new Set((sess.sets||[]).map(set=>set.unit).filter(Boolean)),time=recorded.size===1?recorded.has('seconds'):exerciseUsesResistedTime(e,sess.week),unit=time?'s':'×';const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(time?Number(s.reps)||0:(Number(s.weight)||0)*(Number(s.reps)||0)),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${sessionPerformedResult(s,unit)}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo total (seg)':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
 buildSessions=buildSessionsV102;
 
 const openEditSessionV101=openEditSession;
 openEditSession=function(sid){const result=openEditSessionV101.apply(this,arguments);const exercise=getE(EDIT_SESSION_WID,EDIT_SESSION_EID),label=document.getElementById('edit-session-result-label');if(label)label.textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';document.querySelectorAll('#edit-sets-editor .performed-set-row').forEach((row,index)=>{const session=findSessionOwner(sid)?.session,set=session?.sets?.[index];if(set?.backoff){row.dataset.backoff='1';row.classList.add('backoff-row');const target=row.querySelector('.performed-target');if(target)target.innerHTML+='<span class="backoff-label">-20% carga</span>';}});return result;};
 const addEditSetRowV101=addEditSetRow;
 function renumberEditSetRows(){document.querySelectorAll('#edit-sets-editor .performed-set-row').forEach((row,index)=>{const num=row.querySelector('.set-edit-num');if(num)num.innerHTML=`${index+1}${row.dataset.backoff==='1'?'<span class="backoff-label">BOS</span>':''}`;});EDIT_SET_COUNT=document.querySelectorAll('#edit-sets-editor .performed-set-row').length;}
-addEditSetRow=function(weight='',reps='',prescription=null){
+addEditSetRow=function(weight='',reps='',prescription=null,cluster){
   const before=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')];
   const result=addEditSetRowV101.apply(this,arguments);
   const rows=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')];
-  const row=rows.find(item=>!before.includes(item))||rows[rows.length-1];
+  const row=rows.find(item=>!before.includes(item));
+  if(!row)return result;
   const exercise=getE(EDIT_SESSION_WID,EDIT_SESSION_EID);
   const backoff=prescription?.backoff===true;
   if(row&&exerciseUsesResistedTime(exercise)){
@@ -6857,11 +6954,35 @@ addEditSetRow=function(weight='',reps='',prescription=null){
   }
   const existingBackoff=document.querySelector('#edit-sets-editor .performed-set-row[data-backoff="1"]');
   if(row&&!backoff&&existingBackoff&&row!==existingBackoff)existingBackoff.parentNode.insertBefore(row,existingBackoff);
+  if(cluster===undefined&&before.some(item=>item.classList.contains('cluster-set-row')))cluster=[];
+  if(Array.isArray(cluster))renderClusterSetRow(row,normalizePrescriptionSet(prescription),cluster);
   renumberEditSetRows();
   return result;
 };
 
-onEditSessionWeekChange=function(){const week=Number(document.getElementById('edit-session-week').value)||1,exercise=getE(EDIT_SESSION_WID||CUR_WORKOUT,EDIT_SESSION_EID||CUR_EX);if(!exercise)return;const actual=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')].map(row=>({weight:row.querySelector('[data-f="w"]').value,reps:row.querySelector('[data-f="r"]').value,backoff:row.dataset.backoff==='1'})),rx=resolveWeekPrescription(exercise,week),targets=effectivePrescriptionSets(exercise,rx.sets);EDIT_SET_COUNT=0;document.getElementById('edit-sets-editor').innerHTML='';const count=Math.max(actual.length,targets.length);for(let index=0;index<count;index++){const source=actual[index]||{},target=targets[index]||null;addEditSetRow(source.weight||'',source.reps||'',target);const row=document.querySelector('#edit-sets-editor .performed-set-row:last-child');if(row&&(target?.backoff||source.backoff)){row.dataset.backoff='1';row.classList.add('backoff-row');}}const label=document.getElementById('edit-session-result-label');if(label)label.textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'edit-session-prescription-summary');};
+onEditSessionWeekChange=function(){
+  const week=Number(document.getElementById('edit-session-week').value)||1;
+  const exercise=getE(EDIT_SESSION_WID||CUR_WORKOUT,EDIT_SESSION_EID||CUR_EX);
+  if(!exercise)return;
+  const editor=document.getElementById('edit-sets-editor');
+  const actual=[...editor.querySelectorAll('.performed-set-row')].map(row=>({
+    weight:row.querySelector('[data-f="w"]').value,
+    reps:row.querySelector('[data-f="r"]').value,
+    backoff:row.dataset.backoff==='1',
+    cluster:clusterBlockInputs(row)?.map(input=>input.value)??null
+  }));
+  const targets=effectivePrescriptionSets(exercise,resolveWeekPrescription(exercise,week).sets,week);
+  EDIT_SET_COUNT=0;
+  editor.replaceChildren();
+  for(let index=0;index<Math.max(actual.length,targets.length);index++){
+    const source=actual[index],target=targets[index];
+    const prescription=target||source?.backoff?{...target,backoff:!!(target?.backoff||source?.backoff)}:null;
+    addEditSetRow(source?.weight||'',source?.reps||'',prescription,source?.cluster??null);
+  }
+  const label=document.getElementById('edit-session-result-label');
+  if(label)label.textContent=exerciseUsesResistedTime(exercise,week)?'Tempo':'Reps';
+  renderSessionPrescriptionSummary(exercise,week,'edit-session-prescription-summary');
+};
 
 const workoutPdfHtmlV101=workoutPdfHtml;
 workoutPdfHtml=function(workout,studentName){let html=workoutPdfHtmlV101(workout,studentName);for(const exercise of(workout?.exercises||[])){const items=techniqueItemsForExercise(exercise);if(!items.length)continue;const needle=`<h3>${pdfEscape(exercise.name)}</h3>`;const technique=`${needle}<div class="instruction"><b>Técnicas:</b> ${items.map(item=>pdfEscape(item.code+' — '+item.name+(exerciseHasOptionalTechnique(exercise,item.id)?' (opcional)':''))).join(' · ')}</div>`;html=html.replace(needle,technique);}return html.replace(/Team Bulls v10\.1/g,'Team Bulls v10.5').replace(/Team Bulls v10\.2/g,'Team Bulls v10.5').replace(/Team Bulls v10\.3/g,'Team Bulls v10.5');};

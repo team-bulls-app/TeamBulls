@@ -9,19 +9,28 @@ addEventListener('error',e=>errors.push(e.error?.stack||e.message));addEventList
 let CURRENT_USER={uid:'student-test',role:'student'},MODE='cloud',LOCAL_OWNER_UID='',VIEW_STUDENT=null,VIEW_STUDENT_WORKOUT=null;
 let SESSION_WID='w',SESSION_EID='e',EDIT_SESSION_WID='w',EDIT_SESSION_EID='e',EDIT_SESSION_ID='old',SET_COUNT=0,EDIT_SET_COUNT=0;
 let SESSION_EDITOR_WEEK=1,LAST_SESSION_WEEK=1;
+let REST_INTERVAL=null,REST_REMAINING=0,REST_TOTAL=0,REST_PAUSED=false,REST_END_AT=0,REST_CLUSTER_CLOCK=null;
 const TECHNIQUE_CATALOG={items:[{id:'it',name:'Isometria tradicional'},{id:'is',name:'Isometria de sustentação'},{id:'custom',name:'Isometria na parede'}]};
 window.exercise={id:'e',name:'Cadeira flexora',weeks:{1:['it'],2:[]},sets:[{targetMin:120,targetMax:240,ger:3,unit:'seconds'}]};
 const sessionExerciseForSave=()=>exercise,getE=()=>exercise,exerciseTechniqueIds=(ex,w=1)=>ex.weeks[w]||[],inferExerciseTechniqueWeek=()=>Number(document.getElementById('input-session-week').value)||1;
+const exerciseHasTechnique=(ex,id,week)=>exerciseTechniqueIds(ex,week).includes(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const prescribedRangeLabel=s=>s.targetMin+'–'+s.targetMax,formatGerLevel=v=>'GER '+v,renderGerMeter=()=>'',updateBackoffLoadSuggestion=()=>{},renderSessionPrescriptionSummary=()=>{};
 function showToast(m,e){messages.push({message:m,error:!!e});}function cloudWrite(p){return p;}function cloudGet(p){return p.get();}function withTimeout(p,ms){return Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),ms))]);}
 window.confirm=()=>true;window.alert=m=>messages.push({message:m});
 function openModal(id){document.getElementById(id)?.classList.add('open');}function closeModal(id){document.getElementById(id)?.classList.remove('open');}
 function openLogSessionModal(){openModal('modal-session');populateSessionEditorForWeek(document.getElementById('input-session-week').value);}
-function populateSessionEditorForWeek(){SET_COUNT=0;document.getElementById('sets-editor').replaceChildren();addSetRow('','',exercise.sets[0]);}
-function saveSession(){const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')];const sets=normalizePerformedSets(rows.map(row=>({weight:Number(row.querySelector('[data-f="w"]').value),reps:Number(row.querySelector('[data-f="r"]').value),unit:row.dataset.unit,targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger})));if(!sets)throw new Error('invalid performed sets');saved.push(sets);return true;}
-function saveEditSession(){const row=document.querySelector('#edit-sets-editor .performed-set-row');saved.push(normalizePerformedSets([{weight:Number(row.querySelector('[data-f="w"]').value),reps:Number(row.querySelector('[data-f="r"]').value),unit:row.dataset.unit}]));return true;}
-function openEditSession(){EDIT_SET_COUNT=0;document.getElementById('edit-sets-editor').replaceChildren();addEditSetRow('40','35',{targetMin:120,targetMax:240,ger:3,unit:'seconds'});openModal('modal-edit-session');}const findSessionOwner=()=>({session:{sets:[{unit:'seconds',targetMin:120,targetMax:240,ger:3}]}}),getPlanEditExercise=()=>exercise,currentWeekTechniqueEditorConfig=()=>null;
+function populateSessionEditorForWeek(){SET_COUNT=0;document.getElementById('sets-editor').replaceChildren();for(const set of exercise.sets)addSetRow('','',set);}
+function saveSession(){const sets=normalizePerformedSets(readSessionSetRows('sets-editor'));if(!sets)return false;saved.push(sets);return true;}
+function saveEditSession(){const sets=normalizePerformedSets(readSessionSetRows('edit-sets-editor'));if(!sets)return false;saved.push(sets);return true;}
+let editHistory=[{weight:40,reps:35,unit:'seconds',targetMin:120,targetMax:240,ger:3}];
+function openEditSession(){EDIT_SET_COUNT=0;document.getElementById('edit-sets-editor').replaceChildren();for(const set of editHistory)addEditSetRow(set.weight,set.reps,set,set.clusterReps??null);openModal('modal-edit-session');}const findSessionOwner=()=>({session:{sets:editHistory}}),getPlanEditExercise=()=>exercise,currentWeekTechniqueEditorConfig=()=>null;
+window.openClusterExample=(count=2,min=8,max=12)=>{
+  exercise.weeks={1:['cs'],2:[],3:['cs','it']};
+  exercise.sets=Array.from({length:count},()=>({targetMin:min,targetMax:max,ger:3}));
+  openLogSessionModal();
+};
+window.editClusterExample=()=>{editHistory=saved[0];closeModal('modal-session');openEditSession();};
 window.TeamBullsCardioAlert={prime(){},restFinished(){alarms++;}};
 let WEEKLY_CHECKIN_REQUEST={requestKey:'scheduled:2026-11-18'},WEEKLY_CHECKIN_FILES=Array(6).fill(null),QUESTIONNAIRE_REPORT_FILES=Array(6).fill(null),CUR_ANSWER_QUEST_ID='report-test';
 function openWeeklyCheckinModal(){document.getElementById('weekly-checkin-weight').value='';document.querySelector('[data-weekly-question]').value='';WEEKLY_CHECKIN_FILES=Array(6).fill(null);openModal('modal-weekly-checkin');}
@@ -37,9 +46,9 @@ const getWorkoutDays=w=>w.days,exercisesForDay=(w,n)=>w.exercises.filter(e=>e.da
 window.asStudent=()=>{CURRENT_USER={uid:'student-test',role:'student'};VIEW_STUDENT=null;};
 window.testImage=()=>{const canvas=document.createElement('canvas');canvas.width=180;canvas.height=240;const c=canvas.getContext('2d');c.fillStyle='#ddd';c.fillRect(0,0,180,240);c.fillStyle='#553';c.fillRect(40,30,80,190);return canvas.toDataURL('image/jpeg');};
 window.addTestImage=async()=>{const blob=await(await fetch(testImage())).blob();return TeamBullsFeedbackMedia.add(blob,'Cópia de teste','photo-test');};
-`+['normalizePrescriptionSet','normalizePerformedSet','normalizePerformedSets','exerciseUsesResistedTime','renumberPerformedSetRows','addEditSetRow','sessionEditorHasData','onSessionWeekChange','onEditSessionWeekChange'].map(source).join('\n')+'\n'+slice("addSetRow=function(weight='',reps='',prescription=null){",'removeSet=function(btn)');
+`+['normalizePrescriptionSet','validClusterReps','normalizePerformedSet','normalizePerformedSets','exerciseUsesResistedTime','clusterBlockInputs','readSessionSetRows','renumberPerformedSetRows','addEditSetRow','sessionEditorHasData','onSessionWeekChange','startRestTimer','restTick','renderRestTick','resetRestTimer','sessionPerformedResult'].map(source).join('\n')+'\n'+slice('function usesTraditionalCluster(', 'removeSet=function(btn)')+'\n'+slice('const addEditSetRowV101=addEditSetRow;', 'const workoutPdfHtmlV101=');
 const modal=(id,title,contents)=>'<div id="'+id+'" class="modal-backdrop"><div class="modal-sheet"><div class="modal-title">'+title+'</div>'+contents+'</div></div>';
-const ui=modal('modal-edit-session','Editar registro','<select id="edit-session-week" onchange="onEditSessionWeekChange()"><option>1</option><option>2</option></select><div id="edit-sets-editor"></div><button onclick="saveEditSession()">SALVAR ALTERAÇÕES</button>')+modal('modal-session','Registrar séries','<label>Semana<select id="input-session-week" onchange="onSessionWeekChange()"><option>1</option><option>2</option></select></label><div id="sets-editor"></div><button onclick="saveSession()">SALVAR REGISTRO</button>')+
+const ui=modal('modal-edit-session','Editar registro','<select id="edit-session-week" onchange="onEditSessionWeekChange()"><option>1</option><option>2</option></select><div id="edit-sets-editor"></div><button onclick="saveEditSession()">SALVAR ALTERAÇÕES</button>')+modal('modal-session','Registrar resultado','<label>Semana<select id="input-session-week" onchange="onSessionWeekChange()"><option>1</option><option>2</option><option>3</option></select></label><div id="sets-editor"></div><div class="rest-timer"><span id="rest-timer-display"></span><span id="rest-timer-bar"></span><div id="rest-timer-presets"></div><div id="rest-timer-controls"><button id="rest-timer-toggle-btn">Pausar</button></div></div><button class="btn-primary" onclick="saveSession()">SALVAR REGISTRO</button>')+
 modal('modal-weekly-checkin','Relatório semanal','<div class="form-group"><label>Peso</label><input id="weekly-checkin-weight" type="number"></div><div class="form-group"><label>Como foi a semana?</label><textarea data-weekly-question="0"></textarea></div>'+Array.from({length:6},(_,i)=>'<input id="weekly-photo-'+i+'" type="file" accept="image/*" onchange="WEEKLY_CHECKIN_FILES['+i+']=this.files[0]">').join(''))+
 modal('modal-feedback','Feedback','<div class="form-group"><label>Tipo<select id="input-feedback-type"><option value="extra">Extra</option></select></label></div><div class="form-group"><label>Título<input id="input-feedback-title"></label></div><div class="form-group"><label>Mensagem<textarea id="input-feedback"></textarea></label></div><button onclick="sendFeedback()">TRANSMITIR FEEDBACK</button>')+
 modal('modal-photo-view','Foto de teste','<img id="photo-view-img" style="max-width:100%"><div id="photo-view-meta"></div>');

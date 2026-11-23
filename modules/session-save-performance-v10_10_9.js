@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__)return;
   window.__TEAM_BULLS_SESSION_SAVE_PERF_V10109__=true;
 
-  const VERSION='10.10.63-sessionperf8';
+  const VERSION='10.10.63-sessionperf9';
   const QUEUE_PREFIX='team_bulls_pending_sessions_v1_';
   const SYNC_DIAGNOSTIC_PREFIX='team_bulls_session_sync_diag_v1_';
   const SESSION_SNAPSHOT_VERSION=3;
@@ -560,20 +560,8 @@
       if(!exercise){alert('Erro: exercício não encontrado. Atualize a tela e tente novamente.');return;}
       const variant=selectedVariantData(exercise,'input-session-variant');
       const performedTechniqueMode=selectedPerformedTechniqueMode(exercise);
-      const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')],sets=[];
-      for(const row of rows){
-        const rawWeight=String(row.querySelector('[data-f="w"]')?.value||'').trim();
-        const rawReps=String(row.querySelector('[data-f="r"]')?.value||'').trim();
-        if(rawWeight===''&&rawReps==='')continue;
-        const weight=rawWeight===''?0:parseFloat(rawWeight),reps=parseInt(rawReps,10);
-        if(!Number.isFinite(weight)||!Number.isInteger(reps)||weight<0||weight>10000||reps<0||reps>(row.dataset.unit==='seconds'?3600:100)){alert('Confira a carga e as repetições das séries realizadas.');return;}
-        const performed={weight,reps};
-        if(['seconds','reps'].includes(row.dataset.unit))performed.unit=row.dataset.unit;
-        if(row.dataset.backoff==='1')performed.backoff=true;
-        const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
-        if(target)Object.assign(performed,target);
-        sets.push(performed);
-      }
+      const sets=readSessionSetRows('sets-editor');
+      if(!sets)return;
       if(!sets.length){alert('Registre ao menos uma série realizada.');return;}
       if(sets.length>60){alert('Registre no máximo 60 séries por sessão. Os campos foram mantidos.');return false;}
       LAST_SESSION_WEEK=week;

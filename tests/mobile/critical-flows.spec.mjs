@@ -9,7 +9,7 @@ test('student preview is read-only and activation preflight exposes empty days b
   await page.getByRole('button',{name:'ATIVAR APÓS CONFERÊNCIA',exact:true}).click();expect(await page.evaluate(()=>activations)).toBe(1);expect(await page.evaluate(()=>errors)).toEqual([]);
 });
 test('isometry timer measures each set, captures early stop and explicit save with load',async({page})=>{
-  await page.clock.install({time:new Date('2026-11-18T12:00:00Z')});await page.goto('/');await page.clock.pauseAt(new Date('2026-11-18T12:00:01Z'));
+  await page.clock.install({time:new Date('2026-11-18T12:00:00Z')});await page.goto('/');await page.clock.pauseAt(new Date('2026-11-18T12:01:00Z'));
   await page.evaluate(()=>openLogSessionModal());const row=page.locator('#sets-editor .performed-set-row').first();
   await expect(row.locator('[data-f="r"]')).toHaveAttribute('max','3600');await row.locator('[data-f="w"]').fill('40');
   await row.getByRole('button',{name:'INICIAR SÉRIE',exact:true}).click();await page.clock.fastForward(35000);
@@ -26,7 +26,7 @@ test('isometry timer measures each set, captures early stop and explicit save wi
 });
 
 test('editing a timed record preserves its unit after the current technique changes',async({page})=>{
-  await page.clock.install({time:new Date('2026-11-18T12:00:00Z')});await page.goto('/');await page.clock.pauseAt(new Date('2026-11-18T12:00:01Z'));
+  await page.clock.install({time:new Date('2026-11-18T12:00:00Z')});await page.goto('/');await page.clock.pauseAt(new Date('2026-11-18T12:01:00Z'));
   await page.evaluate(()=>{exercise.weeks={1:[],2:[]};openEditSession();});const row=page.locator('#edit-sets-editor .performed-set-row');await expect(row.locator('[data-f="r"]')).toHaveAttribute('max','3600');
   await row.locator('[data-f="r"]').fill('');await row.locator('[data-series-start]').click();await page.clock.fastForward(25000);await page.getByRole('button',{name:'SALVAR ALTERAÇÕES',exact:true}).click();expect(await page.evaluate(()=>saved.at(-1)[0])).toMatchObject({weight:40,reps:25,unit:'seconds'});expect(await page.evaluate(()=>TeamBullsIsometrySeriesTimer.state())).toBeNull();expect(await page.evaluate(()=>errors)).toEqual([]);
 });
@@ -34,7 +34,7 @@ test('editing a timed record preserves its unit after the current technique chan
 test('week changes protect a running set in a new session and preserve elapsed time in edits',async({page})=>{
   await page.clock.install({time:new Date('2026-11-18T12:00:00Z')});
   await page.goto('/');
-  await page.clock.pauseAt(new Date('2026-11-18T12:00:01Z'));
+  await page.clock.pauseAt(new Date('2026-11-18T12:01:00Z'));
   await page.evaluate(()=>{window.confirm=message=>{messages.push({message});return false;};openLogSessionModal();});
   const row=page.locator('#sets-editor .performed-set-row').first();
   await row.locator('[data-series-start]').click();

@@ -135,11 +135,11 @@ export function app(options={}){
   context.firebase=options.firebase||context.firebase;
   vm.createContext(context);
   const coreFunction=name=>{const start=core.indexOf(`function ${name}(`);if(start<0)return '';const line=core.slice(start).split('\n')[0].trimEnd(),prefix=core.slice(start-6,start)==='async '?'async ':'';return prefix+(line.endsWith('}')?line:core.slice(start,core.indexOf('\n}',start)+2));};
-  vm.runInContext(['captureSessionDraftContext','sessionExerciseForSave','filterDeletedSessions','performDeleteSession','deleteSession','deleteEditedSession'].map(coreFunction).join('\n'),context);
+  vm.runInContext(['validClusterReps','clusterBlockInputs','readSessionSetRows','captureSessionDraftContext','sessionExerciseForSave','filterDeletedSessions','performDeleteSession','deleteSession','deleteEditedSession'].map(coreFunction).join('\n'),context);
   vm.runInContext(perfSource,context);
   vm.runInContext(integritySource,context);
   vm.runInContext(mutationSource,context);
-  return{context,api:context.TeamBullsSessionPerformance,local,indexed,remote,modal,editModal,button,rows,alerts,toasts,calls,values,timers,
+  return{context,api:context.TeamBullsSessionPerformance,local,indexed,remote,modal,editModal,button,rows,editRows,alerts,toasts,calls,values,timers,
     get tree(){return tree;},set tree(value){tree=value;},emit,
     async ready(){await context.TeamBullsSessionPerformance.ready('student-a');await settle();},
     frames(){while(frames.length)frames.shift()();},
@@ -395,6 +395,28 @@ await check('isometria de 240 segundos mantém unidade no backup e no envio orig
   const saved=await a.save();assert.equal(saved.result,true);
   const pending=a.api.syncItems().find(item=>item.type==='session');assert(pending);
   const entry=a.api.getPending(saved.id,'student-a');assert.equal(entry.sets[0].reps,240);assert.equal(entry.sets[0].unit,'seconds');
+});
+
+if(core.includes('function readSessionSetRows('))await check('cluster preserva blocos e uma única série na fila, na reabertura e na edição',async()=>{
+  const a=app({online:false});await a.ready();
+  const configure=(row,weight,blocks)=>{
+    row.dataset.unit='reps';
+    row.classList={contains:name=>name==='cluster-set-row'};
+    row.querySelector=selector=>({value:selector.includes('"w"')?weight:''});
+    row.querySelectorAll=()=>blocks.map(value=>({value,validity:{badInput:false}}));
+  };
+  configure(a.rows[0],'40',['4','4']);
+  const {id,result}=await a.save();assert.equal(result,true);
+  assert.deepEqual(clone(a.api.getPending(id).sets),[{weight:40,reps:8,unit:'reps',clusterReps:[4,4]}]);
+  const reopened=app({online:false,local:a.local,indexed:a.indexed,remote:a.remote});
+  await reopened.ready();reopened.frames();
+  reopened.context.EDIT_SESSION_ID=id;
+  configure(reopened.editRows[0],'42',['4','3']);
+  await reopened.context.saveEditSession();
+  assert.deepEqual(clone(reopened.api.getPending(id).sets),[{weight:42,reps:7,unit:'reps',clusterReps:[4,3]}]);
+  reopened.context.navigator.onLine=true;
+  assert.equal(await reopened.api.flush(),true);
+  assert.deepEqual(clone(reopened.remote.get(id).sets),[{weight:42,reps:7,unit:'reps',clusterReps:[4,3]}]);
 });
 
 console.log(`APROVADO — ${tests.length} cenários executaram a lógica real de persistência, reabertura, sincronização, edição e isolamento de registros.`);
