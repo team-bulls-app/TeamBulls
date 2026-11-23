@@ -44,6 +44,34 @@ modal('modal-weekly-checkin','Relatório semanal','<div class="form-group"><labe
 modal('modal-feedback','Feedback','<div class="form-group"><label>Tipo<select id="input-feedback-type"><option value="extra">Extra</option></select></label></div><div class="form-group"><label>Título<input id="input-feedback-title"></label></div><div class="form-group"><label>Mensagem<textarea id="input-feedback"></textarea></label></div><button onclick="sendFeedback()">TRANSMITIR FEEDBACK</button>')+
 modal('modal-photo-view','Foto de teste','<img id="photo-view-img" style="max-width:100%"><div id="photo-view-meta"></div>');
 const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>body{margin:0}input,textarea,select{font-size:16px;max-width:100%}.modal-sheet{box-sizing:border-box}button{min-height:44px}#screen-settings{display:none}</style><body><div id="screen-settings"></div>'+ui+'<script src="/setup.js"></script>'+modules.map(file=>'<script src="/'+file+'"></script>').join('')+'</body></html>';
+const trainerDashboard=read('index.html').split('<!-- TRAINER DASHBOARD -->')[1].split('<!-- TRAINER VIEWING STUDENT -->')[0].replace('class="screen" id="screen-trainer"','class="screen active" id="screen-trainer"');
+const queueHtml='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><body>'+trainerDashboard+
+  '<script src="/queue-setup.js"></script><script src="/modules/workflow-model-v10_10_71.js"></script><script src="/modules/workflow-sync-v10_10_71.js"></script></body></html>';
+const queueSetup=`
+let CURRENT_USER={uid:'queue-coach',role:'trainer'},VIEW_STUDENT=null;
+window.TeamBullsWorkflowStorage={owner:()=>CURRENT_USER.uid};
+const student={uid:'queue-student',name:'Alex da Silva Pereira dos Santos Júnior'};
+const todayIso=()=> '2026-11-23';
+window.queueCalls=0;window.queueMode='ready';window.queueVisits=[];
+window.TeamBullsTrainerIntelligenceData={
+  todayIso,
+  dayDiff:()=>3,
+  addDays:()=> '2026-11-26',
+  protocolState:()=>({pending:true,nextDueDate:'2026-11-20'}),
+  async loadDashboard(){
+    queueCalls++;
+    if(queueMode==='fail')throw new Error('offline fixture');
+    if(queueMode==='hold')await new Promise(resolve=>{window.finishQueue=resolve;});
+    return {
+      rows:[{student,protocolSchedule:{sourceWorkoutId:'w',startDate:'2026-10-01'}}],
+      activity:Array.from({length:7},(_,index)=>({studentId:student.uid,type:'weekly_checkin',sourceId:'report-'+index,submittedDate:'2026-11-'+(16+index)}))
+    };
+  }
+};
+function viewStudent(uid){VIEW_STUDENT={uid};}
+function openTsWorkout(id){queueVisits.push({student:VIEW_STUDENT.uid,workout:id});}
+window.setQueueAccount=(uid,role)=>{CURRENT_USER={uid,role};dispatchEvent(new Event('team-bulls-runtime-state'));};
+`;
 // A separate food fixture runs the canonical catalog, rendering and choice persistence.
 const foodSetup=`let CURRENT_USER={uid:'student-test',role:'student'},MODE='local';
 const meal={id:'meal-test',items:'0,25 porção de carboidrato\\n1 porção de proteína\\nÁgua'},variant={id:'variant-test',meals:[meal]},plan={id:'diet-test',variants:[variant]};
@@ -56,5 +84,5 @@ ${slice('function renderMealsList(','function openAddMealModal(')}
 window.errors=[];addEventListener('error',e=>errors.push(e.error?.stack||e.message));addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
 window.mixedRow=()=>[...document.querySelectorAll('[data-tb-food-row]')].find(row=>JSON.parse(row.dataset.tbFoodRow).at(-1)==='misc');`;
 const food='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><body><div id="diet-meals-list"></div><div id="diet-meals-empty"></div><script src="/food-setup.js"></script><script src="/modules/student-food-choices-v10_10_64.js"></script></body></html>';
-const server=http.createServer((req,res)=>{let content,type='text/javascript';if(req.url==='/'){content=html;type='text/html';}else if(req.url==='/food'){content=food;type='text/html';}else if(req.url==='/setup.js')content=setup;else if(req.url==='/food-setup.js')content=foodSetup;else if(req.url==='/styles.css'){content=read('styles_v10_10_9.css');type='text/css';}else if(/^\/modules\/[a-zA-Z0-9_-]+\.js$/.test(req.url)){try{content=read(req.url.slice(1));}catch{res.writeHead(404);res.end();return;}}else{res.writeHead(404);res.end();return;}res.setHeader('Content-Type',type+';charset=utf-8');res.end(content);});
+const server=http.createServer((req,res)=>{let content,type='text/javascript';if(req.url==='/'){content=html;type='text/html';}else if(req.url==='/food'){content=food;type='text/html';}else if(req.url==='/trainer-queue'){content=queueHtml;type='text/html';}else if(req.url==='/queue-setup.js')content=queueSetup;else if(req.url==='/setup.js')content=setup;else if(req.url==='/food-setup.js')content=foodSetup;else if(req.url==='/styles.css'){content=read('styles_v10_10_9.css');type='text/css';}else if(/^\/modules\/[a-zA-Z0-9_-]+\.js$/.test(req.url)){try{content=read(req.url.slice(1));}catch{res.writeHead(404);res.end();return;}}else{res.writeHead(404);res.end();return;}res.setHeader('Content-Type',type+';charset=utf-8');res.end(content);});
 server.listen(43871,'127.0.0.1');

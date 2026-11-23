@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026111802,
-  "revision": "workflow-media-isometry-1",
-  "publishedAt": "2026-11-18T00:00:00Z",
+  "build": 2026112301,
+  "revision": "trainer-work-queue-layout-1",
+  "publishedAt": "2026-11-23T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Isometria por tempo e cronômetro por série; recuperação de rascunhos, conferência de prescrições e feedbacks visuais."
+  "message": "Fila de trabalho organizada na Central do treinador, com tipografia e controles do app."
 }

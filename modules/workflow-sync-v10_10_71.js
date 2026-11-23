@@ -1,7 +1,7 @@
 /* One visible control surface for existing durable queues and private diagnostics. */
 (()=>{
   'use strict';if(window.TeamBullsWorkflowSync)return;
-  const version='10.10.71-workflowsync1';let serial=0,rows=[],lastError=null,action='interface',queueData=null,queueOwner='',queueAt=0;
+  const version='10.10.71-workflowsync2';let serial=0,rows=[],lastError=null,action='interface',queueOwner='',queueAt=0,queueRequest=null;
   const busy=new Set(),h=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const owner=()=>window.TeamBullsWorkflowStorage?.owner?.()||'',trainer=()=>{try{return CURRENT_USER?.role==='trainer';}catch{return false;}},model=()=>window.TeamBullsWorkflowModel;
   function category(error){const value=String(error?.code||error?.message||'').toLowerCase();return /permission|unauth/.test(value)?'permission':/quota|storage|armazenamento/.test(value)?'storage':/conflict|conflito/.test(value)?'conflict':/offline|network|timeout|unavailable|conex/.test(value)?'network':'other';}
@@ -13,7 +13,7 @@
     modal.querySelector('h2').textContent=title;modal.querySelector('.tb-flow-body').replaceChildren();if(typeof openModal==='function')openModal(id);else modal.classList.add('open');return{modal,body:modal.querySelector('.tb-flow-body')};
   }
   function styles(){if(document.getElementById('tb-workflow-style'))return;const style=document.createElement('style');style.id='tb-workflow-style';style.textContent=`
-    .tb-flow-sheet{width:min(1080px,96vw);max-width:1080px;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden;background:#111!important;color:#eee!important}.tb-flow-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex:0 0 auto}.tb-flow-head h2{font:800 24px 'Barlow Condensed',sans-serif;color:#eee;margin:0}.tb-flow-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 0}.tb-flow-body button,.tb-workflow-draft button,.tb-workflow-tools button,.tb-workflow-error button{min-height:44px;padding:8px 12px;border:1px solid #65474a;border-radius:6px;background:#201417;color:#f2d9dc;font:700 12px 'Barlow',sans-serif;cursor:pointer}.tb-flow-body button:disabled{opacity:.55;cursor:wait}.tb-flow-body h3,.tb-flow-body strong,.tb-flow-body label{color:#eee}.tb-flow-body p,.tb-flow-body small{color:#c1b7ae;line-height:1.5}.tb-flow-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px;border:1px solid #493c36;margin:8px 0;border-left:3px solid #e11d48;border-radius:6px}.tb-flow-row>div{min-width:0}.tb-flow-row strong{display:block;overflow-wrap:anywhere}.tb-flow-row small{display:block;margin:5px 0}.tb-flow-actions{display:flex;gap:8px;flex-wrap:wrap}.tb-flow-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tb-flow-grid label{display:grid;gap:5px}.tb-flow-grid input,.tb-flow-grid select,.tb-flow-body textarea{min-width:0;width:100%;min-height:44px;background:#181615;color:#eee;border:1px solid #66574c;border-radius:5px;padding:9px;font:16px 'Barlow',sans-serif}.tb-flow-warning{padding:12px;border-left:3px solid #e5ad61;background:#281e13;color:#f5d6ad;margin:10px 0}.tb-workflow-draft{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:8px 0;padding:8px;border:1px solid #51443b;border-radius:6px;background:#181513;color:#cfc2b6;font:12px/1.5 'Barlow',sans-serif}.tb-workflow-draft span{flex:1;min-width:150px}.tb-workflow-draft [data-error="1"]{color:#ffc29b}.tb-workflow-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.tb-workflow-error{position:fixed;z-index:10080;bottom:calc(112px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);max-width:94vw;display:flex;align-items:center;gap:8px;padding:10px;background:#211315;border:1px solid #b72c48;border-radius:8px;color:#eee;font:12px 'Barlow',sans-serif}.tb-work-queue{margin:12px 0;padding:14px;border:1px solid #54443a;border-left:3px solid #e11d48;background:#151210;color:#eee}.tb-work-queue h2{font:800 23px 'Barlow Condensed',sans-serif;margin:0}.tb-work-queue p{color:#bdb1a2}.tb-flow-status[data-status="confirmed"]{color:#83d19b}.tb-flow-status{color:#e9bd84}@media(max-width:600px){.tb-flow-grid{grid-template-columns:1fr}.tb-flow-row{align-items:flex-start;flex-direction:column}.tb-flow-actions{width:100%}.tb-flow-actions button{flex:1}.tb-flow-sheet{width:100%;max-height:96dvh}.tb-workflow-error{flex-wrap:wrap;width:94vw}.tb-workflow-error span{flex:1}.tb-flow-head h2{font-size:21px}}
+    .tb-flow-sheet{width:min(1080px,96vw);max-width:1080px;max-height:94dvh;display:flex;flex-direction:column;overflow:hidden;background:#111!important;color:#eee!important}.tb-flow-head{display:flex;gap:12px;align-items:center;justify-content:space-between;flex:0 0 auto}.tb-flow-head h2{font:800 24px 'Barlow Condensed',sans-serif;color:#eee;margin:0}.tb-flow-body{min-height:0;overflow:auto;overscroll-behavior:contain;padding:12px 0}.tb-flow-body button,.tb-workflow-draft button,.tb-workflow-tools button,.tb-workflow-error button{min-height:44px;padding:8px 12px;border:1px solid #65474a;border-radius:6px;background:#201417;color:#f2d9dc;font:700 12px 'Barlow',sans-serif;cursor:pointer}.tb-flow-body button:disabled{opacity:.55;cursor:wait}.tb-flow-body h3,.tb-flow-body strong,.tb-flow-body label{color:#eee}.tb-flow-body p,.tb-flow-body small{color:#c1b7ae;line-height:1.5}.tb-flow-row{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:12px;border:1px solid #493c36;margin:8px 0;border-left:3px solid #e11d48;border-radius:6px}.tb-flow-row>div{min-width:0}.tb-flow-row strong{display:block;overflow-wrap:anywhere}.tb-flow-row small{display:block;margin:5px 0}.tb-flow-actions{display:flex;gap:8px;flex-wrap:wrap}.tb-flow-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.tb-flow-grid label{display:grid;gap:5px}.tb-flow-grid input,.tb-flow-grid select,.tb-flow-body textarea{min-width:0;width:100%;min-height:44px;background:#181615;color:#eee;border:1px solid #66574c;border-radius:5px;padding:9px;font:16px 'Barlow',sans-serif}.tb-flow-warning{padding:12px;border-left:3px solid #e5ad61;background:#281e13;color:#f5d6ad;margin:10px 0}.tb-workflow-draft{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:8px 0;padding:8px;border:1px solid #51443b;border-radius:6px;background:#181513;color:#cfc2b6;font:12px/1.5 'Barlow',sans-serif}.tb-workflow-draft span{flex:1;min-width:150px}.tb-workflow-draft [data-error="1"]{color:#ffc29b}.tb-workflow-tools{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.tb-workflow-error{position:fixed;z-index:10080;bottom:calc(112px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);max-width:94vw;display:flex;align-items:center;gap:8px;padding:10px;background:#211315;border:1px solid #b72c48;border-radius:8px;color:#eee;font:12px 'Barlow',sans-serif}.tb-flow-status[data-status="confirmed"]{color:#83d19b}.tb-flow-status{color:#e9bd84}@media(max-width:600px){.tb-flow-grid{grid-template-columns:1fr}.tb-flow-row{align-items:flex-start;flex-direction:column}.tb-flow-actions{width:100%}.tb-flow-actions button{flex:1}.tb-flow-sheet{width:100%;max-height:96dvh}.tb-workflow-error{flex-wrap:wrap;width:94vw}.tb-workflow-error span{flex:1}.tb-flow-head h2{font-size:21px}}
   `;document.head.append(style);}
   async function collect(){
     const uid=owner();if(!uid)return[];const result=[];
@@ -56,29 +56,107 @@
     }catch(error){if(owner()===uid){recordError(error,'retry-record');if(typeof showToast==='function')showToast(error.message||'Não foi possível confirmar o registro.',true);}}
     finally{busy.delete(identity);if(button.isConnected)button.disabled=false;}
   }
-  async function workQueue(force=false){
-    if(!trainer()||!owner())return;const uid=owner(),host=document.getElementById('tb-work-queue');if(!host)return;
-    if(queueOwner===uid&&Date.now()-queueAt<60000&&!force){paintQueue(host,queueData);return;}
-    host.querySelector('[data-work-list]').textContent='Conferindo relatórios e datas…';
-    try{const data=await window.TeamBullsTrainerIntelligenceData?.loadDashboard?.(force);if(owner()!==uid||!trainer()||!data)return;queueData=data;queueOwner=uid;queueAt=Date.now();paintQueue(host,data);}catch(error){if(owner()===uid){host.querySelector('[data-work-list]').textContent='A fila não pôde ser atualizada. Use Atualizar.';recordError(error,'trainer-queue',false);}}
+  function workQueue(force=false){
+    const uid=owner(),host=document.getElementById('tb-work-queue');
+    if(!host)return;
+    const list=host.querySelector('[data-work-list]'),count=host.querySelector('[data-work-count]');
+    const status=host.querySelector('[data-work-status]'),refresh=host.querySelector('[data-work-refresh]');
+    const active=trainer()&&!!uid;
+    host.hidden=!active;
+    if(queueOwner!==(active?uid:'')){
+      queueOwner=active?uid:'';queueAt=0;queueRequest=null;
+      host.open=false;
+      list.replaceChildren();count.textContent='';status.textContent='';refresh.disabled=false;
+    }
+    if(!active)return;
+    refresh.onclick=()=>void workQueue(true);
+    const api=window.TeamBullsTrainerIntelligenceData;
+    if(queueRequest)return queueRequest;
+    if(!api?.loadDashboard||(!force&&Date.now()-queueAt<60000))return;
+
+    status.textContent='Conferindo relatórios e datas…';
+    refresh.disabled=true;
+    const request=Promise.resolve().then(()=>api.loadDashboard(force)).then(data=>{
+      if(queueRequest!==request||owner()!==uid||!trainer())return;
+      if(!data)throw new Error('Fila indisponível');
+      const total=paintQueue(list,data,api);
+      count.textContent=total===1?'1 pendência':total+' pendências';
+      status.textContent=total?'':'Nenhuma pendência na fila.';
+      queueAt=Date.now();
+    }).catch(error=>{
+      if(queueRequest!==request||owner()!==uid||!trainer())return;
+      status.textContent='Não foi possível atualizar. Tente novamente.';
+      recordError(error,'trainer-queue',false);
+    }).finally(()=>{
+      if(queueRequest!==request)return;
+      queueRequest=null;
+      refresh.disabled=false;
+    });
+    queueRequest=request;
+    return request;
   }
-  function paintQueue(host,data){
-    if(!data)return;const list=host.querySelector('[data-work-list]'),items=[],api=window.TeamBullsTrainerIntelligenceData,today=api.todayIso();
+  function paintQueue(list,data,api){
+    const items=[],today=api.todayIso();
     const roster=new Map((data.rows||[]).map(row=>[row.student.uid,row]));
     for(const report of data.activity||[])if(report.read!==true&&roster.has(report.studentId)&&['weekly_checkin','questionnaire'].includes(report.type))items.push({student:roster.get(report.studentId).student,kind:'report',report,label:'Responder relatório recebido',date:report.submittedDate||today});
     for(const row of data.rows||[]){const state=api.protocolState(row.protocolSchedule);if(state?.pending)items.push({student:row.student,kind:'monthly',label:'Revisão mensal vencida',date:state.nextDueDate});if(row.protocolSchedule?.sourceWorkoutId&&model().iso(row.protocolSchedule.startDate)){const due=api.addDays(row.protocolSchedule.startDate,56);if(api.dayDiff(today,due)<=7)items.push({student:row.student,kind:'workout',label:due<today?'Treino com 8 semanas completas':'Treino próximo de 8 semanas',date:due,workoutId:row.protocolSchedule.sourceWorkoutId});}}
-    items.sort((a,b)=>String(a.date).localeCompare(String(b.date)));list.replaceChildren();if(!items.length)list.textContent='Nenhuma ação pendente nas agendas e relatórios consultados.';
-    for(const item of items.slice(0,50)){const row=document.createElement('article');row.className='tb-flow-row';row.innerHTML='<div><strong></strong><small></small></div><button type="button">ABRIR</button>';row.querySelector('strong').textContent=item.student.name+' · '+item.label;row.querySelector('small').textContent=item.date;row.querySelector('button').onclick=()=>void openWork(item);list.append(row);}
+    items.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+    const groups=document.createDocumentFragment();
+    for(const [kind,title] of [['report','Relatórios'],['monthly','Revisões mensais'],['workout','Treinos']]){
+      const entries=items.filter(item=>item.kind===kind);
+      if(!entries.length)continue;
+      const section=document.createElement('section');
+      section.className='trainer-work-group';
+      section.innerHTML='<h3></h3><ul></ul>';
+      section.querySelector('h3').textContent=title;
+      const visible=section.querySelector('ul');
+      for(const item of entries.slice(0,5))visible.append(workRow(item));
+      if(entries.length>5){
+        const more=document.createElement('details');
+        more.className='trainer-work-more';
+        more.innerHTML='<summary></summary><ul></ul>';
+        more.querySelector('summary').textContent='Ver mais ('+(entries.length-5)+')';
+        const remaining=more.querySelector('ul');
+        for(const item of entries.slice(5))remaining.append(workRow(item));
+        section.append(more);
+      }
+      groups.append(section);
+    }
+    list.replaceChildren(groups);
+    return items.length;
+  }
+  function workRow(item){
+    const row=document.createElement('li');
+    row.className='trainer-work-row';
+    row.innerHTML='<div><strong></strong><span class="trainer-work-caption"></span><time class="trainer-work-date"></time></div><button type="button" class="btn-ghost">Abrir</button>';
+    const name=item.student.name||'Aluno';
+    row.querySelector('strong').textContent=name;
+    row.querySelector('.trainer-work-caption').textContent=item.label;
+    const date=model()?.iso(item.date)?item.date:'';
+    const time=row.querySelector('time');
+    if(date){
+      time.dateTime=date;
+      time.textContent=date.split('-').reverse().join('/');
+    }else time.remove();
+    const button=row.querySelector('button');
+    button.setAttribute('aria-label','Abrir: '+name+' · '+item.label);
+    button.onclick=async()=>{
+      if(!button.isConnected||owner()!==queueOwner||!trainer())return;
+      button.disabled=true;
+      try{await openWork(item);}finally{button.disabled=false;}
+    };
+    return row;
   }
   async function openWork(item){const uid=owner();if(!trainer())return;try{await viewStudent(item.student.uid,item.student.name,item.student.email||'',item.student.status||'active');if(owner()!==uid||!trainer()||VIEW_STUDENT?.uid!==item.student.uid)return;if(item.kind==='report'){const collection=item.report.type==='weekly_checkin'?'weeklyCheckins':'questionnaires',snapshot=await cloudGet(db.collection(collection).doc(item.report.sourceId),'abrir relatório da fila');if(owner()!==uid||VIEW_STUDENT?.uid!==item.student.uid||!snapshot.exists||snapshot.data().studentId!==item.student.uid)return;if(collection==='weeklyCheckins'){WEEKLY_CHECKINS=[{...snapshot.data(),id:snapshot.id}];await viewWeeklyCheckin(snapshot.id,{source:'trainer-inbox',studentId:item.student.uid});}else{TS_QUEST_CACHE=[{...snapshot.data(),id:snapshot.id}];viewQuestionnaire(snapshot.id,true);}}else if(item.kind==='workout')openTsWorkout(item.workoutId);else document.getElementById('trainer-protocol-review-state')?.closest('section,article,div')?.scrollIntoView({block:'center'});}catch(error){recordError(error,'open-work-item');}}
-  function entry(){styles();const settings=document.querySelector('#screen-settings .settings-grid')||document.getElementById('screen-settings');if(settings&&!document.getElementById('tb-workflow-sync-entry')){const button=document.createElement('button');button.id='tb-workflow-sync-entry';button.className='btn-add-set';button.textContent='CENTRAL DE SINCRONIZAÇÃO E RASCUNHOS';button.onclick=()=>void open();settings.append(button);}const screen=document.getElementById('screen-trainer');if(trainer()&&screen&&!document.getElementById('tb-work-queue')){const host=document.createElement('section');host.id='tb-work-queue';host.className='tb-work-queue';host.innerHTML='<h2>TRABALHO DE HOJE</h2><p>Relatórios para responder, revisões mensais e treinos chegando a 8 semanas.</p><button class="btn-add-set" type="button">ATUALIZAR FILA</button><div data-work-list></div>';host.querySelector('button').onclick=()=>void workQueue(true);(screen.querySelector('.trainer-header-info,.home-hero')||screen.querySelector('.header'))?.insertAdjacentElement('afterend',host);void workQueue(false);}}
+  function entry(){styles();const settings=document.querySelector('#screen-settings .settings-grid')||document.getElementById('screen-settings');if(settings&&!document.getElementById('tb-workflow-sync-entry')){const button=document.createElement('button');button.id='tb-workflow-sync-entry';button.className='btn-add-set';button.textContent='CENTRAL DE SINCRONIZAÇÃO E RASCUNHOS';button.onclick=()=>void open();settings.append(button);}void workQueue();}
   function install(){
-    entry();if(typeof renderTrainer==='function'&&!renderTrainer.__tbWorkQueue){const base=renderTrainer;renderTrainer=async function(){const result=await base.apply(this,arguments);entry();if(trainer())void workQueue();return result;};renderTrainer.__tbWorkQueue=true;}
+    entry();if(typeof renderTrainer==='function'&&!renderTrainer.__tbWorkQueue){const base=renderTrainer;renderTrainer=async function(){const result=await base.apply(this,arguments);entry();return result;};renderTrainer.__tbWorkQueue=true;}
     if(typeof showToast==='function'&&!showToast.__tbWorkflowDiagnostics){const base=showToast;showToast=function(message,error){const result=base.apply(this,arguments);if(error)recordError(null,'interface');return result;};showToast.__tbWorkflowDiagnostics=true;}
     if(typeof cloudWrite==='function'&&!cloudWrite.__tbWorkflowDiagnostics){const base=cloudWrite;cloudWrite=async function(){try{return await base.apply(this,arguments);}catch(error){recordError(error,'cloud-write',false);throw error;}};cloudWrite.__tbWorkflowDiagnostics=true;}
     if(typeof alert==='function'&&!window.alert.__tbWorkflowDiagnostics){const base=window.alert;window.alert=function(){const result=base.apply(this,arguments);if(/erro|não foi|falh|recusad|permissão|indisponível/i.test(String(arguments[0]||'')))recordError(null,lastError?.stage||'interface');return result;};window.alert.__tbWorkflowDiagnostics=true;}
   }
   document.addEventListener('click',event=>{const button=event.target?.closest?.('button,[role="button"]');if(!button)return;const match=/^\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\(/.exec(button.getAttribute('onclick')||'');action=match?.[1]||({'weekly-checkin-submit-button':'submitWeeklyCheckin','questionnaire-submit-button':'submitQuestionnaireAnswers','tb-payment-save':'savePayment'}[button.id])||'interface';},true);
   ['team-bulls-runtime-ready','team-bulls-student-runtime-ready','team-bulls-intelligence-ready'].forEach(name=>window.addEventListener(name,install));
+  window.addEventListener('team-bulls-runtime-state',()=>void workQueue());
   window.TeamBullsWorkflowSync=Object.freeze({version,open,collect,copyDiagnostic:copy,recordError,dialog,workQueue,styles});install();
 })();

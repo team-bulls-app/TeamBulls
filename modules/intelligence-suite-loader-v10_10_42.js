@@ -33,7 +33,7 @@
   const workflowSpecs=[
     ['./modules/workflow-model-v10_10_71.js?v=10.10.71-workflowmodel1',()=>window.TeamBullsWorkflowModel?.version==='10.10.71-workflowmodel1'],
     ['./modules/workflow-storage-v10_10_71.js?v=10.10.71-workflowstorage1',()=>window.TeamBullsWorkflowStorage?.version==='10.10.71-workflowstorage1'],
-    ['./modules/workflow-sync-v10_10_71.js?v=10.10.71-workflowsync1',()=>window.TeamBullsWorkflowSync?.version==='10.10.71-workflowsync1'],
+    ['./modules/workflow-sync-v10_10_71.js?v=10.10.71-workflowsync2',()=>window.TeamBullsWorkflowSync?.version==='10.10.71-workflowsync2'],
     ['./modules/workflow-drafts-v10_10_71.js?v=10.10.71-workflowdrafts1',()=>window.TeamBullsWorkflowDrafts?.version==='10.10.71-workflowdrafts1'],
     ['./modules/prescription-workflow-v10_10_71.js?v=10.10.71-prescriptionworkflow1',()=>window.TeamBullsPrescriptionWorkflow?.version==='10.10.71-prescriptionworkflow1'],
     ['./modules/isometry-series-timer-v10_10_71.js?v=10.10.71-isometrytimer1',()=>window.TeamBullsIsometrySeriesTimer?.version==='10.10.71-isometrytimer1'],
