@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__)return;
   window.__TEAM_BULLS_USABILITY_CHECKUP_V10109__=true;
 
-  const VERSION='10.10.21-usability12';
+  const VERSION='10.10.21-usability13';
   let profileLogoutHooks=false;
 
   function scrollActiveWeekIntoView(root=document.querySelector('.screen.active')){
@@ -232,8 +232,8 @@
 
 /* Carrega a suíte de inteligência somente depois que o papel do usuário já é conhecido. */
 (()=>{
-  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite15';
-  const EXPECTED_VERSION='10.10.58-intelsuite15';
+  const SRC='./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite16';
+  const EXPECTED_VERSION='10.10.58-intelsuite16';
   let loading=null;
   const supportedContext=()=>{try{return MODE==='cloud'&&(CURRENT_USER?.role==='trainer'||CURRENT_USER?.role==='student');}catch(error){return false;}};
   const ready=()=>window.TeamBullsIntelligenceSuiteLoader?.version===EXPECTED_VERSION;

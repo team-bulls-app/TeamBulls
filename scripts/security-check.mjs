@@ -21,7 +21,7 @@ required.forEach(requireFile);
 if(failures.length){console.error(failures.join('\n'));process.exit(1);}
 
 assert(firestorePath==='firebase/firestore_28_compacto.rules','Firebase ativo não aponta para Rules 28.');
-assert(storagePath==='firebase/storage_6.rules','Firebase ativo não aponta para Storage 6.');
+assert(storagePath==='firebase/storage_7.rules','Firebase ativo não aponta para Storage 7.');
 const firestore=read(firestorePath);
 has(firestore,'function trainerOwns(uid)','Firestore não possui isolamento trainer → aluno.');
 has(firestore,'function trainerOwnsWorkout(workoutId)','Firestore não protege consultas por workoutId.');
@@ -63,7 +63,7 @@ lacks(storage,'allow read: if isTrainer() || activeOwner(uid);','Storage voltou 
 has(storage,'match /paymentReceipts/{trainerUid}/{studentUid}/{fileName}','Storage não isola comprovantes financeiros.');
 has(storage,'request.auth.uid == trainerUid','Comprovante não exige o próprio treinador no caminho.');
 has(storage,'trainerOwns(studentUid)','Comprovante não exige vínculo real treinador → aluno.');
-lacks(storage,'activeOwner(studentUid)','Aluno recebeu acesso ao domínio financeiro de comprovantes.');
+lacks(storage.slice(storage.indexOf('match /paymentReceipts/'),storage.indexOf('// Cópias anotadas')),'activeOwner(studentUid)','Aluno recebeu acesso ao domínio financeiro de comprovantes.');
 has(storage,'match /{allPaths=**} { allow read, write: if false; }','Storage perdeu o deny-all final.');
 
 const security=read('modules/security-hardening-v10_10_9.js');
@@ -111,7 +111,7 @@ has(config,'security-hardening-v10_10_9.js?v=10.10.10-security10','Loader não i
 has(config,'legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','Loader não inclui o reconciliador legacy-links6 com URL nova.');
 has(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration2','Loader não inclui a revisão passiva/cache-safe do cadastro.');
 lacks(config,'registration-integrity-v10_10_9.js?v=10.10.9-registration1','Loader ainda referencia a revisão antiga do cadastro.');
-has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments7','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
+has(config,'trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments8','Loader não inclui Central/Pagamentos com a revisão de cache atual.');
 has(read('firebase/firestore_28_compacto.rules'),'function paymentDurationValid(data)','Rules não validam a duração permitida para os planos.');
 has(read('firebase/firestore_28_compacto.rules'),"type == 'custom' && months is int && months >= 1 && months <= 60",'Rules não limitam o plano ajustável a 1–60 meses inteiros.');
 
@@ -126,4 +126,4 @@ walk(root);
 for(const file of jsFiles){const text=fs.readFileSync(file,'utf8');const relative=path.relative(root,file);assert(!/localStorage\.setItem\([^\n]{0,180}(?:password|senha|pass\s*\))/i.test(text),`Possível senha em texto persistida em ${relative}.`);}
 
 if(failures.length){console.error('Falhas de segurança/regressão:');failures.forEach(item=>console.error('- '+item));process.exit(1);}
-console.log('Security checks OK — Rules 28, Storage 6, isolamento financeiro, App Check e cadastro atômico validados.');
+console.log('Security checks OK — Rules 28, Storage 7, isolamento financeiro, App Check e cadastro atômico validados.');

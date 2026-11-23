@@ -1,0 +1,31 @@
+name: Mobile critical flows
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/mobile/package-lock.json
+      - run: npm ci --prefix tests/mobile --ignore-scripts --no-audit --no-fund
+      - run: npx --prefix tests/mobile playwright install --with-deps chromium webkit
+      - run: node scripts/workflow-reliability-check.mjs
+      - run: npm test --prefix tests/mobile
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mobile-critical-flow-evidence
+          path: |
+            tests/mobile/test-results/
+            tests/mobile/playwright-report/
+          retention-days: 7

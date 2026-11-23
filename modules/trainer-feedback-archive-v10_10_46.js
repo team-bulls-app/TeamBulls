@@ -5,7 +5,7 @@
   window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101046__=true;
   window.__TEAM_BULLS_TRAINER_FEEDBACK_ARCHIVE_101037__=true;
 
-  const VERSION='10.10.46-feedback4';
+  const VERSION='10.10.46-feedback5';
   const SCREEN_ID='screen-trainer-feedback-archive';
   const DETAIL_ID='modal-trainer-feedback-detail';
   const ENTRY_ID='tb-trainer-feedback-archive-entry';
@@ -114,7 +114,7 @@
     const item=feedbacks.find(value=>String(value.id)===String(id));if(!item)return;ensureScreen();const student=studentsById.get(String(item.studentId))||{};
     const meta=document.getElementById('tb-feedback-detail-meta'),message=document.getElementById('tb-feedback-detail-message'),button=document.getElementById('tb-feedback-detail-student');
     if(meta)meta.innerHTML=`<strong>${h(titleOf(item))}</strong><span>${h(item._studentName||student.name||'Aluno')} · ${h(typeLabel(item))} · ${h(formatDate(item.createdAt))}</span><span>Status no aluno: ${item.read===true?'LIDO':'AINDA NÃO LIDO'}</span>`;
-    if(message)message.textContent=String(item.message||'');if(button){button.dataset.studentUid=String(item.studentId||'');button.onclick=()=>openStudent(button.dataset.studentUid);}if(typeof openModal==='function')openModal(DETAIL_ID);
+    if(message){message.textContent=String(item.message||'');window.TeamBullsFeedbackMedia?.render?.(message,item,id);}if(button){button.dataset.studentUid=String(item.studentId||'');button.onclick=()=>openStudent(button.dataset.studentUid);}if(typeof openModal==='function')openModal(DETAIL_ID);
   }
   function openStudent(uid){const student=studentsById.get(String(uid));if(!student)return;try{if(typeof closeModal==='function')closeModal(DETAIL_ID);}catch(error){}const api=window.TeamBullsTrainerRuntimeReliability;if(api?.openStudent){api.openStudent(student.uid,student.name,student.email,student.status);return;}if(typeof viewStudent==='function')viewStudent(student.uid,student.name||'Aluno',student.email||'',student.status||'active');}
   function open(){if(!trainer())return false;install();if(typeof showScreen==='function')showScreen(SCREEN_ID);load(true);return true;}

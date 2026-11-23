@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_PRESCRIPTION_PROPAGATION_V10109__)return;
   window.__TEAM_BULLS_PRESCRIPTION_PROPAGATION_V10109__=true;
 
-  const VERSION='10.10.9-propagation1';
+  const VERSION='10.10.9-propagation2';
   const CENTER_ID='tb-prescription-actions-center';
   const MAX_BATCH_WRITES=450;
   let running=false;
@@ -20,7 +20,7 @@
   }
   function cloneSets(sets){
     if(typeof clonePrescriptionSets==='function')return clonePrescriptionSets(sets);
-    return(Array.isArray(sets)?sets:[]).map(set=>({targetMin:set.targetMin,targetMax:set.targetMax,ger:set.ger}));
+    return(Array.isArray(sets)?sets:[]).map(set=>({targetMin:set.targetMin,targetMax:set.targetMax,ger:set.ger,...(['seconds','reps'].includes(set.unit)?{unit:set.unit}:{})}));
   }
   function normalizedPlan(plan){
     try{return typeof normalizeWeeklyPlan==='function'?normalizeWeeklyPlan(plan):clonePlan(plan);}catch(error){return clonePlan(plan);}
@@ -48,14 +48,19 @@
     if(!Array.isArray(dayExercises)||!dayExercises.length)dayExercises=(workout.exercises||[]).filter(item=>String(item.dayName||'Treino geral')===String(source.dayName||'Treino geral'));
     const sourceIndex=dayExercises.findIndex(item=>String(item.id)===String(source.id));
     const below=sourceIndex>=0?dayExercises.slice(sourceIndex+1):[];
-    return{target,source,workout,week,sets:cloneSets(sets),below};
+    const unit=typeof exerciseUsesResistedTime==='function'?(exerciseUsesResistedTime(source,week)?'seconds':'reps'):null;
+    return{target,source,workout,week,sets:cloneSets(sets).map(set=>unit?{...set,unit}:set),below};
   }
   function weeksFrom(start,end=8){
     const out=[];for(let week=Math.max(1,start);week<=Math.min(8,end);week++)out.push(week);return out;
   }
+  function assertCompatibleUnit(exercise,week,sets){
+    if(typeof exerciseUsesResistedTime!=='function')return;const unit=exerciseUsesResistedTime(exercise,week)?'seconds':'reps';
+    if(sets.some(set=>set.unit&&set.unit!==unit))throw new Error('A prescrição usa '+(unit==='seconds'?'tempo':'repetições')+' em '+exercise.name+' na semana '+week+'. Ajuste esta semana separadamente; nenhuma prescrição foi repassada.');
+  }
   function planWithWeeks(exercise,weeks,sets){
     const next=normalizedPlan(exercise.weeklyPlan);
-    weeks.forEach(week=>{next['w'+week]=cloneSets(sets);});
+    weeks.forEach(week=>{assertCompatibleUnit(exercise,week,sets);next['w'+week]=cloneSets(sets);});
     return next;
   }
   function addChange(map,exercise,next){
@@ -90,7 +95,7 @@
         const resolved=typeof resolveWeekPrescription==='function'?resolveWeekPrescription(temp,n):{sets:sourcePlan['w'+n]||[]};
         materialized['w'+n]=cloneSets(resolved?.sets||[]);
       }
-      all.forEach(exercise=>addChange(changes,exercise,materialized));
+      all.forEach(exercise=>{for(let n=1;n<=8;n++)assertCompatibleUnit(exercise,n,materialized['w'+n]||[]);addChange(changes,exercise,materialized);});
     }
     return changes;
   }

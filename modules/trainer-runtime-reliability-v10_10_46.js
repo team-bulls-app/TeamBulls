@@ -6,7 +6,7 @@
 
   const VERSION='10.10.53-trainer5';
   const REPORTS_SRC='./modules/trainer-sent-reports-v10_10_52.js?v=10.10.52-sentreports5';
-  const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback4';
+  const FEEDBACK_SRC='./modules/trainer-feedback-archive-v10_10_46.js?v=10.10.46-feedback5';
   const QUESTIONNAIRE_FEEDBACK_STYLE_ID='tb-trainer-questionnaire-feedback-shortcuts';
   const loads=new Map();
   let viewStudentBase=null;

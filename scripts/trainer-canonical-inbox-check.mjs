@@ -25,7 +25,7 @@ const loader=read(loaderPath);
 const bootstrap=read('modules/usability-checkup-v10_10_9.js');
 const firebaseConfig=read('firebase.json');
 const firestoreRules=read('firebase/firestore_28_compacto.rules');
-const storageRules=read('firebase/storage_6.rules');
+const storageRules=read('firebase/storage_7.rules');
 const legacyRepair=read('modules/legacy-student-link-repair-v10_10_10.js');
 const sw=read('sw.js');
 
@@ -62,7 +62,7 @@ assert(legacyWindow.__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__===loaderVers
 const listenerCount=upgradeListeners.length;
 runLoader(legacyWindow);
 assert(upgradeListeners.length===listenerCount,'Reavaliar o mesmo loader não pode duplicar listeners de runtime.');
-const newerVersion='10.10.58-intelsuite15';
+const newerVersion='10.10.58-intelsuite16';
 const newerWindow={__TEAM_BULLS_INTELLIGENCE_SUITE_LOADER_101042__:newerVersion,TeamBullsIntelligenceSuiteLoader:{version:newerVersion},addEventListener(){},dispatchEvent(){}};
 runLoader(newerWindow);
 assert(newerWindow.TeamBullsIntelligenceSuiteLoader.version===newerVersion,'Um loader atrasado não pode substituir uma revisão mais nova já registrada.');
@@ -154,7 +154,7 @@ has(source,'async openInbox(){const result=await hub.openInbox.apply(hub,argumen
 has(source,'async refreshInbox(){const result=await hub.refreshInbox.apply(hub,arguments);await refresh(true);return result;}','Botão atualizar não força leitura canônica.');
 
 assert(JSON.parse(firebaseConfig)?.firestore?.rules==='firebase/firestore_28_compacto.rules','Correção alterou o caminho da Rule Firestore ativa.');
-assert(JSON.parse(firebaseConfig)?.storage?.rules==='firebase/storage_6.rules','Correção alterou o caminho da Rule Storage ativa.');
+assert(JSON.parse(firebaseConfig)?.storage?.rules==='firebase/storage_7.rules','Correção alterou o caminho da Rule Storage ativa.');
 has(sw,"'/modules/intelligence-suite-loader-v10_10_42.js'",'Loader da Central não permanece network-first/mutável no PWA.');
 const mutableStart=sw.indexOf('const MUTABLE_PATHS=new Set([');
 const mutableEnd=sw.indexOf(']);',mutableStart);

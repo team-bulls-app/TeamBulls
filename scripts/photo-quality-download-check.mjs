@@ -16,7 +16,7 @@ const conversion=read(conversionPath);
 const config=read('config_v10_7.js');
 const firebaseConfig=JSON.parse(read('firebase.json'));
 const storagePath=String(firebaseConfig?.storage?.rules||'');
-assert(storagePath==='firebase/storage_6.rules','firebase.json não aponta para Storage 6.');
+assert(storagePath==='firebase/storage_7.rules','firebase.json não aponta para Storage 7.');
 assert(fs.existsSync(path.join(root,storagePath)),`Regras Storage ativas ausentes: ${storagePath}`);
 const rules=fs.existsSync(path.join(root,storagePath))?read(storagePath):'';
 

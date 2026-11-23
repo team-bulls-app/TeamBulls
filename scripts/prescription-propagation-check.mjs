@@ -11,7 +11,7 @@ const bridge=read('sw_47.js');
 const core=read('app_v10_10_9_core.js');
 const firestore=read('firebase/firestore_26_compacto.rules');
 
-assert(module.includes("const VERSION='10.10.9-propagation1'"),'Módulo de propagação não identifica propagation1.');
+assert(module.includes("const VERSION='10.10.9-propagation2'"),'Módulo de propagação não identifica propagation1.');
 assert(module.includes("PLAN_EDIT_TARGET==='trainer'||PLAN_EDIT_TARGET==='local'"),'Propagação não restringe a edição aos contextos permitidos.');
 assert(module.includes("CURRENT_USER?.role!=='trainer'"),'Propagação cloud não valida a função de treinador.');
 assert(module.includes("exercisesForDay(workout,source.dayName||'Treino geral')"),'Exercícios abaixo não respeitam a ordem do dia atual.');
@@ -29,7 +29,7 @@ assert(module.includes("MAX_BATCH_WRITES=450"),'Propagação não limita o lote 
 assert(module.includes("typeof showConfirm==='function'")&&module.includes('window.confirm(text)'),'Confirmação não possui fallback se a camada visual estiver indisponível.');
 assert(module.includes("directTechnique('full-forward')")&&module.includes("directTechnique('below-current')")&&module.includes("directTechnique('source-future')")&&module.includes("directTechnique('below-future')"),'Atalhos de técnicas não foram reconectados diretamente.');
 
-const propagationUrl='./modules/prescription-propagation-v10_10_9.js?v=10.10.9-propagation1';
+const propagationUrl='./modules/prescription-propagation-v10_10_9.js?v=10.10.9-propagation2';
 assert(config.includes(propagationUrl),'Loader não inclui propagation1.');
 assert(config.indexOf('prescription-actions-layout-v10_10_9.js')<config.indexOf('prescription-propagation-v10_10_9.js'),'Propagação deve executar depois da central de ações.');
 assert(config.indexOf('prescription-propagation-v10_10_9.js')<config.indexOf('modal-stack-stability-v10_10_9.js'),'Propagação deve executar antes da proteção final da pilha de modais.');

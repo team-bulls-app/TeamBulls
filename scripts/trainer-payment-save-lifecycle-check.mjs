@@ -11,7 +11,8 @@ const attachmentStart=source.indexOf('async function attachPaymentReceipt(');
 const start=attachmentStart>=0?attachmentStart:saveStart;
 const end=source.indexOf(attachmentStart>=0?'\n  function clearReceiptView':'\n  async function openReceipt',start);
 assert(start>=0&&end>start,'Não foi possível localizar o salvamento de pagamentos.');
-const saveSource=source.slice(start,end);
+const helpersStart=source.indexOf('const receiptScope='),helpersEnd=source.indexOf('async function paymentSyncItems',helpersStart);
+const saveSource=(helpersStart>=0&&helpersEnd>helpersStart?source.slice(helpersStart,helpersEnd):'')+source.slice(start,end);
 
 function harness({primaryFailures=0,receiptFailure=false,linkFailure=false,holdPrimary=null,holdUpload=null,holdLink=null}={}){
   const fields={
@@ -22,7 +23,7 @@ function harness({primaryFailures=0,receiptFailure=false,linkFailure=false,holdP
   };
   const writes=[],uploads=[],closed=[],messages=[],deleted=[],records=new Map(),attachments=[],published=[];let failCount=primaryFailures;
   const context={
-    CURRENT_USER:{uid:'trainer-a'},MODE:'cloud',trainer:()=>true,
+    window:{},CURRENT_USER:{uid:'trainer-a'},MODE:'cloud',trainer:()=>true,
     paymentSaving:false,paymentEditorRequest:1,
     studentMap:new Map([['student-a',{uid:'student-a'}]]),
     paymentEditorId:'',pendingPaymentId:'pay-stable',pendingPaymentStudentId:'',

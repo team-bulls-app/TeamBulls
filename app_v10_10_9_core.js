@@ -679,22 +679,23 @@ function sessionFingerprint(s){
     Number.isFinite(Number(x.targetMin))?Number(x.targetMin):null,
     Number.isFinite(Number(x.targetMax))?Number(x.targetMax):null,
     Number.isFinite(Number(x.ger))?Number(x.ger):null,
-    x.backoff===true
+    x.backoff===true,String(x.unit||'')
   ]);
   return JSON.stringify([s.date||'',Number(s.week)||0,s.note||'',String(s.performedExerciseItemId||''),String(s.performedExerciseName||''),sets]);
 }
 function normalizePerformedSet(value){
   if(!value||typeof value!=='object')return null;
   const weight=Number(value.weight),reps=Number(value.reps);
-  if(!Number.isFinite(weight)||weight<0||weight>10000||!Number.isInteger(reps)||reps<0||reps>100)return null;
+  if(!Number.isFinite(weight)||weight<0||weight>10000||!Number.isInteger(reps)||reps<0||reps>(value.unit==='seconds'?3600:100))return null;
   const clean={weight:Math.round(weight*100)/100,reps};
+  if(['seconds','reps'].includes(value.unit))clean.unit=value.unit;
   if(value.backoff===true)clean.backoff=true;
   const prescription=normalizePrescriptionSet(value);
   if(prescription)Object.assign(clean,prescription);
   return clean;
 }
 function normalizePerformedSets(value){
-  if(!Array.isArray(value)||value.length<1||value.length>30)return null;
+  if(!Array.isArray(value)||value.length<1||value.length>60)return null;
   const sets=value.map(normalizePerformedSet);
   return sets.every(Boolean)?sets:null;
 }
@@ -718,9 +719,9 @@ function normalizePrescriptionSet(value){
   const targetMin=parseInt(value.targetMin??value.minReps??value.repsMin,10);
   const targetMax=parseInt(value.targetMax??value.maxReps??value.repsMax,10);
   const ger=parseInt(value.ger,10);
-  if(!Number.isInteger(targetMin)||!Number.isInteger(targetMax)||targetMin<1||targetMax<targetMin||targetMax>100)return null;
+  if(!Number.isInteger(targetMin)||!Number.isInteger(targetMax)||targetMin<1||targetMax<targetMin||targetMax>(value.unit==='seconds'?3600:100))return null;
   if(!Number.isInteger(ger)||ger<1||ger>6)return null;
-  return{targetMin,targetMax,ger};
+  return{targetMin,targetMax,ger,...(['seconds','reps'].includes(value.unit)?{unit:value.unit}:{})};
 }
 function normalizeWeeklyPlan(value){
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
@@ -734,7 +735,7 @@ function normalizeWeeklyPlan(value){
   return out;
 }
 function clonePrescriptionSets(sets){
-  return(Array.isArray(sets)?sets:[]).map(s=>({targetMin:s.targetMin,targetMax:s.targetMax,ger:s.ger}));
+  return(Array.isArray(sets)?sets:[]).map(s=>({targetMin:s.targetMin,targetMax:s.targetMax,ger:s.ger,...(['seconds','reps'].includes(s.unit)?{unit:s.unit}:{})}));
 }
 function resolveWeekPrescription(exercise,week){
   const safeWeek=Math.max(1,Math.min(8,parseInt(week,10)||1));
@@ -1954,14 +1955,15 @@ function normalizeLegacyDate(value){
   return br?`${br[3]}-${br[2]}-${br[1]}`:'';
 }
 function normalizeLegacyPerformedSets(value){
-  if(!Array.isArray(value)||!value.length||value.length>30)return null;
+  if(!Array.isArray(value)||!value.length||value.length>60)return null;
   const result=[];
   for(const raw of value){
     if(!raw||typeof raw!=='object')continue;
     const weight=Number(raw.weight??raw.carga??raw.kg??raw.load??0);
     const reps=Number(raw.reps??raw.repeticoes??raw.repetitions??raw.rep);
-    if(!Number.isFinite(weight)||weight<0||weight>10000||!Number.isInteger(reps)||reps<0||reps>100)continue;
+    if(!Number.isFinite(weight)||weight<0||weight>10000||!Number.isInteger(reps)||reps<0||reps>(raw.unit==='seconds'?3600:100))continue;
     const clean={weight:Math.round(weight*100)/100,reps};
+    if(['seconds','reps'].includes(raw.unit))clean.unit=raw.unit;
     if(raw.backoff===true)clean.backoff=true;
     const prescription=normalizePrescriptionSet(raw);if(prescription)Object.assign(clean,prescription);
     result.push(clean);
@@ -2886,6 +2888,7 @@ async function saveMeal(){
       MEAL_PLAN_CACHE.meals.push({id:uid(),time,name,items,notes,doneDates:[]});
     }
     await persistMealPlan();
+    await globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-meal');
     closeModal('modal-meal');
     renderMealsList();
   }catch(e){
@@ -4881,7 +4884,7 @@ async function saveWorkout(){
         const dates=card?.querySelector('.workout-card-cycle');if(dates)dates.textContent=v104CycleMeta({startDate,updateDate});
       }
       closeModal('modal-workout');
-      showToast('✓ Treino salvo');
+      globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-workout');showToast('✓ Treino salvo');
       // Reloading the student's other data must not keep a confirmed write
       // locked. This release belongs only to this invocation, including finally.
       releaseWorkoutAction();
@@ -4908,7 +4911,7 @@ async function saveWorkout(){
         if(!LOCAL_DB.workouts.some(w=>w.id===docId))LOCAL_DB.workouts.unshift({id:docId,name,color:SEL_COLOR,startDate,updateDate,days:[],order:0,isActive:true,exercises:[]});
       }
       WORKOUT_CREATE_ID=null;
-      if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(__localSnapshot));throw new Error('Falha ao gravar no armazenamento local.');}showToast('✓ Treino salvo offline');closeModal('modal-workout');renderHome();
+      if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(__localSnapshot));throw new Error('Falha ao gravar no armazenamento local.');}globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-workout');showToast('✓ Treino salvo offline');closeModal('modal-workout');renderHome();
     }else{
       if(EDIT_W){
         await cloudWrite(db.collection('workouts').doc(EDIT_W).update({name,color:SEL_COLOR,startDate,updateDate}),'editar treino');
@@ -5071,14 +5074,14 @@ async function saveDayFolder(){
       if(renamed.size)for(const exercise of workout.exercises||[])if(renamed.has(String(exercise.id)))exercise.dayName=name;
       if(renamed.size)workout.exercises=sortWorkoutExercises(workout);
       saveSucceeded=true;
-      VIEW_STUDENT_DAY=name;closeModal('modal-day');renderTsWorkout(workout);showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
+      VIEW_STUDENT_DAY=name;if(typeof window!=='undefined')await globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-day');closeModal('modal-day');renderTsWorkout(workout);showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
     }else{
       if(!canSelfManagePlan())throw new Error('Este plano é administrado pelo treinador.');
       const newDays=dayListAfterRename(workout,oldName,name).map(day=>normalizedName(day.name)===normalizedName(name)?{...day,muscleGroups:groups,frequencyGuidance,restGuidance}:day);
       const snapshot=JSON.stringify(LOCAL_DB);workout.days=newDays;if(oldName)for(const exercise of exercisesForDay(workout,oldName))exercise.dayName=name;
       if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(snapshot));throw new Error('Falha ao gravar no aparelho.');}
       saveSucceeded=true;
-      CUR_DAY=name;closeModal('modal-day');renderWorkout();showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
+      CUR_DAY=name;if(typeof window!=='undefined')await globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-day');closeModal('modal-day');renderWorkout();showToast(oldName?'✓ Pasta renomeada':'✓ Dia criado');
     }
   }catch(error){
     console.error('[Team Bulls] Falha ao salvar o dia de treino.',error);
@@ -5286,7 +5289,7 @@ async function saveExercise(){
       EXERCISE_CREATE_ID=null;EDIT_EXERCISE_ID=null;
       syncExerciseDestinationBeforeClose('student',localWorkout,dayName);
       closeModal('modal-exercise');
-      showToast('✓ Exercício salvo');
+      globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-exercise');showToast('✓ Exercício salvo');
       EXERCISE_MODAL_CONTEXT=null;
       const saved=localWorkout?.exercises.find(exercise=>String(exercise.id)===String(savedExerciseId));
       if(wasEdit&&saved){VIEW_STUDENT_EXERCISE=saved;openTsExercise(savedExerciseId);}
@@ -5299,7 +5302,7 @@ async function saveExercise(){
       const docId=EXERCISE_CREATE_ID||(EXERCISE_CREATE_ID=uid());
       if(EDIT_EXERCISE_ID){const e=w.exercises.find(x=>x.id===EDIT_EXERCISE_ID);if(e){const changedDay=normalizedName(e.dayName)!==normalizedName(dayName);Object.assign(e,{name,dayName,instructions,techniqueIds,optionalTechniqueIds,supersetExerciseId,order:changedDay?nextExerciseOrder(w,dayName):(hasManualOrder(e)?Number(e.order):nextExerciseOrder(w,dayName)),...catalogSelection});}}else if(!w.exercises.some(e=>e.id===docId))w.exercises.push({id:docId,name,dayName,instructions,techniqueIds,optionalTechniqueIds,supersetExerciseId,order:nextExerciseOrder(w,dayName),sessions:[],videoUrl:'',weeklyPlan:{},weeklyTechniquePlan:{},...catalogSelection});
       EXERCISE_CREATE_ID=null;EDIT_EXERCISE_ID=null;
-      if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(__localSnapshot));throw new Error('Falha ao gravar no armazenamento local.');}showToast('✓ Exercício salvo offline');syncExerciseDestinationBeforeClose('self',w,dayName);closeModal('modal-exercise');EXERCISE_MODAL_CONTEXT=null;renderDay();
+      if(!localSave()){LOCAL_DB=normalizeLocalDb(JSON.parse(__localSnapshot));throw new Error('Falha ao gravar no armazenamento local.');}globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-exercise');showToast('✓ Exercício salvo offline');syncExerciseDestinationBeforeClose('self',w,dayName);closeModal('modal-exercise');EXERCISE_MODAL_CONTEXT=null;renderDay();
     }else{
       const docId=EXERCISE_CREATE_ID||(EXERCISE_CREATE_ID=draftId('exercises'));
       const w=targetWorkout,order=nextExerciseOrder(w,dayName),ownerUid=String(EXERCISE_MODAL_CONTEXT?.studentUid||CURRENT_USER.uid);
@@ -5357,6 +5360,7 @@ function populateSessionEditorForWeek(week){
   renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');
 }
 function sessionEditorHasData(){
+  if(globalThis.TeamBullsIsometrySeriesTimer?.hasActiveSeries?.())return true;
   return[...document.querySelectorAll('#sets-editor .performed-set-row')].some(row=>
     row.querySelector('[data-f="w"]').value!==''||row.querySelector('[data-f="r"]').value!==''
   );
@@ -5501,10 +5505,11 @@ async function saveSession(){
     if(rawWeight===''&&rawReps==='')continue; // série prescrita que não foi realizada
     const w=rawWeight===''?0:parseFloat(rawWeight);
     const r=parseInt(rawReps,10);
-    if(!Number.isFinite(w)||!Number.isInteger(r)||w<0||w>10000||r<0||r>100){alert('Confira a carga e as repetições das séries realizadas.');return;}
+    if(!Number.isFinite(w)||!Number.isInteger(r)||w<0||w>10000||r<0||r>(row.dataset.unit==='seconds'?3600:100)){alert('Confira a carga e as repetições das séries realizadas.');return;}
     const performed={weight:w,reps:r};
+    if(['seconds','reps'].includes(row.dataset.unit))performed.unit=row.dataset.unit;
     if(row.dataset.backoff==='1')performed.backoff=true;
-    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger});
+    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
     if(target)Object.assign(performed,target);
     sets.push(performed);
   }
@@ -6007,10 +6012,11 @@ async function saveEditSession(){
     if(rawWeight===''&&rawReps==='')continue;
     const w=rawWeight===''?0:parseFloat(rawWeight);
     const r=parseInt(rawReps,10);
-    if(!Number.isFinite(w)||!Number.isInteger(r)||w<0||w>10000||r<0||r>100){alert('Confira a carga e as repetições das séries realizadas.');return;}
+    if(!Number.isFinite(w)||!Number.isInteger(r)||w<0||w>10000||r<0||r>(row.dataset.unit==='seconds'?3600:100)){alert('Confira a carga e as repetições das séries realizadas.');return;}
     const performed={weight:w,reps:r};
+    if(['seconds','reps'].includes(row.dataset.unit))performed.unit=row.dataset.unit;
     if(row.dataset.backoff==='1')performed.backoff=true;
-    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger});
+    const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger,...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
     if(target)Object.assign(performed,target);
     sets.push(performed);
   }
@@ -6703,7 +6709,7 @@ function exerciseTechniqueIds(exercise){const ids=normalizeExerciseTechniqueIds(
 function exerciseHasTechnique(exercise,id){return exerciseTechniqueIds(exercise).includes(id);}
 function exerciseOptionalTechniqueIds(exercise){return normalizeExerciseTechniqueIds(exercise?.optionalTechniqueIds).filter(id=>id==='mp'&&exerciseHasTechnique(exercise,'mp'));}
 function exerciseHasOptionalTechnique(exercise,id){return exerciseOptionalTechniqueIds(exercise).includes(id);}
-function exerciseUsesResistedTime(exercise){return exerciseHasTechnique(exercise,'is');}
+function exerciseUsesResistedTime(exercise,week){return exerciseTechniqueIds(exercise,week).some(id=>{if(['is','it'].includes(id))return true;try{return /isometria/i.test(TECHNIQUE_CATALOG.items.find(item=>item.id===id)?.name||'');}catch{return false;}});}
 function techniqueItemsForExercise(exercise){const ids=exerciseTechniqueIds(exercise);return ids.map(id=>TECHNIQUE_CATALOG.items.find(item=>item.id===id)).filter(Boolean);}
 function renderExerciseTechniquePanels(exercise,trainerMode=false){const techniqueHost=document.getElementById(trainerMode?'ts-exercise-techniques-box':'exercise-techniques-box'),supersetHost=document.getElementById(trainerMode?'ts-exercise-superset-box':'exercise-superset-box');if(!techniqueHost||!supersetHost||!exercise)return;const items=techniqueItemsForExercise(exercise);techniqueHost.innerHTML=items.length?`<div class="exercise-technique-panel"><div class="exercise-technique-panel-head">Técnicas aplicadas</div><div class="exercise-technique-chips">${items.map(item=>`<button class="exercise-technique-chip ${exerciseHasOptionalTechnique(exercise,item.id)?'optional':''}" onclick="openTechniqueDetail(${jsArg(item.id)})">${esc(item.code)} · ${esc(item.name)}${exerciseHasOptionalTechnique(exercise,item.id)?' · OPCIONAL':''}</button>`).join('')}</div></div>`:'';const partner=findSupersetPartner(exercise);if(partner){const open=trainerMode?`openTsExercise(${jsArg(partner.id)})`:`openExercise(${jsArg(partner.id)})`;supersetHost.innerHTML=`<div class="superset-card"><span class="superset-badge">SS</span><div class="superset-main"><div class="superset-title">Conjugado com ${esc(partner.name)}</div><div class="superset-note">Execute os dois exercícios em sequência conforme a orientação.</div></div><button class="superset-open" onclick="${open}">ABRIR</button></div>`;}else supersetHost.innerHTML='';}
 function refreshStudentExerciseTechniquePanels(){
@@ -6777,18 +6783,18 @@ copyPreviousPrescription=function(){const result=copyPreviousPrescriptionV101.ap
 collectPrescriptionRows=function(){const rows=[...document.querySelectorAll('#prescription-editor .plan-set-row:not([data-backoff="1"])')];if(!rows.length){alert('Adicione ao menos uma série prescrita.');return null;}const sets=[];for(const row of rows){const targetMin=parseInt(row.querySelector('[data-f="min"]').value,10),targetMax=parseInt(row.querySelector('[data-f="max"]').value,10),ger=parseInt(row.querySelector('[data-f="ger"]').value,10),normalized=normalizePrescriptionSet({targetMin,targetMax,ger});if(!normalized){alert('Confira a faixa prescrita e o GER de todas as séries.');return null;}sets.push(normalized);}return sets;};
 
 renderSessionPrescriptionSummary=function(exercise,week,elId){const el=document.getElementById(elId);if(!el)return;const summary=prescriptionCompactSummary(exercise,week),partner=findSupersetPartner(exercise);el.innerHTML=summary.rx.sets.length?`<strong>Semana ${week}:</strong> ${esc(summary.reps)} · ${esc(summary.ger)}.${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''}${exerciseHasOptionalTechnique(exercise,'mp')?' <b>Myo Reps opcional: ${esc(summary.reps)} em MP OU ${esc(summary.reps)} em séries normais.</b>':''} Preencha somente o que você conseguiu realizar.`:`<strong>Semana ${week}:</strong> sem prescrição cadastrada. O registro continuará disponível, mas confirme a orientação com o treinador.`;};
-populateSessionEditorForWeek=function(week){const exercise=getE(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos'))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise);};
+populateSessionEditorForWeek=function(week){const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos'))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise);};
 function renumberPerformedSetRows(){const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')];rows.forEach((row,index)=>{const num=row.querySelector('.set-edit-num');if(num)num.innerHTML=`${index+1}${row.dataset.backoff==='1'?'<span class="backoff-label">BOS</span>':''}`;});SET_COUNT=rows.length;}
 addSetRow=function(weight='',reps='',prescription=null){
   if(SET_COUNT>=30){alert('Limite de 30 séries por sessão.');return;}
-  const exercise=getE(SESSION_WID,SESSION_EID);
+  const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);
   const target=normalizePrescriptionSet(prescription);
   const backoff=prescription?.backoff===true;
   const time=exerciseUsesResistedTime(exercise);
   const unit=time?'seg':'reps';
   const editor=document.getElementById('sets-editor');
   const row=document.createElement('div');
-  row.className='performed-set-row'+(backoff?' backoff-row':'');
+  row.className='performed-set-row'+(backoff?' backoff-row':'');row.dataset.unit=time?'seconds':'reps';
   if(target){
     row.dataset.targetMin=target.targetMin;
     row.dataset.targetMax=target.targetMax;
@@ -6805,7 +6811,7 @@ addSetRow=function(weight='',reps='',prescription=null){
     </label>
     <label class="performed-field performed-field-result">
       <span class="performed-field-label">${time?'Tempo':'Reps'}</span>
-      <input class="set-edit-input" type="number" placeholder="${unit}" min="0" max="100" step="1" data-f="r" value="${esc(reps)}" aria-label="${time?'Tempo resistido em segundos':'Repetições realizadas'}">
+      <input class="set-edit-input" type="number" placeholder="${unit}" min="0" max="${time?3600:100}" step="1" data-f="r" value="${esc(reps)}" aria-label="${time?'Tempo resistido em segundos':'Repetições realizadas'}">
     </label>
     <button class="btn-rm-set" ${backoff?'disabled':''} onclick="removeSet(this)">✕</button>
     ${backoff?'<div class="backoff-suggestion">Sugestão de carga: preencha as séries convencionais.</div>':''}`;
@@ -6819,9 +6825,9 @@ addSetRow=function(weight='',reps='',prescription=null){
 removeSet=function(btn){const row=btn?.closest('.performed-set-row');if(!row||row.dataset.backoff==='1')return;row.remove();renumberPerformedSetRows();updateBackoffLoadSuggestion();};
 function updateBackoffLoadSuggestion(){const rows=[...document.querySelectorAll('#sets-editor .performed-set-row')],normal=rows.filter(row=>row.dataset.backoff!=='1'),last=[...normal].reverse().map(row=>parseFloat(row.querySelector('[data-f="w"]').value)).find(value=>Number.isFinite(value)&&value>0),backoff=rows.find(row=>row.dataset.backoff==='1');if(!backoff)return;const label=backoff.querySelector('.backoff-suggestion');if(!label)return;if(!last){label.textContent='Sugestão de carga: preencha as séries convencionais.';return;}const suggestion=Math.round(last*.8*2)/2;label.textContent=`Sugestão aproximada: ${suggestion.toLocaleString('pt-BR')} kg (-20% sobre ${last.toLocaleString('pt-BR')} kg). Ajuste ao peso disponível.`;}
 const openLogSessionModalV101=openLogSessionModal;
-openLogSessionModal=function(){const result=openLogSessionModalV101.apply(this,arguments);const exercise=getE(SESSION_WID,SESSION_EID);renderRestTimerPresetsForExercise(exercise);return result;};
+openLogSessionModal=function(){const result=openLogSessionModalV101.apply(this,arguments);const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);renderRestTimerPresetsForExercise(exercise);return result;};
 
-function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(Number(s.weight)||0)*(Number(s.reps)||0),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo/carga':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
+function buildSessionsV102(e,elId,readonly,homeWid,ws){const el=document.getElementById(elId),sessions=getSharedSessions(e,ws),time=exerciseUsesResistedTime(e),unit=time?'s':'×';if(!sessions.length){el.innerHTML='<div class="no-data-inline">Nenhuma sessão registrada.</div>';return;}const sorted=[...sessions].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));el.innerHTML=sorted.map(sess=>{const recorded=new Set((sess.sets||[]).map(set=>set.unit).filter(Boolean)),time=recorded.size===1?recorded.has('seconds'):exerciseUsesResistedTime(e,sess.week),unit=time?'s':'×';const sets=Array.isArray(sess.sets)?sess.sets:[],vol=sets.reduce((a,s)=>a+(time?Number(s.reps)||0:(Number(s.weight)||0)*(Number(s.reps)||0)),0),rows=sets.map((s,i)=>{const target=normalizePrescriptionSet(s),inRange=target&&Number(s.reps)>=target.targetMin&&Number(s.reps)<=target.targetMax,below=target&&Number(s.reps)<target.targetMin;return`<tr class="${s.backoff?'backoff-row':''}"><td><span class="set-idx">${i+1}${s.backoff?' BOS':''}</span></td><td><span class="set-chip">${target?esc(prescribedRangeLabel(target))+(time?'s':''):'—'}${s.backoff?'<span class="backoff-label">-20%</span>':''}</span></td><td><span class="ger-pill">${target?formatGerLevel(target.ger)+' '+renderGerMeter(target.ger):'—'}</span></td><td><span class="set-chip">${Number(s.weight)||0} kg</span></td><td><span class="set-chip ${inRange?'set-performance-ok':below?'set-performance-low':''}">${Number(s.reps)||0}${unit}</span></td></tr>`;}).join(''),del=(readonly||sess._archived)?'':`<button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px;margin-right:2px" onclick="openEditSession(${jsArg(sess.id)})">✏️</button><button class="btn-icon ghost" style="width:28px;height:28px;font-size:13px" onclick="deleteSession(${jsArg(sess.id)})">🗑</button>`,srcBadge=sess._archived?`<span class="session-week-badge">treino anterior</span>`:(homeWid&&sess._wid&&sess._wid!==homeWid)?`<span class="session-week-badge">${esc(sess._wName)}</span>`:'',weekBadge=sess.week?`<span class="session-week-badge">Sem. ${esc(sess.week)}</span>`:'',variantBadge=sess.performedExerciseName&&normalizedName(sess.performedExerciseName)!==normalizedName(e.name)?`<span class="session-week-badge">↺ ${esc(sess.performedExerciseName)}</span>`:'',modeBadge=sess.performedTechniqueMode?`<span class="session-week-badge">${sess.performedTechniqueMode==='myo'?'MP':'NORMAL'}</span>`:'',noteBlock=sess.note?`<div class="session-note"><b>📝 Anotação:</b> ${esc(sess.note)}</div>`:'';return`<div class="session-block"><div class="session-header"><span class="session-date-badge">📅 ${fmt(sess.date)}</span>${weekBadge}${variantBadge}${modeBadge}${srcBadge}${sessionSyncBadge(sess)}<div style="display:flex;align-items:center;gap:6px;margin-left:auto"><span class="session-vol">${time?'Tempo total (seg)':'Vol'}: ${vol}</span>${del}</div></div><table class="sets-table"><thead><tr><th>#</th><th>Prescrito</th><th>GER</th><th>Carga</th><th>${time?'Tempo':'Feito'}</th></tr></thead><tbody>${rows}</tbody></table>${noteBlock}</div>`;}).join('');}
 buildSessions=buildSessionsV102;
 
 const openEditSessionV101=openEditSession;
@@ -7062,7 +7068,7 @@ async function saveDietPlan(){
     if(plan){plan.name=name;plan.isActive=active;}else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,meals:[]},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}
     if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});
     DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');
-    const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta salva');
+    const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-diet');showToast('✓ Dieta salva');
   }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}
   finally{endAction('save-diet','modal-diet');}
 }
@@ -7467,6 +7473,7 @@ openLogSessionModal=function(){const w=getW(CUR_WORKOUT);if(w?.startDate)LAST_SE
 function syncSessionWeekFromDate(force=false){
   const w=getW(SESSION_WID||CUR_WORKOUT),date=document.getElementById('input-session-date')?.value;if(!w?.startDate||!validIsoDate(date))return;
   const next=v104CycleWeek(w.startDate,date),select=document.getElementById('input-session-week');if(!select)return;
+  if(!force&&Number(select.value)===next)return;
   if(!force&&sessionEditorHasData()&&Number(select.value)!==next&&!confirm(`A data corresponde à semana ${next}. Ajustar a prescrição exibida?`))return;
   select.value=String(next);SESSION_EDITOR_WEEK=next;LAST_SESSION_WEEK=next;populateSessionEditorForWeek(next);
 };
@@ -7621,7 +7628,7 @@ openAddDietModal=function(){if(!dietCanEdit())return;EDIT_DIET_PLAN_ID='';docume
 openEditDietModal=function(id=CURRENT_DIET_ID){if(!dietCanEdit())return;const plan=DIET_DOCUMENT.plans.find(item=>String(item.id)===String(id));if(!plan)return;EDIT_DIET_PLAN_ID=plan.id;document.getElementById('modal-diet-title').textContent='Editar dieta';document.getElementById('input-diet-name').value=plan.name;document.getElementById('input-diet-active').value=String(plan.isActive);document.getElementById('input-diet-start-date').value=v104DateOr(plan.startDate,today());document.getElementById('input-diet-update-date').value=v104DateOr(plan.updateDate,addDaysIso(plan.startDate,28));document.getElementById('btn-delete-diet').style.display='block';openModal('modal-diet');};
 saveDietPlan=async function(){
   if(!dietCanEdit()||!beginAction('save-diet','modal-diet'))return;const name=document.getElementById('input-diet-name').value.trim(),active=document.getElementById('input-diet-active').value==='true',startDate=document.getElementById('input-diet-start-date').value,updateDate=document.getElementById('input-diet-update-date').value;if(!name){alert('Informe o nome da dieta.');endAction('save-diet','modal-diet');return;}if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){alert('Confira as datas da dieta.');endAction('save-diet','modal-diet');return;}const snapshot=JSON.stringify(DIET_DOCUMENT);
-  try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan){Object.assign(plan,{name,isActive:active,startDate,updateDate});}else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[]},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta salva');if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});}catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}finally{endAction('save-diet','modal-diet');}
+  try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan){Object.assign(plan,{name,isActive:active,startDate,updateDate});}else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[]},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-diet');showToast('✓ Dieta salva');if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});}catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}finally{endAction('save-diet','modal-diet');}
 };
 persistMealPlan=async function(){const plan=currentDiet(),variant=currentDietVariant();if(plan&&variant){variant.meals=MEAL_PLAN_CACHE.meals;plan.meals=variant.meals;}await persistDietDocument();};
 function openAddDietVariantModal(){const plan=currentDiet();if(!dietCanEdit()||!plan)return;if((plan.variants||[]).length>=12){alert('Esta dieta já atingiu o limite seguro de 12 divisões.');return;}EDIT_DIET_VARIANT_ID='';document.getElementById('modal-diet-variant-title').textContent='Nova divisão';document.getElementById('input-diet-variant-name').value='';const days=document.getElementById('input-diet-variant-days');days.value='0';days.dataset.manualValue='0';days.disabled=false;document.getElementById('input-diet-variant-day-type').value='';const rest=document.getElementById('input-diet-variant-rest-days');rest.value='0';rest.dataset.manualValue='0';rest.disabled=false;document.querySelectorAll('[data-diet-variant-weekday],[data-diet-variant-rest-weekday]').forEach(field=>field.checked=false);populateDietVariantWorkoutChoices(null);syncDietVariantDaysFromWeekdays();document.getElementById('btn-delete-diet-variant').style.display='none';openModal('modal-diet-variant');}
@@ -7657,7 +7664,7 @@ async function saveDietVariant(){
     }
     else{variant=normalizeDietVariant({id:uid(),name,daysPerWeek:days,weekdays,dayType,workoutDays,restDaysPerWeek,restWeekdays,order:plan.variants.length,meals:[]},plan.variants.length);plan.variants.push(variant);CURRENT_DIET_VARIANT_ID=variant.id;}
     const total=plan.variants.reduce((sum,item)=>sum+item.daysPerWeek,0);if(total>7)throw new Error('A distribuição ultrapassa 7 dias. Reduza outra divisão antes de salvar.');
-    await persistDietDocument();closeModal('modal-diet-variant');renderDietVariantTabs(DIET_CONTEXT.trainer);v104ActivateVariantMeals(DIET_CONTEXT.trainer);showToast('✓ Divisão salva');
+    await persistDietDocument();closeModal('modal-diet-variant');renderDietVariantTabs(DIET_CONTEXT.trainer);v104ActivateVariantMeals(DIET_CONTEXT.trainer);globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-diet-variant');showToast('✓ Divisão salva');
   }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(before));alert(error.message||cloudWriteError(error,'salvar a divisão'));}
   finally{endAction('save-diet-variant','modal-diet-variant');}
 }
@@ -7786,7 +7793,7 @@ exerciseTechniqueIds=function(exercise,week=inferExerciseTechniqueWeek(exercise)
 exerciseHasTechnique=function(exercise,id,week=inferExerciseTechniqueWeek(exercise)){return exerciseTechniqueIds(exercise,week).includes(id);};
 exerciseOptionalTechniqueIds=function(exercise,week=inferExerciseTechniqueWeek(exercise)){const cfg=resolveWeekTechniqueConfig(exercise,week);return cfg.optionalTechniqueIds.filter(id=>id==='mp'&&exerciseHasTechnique(exercise,'mp',week));};
 exerciseHasOptionalTechnique=function(exercise,id,week=inferExerciseTechniqueWeek(exercise)){return exerciseOptionalTechniqueIds(exercise,week).includes(id);};
-exerciseUsesResistedTime=function(exercise,week=inferExerciseTechniqueWeek(exercise)){return exerciseHasTechnique(exercise,'is',week);};
+exerciseUsesResistedTime=function(exercise,week=inferExerciseTechniqueWeek(exercise)){return exerciseTechniqueIds(exercise,week).some(id=>{if(['is','it'].includes(id))return true;try{return /isometria/i.test(TECHNIQUE_CATALOG.items.find(item=>item.id===id)?.name||'');}catch{return false;}});};
 techniqueItemsForExercise=function(exercise,week=inferExerciseTechniqueWeek(exercise)){return exerciseTechniqueIds(exercise,week).map(id=>TECHNIQUE_CATALOG.items.find(item=>item.id===id)).filter(Boolean);};
 effectivePrescriptionSets=function(exercise,sets,week=inferExerciseTechniqueWeek(exercise)){const clean=(Array.isArray(sets)?sets:[]).map(set=>({...set}));if(exerciseHasTechnique(exercise,'bos',week)&&clean.length){const last=clean[clean.length-1];clean.push({...last,backoff:true});}return clean;};
 exerciseResultUnit=function(exercise,week=inferExerciseTechniqueWeek(exercise)){return exerciseUsesResistedTime(exercise,week)?'seg':'reps';};
@@ -7855,7 +7862,7 @@ renderSessionPrescriptionSummary=function(exercise,week,elId){
   const info=summary.rx.sets.length?`${esc(summary.reps)} · ${esc(summary.ger)}.${partner?` <b>Super set com ${esc(partner.name)}.</b>`:''} Preencha somente o que você conseguiu realizar.`:'Sem prescrição de séries. Confirme a orientação com o treinador.';
   el.innerHTML=`<strong>Semana ${week}:</strong> ${info}${studentTechniqueGuide(exercise,week)}${studentMyoRepGuide(exercise,week,summary.rx.sets)}${studentGerGuide(summary.rx.sets)}`;
 };
-populateSessionEditorForWeek=function(week){const exercise=getE(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets,week);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos',week))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise,week)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise,week);renderOptionalTechniqueMode(exercise);};
+populateSessionEditorForWeek=function(week){const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);SET_COUNT=0;document.getElementById('sets-editor').innerHTML='';const rx=resolveWeekPrescription(exercise,week),sets=effectivePrescriptionSets(exercise,rx.sets,week);if(sets.length)sets.forEach(set=>addSetRow('','',set));else{for(let i=0;i<3;i++)addSetRow();if(exerciseHasTechnique(exercise,'bos',week))addSetRow('','',{targetMin:8,targetMax:12,ger:3,backoff:true});}document.getElementById('session-result-label').textContent=exerciseUsesResistedTime(exercise,week)?'Tempo':'Reps';renderSessionPrescriptionSummary(exercise,week,'session-prescription-summary');renderRestTimerPresetsForExercise(exercise,week);renderOptionalTechniqueMode(exercise);};
 
 function currentWeekTechniqueEditorConfig(){
   const exercise=getPlanEditExercise();if(!exercise)return null;const ids=[...document.querySelectorAll('#week-technique-picker input[type="checkbox"]:checked')].map(input=>input.value),optional=ids.includes('mp')&&document.getElementById('week-input-myo-optional')?.checked?['mp']:[],supersetExerciseId=ids.includes('ss')?String(document.getElementById('week-input-superset-exercise')?.value||''):'';
@@ -7901,7 +7908,7 @@ async function persistWeekTechniqueConfiguration(config,weeks,{close=false,label
   try{
     if(PLAN_EDIT_TARGET==='trainer'){const batch=db.batch();for(const [id,plan] of updates)batch.update(db.collection('exercises').doc(id),{weeklyTechniquePlan:plan});await cloudWrite(batch.commit(),'salvar técnicas por semana');}
     for(const [id,plan] of updates){const item=workout.exercises.find(e=>e.id===id);if(item)item.weeklyTechniquePlan=plan;}if(PLAN_EDIT_TARGET!=='trainer'&&!localSave())throw new Error('Não foi possível salvar no aparelho.');
-    if(close)closeModal('modal-prescription');refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week);showToast('✓ '+label);return true;
+    if(close){if(typeof window!=='undefined')await globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-prescription');closeModal('modal-prescription');}refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week);showToast('✓ '+label);return true;
   }catch(error){for(const [id,raw] of before){const item=workout.exercises.find(e=>e.id===id);if(item)item.weeklyTechniquePlan=JSON.parse(raw||'{}');}alert(cloudWriteError(error,'salvar as técnicas da semana'));return false;}
 }
 persistPrescription=async function(sets,replicate){
@@ -7910,7 +7917,7 @@ persistPrescription=async function(sets,replicate){
   try{
     if(PLAN_EDIT_TARGET==='trainer'){const batch=db.batch();batch.update(db.collection('exercises').doc(exercise.id),{weeklyPlan,weeklyTechniquePlan:techUpdates.get(exercise.id)||normalizeWeeklyTechniquePlan(exercise.weeklyTechniquePlan)});for(const [id,plan] of techUpdates){if(id!==exercise.id)batch.update(db.collection('exercises').doc(id),{weeklyTechniquePlan:plan});}await cloudWrite(batch.commit(),'salvar prescrição e técnicas');}
     exercise.weeklyPlan=weeklyPlan;for(const [id,plan] of techUpdates){const item=workout.exercises.find(e=>e.id===id);if(item)item.weeklyTechniquePlan=plan;}if(PLAN_EDIT_TARGET!=='trainer'&&!localSave())throw new Error('Falha ao gravar no armazenamento local.');
-    closeModal('modal-prescription');refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week);showToast(replicate?'✓ Séries repassadas; técnicas mantidas apenas nesta semana':'✓ Séries e técnicas da semana salvas');return true;
+    if(typeof window!=='undefined')await globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-prescription');closeModal('modal-prescription');refreshPlanViewsAfterWeeklyTechniqueChange(exercise,week);showToast(replicate?'✓ Séries repassadas; técnicas mantidas apenas nesta semana':'✓ Séries e técnicas da semana salvas');return true;
   }catch(error){exercise.weeklyPlan=previousPlan;for(const [id,raw] of beforeTech){const item=workout.exercises.find(e=>e.id===id);if(item)item.weeklyTechniquePlan=JSON.parse(raw||'{}');}alert(cloudWriteError(error,'salvar a prescrição'));return false;}
   finally{endAction(actionKey,'modal-prescription');}
 };
@@ -8040,7 +8047,7 @@ collectPrescriptionRows=function(){
   for(const row of rows){
     const minInput=row.querySelector('[data-f="min"]'),maxInput=row.querySelector('[data-f="max"]'),gerInput=row.querySelector('[data-f="ger"]');
     if(!minInput||!maxInput||!gerInput){alert('Não foi possível ler uma das séries. Feche e abra a prescrição novamente.');return null;}
-    const normalized=normalizePrescriptionSet({targetMin:parseInt(minInput.value,10),targetMax:parseInt(maxInput.value,10),ger:parseInt(gerInput.value,10)});
+    const normalized=normalizePrescriptionSet({targetMin:parseInt(minInput.value,10),targetMax:parseInt(maxInput.value,10),ger:parseInt(gerInput.value,10),...(row.dataset.unit==='seconds'?{unit:'seconds'}:{})});
     if(!normalized){alert('Confira a faixa de repetições e o GER de todas as séries.');return null;}
     sets.push(normalized);
   }
@@ -8440,7 +8447,7 @@ saveDietPlan=async function(){
     else{plan=normalizeDietPlan({id:uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[],freeMealPolicy},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}
     if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});
     DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');
-    const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta salva');
+    const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-diet');showToast('✓ Dieta salva');
     if(CURRENT_DIET_ID===plan.id)renderDietFreeMealPolicy(trainer?'ts-diet-free-meal-policy':'diet-free-meal-policy',plan,trainer);
     if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});
   }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}
@@ -8563,9 +8570,10 @@ async function v10515PersistIsDefaultPrescription(exercise,week){
   const editorSets=v10515NormalPrescriptionRows().map(row=>normalizePrescriptionSet({
     targetMin:parseInt(row.querySelector('[data-f="min"]')?.value,10),
     targetMax:parseInt(row.querySelector('[data-f="max"]')?.value,10),
-    ger:parseInt(row.querySelector('[data-f="ger"]')?.value,10)
+    ger:parseInt(row.querySelector('[data-f="ger"]')?.value,10),
+    unit:'seconds'
   })).filter(Boolean);
-  const sets=editorSets.length?editorSets:Array.from({length:3},()=>({targetMin:35,targetMax:45,ger:3}));
+  const sets=editorSets.length?editorSets:Array.from({length:3},()=>({targetMin:35,targetMax:45,ger:3,unit:'seconds'}));
   const previousPlan=normalizeWeeklyPlan(exercise.weeklyPlan);
   const weeklyPlan=buildWeeklyPlanUpdate(previousPlan,week,sets,false);
   if(PLAN_EDIT_TARGET==='trainer'){
@@ -9626,7 +9634,7 @@ saveDietPlan=async function(){
   const energySummary=normalizeDietEnergySummary({...editingPlan?.energySummary,totalExpenditure:document.getElementById('input-diet-total-expenditure')?.value,variantEnergy},editingPlan?.variants||normalizeDietPlan({id:EDIT_DIET_PLAN_ID,variants:[]},0).variants);
   if(!name){alert('Informe o nome da dieta.');endAction('save-diet','modal-diet');return;}if(!validIsoDate(startDate)||!validIsoDate(updateDate)||updateDate<startDate){alert('Confira as datas da dieta.');endAction('save-diet','modal-diet');return;}
   const snapshot=JSON.stringify(DIET_DOCUMENT);
-  try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan)Object.assign(plan,{name,isActive:active,startDate,updateDate,freeMealPolicy,energySummary});else{plan=normalizeDietPlan({id:EDIT_DIET_PLAN_ID||uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[],freeMealPolicy,energySummary},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);showToast('✓ Dieta e tabela calórica salvas');if(CURRENT_DIET_ID===plan.id){renderDietEnergySummary(trainer?'ts-diet-energy-summary':'diet-energy-summary',plan,trainer);renderDietFreeMealPolicy(trainer?'ts-diet-free-meal-policy':'diet-free-meal-policy',plan,trainer);}if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});
+  try{let plan=DIET_DOCUMENT.plans.find(item=>item.id===EDIT_DIET_PLAN_ID);if(plan)Object.assign(plan,{name,isActive:active,startDate,updateDate,freeMealPolicy,energySummary});else{plan=normalizeDietPlan({id:EDIT_DIET_PLAN_ID||uid(),name,isActive:active,order:DIET_DOCUMENT.plans.length,startDate,updateDate,variants:[],freeMealPolicy,energySummary},DIET_DOCUMENT.plans.length);DIET_DOCUMENT.plans.push(plan);EDIT_DIET_PLAN_ID=plan.id;}if(active)DIET_DOCUMENT.plans.forEach(item=>{if(item.id!==plan.id)item.isActive=false;});DIET_DOCUMENT=normalizeDietDocument(DIET_DOCUMENT);await persistDietDocument();closeModal('modal-diet');const trainer=DIET_CONTEXT.trainer;renderDietList(trainer?'ts-meals-list':'meals-list',trainer?'ts-meals-empty':'meals-empty',trainer);globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-diet');showToast('✓ Dieta e tabela calórica salvas');if(CURRENT_DIET_ID===plan.id){renderDietEnergySummary(trainer?'ts-diet-energy-summary':'diet-energy-summary',plan,trainer);renderDietFreeMealPolicy(trainer?'ts-diet-free-meal-policy':'diet-free-meal-policy',plan,trainer);}if(trainer&&active&&DIET_CONTEXT.targetUid)await v104SyncCycleSchedule(DIET_CONTEXT.targetUid,startDate,updateDate,'diet').catch(()=>{});
   }catch(error){DIET_DOCUMENT=normalizeDietDocument(JSON.parse(snapshot));alert(cloudWriteError(error,'salvar a dieta'));}finally{endAction('save-diet','modal-diet');}
 };
 const V1010_OPEN_DIET_DETAIL_BASE=openDietDetail;
@@ -9664,7 +9672,7 @@ dismissFeedback=async function(){const banner=document.getElementById('feedback-
 function updateFeedbackCharacterCount(){const input=document.getElementById('input-feedback'),counter=document.getElementById('feedback-character-count');if(counter)counter.textContent=`${(input?.value.length||0).toLocaleString('pt-BR')} / 30.000 caracteres`;}
 function syncFeedbackEditorType(){const select=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),modalTitle=document.getElementById('modal-feedback-title'),help=document.getElementById('feedback-editor-help'),type=v1010FeedbackType(select?.value),label=v1010FeedbackLabel({feedbackType:type});if(title){if(!title.value.trim()||title.value===title.dataset.autoLabel)title.value=label;title.dataset.autoLabel=label;}if(modalTitle)modalTitle.textContent=label;if(help)help.textContent='O aluno receberá o feedback na Sala Vermelha e, se autorizar no celular, um aviso na barra de notificações.';}
 openFeedbackModal=function(type='general'){if(!VIEW_STUDENT)return;V1010_FEEDBACK_PREFILL=v1010FeedbackType(type);const typeInput=document.getElementById('input-feedback-type'),title=document.getElementById('input-feedback-title'),message=document.getElementById('input-feedback');if(typeInput)typeInput.value=V1010_FEEDBACK_PREFILL;if(title)title.value='';if(message)message.value='';syncFeedbackEditorType();updateFeedbackCharacterCount();openModal('modal-feedback');};
-sendFeedback=async function(){const message=document.getElementById('input-feedback').value.normalize('NFKC').trim(),type=v1010FeedbackType(document.getElementById('input-feedback-type')?.value),title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||v1010FeedbackLabel({feedbackType:type});if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;try{const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='monthly_full'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule?v109ProtocolState(schedule):null;await cloudWrite(db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,...v1010FeedbackFields(type),message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.elapsedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false}),'enviar o feedback');clearIdempotentDraft(draftKey);closeModal('modal-feedback');alert('Feedback enviado. Se houver outras transmissões pendentes, o aluno verá cada uma em sequência.');}catch(error){alert(cloudWriteError(error,'enviar o feedback'));}finally{endAction('send-feedback','modal-feedback');}};
+sendFeedback=async function(){const message=document.getElementById('input-feedback').value.normalize('NFKC').trim(),type=v1010FeedbackType(document.getElementById('input-feedback-type')?.value),title=(document.getElementById('input-feedback-title')?.value||'').normalize('NFKC').trim().slice(0,160)||v1010FeedbackLabel({feedbackType:type});if(!message){alert('Digite o conteúdo do feedback.');return;}if(message.length>30000){alert('O feedback ultrapassa 30.000 caracteres.');return;}if(!VIEW_STUDENT||!beginAction('send-feedback','modal-feedback'))return;try{const draftKey='feedback-'+VIEW_STUDENT.uid,feedbackId=idempotentDraftId(draftKey,'feedback'),schedule=type==='monthly_full'?V109_PROTOCOL_REVIEW_SCHEDULE:null,state=schedule?v109ProtocolState(schedule):null;await cloudWrite(db.collection('feedback').doc(feedbackId).set({studentId:VIEW_STUDENT.uid,trainerId:CURRENT_USER.uid,title,...v1010FeedbackFields(type),message,protocolStartDate:type==='monthly_full'&&validIsoDate(schedule?.startDate)?schedule.startDate:'',protocolCycle:type==='monthly_full'?Math.max(0,Number(state?.pendingCycle||state?.elapsedCycle||0)):0,createdAt:firebase.firestore.FieldValue.serverTimestamp(),read:false}),'enviar o feedback');clearIdempotentDraft(draftKey);if(typeof window!=='undefined')await globalThis.TeamBullsWorkflowDrafts?.confirmed?.('modal-feedback');closeModal('modal-feedback');alert('Feedback enviado. Se houver outras transmissões pendentes, o aluno verá cada uma em sequência.');}catch(error){alert(cloudWriteError(error,'enviar o feedback'));}finally{endAction('send-feedback','modal-feedback');}};
 
 const V1010_CONFIRM_LOGOUT_BASE=confirmLogout;
 confirmLogout=function(){TRAINER_SUPPLEMENT_CATALOG={items:[]};TRAINER_SUPPLEMENT_CATALOG_UID='';EDIT_TRAINER_SUPPLEMENT_ID='';V1010_FEEDBACK_LOADING=false;return V1010_CONFIRM_LOGOUT_BASE();};
@@ -9963,7 +9971,7 @@ renderExercisePrescription=function(exercise,elId,week){
 };
 const BC_BASE_POPULATE_SESSION=populateSessionEditorForWeek;
 populateSessionEditorForWeek=function(week){
-  const result=BC_BASE_POPULATE_SESSION.apply(this,arguments),exercise=getE(SESSION_WID,SESSION_EID);
+  const result=BC_BASE_POPULATE_SESSION.apply(this,arguments),exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);
   if(exerciseHasBcTechnique(exercise,week))document.querySelectorAll('#sets-editor .performed-set-row[data-target-min] .performed-target').forEach(replaceBcRangeText);
   return result;
 };
@@ -9976,7 +9984,8 @@ function trainerProgressRows(sessions,workouts){
   for(const w of workouts||[]){protocols.set(String(w.id),w.name);for(const e of w.exercises||[])exercises.set(String(e.id),e);}
   return mergeHistorySessions(sessions,sessionsFromWorkoutTree(workouts)).map(s=>{
     const e=exercises.get(String(s.exerciseId)),name=s.performedExerciseName||s.exerciseName||e?.name||'Exercício sem identificação';
-    const time=e?exerciseUsesResistedTime(e):null;
+    const units=new Set((s.sets||[]).map(set=>set.unit).filter(Boolean));
+    const time=units.size===1?(units.has('seconds')?true:units.has('reps')?false:null):units.size>1?null:e?exerciseUsesResistedTime(e,s.week):null;
     const unit=time===true?'seg':time===false?'reps':'registrado';
     const mode=s.performedTechniqueMode||'não informado';
     const sets=s.sets||[],max=Math.max(0,...sets.map(x=>Number(x.weight)||0)),reps=sets.reduce((n,x)=>n+(Number(x.reps)||0),0);
