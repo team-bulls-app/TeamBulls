@@ -41,7 +41,7 @@ await test('isometry detection follows each week, including custom technique nam
   assert.equal(c.exerciseUsesResistedTime({weeks:{1:['it'],2:['bos']}},2),false);
 });
 await test('seconds above 100 survive normalization, cloning and history; reps remain bounded',()=>{
-  const c=vm.createContext({});vm.runInContext(['sessionFingerprint','normalizePrescriptionSet','normalizePerformedSet','normalizePerformedSets','clonePrescriptionSets'].map(source).join('\n'),c);
+  const c=vm.createContext({});vm.runInContext(['validClusterReps','sessionFingerprint','normalizePrescriptionSet','normalizePerformedSet','normalizePerformedSets','clonePrescriptionSets'].map(source).join('\n'),c);
   const timed={weight:40,reps:240,targetMin:120,targetMax:240,ger:3,unit:'seconds'};
   assert.equal(c.normalizePerformedSet(timed).reps,240);assert.equal(c.normalizePerformedSet(timed).unit,'seconds');assert.equal(c.clonePrescriptionSets([timed])[0].unit,'seconds');
   assert.equal(c.normalizePerformedSet({...timed,unit:'reps'}),null);assert.equal(c.normalizePerformedSet({...timed,reps:3601}),null);
@@ -83,7 +83,7 @@ await test('media rules preserve every existing protected domain and restrict im
 });
 await test('all workflow modules are registered in order and delivered by the exact same cache URLs',()=>{
   const loader=read('modules/intelligence-suite-loader-v10_10_42.js'),sw=read('sw.js'),updater=read('update_v10_10_9.js'),index=read('index.html');
-  const refs=[...loader.matchAll(/'(\.\/modules\/(?:workflow-|prescription-workflow|isometry-series-timer|feedback-media)[^']+)'/g)].map(m=>m[1]);assert.equal(refs.length,7);
+  const refs=[...loader.matchAll(/'(\.\/modules\/(?:workflow-|prescription-workflow|isometry-series-timer|feedback-video-tools|feedback-media)[^']+)'/g)].map(m=>m[1]);assert.equal(refs.length,8);
   for(const ref of refs){assert(sw.includes(ref),ref);assert(updater.includes(ref),ref);assert(fs.existsSync(ref.split('?')[0]));}assert.equal(sw,read('sw_47.js'));
   const timer=refs.find(ref=>ref.includes('/isometry-series-timer-')).slice(2);
   const coreScript=index.indexOf('<script defer src="app_v10_10_9_core.js?');

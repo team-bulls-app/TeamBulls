@@ -1,7 +1,7 @@
 /* Pure prescription/reliability calculations. No storage or network access. */
 (function(root,factory){const api=Object.freeze(factory());if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.TeamBullsWorkflowModel=api;})(typeof window!=='undefined'?window:globalThis,function(){
   'use strict';
-  const version='10.10.71-workflowmodel1';
+  const version='10.10.72-workflowmodel2';
   const text=value=>String(value??'').normalize('NFKC').trim();
   const key=value=>text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').toLowerCase();
   const number=value=>Number(String(value??'').replace(',','.'));
@@ -50,7 +50,7 @@
         const lines=text(meal.items).split(/\r?\n/).filter(Boolean),result=analyze?.(meal.items);
         if(!lines.length)issues.push({type:'meal',id:meal.id,variantId:variant.id,message:text(variant.name)+' / '+text(meal.name)+': refeição sem alimentos.'});
         if(lines.some(line=>/^\s*0+(?:[.,]0+)?\s+por[çc]/i.test(line)||/por[çc](?:ão|ões|ao|oes)/i.test(line)&&!/^\s*\d+(?:[.,]\d+)?\s+por[çc](?:ão|ões|ao|oes)\s+(?:de\s+)?(?:carbo(?:idratos?)?|prote[íi]nas?|gorduras?|frutas?)\s*$/i.test(line)))issues.push({type:'meal',id:meal.id,variantId:variant.id,message:text(meal.name)+': confira o texto das porções.'});
-        if(result?.unknown>0)issues.push({type:'meal',id:meal.id,variantId:variant.id,level:'notice',message:text(meal.name)+': '+result.unknown+' linha(s) sem referência nutricional; o total é parcial.'});
+        if(result?.unknown>0)issues.push({type:'meal',id:meal.id,variantId:variant.id,level:'notice',message:[text(variant.name),text(meal.name)].filter(Boolean).join(' · ')+': '+result.unknown+(result.unknown===1?' linha sem valor nutricional cadastrado.':' linhas sem valor nutricional cadastrado.')+' O total calculado é parcial.'});
       }
     }
     return issues;

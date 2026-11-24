@@ -37,10 +37,10 @@ assert(sw.includes(`'./${indexConfigRefs[0]}'`)&&updater.includes(`'./${indexCon
 
 
 const styleRefs=[...index.matchAll(/href="(styles_v10_10_9\.css\?[^"]+)"/g)].map(match=>match[1]);
-assert(styleRefs.length>=2&&new Set(styleRefs).size===1&&styleRefs[0].endsWith('&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1&battle=1&workqueue=2'),'Pré-carregamento e folha de estilo precisam usar a revisão móvel.');
+assert(styleRefs.length>=2&&new Set(styleRefs).size===1&&styleRefs[0].endsWith('&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1&battle=1&workqueue=2&cluster=1&workflowui=2'),'Pré-carregamento e folha de estilo precisam usar a revisão móvel.');
 assert(updater.includes('./'+styleRefs[0])&&sw.includes('./'+styleRefs[0]),'CSS móvel precisa chegar pela atualização e pelo cache offline.');
 
-const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1&photoReturn=1&muscles=groups2&panes=independent1&reports=monthly-priority1&feedback=protocol1&stability=session1&workflow=reliability1';
+const recoveredCoreRef='app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1&photoReturn=1&muscles=groups2&panes=independent1&reports=monthly-priority1&feedback=protocol1&stability=session1&workflow=reliability1&cluster=1';
 const dayCopyRef='./modules/diet-copy-v10_10_28.js?v=10.10.28-dietcopy2';
 assert(config.includes(dayCopyRef)&&sw.includes(dayCopyRef)&&updater.includes(dayCopyRef),'A copia de refeicoes entre dias deve chegar pelo loader, cache e atualizador.');
 const workspaceRef='./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace6';
@@ -53,7 +53,7 @@ assert((index.match(new RegExp(recoveredCoreRef.replace(/[.*+?^${}()|[\]\\]/g,'\
 assert(updater.includes(`'./${recoveredCoreRef}'`)&&sw.includes(`'./${recoveredCoreRef}'`),'Runtime do listener e recuperação de rascunho precisam ser aquecidos pelo atualizador e pelo cache offline.');
 assert(index.includes(`modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4`)&&updater.includes(`'./${recoveredModalRef}'`)&&sw.includes(`'./${recoveredModalRef}'`),'Recuperação de rascunho precisa usar a mesma revisão no HTML, atualizador e Service Worker.');
 assert(updater.includes(`'./${foregroundRecoveryRef}'`)&&sw.includes(`'./${foregroundRecoveryRef}'`)&&intelligence.includes(foregroundRecoveryRef),'Retomada passiva precisa chegar pelo atualizador, loader do app e Service Worker.');
-assert(version.revision==='trainer-work-queue-layout-1','Release precisa identificar a revisão segura da montagem da dieta.');
+assert(version.revision==='workflow-ui-video-1','Release precisa identificar a revisão segura da montagem da dieta.');
 const weekLayoutRef='./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4';
 assert(usability.includes(weekLayoutRef)&&updater.includes(weekLayoutRef)&&sw.includes(weekLayoutRef),'Layout semanal deve usar a mesma revisão no loader, atualizador e cache.');
 const guidedCalendarRef='./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar7';

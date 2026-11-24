@@ -4,7 +4,7 @@
   if(window.__TEAM_BULLS_PENDING_SESSION_MUTATIONS_101034__)return;
   window.__TEAM_BULLS_PENDING_SESSION_MUTATIONS_101034__=true;
 
-  const VERSION='10.10.63-pendingsession3';
+  const VERSION='10.10.63-pendingsession4';
 
   const perf=()=>window.TeamBullsSessionPerformance||null;
   const studentCloud=()=>{
@@ -15,27 +15,6 @@
     const code=String(error?.code||'').toLowerCase(),message=String(error?.message||'').toLowerCase();
     return code.includes('permission-denied')||code.includes('not-found')||message.includes('missing or insufficient permissions')||message.includes('not found');
   };
-
-  function collectEditedSets(){
-    const rows=[...document.querySelectorAll('#edit-sets-editor .performed-set-row')],sets=[];
-    for(const row of rows){
-      const rawWeight=String(row.querySelector('[data-f="w"]')?.value||'').trim();
-      const rawReps=String(row.querySelector('[data-f="r"]')?.value||'').trim();
-      if(rawWeight===''&&rawReps==='')continue;
-      const weight=rawWeight===''?0:parseFloat(rawWeight),reps=parseInt(rawReps,10);
-      if(!Number.isFinite(weight)||!Number.isInteger(reps)||weight<0||weight>10000||reps<0||reps>100){
-        alert('Confira a carga e as repetições das séries realizadas.');return null;
-      }
-      const performed={weight,reps};
-      if(row.dataset.backoff==='1')performed.backoff=true;
-      try{
-        const target=normalizePrescriptionSet({targetMin:row.dataset.targetMin,targetMax:row.dataset.targetMax,ger:row.dataset.ger});
-        if(target)Object.assign(performed,target);
-      }catch(error){}
-      sets.push(performed);
-    }
-    return sets;
-  }
 
   function installEditPatch(){
     if(typeof saveEditSession!=='function'||saveEditSession.__tbPendingSessionMutation)return false;
@@ -49,7 +28,7 @@
       const week=parseInt(document.getElementById('edit-session-week')?.value,10);
       if(!week||week<1||week>8){alert('Selecione a semana de treino!');return;}
       const note=String(document.getElementById('edit-session-note')?.value||'').trim();
-      const sets=collectEditedSets();if(!sets)return;
+      const sets=readSessionSetRows('edit-sets-editor');if(!sets)return;
       if(!sets.length){if(typeof deleteEditedSession==='function')deleteEditedSession();return;}
 
       const wid=EDIT_SESSION_WID||CUR_WORKOUT,eid=EDIT_SESSION_EID||CUR_EX,e=getE(wid,eid);if(!e)return;
