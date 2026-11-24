@@ -3,6 +3,7 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..'),re
 const slice=(a,b)=>{const at=core.indexOf(a),end=core.indexOf(b,at);if(at<0||end<0)throw new Error(a);return core.slice(at,end);};
 const source=name=>{const at=core.indexOf('function '+name+'(');if(at<0)throw new Error(name);const line=core.slice(at).split('\n')[0].trimEnd();return line.endsWith('}')?line:core.slice(at,core.indexOf('\n}',at)+2);};
 const modules=['workflow-model','workflow-storage','workflow-sync','workflow-drafts','prescription-workflow','isometry-series-timer','feedback-media'].map(name=>'modules/'+name+'-v10_10_71.js');
+modules.splice(modules.indexOf('modules/feedback-media-v10_10_71.js'),0,'modules/feedback-video-tools-v10_10_72.js');
 const setup=`
 window.errors=[];window.messages=[];window.saved=[];window.alarms=0;window.writes=0;window.uploads=0;window.remote=new Map();window.objects=new Map();window.dropUpload=false;window.dropAck=false;
 addEventListener('error',e=>errors.push(e.error?.stack||e.message));addEventListener('unhandledrejection',e=>errors.push(String(e.reason)));
@@ -42,8 +43,19 @@ async function ensureStorageService(){return{ref:path=>({getMetadata:async()=>{c
 let CUR_PHOTO_ID='photo-test',PHOTOS_CACHE=[{id:'photo-test',userId:'student-test'}];function openPhotoView(){openModal('modal-photo-view');return true;}
 window.asTrainer=()=>{CURRENT_USER={uid:'coach-test',role:'trainer'};VIEW_STUDENT_WORKOUT={id:'w',name:'Treino de teste',startDate:'2026-11-18',updateDate:'2027-01-13',days:[{id:'d',name:'Pernas'},{id:'empty',name:'Dia vazio'}],exercises:[{...exercise,dayName:'Pernas',instructions:'Mantenha a posição',weeklyPlan:{}}]};VIEW_STUDENT={uid:'student-test',name:'Aluno',workouts:[VIEW_STUDENT_WORKOUT]};};
 window.activations=0;function activateTrainerWorkout(){activations++;return true;}function activateDietPlan(){activations++;return true;}
+const dietFixture={id:'diet-fixture',name:'Dieta de teste',variants:[
+  {id:'training',name:'Dia de treino',meals:[{id:'meal-a',name:'Refeição 1',items:'1 porção de proteína\\nÁgua'}]},
+  {id:'rest',name:'Dia sem treino',meals:[{id:'meal-b',name:'Refeição 1',items:'1 porção de proteína\\nÁgua'}]}
+]};
+const DIET_DOCUMENT={plans:[dietFixture]},DIET_CONTEXT={targetUid:'student-test'};
+const currentDiet=()=>dietFixture,currentDietVariant=()=>dietFixture.variants[0];
+let EDIT_MEAL_ID='meal-a';window.mealSaves=0;
+window.TeamBullsDietLiveCalories={analyze:text=>({unknown:String(text).includes('Água')?1:0})};
+function openEditMealModal(){openModal('modal-meal');}
+function openAddMealModal(){openModal('modal-meal');}
+function saveMeal(){mealSaves++;return true;}
+window.asStudent=()=>{CURRENT_USER={uid:'student-test',role:'student'};VIEW_STUDENT=null;dispatchEvent(new Event('team-bulls-runtime-state'));};
 const getWorkoutDays=w=>w.days,exercisesForDay=(w,n)=>w.exercises.filter(e=>e.dayName===n),resolveWeekPrescription=e=>({sets:e.sets}),effectivePrescriptionSets=(e,s)=>s,exerciseResultUnit=(e,w)=>exerciseUsesResistedTime(e,w)?'seg':'reps',techniqueItemsForExercise=(e,w)=>(e.weeks[w]||[]).map(id=>TECHNIQUE_CATALOG.items.find(t=>t.id===id)).filter(Boolean),findExerciseGroup=()=>null;
-window.asStudent=()=>{CURRENT_USER={uid:'student-test',role:'student'};VIEW_STUDENT=null;};
 window.testImage=()=>{const canvas=document.createElement('canvas');canvas.width=180;canvas.height=240;const c=canvas.getContext('2d');c.fillStyle='#ddd';c.fillRect(0,0,180,240);c.fillStyle='#553';c.fillRect(40,30,80,190);return canvas.toDataURL('image/jpeg');};
 window.addTestImage=async()=>{const blob=await(await fetch(testImage())).blob();return TeamBullsFeedbackMedia.add(blob,'Cópia de teste','photo-test');};
 `+['normalizePrescriptionSet','validClusterReps','normalizePerformedSet','normalizePerformedSets','exerciseUsesResistedTime','clusterBlockInputs','readSessionSetRows','renumberPerformedSetRows','addEditSetRow','sessionEditorHasData','onSessionWeekChange','startRestTimer','restTick','renderRestTick','resetRestTimer','sessionPerformedResult'].map(source).join('\n')+'\n'+slice('function usesTraditionalCluster(', 'removeSet=function(btn)')+'\n'+slice('const addEditSetRowV101=addEditSetRow;', 'const workoutPdfHtmlV101=');
@@ -51,6 +63,7 @@ const modal=(id,title,contents)=>'<div id="'+id+'" class="modal-backdrop"><div c
 const ui=modal('modal-edit-session','Editar registro','<select id="edit-session-week" onchange="onEditSessionWeekChange()"><option>1</option><option>2</option></select><div id="edit-sets-editor"></div><button onclick="saveEditSession()">SALVAR ALTERAÇÕES</button>')+modal('modal-session','Registrar resultado','<label>Semana<select id="input-session-week" onchange="onSessionWeekChange()"><option>1</option><option>2</option><option>3</option></select></label><div id="sets-editor"></div><div class="rest-timer"><span id="rest-timer-display"></span><span id="rest-timer-bar"></span><div id="rest-timer-presets"></div><div id="rest-timer-controls"><button id="rest-timer-toggle-btn">Pausar</button></div></div><button class="btn-primary" onclick="saveSession()">SALVAR REGISTRO</button>')+
 modal('modal-weekly-checkin','Relatório semanal','<div class="form-group"><label>Peso</label><input id="weekly-checkin-weight" type="number"></div><div class="form-group"><label>Como foi a semana?</label><textarea data-weekly-question="0"></textarea></div>'+Array.from({length:6},(_,i)=>'<input id="weekly-photo-'+i+'" type="file" accept="image/*" onchange="WEEKLY_CHECKIN_FILES['+i+']=this.files[0]">').join(''))+
 modal('modal-feedback','Feedback','<div class="form-group"><label>Tipo<select id="input-feedback-type"><option value="extra">Extra</option></select></label></div><div class="form-group"><label>Título<input id="input-feedback-title"></label></div><div class="form-group"><label>Mensagem<textarea id="input-feedback"></textarea></label></div><button onclick="sendFeedback()">TRANSMITIR FEEDBACK</button>')+
+modal('modal-meal','Editar refeição','<input id="input-meal-time" type="time"><textarea id="input-meal-items"></textarea><textarea id="input-meal-notes"></textarea><button class="btn-primary" onclick="saveMeal()">SALVAR REFEIÇÃO</button>')+
 modal('modal-photo-view','Foto de teste','<img id="photo-view-img" style="max-width:100%"><div id="photo-view-meta"></div>');
 const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><style>body{margin:0}input,textarea,select{font-size:16px;max-width:100%}.modal-sheet{box-sizing:border-box}button{min-height:44px}#screen-settings{display:none}</style><body><div id="screen-settings"></div>'+ui+'<script src="/setup.js"></script>'+modules.map(file=>'<script src="/'+file+'"></script>').join('')+'</body></html>';
 const trainerDashboard=read('index.html').split('<!-- TRAINER DASHBOARD -->')[1].split('<!-- TRAINER VIEWING STUDENT -->')[0].replace('class="screen" id="screen-trainer"','class="screen active" id="screen-trainer"');

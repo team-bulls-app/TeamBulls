@@ -31,13 +31,14 @@
     ]
   };
   const workflowSpecs=[
-    ['./modules/workflow-model-v10_10_71.js?v=10.10.71-workflowmodel1',()=>window.TeamBullsWorkflowModel?.version==='10.10.71-workflowmodel1'],
+    ['./modules/workflow-model-v10_10_71.js?v=10.10.72-workflowmodel2',()=>window.TeamBullsWorkflowModel?.version==='10.10.72-workflowmodel2'],
     ['./modules/workflow-storage-v10_10_71.js?v=10.10.71-workflowstorage1',()=>window.TeamBullsWorkflowStorage?.version==='10.10.71-workflowstorage1'],
-    ['./modules/workflow-sync-v10_10_71.js?v=10.10.71-workflowsync2',()=>window.TeamBullsWorkflowSync?.version==='10.10.71-workflowsync2'],
+    ['./modules/workflow-sync-v10_10_71.js?v=10.10.72-workflowsync3',()=>window.TeamBullsWorkflowSync?.version==='10.10.72-workflowsync3'],
     ['./modules/workflow-drafts-v10_10_71.js?v=10.10.71-workflowdrafts1',()=>window.TeamBullsWorkflowDrafts?.version==='10.10.71-workflowdrafts1'],
-    ['./modules/prescription-workflow-v10_10_71.js?v=10.10.71-prescriptionworkflow1',()=>window.TeamBullsPrescriptionWorkflow?.version==='10.10.71-prescriptionworkflow1'],
+    ['./modules/prescription-workflow-v10_10_71.js?v=10.10.72-prescriptionworkflow2',()=>window.TeamBullsPrescriptionWorkflow?.version==='10.10.72-prescriptionworkflow2'],
     ['./modules/isometry-series-timer-v10_10_71.js?v=10.10.71-isometrytimer1',()=>window.TeamBullsIsometrySeriesTimer?.version==='10.10.71-isometrytimer1'],
-    ['./modules/feedback-media-v10_10_71.js?v=10.10.71-feedbackmedia1',()=>window.TeamBullsFeedbackMedia?.version==='10.10.71-feedbackmedia1']
+    ['./modules/feedback-video-tools-v10_10_72.js?v=10.10.72-videotools1',()=>window.TeamBullsFeedbackVideoTools?.version==='10.10.72-videotools1'],
+    ['./modules/feedback-media-v10_10_71.js?v=10.10.72-feedbackmedia2',()=>window.TeamBullsFeedbackMedia?.version==='10.10.72-feedbackmedia2']
   ];
   specs.local=[];for(const value of Object.values(specs))value.push(...workflowSpecs);
   const loading=new Map();let completedRole='';
