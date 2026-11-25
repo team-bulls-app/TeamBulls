@@ -25,7 +25,7 @@ function clock(){
     }
   };
 }
-function events(){const map=new Map();return {addEventListener:(name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);},dispatchEvent:event=>{for(const fn of map.get(event.type)||[])fn(event);}};}
+function events(){const map=new Map();return {addEventListener:(name,fn)=>{if(!map.has(name))map.set(name,[]);map.get(name).push(fn);},removeEventListener:(name,fn)=>map.set(name,(map.get(name)||[]).filter(item=>item!==fn)),dispatchEvent:event=>{for(const fn of map.get(event.type)||[])fn(event);}};}
 function runtime(role='student'){
   const time=clock(),loaded=[],scripts=[],links=[],observers=[];let screen=role==='trainer'?'screen-trainer':'screen-home';
   const body={classList:{contains:name=>name==='trainer-desktop'&&role==='trainer'}},window={...events(),TeamBulls107:{}};
@@ -99,10 +99,24 @@ await test('Cold start permite duas etapas de SDK sem anunciar falha antecipada'
   assert.equal(time.now,16000);assert.equal(scripts.length,3,'Warmup deve compartilhar os downloads.');
 });
 
+await test('Carregamento incompleto do SDK pode ser tentado de novo na mesma página',async()=>{
+  const time=clock(),scripts=[];let available=false,requests=0;
+  const document={scripts,createElement(){return {...events(),dataset:{},remove(){scripts.splice(scripts.indexOf(this),1);}};},head:{appendChild(node){
+    requests++;scripts.push(node);time.setTimeout(()=>{if(requests===2)available=true;node.dispatchEvent({type:'load'});},5);
+  }}};
+  const context=vm.createContext({document,...time,ready:()=>available});
+  vm.runInContext("const SDK_LOAD_PROMISES=new Map();const V106_SDK_TIMEOUT_MS=9000;"+between(core,'function loadSdkOnce(', '\nensureFirebaseReady=function('),context);
+  let result;const start=()=>vm.runInContext("loadSdkOnce('sdk.js',ready)",context).then(ok=>{result=ok;});
+  const first=start();start();await time.until(()=>result!==undefined);await first;
+  assert.equal(requests,1);assert.equal(result,false);assert.equal(scripts.length,0);
+  result=undefined;start();await time.until(()=>result!==undefined);
+  assert.equal(result,true);assert.equal(requests,2);
+});
+
 await test('Falha inesperada ao preparar conexão libera o botão para tentar novamente',async()=>{
   const button={disabled:false,textContent:'ACESSAR SISTEMA'},errors=[];
   const context=vm.createContext({document:{getElementById:id=>id==='btn-login'?button:{value:id==='login-email'?'aluno@example.test':'senha'}},
-    navigator:{onLine:true},auth:null,clearAuthError(){},showAuthError:(_,message)=>errors.push(message),
+    navigator:{onLine:true},auth:null,prepareConnectionAttestation:async()=>{},clearAuthError(){},showAuthError:(_,message)=>errors.push(message),
     ensureFirebaseReady:async()=>{throw new Error('bootstrap indisponível');},isNetworkLikeError:()=>false});
   vm.runInContext(between(core,'async function doLogin(', '\nasync function sendPasswordReset('),context);
   await vm.runInContext('doLogin()',context).catch(()=>{});
@@ -149,7 +163,7 @@ await test('Senha incorreta preserva validação e libera nova tentativa sem ace
   const button={disabled:false},errors=[];let offline=0;
   const context=vm.createContext({document:{getElementById:id=>id==='btn-login'?button:{value:'valor'}},navigator:{onLine:true},
     auth:{signInWithEmailAndPassword:async()=>{throw Object.assign(new Error('senha'),{code:'auth/invalid-credential'});}},
-    clearAuthError(){},showAuthError:(_,message)=>errors.push(message),startAuthListener(){},startBootWatchdog(){},setLoadingMessage(){},
+    prepareConnectionAttestation:async()=>{},clearAuthError(){},showAuthError:(_,message)=>errors.push(message),startAuthListener(){},startBootWatchdog(){},setLoadingMessage(){},
     withTimeout:task=>task,isNetworkLikeError:()=>false,offlineRegisteredLogin:()=>offline++});
   vm.runInContext(between(core,'async function doLogin(', '\nasync function sendPasswordReset('),context);
   await vm.runInContext('doLogin()',context);
@@ -173,12 +187,12 @@ function authFixture(){
   const pending=new Map(),screens=[],calls={subscribe:0,unsubscribe:0,profiles:0,trainer:0,profileGuard:0,inactive:0,stopProfileGuard:0,deviceSaves:[]};
   let callback,onError;
   const auth={currentUser:null,onAuthStateChanged(next,error){calls.subscribe++;callback=next;onError=error;return()=>calls.unsubscribe++;}};
-  const context=vm.createContext({auth,console:quiet,queueMicrotask,AUTH_UNSUBSCRIBE:null,AUTH_HANDLED:false,AUTH_EXPECTED_LOCAL_SIGNOUT:false,
+  const context=vm.createContext({auth,navigator:{onLine:true},console:quiet,queueMicrotask,AUTH_UNSUBSCRIBE:null,AUTH_HANDLED:false,AUTH_EXPECTED_LOCAL_SIGNOUT:false,
     window:{TeamBullsDeviceAccess:{remember(user){calls.deviceSaves.push(user.uid);return Promise.resolve(true);}}},
     CURRENT_USER:null,ACCESS_MODE:'cloud-active',document:{body:{classList:{add(){},remove(){}}}},stopProfileGuard(){calls.stopProfileGuard++;},startProfileGuard(){calls.profileGuard++;},
     enterInactiveLocalMode:async()=>{calls.inactive++;context.ACCESS_MODE='local-inactive';return true;},renderHome(){},MODE:'cloud',
     storageGet:()=>'',storageSet(){},selectLocalOwner(){},setLoadingMessage(){},restoreCachedStudentAccess:()=>false,getUserProfileWithRetry:uid=>{calls.profiles++;return new Promise((resolve,reject)=>pending.set(uid,{resolve,reject}));},
-    cacheUserProfile(){},updateOfflineCredentialProfile(){},configureAuthPersistence(){},showScreen:screen=>screens.push(screen),renderTrainer:()=>calls.trainer++,bootToAuth:()=>screens.push('error'),isNetworkLikeError:()=>false});
+    prepareConnectionAttestation:async()=>{},cacheUserProfile(){},updateOfflineCredentialProfile(){},configureAuthPersistence(){},showScreen:screen=>screens.push(screen),renderTrainer:()=>calls.trainer++,bootToAuth:()=>screens.push('error'),isNetworkLikeError:()=>false});
   vm.runInContext(between(core,'let AUTH_CALLBACK_SEEN=', '\n/* ══════════════════════════════════════════════════\n   SCREENS'),context);
   return {context,auth,pending,screens,calls,emit(user){auth.currentUser=user;return callback(user);},error(error){onError(error);},start(){return vm.runInContext('startAuthListener()',context);}};
 }

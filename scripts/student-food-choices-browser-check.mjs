@@ -26,6 +26,7 @@ ${slice('function renderMealsList(','function openAddMealModal(')}
 window.errors=[];
 window.addEventListener('error',event=>errors.push(event.message));
 window.addEventListener('unhandledrejection',event=>errors.push(String(event.reason)));
+window.proteinRow=()=>[...document.querySelectorAll('[data-tb-food-row]')].find(row=>row.querySelector('summary')?.textContent.includes('proteína'));
 window.mixedRow=()=>[...document.querySelectorAll('[data-tb-food-row]')].find(row=>JSON.parse(row.dataset.tbFoodRow).at(-1)==='misc');
 `;
 const html='<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><body><main id="app"><div id="diet-meals-list"></div><div id="diet-meals-empty"></div></main><script src="/setup.js"></script><script src="/food.js"></script></body></html>';
@@ -79,6 +80,15 @@ try{
   await command('Emulation.setDeviceMetricsOverride',{width:360,height:800,mobile:true,deviceScaleFactor:1});
   await command('Page.navigate',{url:`http://127.0.0.1:${server.address().port}/`});
   await ready();
+  const portions=()=>evaluate("[...proteinRow().querySelectorAll('[data-tb-food-portions]')].map(node=>Number(node.value))");
+  await evaluate("(()=>{const original=renderMealsList;renderMealsList=(...args)=>original(...args);window.dispatchEvent(new Event('team-bulls-runtime-ready'));window.dispatchEvent(new Event('team-bulls-runtime-ready'));})()");
+  await evaluate("proteinRow().querySelector('summary').click()");
+  assert.deepEqual(await portions(),[1]);
+  await evaluate("proteinRow().querySelector('[data-tb-food-add]').click()");
+  assert.deepEqual(await portions(),[0.5,0.5],'One click creates one allocation and conserves the total even after runtime wrappers reinstall');
+  await evaluate("proteinRow().querySelector('[data-tb-food-add]').click()");
+  assert.deepEqual(await portions(),[0.25,0.5,0.25],'The next click divides exactly one existing portion');
+  await evaluate("proteinRow().querySelector('[data-tb-food-remove=\"2\"]').click()");
   assert(await evaluate("Array.from(mixedRow().querySelector('select').options).find(o=>o.text.startsWith('Salmão')).disabled"));
   await evaluate("mixedRow().querySelector('summary').click()");
   await pause(30);

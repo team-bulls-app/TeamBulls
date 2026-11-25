@@ -2,7 +2,7 @@
 // All accounts/data are synthetic; external requests are blocked.
 import assert from 'node:assert/strict';import fs from 'node:fs';import http from 'node:http';import os from 'node:os';import path from 'node:path';import {spawn,spawnSync} from 'node:child_process';import {waitForChromePage} from './chrome-readiness.mjs';
 import {core,source,variantFunctions} from './session-variant-protocol-check.mjs';
-const names=[...variantFunctions,...(core.includes('function validClusterReps(')?['validClusterReps','clusterBlockInputs','readSessionSetRows','usesTraditionalCluster']:[]),'captureSessionDraftContext','sessionExerciseForSave','openLogSessionModal','showConfirm','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
+const names=[...variantFunctions,'updateSessionExecutionVideo',...(core.includes('function validClusterReps(')?['validClusterReps','clusterBlockInputs','readSessionSetRows','usesTraditionalCluster']:[]),'captureSessionDraftContext','sessionExerciseForSave','openLogSessionModal','showConfirm','openEditSession','addEditSetRow','populateSessionEditorForWeek','addSetRow','removeSet','renderSessionPrescriptionSummary','beginAction','endAction','openModal','closeModal','saveWorkout','saveWorkoutFromButton','setWorkoutSaveStatus','buildColorPicker','pickColor','openEditWorkoutTs','v109PersistWorkoutCycle','v109CyclePayload',...(core.includes('function workoutUpdateDate(')?['workoutUpdateDate']:[]),'hasManualOrder','createdMillis','orderedWorkouts','activeWorkoutId','prepareFontScaleRules','renumberPerformedSetRows','renumberEditSetRows','updateBackoffLoadSuggestion','renderGerMeter','formatGerLevel','renderRestTimerPresetsForExercise','timerLabel'];
 const techniqueNames=['studentTechniqueLabels','studentTechniqueGuide','openTechniqueDetail',...(core.includes('function studentMyoRepGuide(')?['studentMyoRepBand','studentMyoRepGuide','studentGerGuide']:[])];
 const hasTechniqueGuide=core.includes('function studentTechniqueGuide(');
 if(hasTechniqueGuide)names.push(...techniqueNames);
@@ -112,6 +112,7 @@ window.blockBattleStorage=()=>{
 let getCalendarMonthData,openCalDay,openExerciseFromCalendar;
 ${source('buildSessions')}
 window.openBattleFixture=()=>{
+  Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>true});
   CURRENT_USER={uid:'s',role:'student',status:'active'};
   tree[0].name='Protocolo da aluna';tree[0].isActive=true;tree[0].startDate='2026-11-01';
   exercise.videoUrl='https://www.youtube.com/watch/abcd';
@@ -385,18 +386,60 @@ try{
  }
  await command('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
  const api='TeamBullsWorkoutCompletion';
+ const screenshot=async(name,selector)=>{
+   if(!process.env.TB_SCREENSHOT_DIR)return;
+   const rect=await evaluate(`(()=>{
+     const node=document.querySelector(${JSON.stringify(selector)});
+     const style=document.createElement('style');style.id='tb-screenshot-only';
+     style.textContent='#app,.screen.active {height:auto!important;max-height:none!important;overflow:visible!important} .header,.tb-v17-hotbar-shell,.fab-wrap {visibility:hidden!important}';
+     document.head.append(style);
+     const copy=node.cloneNode(true);
+     node.before(copy);node.hidden=true;
+     copy.querySelectorAll('.home-daily-summary-foot strong,.student-guided-heading strong').forEach(el=>el.textContent='Superior completo — 01');
+     copy.querySelectorAll('.home-daily-summary-head span').forEach(el=>el.textContent='10/11/2026');
+     copy.querySelectorAll('.student-guided-prescription').forEach(el=>el.textContent='2 × 8–12 reps · GER 02');
+     copy.querySelectorAll('.student-guided-video iframe').forEach(frame=>{
+       frame.removeAttribute('loading');frame.removeAttribute('src');
+       frame.srcdoc='<meta name="viewport" content="width=device-width"><body style="margin:0;display:grid;place-items:center;height:100dvh;background:linear-gradient(135deg,#22201e,#0c0b0a);color:#eee;font:600 14px system-ui"><div style="text-align:center"><span style="display:block;margin:0 auto 10px;background:#a91625;border-radius:6px;padding:8px 15px;width:max-content">▶</span>Player de demonstração</div>';
+     });
+     const box=copy.getBoundingClientRect();window.tbScreenshotCleanup=()=>{copy.remove();node.hidden=false;style.remove();};
+     return {x:Math.max(0,Math.floor(box.x+scrollX-8)),y:Math.max(0,Math.floor(box.y+scrollY-8)),width:Math.ceil(box.width+16),height:Math.ceil(box.height+16),scale:2};
+   })()`);
+   try{
+     await command('Emulation.setDeviceMetricsOverride',{width:390,height:Math.max(900,rect.y+rect.height+50),deviceScaleFactor:1,mobile:true});
+     await sleep(200);
+     const {data}=await command('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:rect});
+     fs.writeFileSync(path.join(process.env.TB_SCREENSHOT_DIR,name+'.png'),Buffer.from(data,'base64'));
+   }finally{
+     await evaluate('tbScreenshotCleanup()');
+     await command('Emulation.setDeviceMetricsOverride',{width:390,height:900,deviceScaleFactor:1,mobile:true});
+   }
+ };
  const clickBattle=async name=>evaluate(`(()=>{const button=document.querySelector('.screen.active button[onclick*="${name}("]'); if(!button||button.disabled)return false;button.click();return true;})()`);
  await evaluate(`document.documentElement.dataset.theme='light';blockBattleStorage();openBattleFixture()`);
  for(let i=0;i<100;i++){if(await evaluate(`!!document.querySelector('#home-daily-summary [onclick*="startGuidedFromHome"]')`))break;await sleep(20);}
  assert.equal(await evaluate(`document.getElementById('home-daily-summary').previousElementSibling.classList.contains('home-hero')`),true,'Batalha do dia must follow the Sala Vermelha header');
  assert.equal(await evaluate(`document.querySelector('.home-hero').previousElementSibling.classList.contains('header')`),true,'Sala Vermelha must come first after the navigation header');
- assert.match(await evaluate(`document.getElementById('home-daily-summary').textContent`),/Batalha do dia.*semana 2/s);
+ assert.match(await evaluate(`document.getElementById('home-daily-summary').textContent`),/Batalha do dia.*semana 2/is);
  assert.equal(await evaluate(`[...document.querySelectorAll('#home-stats :is(.num,.lbl)')].every(node=>getComputedStyle(node).display==='none')`),true);
+ await evaluate("document.documentElement.dataset.theme='dark';document.getElementById('home-daily-summary').scrollIntoView({block:'start'})");
+ await screenshot('team-bulls-batalha-do-dia','#home-daily-summary');
  assert(await evaluate(api+'.startGuidedFromHome()'));
  assert.equal(await evaluate('activeScreenId()'),'screen-home');
  assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Supino Reto');
- assert(await clickBattle('showGuidedVideo'));
- assert.equal(await evaluate('lastVideo.name'),'Supino Reto');
+ assert.match(await evaluate(`document.querySelector('#home-daily-summary iframe').src`),/youtube-nocookie.*abcd/);
+ await evaluate("document.getElementById('home-daily-summary').scrollIntoView({block:'start'})");
+ await screenshot('team-bulls-treino-guiado','#home-daily-summary');
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary .student-guided-substitution select').options.length`),3);
+ await evaluate(`(()=>{const select=document.querySelector('#home-daily-summary .student-guided-substitution select');select.value='dumbbell';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Supino Reto');
+ await evaluate(`document.getElementById('confirm-ok-btn').click()`);
+ for(let i=0;i<60;i++){if(await evaluate(`savedBattle().then(data=>data.guide?.variants?.e==='dumbbell')`))break;await sleep(20);}
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Supino reto com halteres');
+ assert.equal(await evaluate(`document.querySelector('#home-daily-summary iframe')`),null,'The original video is not shown for a replacement without a video');
+ assert(await clickBattle('registerGuided'));
+ assert.equal(await evaluate(`document.getElementById('input-session-variant').value`),'dumbbell');
+ await evaluate(`closeModal('modal-session')`);
  assert(await clickBattle('showGuidedHistory'));
  const history=await evaluate(`[...document.querySelectorAll('#battle-history-list .session-date-badge')].map(node=>node.textContent)`);
  assert(history[0].includes('2026-11-10')&&history[1].includes('2026-11-01'),'History shows the latest sessions first');
@@ -426,7 +469,7 @@ try{
  assert.equal(await evaluate(`document.querySelector('#home-daily-summary h3').textContent`),'Remada com apoio');
  assert(await clickBattle('finishGuided'));
  assert.match(await evaluate(`document.getElementById('modal-confirm').textContent`),/Encerrar treino com exercícios pendentes/);
- await evaluate(`closeModal('modal-confirm');document.querySelector('.student-guided-end').open=true`);
+ await evaluate(`closeModal('modal-confirm');document.querySelector('.student-guided-card details:last-child').open=true`);
  assert(await clickBattle('cancelGuided'));
  await evaluate(`document.getElementById('confirm-ok-btn').click()`);
  for(let i=0;i<100;i++){if(await evaluate(`savedBattle().then(data=>data.guide===null)`))break;await sleep(20);}

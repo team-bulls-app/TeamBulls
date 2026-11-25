@@ -93,6 +93,7 @@ const progress=vm.createContext({
   showToast:message=>messages.push(message),
   beginAction:name=>{if(actions.has(name))return false;actions.add(name);return true;},endAction:name=>actions.delete(name),
   showConfirm:(_title,message,confirmed)=>{messages.push(message);confirmAction=confirmed;},
+  EXERCISE_OPTIONS:{groups:[]},cachedExerciseCatalog:()=>null,findExerciseGroup:()=>null,
   openLogSessionModal:()=>opened.push([progress.CUR_WORKOUT,progress.CUR_EX]),
   openWorkout:()=>{throw new Error('Unexpected navigation to the workout tab');},
   cloudGet:async query=>{
@@ -125,21 +126,32 @@ assert.equal(await api.startGuidedWorkout(),false,'The same account cannot start
 progress.CUR_DAY='Dia A';
 assert(await api.startGuidedWorkout());
 assert(api.postponeExercise());
-assert.match(messages.at(-1),/ordem foi planejada/);
+assert.match(messages.at(-1),/volte aos aparelhos ocupados logo depois/);
 assert.equal(guide().exerciseId,'first','The order changes only after confirmation');
 assert(await confirmAction());
+assert.equal(guide().exerciseId,'second');
+assert.deepEqual(guide().order,['second','first','third']);
+assert(api.postponeExercise());
+assert(await confirmAction());
+assert.deepEqual(guide().order,['third','first','second'],'Aparelhos seguidos ocupados não prendem o aluno entre os dois');
 assert(api.pauseGuided());
 assert.equal(guide().status,'active');
 assert(await confirmAction());
 assert.equal(guide().status,'paused');
-assert.equal(guide().exerciseId,'second');
+assert.equal(guide().exerciseId,'third');
 progress.CURRENT_USER={uid:'other',role:'student',status:'active'};
 assert.equal(api.dayState(workout,currentDay),'','The saved guide is scoped to its student');
 progress.CURRENT_USER={uid:'student',role:'student',status:'active'};
 activeScreen='screen-home';
 assert(await api.startGuidedFromHome());
 assert.equal(guide().status,'active');
-for(const id of ['second','third','first']){
+for(const id of ['third','second','first']){
+  if(id==='second'){
+    assert.equal(guide().exerciseId,'first','Aparelho ocupado volta logo depois do próximo exercício');
+    assert(api.postponeExercise(false));
+    assert.match(messages.at(-1),/fim do treino/);
+    assert(await confirmAction());
+  }
   assert.equal(guide().exerciseId,id);
   exercises.find(item=>item.id===id).sessions.push({date:'2026-11-15',week:1,sets:[{weight:10,reps:8}]});
   assert(await api.finishExercise());

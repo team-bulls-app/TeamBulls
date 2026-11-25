@@ -75,7 +75,7 @@ lacks(config,"'./modules/photo-guide-v10_10_9.js?v=10.10.9',",'Guia de fotos vol
 const update=read('modules/app-update-v10_10_9.js');
 has(update,'input.multiple=true','Seletor múltiplo de fotos não foi encontrado.');
 assert(update.includes('Lado direito braços estendidos')&&update.includes('Lado esquerdo braços estendidos'),'Nomes atuais das poses não estão presentes.');
-has(update,"pass.autocomplete='off';pass.name='tb_access_secret'",'A camada tardia não pode reativar o gerenciador de senhas externo no login.');
+has(update,"pass.autocomplete='current-password';pass.name='tb_access_secret'",'A camada tardia deve preservar o preenchimento seguro pelo gerenciador de senhas.');
 has(update,"where('studentId','==',studentUid).where('requestKey','==',request.requestKey)",'Proteção do primeiro relatório semanal ausente.');
 assert(!/localStorage\.setItem\([^\n]*(pass|password|senha)/i.test(update),'Senha não pode ser armazenada em texto no localStorage.');
 
@@ -279,7 +279,7 @@ has(boot,"document.documentElement.dataset.theme=light?'light':'dark'",'Tema ini
 has(sw,'const SHELL_FETCH_CONCURRENCY=4','Concorrência do shell crítico não está limitada.');
 has(sw,'async function cachePathsWithLimit','Preparação de shell com limite ausente.');
 [
-  './modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1',
+  './modules/app-update-v10_10_9.js?v=10.10.9&device=local-access2',
   './modules/diet-scroll-fix-v10_10_9.js?v=10.10.9&scroll=top1',
   './modules/modal-form-guard-v10_10_9.js?v=10.10.9&independent=1',
   './modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace6',

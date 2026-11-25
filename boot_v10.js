@@ -24,14 +24,14 @@
     const email=document.getElementById('login-email');
     const password=document.getElementById('login-pass');
     if(form){
-      form.setAttribute('autocomplete','off');
+      form.setAttribute('autocomplete','on');
     }
     if(email){
-      email.setAttribute('autocomplete','off');
+      email.setAttribute('autocomplete','username');
       email.setAttribute('name','tb_access_identity');
     }
     if(password){
-      password.setAttribute('autocomplete','off');
+      password.setAttribute('autocomplete','current-password');
       password.setAttribute('name','tb_access_secret');
     }
     return !!(form&&email&&password);
@@ -685,9 +685,15 @@ try{if(window.top!==window.self)window.top.location=window.self.location.href;}c
       const button=document.createElement('button');button.type='button';button.className='tb-known-account'+(email===current?' active':'');button.textContent=email;button.title='Usar '+email;
       button.disabled=!!document.getElementById('btn-login')?.disabled;
       button.addEventListener('click',()=>{
+        const same=normalize(emailInput.value)===email,password=document.getElementById('login-pass');
         emailInput.value=email;
-        const password=document.getElementById('login-pass');if(password)password.value='';
+        if(password&&!same)password.value='';
         emailInput.dispatchEvent(new Event('input',{bubbles:true}));render();
+        if(navigator.onLine===false){
+          if(password?.value&&typeof doLogin==='function')doLogin();
+          else password?.focus();
+          return;
+        }
         if(typeof loginWithSavedDeviceAccount==='function')loginWithSavedDeviceAccount(email);
       });
       if(window.TeamBullsDeviceAccess?.has(email)){
