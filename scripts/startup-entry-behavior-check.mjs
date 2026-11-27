@@ -6,6 +6,9 @@ const core=fs.readFileSync('app_v10_10_9_core.js','utf8').replace(/\r\n/g,'\n');
 const config=fs.readFileSync('config_v10_7.js','utf8').replace(/\r\n/g,'\n');
 const viewport=fs.readFileSync('viewport_v10_10_9.js','utf8').replace(/\r\n/g,'\n');
 const between=(text,start,end)=>text.slice(text.indexOf(start),text.indexOf(end,text.indexOf(start)));
+const sdkState=between(core,'const SDK_LOAD_PROMISES=', 'async function ensureFirebaseCore(');
+const sdkCore=between(core,'async function ensureFirebaseCore(', '\nasync function ensureFirebaseReady(');
+const sdkLoader=between(core,'function loadSdkOnce(', '\nensureFirebaseReady=function(');
 const quiet={warn(){},error(){},log(){}};
 const flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
 function clock(){
@@ -90,7 +93,7 @@ await test('Cold start permite duas etapas de SDK sem anunciar falha antecipada'
     },8000);}}};
   const context=vm.createContext({window,document,navigator:{onLine:true},console:quiet,queueMicrotask,...time,localStorage:{getItem:()=>null},
     cloudGet(){},initFirebase(){vm.runInContext('auth={};db={};',context);return true;}});
-  vm.runInContext("let auth=null,db=null;const SDK_LOAD_PROMISES=new Map();"+between(core,'function withTimeout(', '\nfunction cloudGet(')+between(core,'async function ensureFirebaseCore(', '\nasync function ensureFirebaseReady(')+between(core,'const V106_SDK_TIMEOUT_MS=', '\n/* Cache de cálculos'),context);
+  vm.runInContext('let auth=null,db=null;'+sdkState+between(core,'function withTimeout(', '\nfunction cloudGet(')+sdkCore+'let V106_FIREBASE_READY_PROMISE=null;'+sdkLoader+between(core,'ensureFirebaseReady=function(', '\n/* Cache de cálculos'),context);
   vm.runInContext(config.slice(0,config.indexOf('\n(()=>{\n  let requested=')),context);
   let result;
   vm.runInContext('ensureFirebaseReady()',context).then(value=>{result=value;});
@@ -105,7 +108,7 @@ await test('Carregamento incompleto do SDK pode ser tentado de novo na mesma pá
     requests++;scripts.push(node);time.setTimeout(()=>{if(requests===2)available=true;node.dispatchEvent({type:'load'});},5);
   }}};
   const context=vm.createContext({document,...time,ready:()=>available});
-  vm.runInContext("const SDK_LOAD_PROMISES=new Map();const V106_SDK_TIMEOUT_MS=9000;"+between(core,'function loadSdkOnce(', '\nensureFirebaseReady=function('),context);
+  vm.runInContext(sdkState+sdkLoader,context);
   let result;const start=()=>vm.runInContext("loadSdkOnce('sdk.js',ready)",context).then(ok=>{result=ok;});
   const first=start();start();await time.until(()=>result!==undefined);await first;
   assert.equal(requests,1);assert.equal(result,false);assert.equal(scripts.length,0);
@@ -148,7 +151,7 @@ await test('Leitura inicial do perfil mantém um listener e o reutiliza como gua
 
 await test('Perfil criado durante a janela inicial ausente não é rejeitado nem perde o listener',async()=>{
   const time=clock();let nextSnapshot=null,result;
-  const context=vm.createContext({...time,navigator:{onLine:true},console:quiet,PROFILE_READ_TIMEOUT_MS:2500,
+  const context=vm.createContext({...time,ACCESS_MODE:'cloud-active',navigator:{onLine:true},console:quiet,PROFILE_READ_TIMEOUT_MS:2500,
     db:{collection:()=>({doc:()=>({onSnapshot(options,next){nextSnapshot=next;return()=>{};}})})}});
   vm.runInContext(between(core,'function withTimeout(', '\nfunction cloudGet(')+between(core,'let AUTH_HANDLED=false;', '\nlet AUTH_CALLBACK_SEEN='),context);
   vm.runInContext("getUserProfileWithRetry('new-trainer')",context).then(value=>{result=value;},error=>{result=error;});
@@ -228,5 +231,118 @@ await test('Perfil atrasado não reabre conta anterior após saída ou troca de 
   f.pending.get('trainer-b').resolve({data:()=>({role:'trainer'})});await current;await flush();
   assert.equal(f.context.CURRENT_USER.uid,'trainer-b');assert.equal(f.calls.trainer,1);
   assert.deepEqual(f.calls.deviceSaves,['trainer-b'],'Perfil atrasado de outra conta não pode salvar acesso.');
+});
+await test('Perfil confirmado após demora recupera os treinos do mesmo aluno',async()=>{
+  const f=authFixture(),loads=[],state={uid:'student-a'};
+  f.auth.currentUser={uid:'student-a'};
+  Object.assign(f.context,{PROFILE_GUARD_STATE:state,CURRENT_USER:{uid:'student-a',role:'student'},ACCESS_MODE:'offline-registered',
+    storageRemove(){},OFFLINE_MODE_KEY:'offline',loadCloudBackup:()=>[{id:'local-plan'}],
+    populateHistoryFromWorkouts(){},hasStoredLocal:()=>false,loadCloudHome:async()=>loads.push(f.context.CURRENT_USER.uid)});
+  f.context.document.getElementById=()=>null;
+  vm.runInContext("resumeOfflineProfile({uid:'other'})",f.context);
+  assert.equal(f.calls.profiles,0);
+  vm.runInContext('resumeOfflineProfile(PROFILE_GUARD_STATE)',f.context);await flush();
+  f.pending.get('student-a').resolve({data:()=>({role:'student',status:'active'})});await flush();
+  assert.equal(f.context.ACCESS_MODE,'cloud-active');assert.equal(f.screens.at(-1),'screen-home');
+  assert.deepEqual(loads,['student-a']);assert.equal(f.context.CLOUD_WORKOUTS[0].id,'local-plan');
+});
+
+await test('Script defer inicia o Firebase na primeira abertura com documento interativo',async()=>{
+  const scripts=[],calls=[];
+  const context=vm.createContext({queueMicrotask,setTimeout,clearTimeout,document:{readyState:'interactive',scripts,
+    createElement:()=>({...events(),dataset:{},remove(){}}),head:{appendChild(node){
+      scripts.push(node);queueMicrotask(()=>{
+        if(node.src.includes('firebase-app-compat'))context.firebase={initializeApp(){}};
+        else if(node.src.includes('firebase-auth-compat'))context.firebase.auth=()=>({});
+        else if(node.src.includes('firebase-firestore-compat'))context.firebase.firestore=()=>({});
+        node.dispatchEvent({type:'load'});
+      });
+    }}}});
+  const startup=between(core,"if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initApp",'\nwindow.addEventListener(\'pageshow\'');
+  assert(startup.includes('DOMContentLoaded'), 'Usar o trecho de inicialização que está no script entregue.');
+  context.report=ok=>calls.push(ok);
+  const declarations=['SDK_LOAD_PROMISES','V106_SDK_TIMEOUT_MS','FIREBASE_CORE_TIMEOUT_MS'].map(name=>{
+    const code=core.split('\n').find(line=>line.startsWith('const '+name+'='));
+    assert.ok(code,name);return {offset:core.indexOf(code),code};
+  });
+  const phases=[...declarations,
+    {offset:core.indexOf(sdkCore),code:sdkCore},
+    {offset:core.indexOf(sdkLoader),code:sdkLoader},
+    {offset:core.indexOf(startup),code:startup}
+  ];
+  assert(phases.every(phase=>phase.offset>=0));
+  vm.runInContext('function initApp(){ensureFirebaseCore().then(report,()=>report(false));}\n'+phases.sort((a,b)=>a.offset-b.offset).map(phase=>phase.code).join('\n'),context);
+  await flush();
+  assert.deepEqual(calls,[true]);
+  assert.equal(scripts.length,3);
+});
+
+await test('Falha inesperada ao criar uma tag do SDK libera nova tentativa',async()=>{
+  let attempts=0,available=false;
+  const context=vm.createContext({setTimeout,clearTimeout,ready:()=>available,document:{scripts:[],
+    createElement(){if(++attempts===1)throw new Error('erro de criação');return {...events(),dataset:{},remove(){}};},
+    head:{appendChild(node){available=true;node.dispatchEvent({type:'load'});}}}});
+  vm.runInContext(sdkState+sdkLoader,context);
+  const load=()=>vm.runInContext("loadSdkOnce('sdk.js',ready)",context);
+  assert.equal(await load(),false);
+  assert.equal(await load(),true);
+  assert.equal(attempts,2);
+});
+
+await test('Login offline só abre aluno com perfil previamente validado',async()=>{
+  const messages=[],selected=[];let profile=null;
+  const student={uid:'owner',role:'student',status:'active',name:'Aluno de teste',email:'student@example.test'};
+  const node={classList:{remove(){}}};
+  const context=vm.createContext({console:quiet,offlineAttemptWait:()=>0,normalizedName:value=>value,
+    offlineCredentialMap:()=>({'student@example.test':{uid:'owner',version:2,salt:'salt',verifier:'matching'}}),
+    deriveOfflineVerifier:async()=> 'matching',constantTimeEqual:(a,b)=>a===b,
+    showAuthError:(_,message)=>messages.push(message),clearOfflineFailures(){},loadCachedUserProfile:()=>profile,
+    selectLocalOwner:uid=>selected.push(uid),localStorage:{setItem(){},removeItem(){}},OFFLINE_MODE_KEY:'offline',
+    MODE:'cloud',ACCESS_MODE:'cloud-active',INACTIVE_UID:'',INACTIVE_NAME:'',CURRENT_USER:null,
+    document:{body:node,getElementById:()=>node},renderHome(){},showScreen(){},showToast(){}
+  });
+  vm.runInContext(between(core,'async function offlineRegisteredLogin(', '\nasync function loginWithSavedDeviceAccount('),context);
+  const login=()=>vm.runInContext("offlineRegisteredLogin('student@example.test','password')",context);
+  profile={...student,role:'trainer'};assert.equal(await login(),false);assert.match(messages.at(-1),/treinador precisa de conexão/);
+  profile=null;assert.equal(await login(),false);assert.deepEqual(selected,[]);
+  profile=student;assert.equal(await login(),true);assert.deepEqual(selected,['owner']);
+  assert.equal(context.CURRENT_USER.role,'student');assert.equal(context.ACCESS_MODE,'offline-registered');
+});
+
+await test('Confirmação de leitura sobrevive a falha de armazenamento e ao carregamento tardio do módulo',async()=>{
+  const stored=new Map(),opened=[];const nodes=new Map();let screen='screen-home',disk=true;
+  const instructions=fs.readFileSync('modules/student-guidance-v10_10_9-v2.js','utf8').replace(/\r\n/g,'\n');
+  const context=vm.createContext({console:quiet,CURRENT_USER:{uid:'first',role:'student'},MODE:'cloud',ACCESS_MODE:'cloud-active',
+    LOCAL_OWNER_UID:'local',LOCAL_GUEST_OWNER:'guest',GENERAL_INSTRUCTIONS:{revision:34,folders:[{active:true,items:[{active:true}]}]},
+    INSTRUCTIONS_PROMPT_RUNNING:false,INSTRUCTIONS_FORCED:false,INSTRUCTIONS_RETURN_SCREEN:null,NAVIGATION_SEQ:0,
+    storageGet:key=>stored.get(key),storageSet:(key,value)=>disk&&(stored.set(key,value),true),
+    document:{querySelector:()=>({id:screen}),getElementById:id=>nodes.get(id)||null},
+    loadGeneralInstructions:async()=>{},beginAsyncNavigation:()=>++context.NAVIGATION_SEQ,isNavigationCurrent:seq=>context.NAVIGATION_SEQ===seq,
+    renderInstructions(){},renderHome(){},goHome(){screen='screen-home';},setTimeout(){},
+    showScreen:id=>{screen=id;opened.push(id);}});
+  vm.runInContext(between(core,'function activeScreenId(){','\nfunction instructionVideoAction('),context);
+  const prompt=()=>vm.runInContext('maybePromptInitialInstructions()',context);
+  const ack=()=>vm.runInContext('acknowledgeInstructions()',context);
+  await prompt();ack();
+  assert.equal(stored.get('team_bulls_instruction_ack_first'),'34');
+  vm.runInContext("let forcedPromptToken='';const STATIC_REVISION='nutrition-stretch-2',ACK_PREFIX='team_bulls_instruction_ack_v2_';"+between(instructions,'function instructionIdentity(){','\n  function stretchPageHtml(')+'patchInstructionPrompt();',context);
+  await prompt();assert.equal(opened.length,1,'A extensão aceita uma leitura confirmada antes de carregar.');
+  context.CURRENT_USER={uid:'second',role:'student'};disk=false;
+  await prompt();assert.equal(opened.length,2,'O recibo de outro aluno não dispensa a leitura.');
+  ack();await prompt();await prompt();assert.equal(opened.length,2,'Recibo em memória evita o ciclo quando o disco recusa gravação.');
+  context.CURRENT_USER={uid:'third',role:'student'};context.MODE='local';context.ACCESS_MODE='offline-registered';
+  await prompt();assert.equal(opened.length,2,'A leitura inicial não bloqueia o plano já salvo no aparelho.');
+});
+
+await test('Dieta de uma conta anterior é descartada ao trocar de sessão',async()=>{
+  let deliver,renders=0;
+  const context=vm.createContext({MODE:'cloud',CURRENT_USER:{uid:'old'},LOCAL_OWNER_UID:'old',
+    DIET_CONTEXT:{targetUid:'new'},DIET_DOCUMENT:{plans:[{id:'new-plan'}]},
+    beginAsyncNavigation:()=>1,isNavigationCurrent:()=>true,
+    loadDietDocument:()=>new Promise(resolve=>{deliver=resolve;}),renderDietList(){renders++;}});
+  vm.runInContext(between(core,'async function openMeals(){','\nasync function openDietDetail('),context);
+  const pending=vm.runInContext('openMeals()',context);context.CURRENT_USER={uid:'new'};
+  deliver({plans:[{id:'old-plan'}]});await pending;
+  assert.equal(context.DIET_DOCUMENT.plans[0].id,'new-plan');assert.equal(renders,0);
 });
 if(failures.length)process.exitCode=1;

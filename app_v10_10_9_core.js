@@ -1118,6 +1118,9 @@ const fmt=iso=>{
 ══════════════════════════════════════════════════ */
 let db=null,auth=null,storageService=null;
 const SDK_LOAD_PROMISES=new Map();
+const V106_SDK_TIMEOUT_MS=9000;
+// firebase-app carrega primeiro; auth e firestore compartilham a segunda etapa.
+const FIREBASE_CORE_TIMEOUT_MS=2*V106_SDK_TIMEOUT_MS+800;
 async function ensureFirebaseCore(){
   if(typeof firebase!=='undefined'&&typeof firebase.auth==='function'&&typeof firebase.firestore==='function')return true;
   const appOk=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js',()=>typeof firebase!=='undefined'&&typeof firebase.initializeApp==='function');
@@ -1228,7 +1231,12 @@ function sanitizeCachedProfile(value,uid=''){
   return safe.uid?safe:null;
 }
 function cacheUserProfile(profile){const safe=sanitizeCachedProfile(profile,profile?.uid);if(safe)storageSet(PROFILE_CACHE_PREFIX+safe.uid,JSON.stringify(safe));}
-function loadCachedUserProfile(uid){try{return sanitizeCachedProfile(JSON.parse(storageGet(PROFILE_CACHE_PREFIX+uid)||'null'),uid);}catch(error){return null;}}
+function loadCachedUserProfile(uid){
+  try{
+    const value=JSON.parse(storageGet(PROFILE_CACHE_PREFIX+uid)||'null');
+    return ['student','trainer'].includes(value?.role)?sanitizeCachedProfile(value,uid):null;
+  }catch(error){return null;}
+}
 function configureAuthPersistence(role){
   try{
     const persistence=role==='trainer'?firebase.auth.Auth.Persistence.SESSION:firebase.auth.Auth.Persistence.LOCAL;
@@ -1296,10 +1304,12 @@ function constantTimeEqual(a,b){
 }
 async function rememberOfflineCredential(email,password,uid,profile={}){
   try{
+    const cached=loadCachedUserProfile(uid);
+    if(cached?.role==='trainer')return;
     const map=offlineCredentialMap();
     const saltBytes=new Uint8Array(16);crypto.getRandomValues(saltBytes);
     const salt=bytesToBase64(saltBytes),iterations=150000;
-    map[normalizedName(email)]={version:2,uid,email,name:profile.name||CURRENT_USER?.name||email.split('@')[0],status:profile.status||CURRENT_USER?.status||'active',salt,iterations,verifier:await deriveOfflineVerifier(email,password,salt,iterations)};
+    map[normalizedName(email)]={version:2,uid,email,name:cached?.name||profile.name||email.split('@')[0],status:cached?.status||profile.status||'active',salt,iterations,verifier:await deriveOfflineVerifier(email,password,salt,iterations)};
     localStorage.setItem('team_bulls_offline_credentials',JSON.stringify(map));
   }catch(e){console.warn('offline credential',e);}
 }
@@ -1316,12 +1326,17 @@ async function offlineRegisteredLogin(email,password){
     else if(record?.hash){valid=constantTimeEqual(record.hash,await credentialDigest(email,password));}
     if(!record||!valid){registerOfflineFailure(email);showAuthError('login-error','Este aparelho ainda não possui uma autenticação offline válida para essa conta. Entre uma vez com internet.');return false;}
     clearOfflineFailures(email);
+    const profile=loadCachedUserProfile(record.uid);
+    if(profile?.role!=='student'){
+      showAuthError('login-error',profile?.role==='trainer'?'A conta de treinador precisa de conexão. Conecte-se e tente novamente.':'Conecte-se para validar o perfil desta conta antes de usar o acesso offline.');
+      return false;
+    }
     if(record.version!==2)await rememberOfflineCredential(email,password,record.uid,record);
     selectLocalOwner(record.uid,true);localStorage.setItem('teamms_last_user_uid',record.uid);
     localStorage.setItem(OFFLINE_MODE_KEY,'registered');localStorage.removeItem('teamms_offline_pref');
-    const inactive=record.status==='inactive';
+    const inactive=profile.status==='inactive';
     MODE='local';ACCESS_MODE=inactive?'local-inactive':'offline-registered';INACTIVE_UID=record.uid;INACTIVE_NAME=inactive?(record.name||'aluno'):'';
-    CURRENT_USER=inactive?null:{uid:record.uid,name:record.name||'aluno',email:record.email||email,role:'student',status:'offline',offlineRegistered:true};
+    CURRENT_USER=inactive?null:{...profile,status:'offline',offlineRegistered:true};
     document.body.classList.remove('trainer-desktop');
     document.getElementById('hero-eyebrow').textContent=inactive?'// protocolo pausado · modo local':'// conta reconhecida · sem internet';
     document.getElementById('user-chip-name').textContent=record.name||'aluno';
@@ -1559,6 +1574,7 @@ function ensureProfileGuard(userId){
         },300);
       }
       if(state.active)await applyProfileGuardSnapshot(state,snapshot);
+      else if(ACCESS_MODE==='offline-registered'&&snapshot.exists&&snapshot.metadata?.fromCache!==true&&navigator.onLine!==false)resumeOfflineProfile(state);
     }
   };
   const fail=error=>{
@@ -1596,6 +1612,11 @@ let AUTH_CALLBACK_SEEN=false;
 let AUTH_PROCESSING_UID='';
 let AUTH_STATE_REVISION=0;
 let AUTH_LISTENER_SERVICE=null;
+function resumeOfflineProfile(state){
+  const user=auth?.currentUser;
+  if(PROFILE_GUARD_STATE!==state||!user||user.uid!==state.uid||CURRENT_USER?.uid!==state.uid||ACCESS_MODE!=='offline-registered'||AUTH_PROCESSING_UID)return;
+  void handleAuthStateUser(user);
+}
 async function handleAuthStateUser(user){
   AUTH_CALLBACK_SEEN=true;
   if(!user){
@@ -2173,6 +2194,7 @@ async function loadCloudHomeOnce(){
   if(!CURRENT_USER)return false;
   const userId=CURRENT_USER.uid,loadSeq=++CLOUD_LOAD_SEQ;
   await withTimeout(warmSessionArchive(userId),900,'abrir arquivo local').catch(()=>{});
+  if(loadSeq!==CLOUD_LOAD_SEQ||CURRENT_USER?.uid!==userId||MODE!=='cloud')return false;
   // Primeiro mostra o último estado bom sem esperar rede.
   if(!CLOUD_WORKOUTS.length){
     CLOUD_WORKOUTS=loadCloudBackup(userId);const archived=mergeHistorySessions(pendingSessionHistory(userId),loadSessionArchive(userId));if(CLOUD_WORKOUTS.length)hydrateWorkoutSessions(CLOUD_WORKOUTS,archived);HISTORY_BY_NAME=buildHistoryByName(archived);renderHome();
@@ -6616,13 +6638,19 @@ const ensureGlobalCatalogsV101=ensureGlobalCatalogs;
 ensureGlobalCatalogs=function(){return Promise.all([ensureGlobalCatalogsV101(),loadGeneralInstructions(),loadTechniqueCatalog()]);};
 
 function activeScreenId(){return document.querySelector('.screen.active')?.id||'screen-home';}
+const INITIAL_INSTRUCTIONS_ACK=new Map();
 function instructionAckKey(){return'team_bulls_instruction_ack_'+String(CURRENT_USER?.uid||LOCAL_OWNER_UID||LOCAL_GUEST_OWNER);}
+function canPromptInitialInstructions(){return CURRENT_USER?.role==='student'&&MODE==='cloud'&&ACCESS_MODE==='cloud-active';}
+function initialInstructionsAcknowledged(){
+  const key=instructionAckKey(),revision=String(GENERAL_INSTRUCTIONS.revision||1);
+  return INITIAL_INSTRUCTIONS_ACK.get(key)===revision||storageGet(key)===revision;
+}
 function visibleInstructionCount(){return GENERAL_INSTRUCTIONS.folders.filter(folder=>folder.active).reduce((total,folder)=>total+folder.items.filter(item=>item.active).length,0);}
 async function maybePromptInitialInstructions(){
-  if(INSTRUCTIONS_PROMPT_RUNNING||CURRENT_USER?.role==='trainer'||activeScreenId()!=='screen-home')return;
+  if(INSTRUCTIONS_PROMPT_RUNNING||!canPromptInitialInstructions()||activeScreenId()!=='screen-home')return;
   INSTRUCTIONS_PROMPT_RUNNING=true;
   const navigation=NAVIGATION_SEQ,owner=CURRENT_USER?.uid,role=CURRENT_USER?.role;
-  try{await loadGeneralInstructions();if(navigation!==NAVIGATION_SEQ||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!==role||activeScreenId()!=='screen-home'||!visibleInstructionCount())return;const revision=String(GENERAL_INSTRUCTIONS.revision||1);if(storageGet(instructionAckKey())===revision)return;await openInstructions(true);}catch(error){console.warn('maybePromptInitialInstructions',error);}finally{INSTRUCTIONS_PROMPT_RUNNING=false;}
+  try{await loadGeneralInstructions();if(navigation!==NAVIGATION_SEQ||CURRENT_USER?.uid!==owner||CURRENT_USER?.role!==role||!canPromptInitialInstructions()||activeScreenId()!=='screen-home'||!visibleInstructionCount()||initialInstructionsAcknowledged())return;await openInstructions(true);}catch(error){console.warn('maybePromptInitialInstructions',error);}finally{INSTRUCTIONS_PROMPT_RUNNING=false;}
 }
 const renderHomeV101=renderHome;
 renderHome=function(){const result=renderHomeV101.apply(this,arguments);setTimeout(maybePromptInitialInstructions,450);return result;};
@@ -6634,7 +6662,11 @@ async function openInstructions(forced=false){
   INSTRUCTIONS_RETURN_SCREEN=returnScreen;INSTRUCTIONS_FORCED=!!forced;renderInstructions();showScreen('screen-instructions',navigation);return true;
 }
 function closeInstructionsScreen(){if(INSTRUCTIONS_FORCED){showToast('Leia e confirme as orientações para continuar.',true);return;}if(CURRENT_USER?.role==='trainer')goTrainer();else goHome();}
-function acknowledgeInstructions(){storageSet(instructionAckKey(),String(GENERAL_INSTRUCTIONS.revision||1));INSTRUCTIONS_FORCED=false;goHome();}
+function acknowledgeInstructions(){
+  const key=instructionAckKey(),revision=String(GENERAL_INSTRUCTIONS.revision||1);
+  INITIAL_INSTRUCTIONS_ACK.set(key,revision);storageSet(key,revision);
+  INSTRUCTIONS_FORCED=false;goHome();
+}
 function instructionVideoAction(url,title){if(!url)return'';return`<button class="instruction-video-btn" onclick="${MODE==='cloud'?`openCatalogVideo(${jsArg(url)},${jsArg(title)})`:`showToast('Conecte-se à internet para assistir ao vídeo.',true)`}">▶ ASSISTIR VÍDEO EXPLICATIVO</button>`;}
 function renderInstructions(){
   const admin=CURRENT_USER?.role==='trainer';const folders=GENERAL_INSTRUCTIONS.folders.filter(folder=>admin||folder.active);
@@ -7031,7 +7063,7 @@ async function initApp(){
 // O shell local inicia após o parse. Firebase é carregado sob demanda e não
 // impede a tela de acesso ou o modo local de aparecerem.
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initApp,{once:true});
-else initApp();
+else queueMicrotask(initApp);
 window.addEventListener('pageshow',event=>{
   if(event.persisted&&document.getElementById('screen-loading')?.classList.contains('active'))showScreen('screen-auth');
 });
@@ -7143,9 +7175,10 @@ function renderDietList(listId,emptyId,trainerMode){
 }
 async function openMeals(){
   const navigation=beginAsyncNavigation(),cloud=MODE==='cloud',targetUid=cloud?CURRENT_USER?.uid:null;
-  DIET_CONTEXT={targetUid,trainer:false,local:!cloud};
-  DIET_DOCUMENT=await loadDietDocument();
-  if(!isNavigationCurrent(navigation))return;
+  const owner=CURRENT_USER?.uid||LOCAL_OWNER_UID;
+  const diet=await loadDietDocument(targetUid);
+  if(!isNavigationCurrent(navigation)||(CURRENT_USER?.uid||LOCAL_OWNER_UID)!==owner||cloud!==(MODE==='cloud'))return;
+  DIET_CONTEXT={targetUid,trainer:false,local:!cloud};DIET_DOCUMENT=diet;
   document.getElementById('meals-readonly-note').style.display=cloud?'block':'none';
   document.getElementById('meals-empty-hint').textContent=cloud?'Seu treinador ainda não montou sua dieta':'Toque em + NOVA DIETA para começar';
   renderDietList('meals-list','meals-empty',false);showScreen('screen-meals',navigation);
@@ -7153,9 +7186,10 @@ async function openMeals(){
 async function openTsMeals(){
   if(!VIEW_STUDENT)return;
   const navigation=beginAsyncNavigation(),targetUid=VIEW_STUDENT.uid;
-  DIET_CONTEXT={targetUid,trainer:true,local:false};
-  DIET_DOCUMENT=await loadDietDocument(targetUid);
-  if(!isNavigationCurrent(navigation)||VIEW_STUDENT?.uid!==targetUid)return;
+  const owner=CURRENT_USER?.uid;
+  const diet=await loadDietDocument(targetUid);
+  if(!isNavigationCurrent(navigation)||CURRENT_USER?.uid!==owner||VIEW_STUDENT?.uid!==targetUid)return;
+  DIET_CONTEXT={targetUid,trainer:true,local:false};DIET_DOCUMENT=diet;
   renderDietList('ts-meals-list','ts-meals-empty',true);showScreen('screen-ts-meals',navigation);
 }
 async function openDietDetail(id,trainerMode=false){
@@ -8938,9 +8972,6 @@ cloudWriteError=function(error,action='concluir a operação'){
 /* Carregamento de SDK com timeout real, detecção de script já carregado e
    possibilidade de nova tentativa depois de uma falha. A implementação antiga
    podia aguardar para sempre quando uma tag <script> já havia falhado. */
-const V106_SDK_TIMEOUT_MS=9000;
-// firebase-app carrega primeiro; auth e firestore compartilham a segunda etapa.
-const FIREBASE_CORE_TIMEOUT_MS=2*V106_SDK_TIMEOUT_MS+800;
 let V106_FIREBASE_READY_PROMISE=null;
 function loadSdkOnce(src,globalReady){
   if(globalReady?.())return Promise.resolve(true);
@@ -8963,9 +8994,9 @@ function loadSdkOnce(src,globalReady){
     script.addEventListener('error',failed,{once:true});
     if(!existing){
       script.src=src;script.async=true;script.crossOrigin='anonymous';script.dataset.teamBullsSdk='1';
-      document.head.appendChild(script);
+      try{document.head.appendChild(script);}catch(error){failed();}
     }
-  });
+  }).catch(()=>false);
   SDK_LOAD_PROMISES.set(src,promise);
   promise.then(ok=>{if(!ok&&SDK_LOAD_PROMISES.get(src)===promise)SDK_LOAD_PROMISES.delete(src);});
   return promise;
