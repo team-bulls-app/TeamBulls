@@ -22,10 +22,9 @@ for(const file of ['viewport_v10_10_9.js','boot_v10.js','update_v10_10_9.js']){
 const earlyBoot=boot.slice(0,boot.indexOf('window.__fbLoadErrors=0;'));
 assert(boot.includes('__TEAM_BULLS_EARLY_AUTH_AUTOFILL_101027__'),'Cold start não instala o guard antecipado de autofill atual.');
 assert(boot.indexOf('__TEAM_BULLS_EARLY_AUTH_AUTOFILL_101027__')<boot.indexOf('__TEAM_BULLS_BOOT_SAFETY_2__'),'Guard de autofill precisa existir antes do boot normal.');
-assert(earlyBoot.includes("form.setAttribute('autocomplete','off')"),'Cold start precisa respeitar o acesso salvo pelo app no aparelho.');
+assert(earlyBoot.includes("form.setAttribute('autocomplete','on')"),'Cold start precisa respeitar o acesso salvo pelo app no aparelho.');
 assert(earlyBoot.includes("email.setAttribute('name','tb_access_identity')"),'Cold start deve manter a identidade do campo local.');
-assert(earlyBoot.includes("password.setAttribute('autocomplete','off')"),'Cold start não pode reativar o gerenciador externo.');
-assert(!earlyBoot.includes("'current-password'"),'Guard inicial voltou a solicitar preenchimento externo de senha.');
+assert(earlyBoot.includes("password.setAttribute('autocomplete','current-password')"),'Cold start deve permitir o gerenciador de senhas.');
 assert(earlyBoot.includes("observer.observe(document.documentElement,{childList:true,subtree:true})"),'Guard não acompanha a criação do formulário durante o parse inicial.');
 assert(earlyBoot.includes("document.addEventListener('focusin'"),'Cold start não reforça a semântica antes do foco nos campos.');
 
@@ -51,12 +50,11 @@ assert(sw.includes(`const BUILD_REVISION=${publishedBuild};`),'Service Worker pr
 assert(sw47.includes(`const BUILD_REVISION=${publishedBuild};`),'Service Worker legado precisa reconhecer o mesmo build publicado no version.json.');
 assert(sw===sw47,'Service Workers precisam permanecer idênticos após um hotfix de sessão.');
 assert(updater.includes("fetch(`${VERSION_URL}?t=${Date.now()}`,{cache:'no-store'"),'Verificação de versão precisa continuar ignorando cache HTTP.');
-assert(updater.includes("'./boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1'"),'Atualizador precisa renovar a camada de tema e sessão do PWA entre os arquivos críticos.');
+assert(updater.includes("'./boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access2'"),'Atualizador precisa renovar a camada de tema e sessão do PWA entre os arquivos críticos.');
 
 assert(viewport.includes("const REVISION='10.10.25-session1';"),'Camada de estabilidade móvel não possui revisão própria.');
-assert(viewport.includes("email.setAttribute('autocomplete','off')"),'Retomada não pode reativar o gerenciador de e-mails externo.');
-assert(viewport.includes("password.setAttribute('autocomplete','off')"),'Retomada não pode reativar o gerenciador de senhas externo.');
-assert(!viewport.includes("'current-password'"),'Retomada voltou a solicitar preenchimento externo de senha.');
+assert(viewport.includes("email.setAttribute('autocomplete','username')"),'Retomada deve preservar a identificação do usuário para o gerenciador.');
+assert(viewport.includes("password.setAttribute('autocomplete','current-password')"),'Retomada deve preservar o preenchimento da senha pelo gerenciador.');
 assert(viewport.includes("const LAST_EMAIL_KEY='team_bulls_last_login_email_v1';"),'Último e-mail não possui memória local segura.');
 assert(viewport.includes("profile=JSON.parse(safeGet('team_bulls_profile_v9_5_'+uid)||'null')"),'E-mail não possui fallback pelo perfil já conhecido do próprio usuário.');
 assert(!/safeSet\([^\n]{0,80}(?:password|login-pass)/i.test(viewport),'Camada nova não pode persistir senha em texto puro.');

@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026112401,
-  "revision": "workflow-ui-video-1",
-  "publishedAt": "2026-11-24T00:00:00Z",
+  "build": 2026112501,
+  "revision": "student-flow-reliability-1",
+  "publishedAt": "2026-11-25T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Cluster Set Tradicional, conferência com layout do app e feedback em vídeo com original arquivado no computador."
+  "message": "Treino guiado com vídeo e substituições, ajuste das porções e retomada mais estável com internet instável ou sem conexão."
 }

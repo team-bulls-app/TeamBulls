@@ -37,7 +37,7 @@ if(heicRecovery){
 assert(sw.includes('const SHELL_ITEM_TIMEOUT_MS=3000;'),'Pré-cache continua sem timeout explícito.');
 assert(sw.includes('const ACTIVATION_SHELL=['),'Shell mínimo de ativação está ausente.');
 assert(sw.includes('async function prepareActivationShell'),'Ativação rápida não prepara o shell mínimo.');
-assert(sw.includes("await prepareActivationShell().catch(()=>false);await self.skipWaiting()"),'Instalação ainda pode esperar o shell completo antes do skipWaiting.');
+assert(sw.includes("await prepareActivationShell();await self.skipWaiting()"),'Instalação deve confirmar os arquivos essenciais antes de ativar.');
 assert(!sw.includes("await prepareShell().catch(()=>false);await self.skipWaiting()"),'Shell completo voltou a bloquear a instalação.');
 assert(!/broadcast\([^;]+\);\s*await forceRecoveredNavigation\(\);\s*prepareShell\(\)/s.test(sw),'Ativação voltou a aquecer o shell inteiro em segundo plano.');
 assert(sw.includes('if(stale.length)await forceRecoveredNavigation();'),'Navegação automática não está limitada a clientes com cache antigo.');

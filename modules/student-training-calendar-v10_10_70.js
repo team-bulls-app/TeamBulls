@@ -385,8 +385,18 @@
     if(!sameDay(guide,workout,day))return null;
     const exercises=exercisesForDay(workout,day.name);
     const remaining=exercises.filter(item=>!guide.done.includes(String(item.id)));
-    const queue=[...remaining.filter(item=>!guide.deferred.includes(String(item.id))),...remaining.filter(item=>guide.deferred.includes(String(item.id)))];
-    const exercise=queue.find(item=>String(item.id)===guide.exerciseId)||queue[0];
+    const pending=new Map(remaining.map(item=>[String(item.id),item]));
+    const order=Array.isArray(guide.order)?guide.order:[
+      ...remaining.filter(item=>!guide.deferred.includes(String(item.id))).map(item=>String(item.id)),
+      ...guide.deferred
+    ];
+    const queue=[];
+    for(const id of [guide.exerciseId,...order]){
+      if(!pending.has(id))continue;
+      queue.push(pending.get(id));pending.delete(id);
+    }
+    queue.push(...pending.values());
+    const exercise=queue[0];
     return {uid:guide.uid,workout,day,week:guide.week,guide,exercises,remaining,queue,exercise};
   }
   function canUseGuide(guide){return !!guide&&studentCanComplete(guide.uid)&&ownerUid()===guide.uid;}
@@ -521,7 +531,8 @@
     const previous=[CUR_WORKOUT,CUR_DAY,CUR_EX,LAST_SESSION_WEEK];
     try{
       CUR_WORKOUT=context.workout.id;CUR_DAY=context.day.name;CUR_EX=exercise.id;LAST_SESSION_WEEK=guide.week;
-      const opened=openLogSessionModal();
+      const {variant}=guidedVariant(exercise,guide);
+      const opened=openLogSessionModal({itemId:variant?.id||'',name:variant?.name||exercise.name});
       if(opened===false)return false;
       const select=document.getElementById('input-session-week');
       if(select&&Number(select.value)!==guide.week){
@@ -536,17 +547,62 @@
     if(!exercise||guide.status!=='active'||!canUseGuide(guide))return false;
     const date=today(),logged=(exercise.sessions||[]).some(session=>validDate(session.date)&&session.date>=guide.date&&session.date<=date&&Number(session.week)===guide.week&&session.sets?.length&&!guide.priorSessions?.includes(String(session.id)));
     if(!logged){showToast('Registre as séries realizadas antes de seguir para o próximo exercício.',true);registerGuided();return false;}
-    const next=context.queue.find(item=>item!==exercise);
-    return saveGuide(guide.uid,guide,{...guide,done:[...guide.done,String(exercise.id)],exerciseId:next?String(next.id):''});
+    const order=context.queue.slice(1).map(item=>String(item.id));
+    return saveGuide(guide.uid,guide,{...guide,done:[...guide.done,String(exercise.id)],exerciseId:order[0]||'',order,occupied:[]});
   }
-  function postponeExercise(){
+  function postponeExercise(occupied=true){
+    const context=guideContext(),guide=context?.guide;
+    if(guide?.status!=='active'||!canUseGuide(guide)||context.queue.length<2)return false;
+    const [exercise,...others]=context.queue;
+    const exerciseId=String(exercise.id),waiting=new Set(guide.occupied||[]);
+    let order;
+    if(occupied){
+      const next=others.find(item=>!waiting.has(String(item.id)))||others[0];
+      const later=others.filter(item=>item!==next);
+      order=[next,...later.filter(item=>waiting.has(String(item.id))),exercise,...later.filter(item=>!waiting.has(String(item.id)))];
+      waiting.add(exerciseId);
+    }else{
+      order=[...others,exercise];
+      waiting.delete(exerciseId);
+    }
+    const ids=order.map(item=>String(item.id));
+    const message=occupied
+      ?'Faça o próximo exercício disponível e volte aos aparelhos ocupados logo depois. Confirma a mudança de ordem?'
+      :'Este exercício ficará para o fim do treino. Se houver desconforto, confira as substituições e siga a orientação do treinador antes de tentar novamente.';
+    showConfirm(occupied?'Aparelho ocupado':'Adiar exercício',message,()=>
+      saveGuide(guide.uid,guide,{...guide,exerciseId:ids[0],order:ids,occupied:[...waiting]}));
+    return true;
+  }
+  function guidedVariant(exercise,guide){
+    const catalog=EXERCISE_OPTIONS.groups?.length?EXERCISE_OPTIONS:cachedExerciseCatalog();
+    const group=findExerciseGroup(exercise,catalog),items=group?.items||[];
+    const prescribed=items.find(item=>item.id===exercise.catalogItemId||normalizedName(item.name)===normalizedName(exercise.name));
+    const alternatives=items.filter(item=>item.id!==prescribed?.id&&normalizedName(item.name)!==normalizedName(exercise.name));
+    const variant=alternatives.find(item=>item.id===guide.variants?.[String(exercise.id)])||null;
+    return {alternatives,variant};
+  }
+  function selectGuidedVariant(select){
     const context=guideContext(),guide=context?.guide,exercise=context?.exercise;
     if(!exercise||guide.status!=='active'||!canUseGuide(guide))return false;
-    const next=context.queue.find(item=>item!==exercise);
-    if(!next)return false;
-    showConfirm('Aparelho ocupado','A ordem foi planejada pelo treinador. Mudar a sequência pode prejudicar a progressão. Se precisar, siga para o próximo exercício e volte a este depois.',()=>
-      saveGuide(guide.uid,guide,{...guide,exerciseId:String(next.id),deferred:[...guide.deferred,String(exercise.id)]}));
+    const {alternatives,variant}=guidedVariant(exercise,guide);
+    const next=select.value,item=alternatives.find(item=>item.id===next),id=String(exercise.id);
+    select.value=variant?.id||'';
+    if(next===select.value||(next&&!item))return false;
+    showConfirm(item?'Substituir exercício?':'Voltar ao exercício prescrito?',
+      item?'Use a substituição quando necessário. A prescrição original é preservada e o histórico identificará o exercício realizado.':'O próximo registro usará o exercício prescrito pelo treinador.',
+      ()=>saveGuide(guide.uid,guide,{...guide,variants:{...guide.variants,[id]:next}}));
     return true;
+  }
+  let guideCatalogOwner='',guideCatalogLoadedAt=0,guideCatalogLoad=null;
+  function refreshGuideCatalog(uid){
+    if(guideCatalogLoad||(navigator.onLine===false&&mode()!=='local'))return;
+    if(guideCatalogOwner===uid&&Date.now()-guideCatalogLoadedAt<60000)return;
+    guideCatalogLoad=Promise.resolve().then(()=>loadExerciseOptions()).then(()=>{
+      guideCatalogOwner=uid;guideCatalogLoadedAt=Date.now();
+    }).catch(()=>{}).finally(()=>{
+      guideCatalogLoad=null;
+      if(guideCatalogOwner===uid&&ownerUid()===uid)refreshBattleScreens();
+    });
   }
   function pauseGuided(){
     const guide=readGuide();if(!canUseGuide(guide))return false;
@@ -573,10 +629,6 @@
     }
     return completeDay(context);
   }
-  function showGuidedVideo(){
-    const exercise=guideContext()?.exercise;if(!exercise||!canUseCatalogVideos())return false;
-    return openCatalogVideo(resolveExerciseVideoUrl(exercise),exercise.name);
-  }
   function showGuidedHistory(){
     const context=guideContext(),exercise=context?.exercise;
     if(!exercise)return false;
@@ -597,20 +649,32 @@
     const context=guideContext(guide);
     if(!canUseGuide(guide))return '';
     if(!context)return `<p>O dia iniciado não está disponível neste protocolo.</p>${guideButton('Cancelar treino iniciado','cancelGuided()')}`;
-    const {day,exercise,exercises,remaining,workout}=context;
-    const progress=`${exercises.length-remaining.length} de ${exercises.length} exercícios concluídos`;
-    const finished=!remaining.length;
-    const video=exercise&&typeof canUseCatalogVideos==='function'&&canUseCatalogVideos()&&extractYouTubeId(resolveExerciseVideoUrl(exercise));
-    const prescription=exercise&&typeof prescriptionCompactSummary==='function'?prescriptionCompactSummary(exercise,guide.week):null;
-    const techniques=exercise&&typeof studentTechniqueLabels==='function'?studentTechniqueLabels(exercise,guide.week):'';
-    const subtitle=`${escapeHtml(workout.name)} · ${escapeHtml(day.name)} · semana ${guide.week}`;
-    return `<div class="student-guided-card"><div class="student-guided-state">${guide.status==='paused'?'Treino pausado':'Treino em andamento'}</div><p class="student-guided-context">${subtitle}</p><p class="student-guided-progress" role="status">${progress}</p>${
-      guide.status==='paused'?guideButton('Retomar treino','resumeGuided()',true):finished?guideButton('Concluir treino','finishGuided()',true):`<h3 tabindex="-1">${escapeHtml(exercise.name)}</h3>${prescription?.rx?.sets?.length?`<p class="student-guided-context">${escapeHtml(prescription.reps)} · ${escapeHtml(prescription.ger)}</p>`:''}
+    const {day,exercise,exercises,remaining}=context;
+    const done=exercises.length-remaining.length,finished=!remaining.length;
+    const progress=`${done} de ${exercises.length} exercícios concluídos`;
+    const paused=guide.status==='paused';
+    let step='';
+    if(paused)step=guideButton('Retomar treino','resumeGuided()',true);
+    else if(finished)step=guideButton('Concluir treino','finishGuided()',true);
+    else{
+      refreshGuideCatalog(guide.uid);
+      const {alternatives,variant}=guidedVariant(exercise,guide);
+      const name=variant?.name||exercise.name;
+      const video=navigator.onLine!==false&&canUseCatalogVideos()&&extractYouTubeId(variant?variant.videoUrl:resolveExerciseVideoUrl(exercise));
+      const prescription=prescriptionCompactSummary(exercise,guide.week);
+      const techniques=typeof studentTechniqueLabels==='function'?studentTechniqueLabels(exercise,guide.week):'';
+      step=`<div class="student-guided-step"><h3 tabindex="-1">${escapeHtml(name)}</h3>
+        ${variant?`<p class="student-guided-context">Substitui ${escapeHtml(exercise.name)}</p>`:''}
+        ${prescription?.rx?.sets?.length?`<p class="student-guided-prescription">${escapeHtml(prescription.reps)} · ${escapeHtml(prescription.ger)}</p>`:''}
         ${techniques}${exercise.instructions?`<p class="student-guided-instructions">${escapeHtml(exercise.instructions)}</p>`:''}
-        <div class="student-guided-actions">${guideButton('Registrar séries','registerGuided()',true)}${guideButton(remaining.length===1?'Finalizar exercício':'Seguir','finishExercise()')}</div>
-        <div class="student-guided-actions">${video?guideButton('Ver vídeo','showGuidedVideo()'):''}${guideButton('Ver histórico','showGuidedHistory()')}${remaining.length>1?guideButton('Aparelho ocupado','postponeExercise()'):''}</div>`}
-      <div class="student-guided-actions">${guideButton('Ver treino todo','showFullDay()')}${guide.status==='active'&&!finished?guideButton('Pausar treino','pauseGuided()'):''}</div>
-      <details class="student-guided-end"><summary>Opções do treino</summary><div class="student-guided-actions">${!finished?guideButton('Encerrar treino','finishGuided()'):''}${guideButton('Cancelar início','cancelGuided()')}</div></details></div>`;
+        ${video?`<div class="student-guided-video"><span>Vídeo de execução</span><iframe title="Vídeo de execução de ${escapeHtml(name)}" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube-nocookie.com/embed/${escapeHtml(video)}?rel=0" allow="encrypted-media; picture-in-picture" allowfullscreen sandbox="allow-scripts allow-same-origin allow-presentation"></iframe><a href="https://www.youtube.com/watch?v=${escapeHtml(video)}" target="_blank" rel="noopener noreferrer">Abrir no YouTube</a></div>`:''}
+        ${alternatives.length?`<label class="student-guided-substitution"><span>Substituir exercício</span><select class="form-input" onchange="TeamBullsWorkoutCompletion.selectGuidedVariant(this)"><option value="">${escapeHtml(exercise.name)} (prescrito)</option>${alternatives.map(item=>`<option value="${escapeHtml(item.id)}"${variant?.id===item.id?' selected':''}>${escapeHtml(item.name)}</option>`).join('')}</select></label>`:''}
+        <div class="student-guided-actions student-guided-primary">${guideButton('Registrar séries','registerGuided()',true)}${guideButton(remaining.length===1?'Finalizar exercício':'Seguir','finishExercise()')}</div>
+        ${remaining.length>1?`<details class="student-guided-options"><summary>Pular exercício</summary><div class="student-guided-actions">${guideButton('Aparelho ocupado','postponeExercise(true)')}${guideButton('Desconforto ou outro problema','postponeExercise(false)')}</div></details>`:''}</div>`;
+    }
+    return `<div class="student-guided-card"><div class="student-guided-heading"><div><p class="student-guided-state">${paused?'Treino pausado':'Treino em andamento'}</p><strong>${escapeHtml(day.name)}</strong></div><span>Semana ${guide.week}</span></div>
+      <div class="student-guided-progress"><p role="status">${progress}</p><progress aria-label="${progress}" max="${exercises.length||1}" value="${done}"></progress></div>
+      ${step}<details class="student-guided-options"><summary>Opções do treino</summary><div class="student-guided-actions">${exercise?guideButton('Ver histórico','showGuidedHistory()'):''}${guideButton('Ver treino todo','showFullDay()')}${!paused&&!finished?guideButton('Pausar treino','pauseGuided()'):''}${!finished?guideButton('Encerrar treino','finishGuided()'):''}${guideButton('Cancelar início','cancelGuided()')}</div></details></div>`;
   }
   const style=document.createElement('style');style.textContent=`
     .student-guided-card{border:1px solid var(--border-l);border-left:3px solid var(--accent);background:var(--surface);padding:12px;margin:12px 0}
@@ -784,11 +848,11 @@
       'today-complete':'Treino de hoje concluído.',
       'cycle-complete':'Ciclo do protocolo concluído.'
     };
-    const details=available?`${escapeHtml(plan.day.name)} · semana ${plan.week}`:messages[plan?.status];
+    const details=available?`<strong>${escapeHtml(plan.day.name)}</strong><span>Semana ${plan.week}${plan.status==='rest'?' · Descanso recomendado':''}</span>`:messages[plan?.status];
     const start=available&&studentCanComplete(uid)
       ?guideButton(plan.status==='rest'?'Iniciar mesmo assim':'Iniciar treino',`startGuidedFromHome(${plan.status==='rest'})`,true):'';
     const content=`<div class="home-daily-summary-head"><strong>Batalha do dia</strong><span>${escapeHtml(fmt(date))}</span></div>
-      ${guide?guidedPanel(guide):`<div class="home-daily-summary-foot">${plan.status==='rest'?'Descanso recomendado · próximo treino: ':''}${details||''}</div>${start}`}
+      ${guide?guidedPanel(guide):`<div class="home-daily-summary-foot">${details||''}</div>${start}`}
       <button class="btn-ghost student-battle-calendar" type="button" onclick="openCalendar()">Calendário de treino e dieta</button>`;
     renderBattleContent(host,content);
     if(workout&&mode()==='cloud'){
@@ -847,6 +911,11 @@
   const baseShowScreen=typeof showScreen==='function'?showScreen:null;
   if(baseShowScreen)showScreen=function(id){const result=baseShowScreen.apply(this,arguments);if(result!==false){
     document.body.classList.toggle('student-no-overview',currentUser()?.role==='student');
+    for(const [screen,hostId] of [['screen-home','home-daily-summary'],['screen-day','student-workout-completion']]){
+      if(screen===id)continue;
+      const host=document.getElementById(hostId),player=host?.querySelector('.student-guided-video iframe');
+      if(player){player.remove();battleContent.delete(host);}
+    }
     if(id==='screen-workout'){markDayFolders();if(!snapshots.has(ownerUid()))refreshFromStorage(ownerUid());}
     if(id==='screen-workout-library'){renderLibraryGuide();if(!snapshots.has(ownerUid()))refreshFromStorage(ownerUid());}
     if(id==='screen-auth'){
@@ -878,7 +947,7 @@
     retry:async id=>{const owner=ownerUid(),data=readLocal(owner);if(!owner||!(data.states[id]||data.completions[id]))return false;return syncPending(owner);},
     currentWeek,renderStudentDay,retrySync,syncPending,diagnostics,
     startGuidedWorkout,startGuidedFromHome,resumeGuided,pauseGuided,cancelGuided,finishGuided,
-    registerGuided,finishExercise,postponeExercise,showGuidedVideo,showGuidedHistory,showFullDay,dayState
+    registerGuided,finishExercise,postponeExercise,selectGuidedVariant,showGuidedHistory,showFullDay,dayState
   });
   if(document.getElementById('screen-day')?.classList.contains('active'))renderStudentDay();
   if(document.getElementById('screen-home')?.classList.contains('active'))refreshHomeSummary();

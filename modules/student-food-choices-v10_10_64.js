@@ -2,7 +2,7 @@
 'use strict';
 (()=>{
   if(window.TeamBullsStudentFoodChoices)return;
-  const VERSION='10.10.64-foodchoices9',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_',DIAGNOSTICS_PREFIX='team_bulls_food_choices_diag_v1_';
+  const VERSION='10.10.64-foodchoices10',TYPE='food_choice',PREFIX='team_bulls_food_choices_v1_',DIAGNOSTICS_PREFIX='team_bulls_food_choices_diag_v1_';
   const drafts=new Map(),errors=new Map(),inflight=new Map(),remote=new Map(),volatile=new Set(),expandedRows=new Set(),diagnosticCache=new Map();
   let loaded='',loading=null,epoch=0;
   const FOOD_SYNC_ERROR_CATEGORIES=new Set(['network','permission','storage','conflict','other']);
@@ -441,8 +441,10 @@
     const own=context();if(!own)return null;
     try{const [studentUid,dietId,variantId,mealId,lineKey]=JSON.parse(node.dataset.tbFoodRow);return studentUid===own.studentUid&&dietId===own.dietId&&variantId===own.variantId?{studentUid,dietId,variantId,mealId,lineKey}:null;}catch(error){return null;}
   }
+  let installed=false;
   function install(){
-    if(typeof renderMealsList!=='function'||renderMealsList.__tbFoodChoices)return;
+    if(installed||typeof renderMealsList!=='function'||typeof openDietDetail!=='function')return;
+    installed=true;
     const base=renderMealsList;
     renderMealsList=function(...args){const result=base.apply(this,args);if(context())refresh().catch(()=>{});return result;};
     renderMealsList.__tbFoodChoices=true;
@@ -514,12 +516,13 @@
       const row=live(ctx,{adjusted:true});if(!row||row.count===0)return;
       const state=selectionForDraft(ctx,row),values=state.values.map(item=>({...item}));
       if(values.length>=8)return;
-      const total=roundPortions(values.reduce((sum,item)=>sum+item.portions,0)),remaining=roundPortions(row.count-total);
+      const units=value=>Math.round(value*1000);
+      const total=values.reduce((sum,item)=>sum+units(item.portions),0),remaining=units(row.count)-total;
       if(row.mixed)values.push({foodId:'',portions:1});
-      else if(remaining>0.001)values.push({foodId:'',portions:remaining});
+      else if(remaining>0)values.push({foodId:'',portions:remaining/1000});
       else{
         let index=0;for(let i=1;i<values.length;i++)if(values[i].portions>values[index].portions)index=i;
-        const first=roundPortions(values[index].portions/2),second=roundPortions(values[index].portions-first);
+        const available=units(values[index].portions),first=Math.ceil(available/2)/1000,second=Math.floor(available/2)/1000;
         if(first<0.001||second<0.001){notify('Essa porção é pequena demais para ser dividida em outro alimento.',true);return;}
         values[index].portions=first;values.push({foodId:'',portions:second});
       }

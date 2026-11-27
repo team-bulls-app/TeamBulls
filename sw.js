@@ -2,7 +2,7 @@
 'use strict';
 
 const APP_VERSION='10.10.9';
-const BUILD_REVISION=2026112401;
+const BUILD_REVISION=2026112501;
 const CACHE_REVISION='studentaccess1';
 const CACHE_HOTFIX='heic-recovery1';
 const CACHE_TAG=`${APP_VERSION.replace(/\./g,'-')}-${CACHE_REVISION}-${CACHE_HOTFIX}-${BUILD_REVISION}`;
@@ -24,7 +24,7 @@ const AUDIO_NAME_PATTERN=/^team-bulls-music-[a-z0-9-]+\.mp3$/i;
  * reaquecimento explícito, mas não é baixado inteiro durante a ativação.
  */
 const REQUIRED_SHELL=[
-  './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices9','./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar7','./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3',
+  './modules/student-food-choices-v10_10_64.js?v=10.10.64-foodchoices10','./modules/student-training-calendar-v10_10_70.js?v=10.10.70-guided-calendar8','./modules/foreground-write-resilience-v10_10_50.js?v=10.10.50-foregroundwrite3',
   './modules/workflow-model-v10_10_71.js?v=10.10.72-workflowmodel2',
   './modules/workflow-storage-v10_10_71.js?v=10.10.71-workflowstorage1',
   './modules/workflow-sync-v10_10_71.js?v=10.10.72-workflowsync3',
@@ -33,25 +33,20 @@ const REQUIRED_SHELL=[
   './modules/isometry-series-timer-v10_10_71.js?v=10.10.71-isometrytimer1',
   './modules/feedback-video-tools-v10_10_72.js?v=10.10.72-videotools1',
   './modules/feedback-media-v10_10_71.js?v=10.10.72-feedbackmedia2',
-  './index.html','./manifest.json','./version.json','./viewport_v10_10_9.js?v=10.10.9&device=local-access1&feedback=protocol1','./boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1','./config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1&protocol=activecycle1&studentadmin=roster1&recovery=bounded1&payments=consult1&workoutdates=cycle2&mixedfoods=1&trainingguidance=2&studentworkflow=1&trainercentral=1&dietcalc=save2&dietcopy=day2&workspace=independent1&reports=monthly-priority1&reportwindow=drag1&feedback=protocol1&stability=session1&dietbuilder=audit1&workflow=reliability1&cluster=1','./update_v10_10_9.js?v=10.10.9&b=2026112401','./app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1&photoReturn=1&muscles=groups2&panes=independent1&reports=monthly-priority1&feedback=protocol1&stability=session1&workflow=reliability1&cluster=1','./modules/student-feedback-device-notices-v10_10_62.js?v=10.10.62-device-notices3','./modules/support-diagnostics-v10_10_9.js?v=10.10.9-diagnostics4','./modules/trainer-student-administration-v10_10_71.js?v=10.10.71-studentadmin3','./modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4','./modules/v107-invites.js?v=10.10.9&registered=name1','./modules/v107-operations.js?v=10.10.9&diet=foodchoices1&syncdiag=1&stability=sync1','./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf9','./modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession4','./modules/session-integrity-v10_10_39.js?v=10.10.63-sessionintegrity2','./modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1','./modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates2','./modules/stability_v10_10_9.js?v=10.10.9','./modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply3','./modules/app-update-v10_10_9.js?v=10.10.9&device=local-access1','./modules/diet-scroll-fix-v10_10_9.js?v=10.10.9&scroll=top1','./modules/modal-form-guard-v10_10_9.js?v=10.10.9&independent=1','./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace6','./modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','./modules/global-performance-v10_10_9.js?v=10.10.9-perf2','./modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2','./modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','./modules/ger-bulk-v10_10_9.js?v=10.10.9-ger2','./modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','./modules/prescription-propagation-v10_10_9.js?v=10.10.9-propagation2','./modules/diet-delete-fix-v10_10_9.js?v=10.10.9-dietdelete1','./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance5','./modules/remove-stretch-planilha-v10_10_9.js?v=10.10.9-stretchremove2','./modules/security-hardening-v10_10_9.js?v=10.10.10-security10','./modules/legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2','./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','./modules/workflow-controls-v10_10_10.js?v=10.10.10-workflow2','./modules/report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2','./modules/usability-audit-v10_10_10.js?v=10.10.10-audit1','./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability13','./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4','./modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1','./modules/release-coherence-v10_10_10.js?v=10.10.12-release6','./modules/technique-composition-integrity-v10_10_12.js?v=10.10.12-techcombo1','./modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome9','./modules/student-home-layout-v10_10_15.js?v=10.10.21-home7','./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact3','./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1','./modules/custom-food-calorie-bridge-v10_10_12.js?v=10.10.13-customfood6','./interaction_v10_10_9.js?v=10.10.9&scroll=top1&modals=independent2','./styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1&battle=1&workqueue=2&cluster=1&workflowui=2','./recuperar.html','./recovery_v10.js?v=10.10.9&repair=installed2','./recovery_v10.css?v=10.10.9','./icon-192-v9-8.png','./icon-512-v9-8.png','./icon-maskable-192-v9-8.png','./icon-maskable-512-v9-8.png','./apple-touch-icon-v9-8.png'
+  './index.html','./manifest.json','./version.json','./viewport_v10_10_9.js?v=10.10.9&device=local-access1&feedback=protocol1&authfill=1','./boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access2','./config_v10_7.js?v=10.10.9&device=local-access1&runtime=stable1&actions=audit1&deep=audit2&sessiondelete=durable1&protocol=activecycle1&studentadmin=roster1&recovery=bounded1&payments=consult1&workoutdates=cycle2&mixedfoods=1&trainingguidance=2&studentworkflow=1&trainercentral=1&dietcalc=save2&dietcopy=day2&workspace=independent1&reports=monthly-priority1&reportwindow=drag1&feedback=protocol1&stability=session1&dietbuilder=audit1&workflow=reliability1&cluster=1&studentflow=1','./update_v10_10_9.js?v=10.10.9&b=2026112501','./app_v10_10_9_core.js?v=10.10.9-sessionhistory2&diet=foodchoices1&syncdiag=1&theme=light13&exercise=groupcatalog1&access=online-recheck1&syncstatus=1&firebase=13.1.0&daysave=transaction1&profile=listener1&draft=exercise-recovery1&resume=passive2&delete=student-context2&device=local-access1&contrast=light15&progression=trainer1&guidance=cycle1&cardio=delete1&actions=audit1&deep=audit1&sessiondelete=durable1&protocol=activecycle1&substitutions=search1&studentadmin=roster1&recovery=bounded1&sessionvariant=choice1&workoutedit=metadata1&sessionlayout=reflow1&workoutdates=cycle2&trainingguidance=2&studentworkflow=1&trainercentral=1&photoReturn=1&muscles=groups2&panes=independent1&reports=monthly-priority1&feedback=protocol1&stability=session1&workflow=reliability1&cluster=1&studentflow=1','./modules/student-feedback-device-notices-v10_10_62.js?v=10.10.62-device-notices3','./modules/support-diagnostics-v10_10_9.js?v=10.10.9-diagnostics4','./modules/trainer-student-administration-v10_10_71.js?v=10.10.71-studentadmin3','./modules/v107-core.js?v=10.10.9-snapshot1&firestore=recovery4','./modules/v107-invites.js?v=10.10.9&registered=name1','./modules/v107-operations.js?v=10.10.9&diet=foodchoices1&syncdiag=1&stability=sync1','./modules/session-save-performance-v10_10_9.js?v=10.10.63-sessionperf9','./modules/pending-session-mutations-v10_10_34.js?v=10.10.63-pendingsession4','./modules/session-integrity-v10_10_39.js?v=10.10.63-sessionintegrity2','./modules/session-restore-recovery-ux-v10_10_31.js?v=10.10.31-sessionrestore1','./modules/student-home-fast-protocol-date-v10_10_31.js?v=10.10.31-fastdates2','./modules/stability_v10_10_9.js?v=10.10.9','./modules/destructive-actions-supply-fix-v10_10_29.js?v=10.10.29-destructive-supply3','./modules/app-update-v10_10_9.js?v=10.10.9&device=local-access2','./modules/diet-scroll-fix-v10_10_9.js?v=10.10.9&scroll=top1','./modules/modal-form-guard-v10_10_9.js?v=10.10.9&independent=1','./modules/trainer-workspace-v10_10_9.js?v=10.10.9-workspace6','./modules/cardio-timer-fix-v10_10_9.js?v=10.10.9-cardio1','./modules/global-performance-v10_10_9.js?v=10.10.9-perf2','./modules/workout-ux-fix-v10_10_9.js?v=10.10.9-workout2','./modules/desktop-performance-v10_10_9.js?v=10.10.9-desktop1','./modules/ger-bulk-v10_10_9.js?v=10.10.9-ger2','./modules/prescription-actions-layout-v10_10_9.js?v=10.10.9-actions2','./modules/prescription-propagation-v10_10_9.js?v=10.10.9-propagation2','./modules/diet-delete-fix-v10_10_9.js?v=10.10.9-dietdelete1','./modules/student-guidance-v10_10_9-v2.js?v=10.10.9-guidance5','./modules/remove-stretch-planilha-v10_10_9.js?v=10.10.9-stretchremove2','./modules/security-hardening-v10_10_9.js?v=10.10.10-security10','./modules/legacy-student-link-repair-v10_10_10.js?v=10.10.10-legacy-links6','./modules/registration-integrity-v10_10_9.js?v=10.10.9-registration2','./modules/photo-quality-download-v10_10_9.js?v=10.10.9-photoquality3','./modules/heic-report-conversion-v10_10_12.js?v=10.10.12-heic4','./modules/heic-libheif-worker-v10_10_12.js?v=10.10.12-heicworker4','./modules/workflow-controls-v10_10_10.js?v=10.10.10-workflow2','./modules/report-photo-ux-v10_10_10.js?v=10.10.10-reportphotos2','./modules/usability-audit-v10_10_10.js?v=10.10.10-audit1','./modules/usability-checkup-v10_10_9.js?v=10.10.21-usability13','./modules/student-week-workout-layout-v10_10_40.js?v=10.10.40-weeklayout4','./modules/modal-stack-stability-v10_10_9.js?v=10.10.9-modal2&fix=freeze1&layers=independent1','./modules/release-coherence-v10_10_10.js?v=10.10.12-release6','./modules/technique-composition-integrity-v10_10_12.js?v=10.10.12-techcombo1','./modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome9','./modules/student-home-layout-v10_10_15.js?v=10.10.21-home7','./modules/student-diet-compact-live-v10_10_23.js?v=10.10.23-dietcompact3','./modules/student-home-layout-runtime-v10_10_16.js?v=10.10.16-runtime1','./modules/custom-food-calorie-bridge-v10_10_12.js?v=10.10.13-customfood6','./interaction_v10_10_9.js?v=10.10.9&scroll=top1&modals=independent2','./styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1&battle=1&workqueue=2&cluster=1&workflowui=2&studentflow=1','./recuperar.html','./recovery_v10.js?v=10.10.9&repair=installed2','./recovery_v10.css?v=10.10.9','./icon-192-v9-8.png','./icon-512-v9-8.png','./icon-maskable-192-v9-8.png','./icon-maskable-512-v9-8.png','./apple-touch-icon-v9-8.png'
 ];
 const OPTIONAL_SHELL=[
-  './team-bulls-auth-bg-v9-8-2.webp','./team-bulls-desktop-menu-v10-5-6.webp','./team-bulls-desktop-login-stone-v2.png','./modules/photo-guide-v10_10_9.js?v=10.10.9','./modules/diet-personalization-v10_10_11.js?v=10.10.11-dietpersonal2','./modules/diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2','./modules/diet-live-deficit-v10_10_13.js?v=10.10.13-deficit2','./modules/training-integrity-v10_10_11.js?v=10.10.11-training1','./modules/report-schedule-consistency-v10_10_11.js?v=10.10.11-reportschedule2','./modules/trainer-overdue-report-status-v10_10_33.js?v=10.10.33-overduestatus2','./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite16','./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate12','./modules/diet-calculation-evolution-v10_10_9.js?v=10.10.10-dietcalc2','./modules/diet-copy-v10_10_28.js?v=10.10.28-dietcopy2','./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly3','./modules/cardio-finish-alert-v10_10_11.js?v=10.10.11-cardioalert2','./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace3','./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments8','./modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay2','./modules/trainer-billing-student-projection-v10_10_22.js?v=10.10.22-billingprojection2','./assets/photo-guide/page-1.png?v=10.10.9','./assets/photo-guide/page-2.png?v=10.10.9','./assets/photo-guide/page-3.png?v=10.10.9','./assets/photo-guide/page-4.png?v=10.10.9','./assets/photo-guide/page-5.png?v=10.10.9'
-];
-/*
- * Apenas estes poucos arquivos são preparados antes do skipWaiting. Cada fetch
- * tem timeout próprio; nenhum recurso opcional pode deixar o novo worker preso.
- */
-const ACTIVATION_SHELL=[
-  './index.html',
-  './version.json',
-  './team-bulls-desktop-login-stone-v2.png',
-  './boot_v10.js?v=10.10.9-themefirstpaint2&login=device-access1',
-  './styles_v10_10_9.css?v=10.10.9&theme=light14&exercise=groupcontrols1&support=diagnostics1&login=sessionquickpick1&mobile=responsive2&catalog=picker2&desktop=login-minotaurs1&device=local-access1&glass=light1&contrast=light15&mobileart=stone1&progression=trainer1&guidance=cycle1&cardio=delete1&substitutions=search1&studentadmin=roster1&sessionlayout=reflow1&phoneproportions=fluid1&trainingguidance=2&studentworkflow=1&trainercentral=1&battle=1&workqueue=2&cluster=1&workflowui=2',
-  './modules/student-home-profile-v10_10_12.js?v=10.10.45-studenthome9',
-  './modules/student-home-layout-v10_10_15.js?v=10.10.21-home7'
+  './team-bulls-auth-bg-v9-8-2.webp','./team-bulls-desktop-menu-v10-5-6.webp','./modules/photo-guide-v10_10_9.js?v=10.10.9','./modules/diet-personalization-v10_10_11.js?v=10.10.11-dietpersonal2','./modules/diet-live-calories-v10_10_11.js?v=10.10.11-dietcalories2','./modules/diet-live-deficit-v10_10_13.js?v=10.10.13-deficit2','./modules/training-integrity-v10_10_11.js?v=10.10.11-training1','./modules/report-schedule-consistency-v10_10_11.js?v=10.10.11-reportschedule2','./modules/trainer-overdue-report-status-v10_10_33.js?v=10.10.33-overduestatus2','./modules/intelligence-suite-loader-v10_10_42.js?v=10.10.58-intelsuite16','./modules/student-report-submit-reconciliation-v10_10_57.js?v=10.10.57-submitstate12','./modules/diet-calculation-evolution-v10_10_9.js?v=10.10.10-dietcalc2','./modules/diet-copy-v10_10_28.js?v=10.10.28-dietcopy2','./modules/monthly-report-cycle-v10_10_59.js?v=10.10.59-monthly3','./modules/cardio-finish-alert-v10_10_11.js?v=10.10.11-cardioalert2','./modules/trainer-diet-workspace-v10_10_11.js?v=10.10.11-dietworkspace3','./modules/trainer-inbox-payments-v10_10_12.js?v=10.10.12-inboxpayments8','./modules/student-hotbar-payments-v10_10_22.js?v=10.10.22-studentpay2','./modules/trainer-billing-student-projection-v10_10_22.js?v=10.10.22-billingprojection2','./assets/photo-guide/page-1.png?v=10.10.9','./assets/photo-guide/page-2.png?v=10.10.9','./assets/photo-guide/page-3.png?v=10.10.9','./assets/photo-guide/page-4.png?v=10.10.9','./assets/photo-guide/page-5.png?v=10.10.9'
 ];
 
+/* Index, estilos e scripts executados no boot precisam existir antes da troca. */
+const ACTIVATION_SHELL=[
+  './index.html','./version.json','./modules/v107-invites.js?v=10.10.9','./modules/week-selection-fix-v10_10_9.js?v=10.10.9-weekselection1',
+  ...REQUIRED_SHELL.filter(path=>/^(?:\.\/)(?:boot_|viewport_|config_|update_|app_v|styles_|interaction_|modules\/(?:v107-|student-training-calendar|student-feedback-device-notices|support-diagnostics|student-home-profile|student-home-layout-v|isometry-series-timer|student-food-choices|student-diet-compact-live|session-save-performance|pending-session-mutations|week-selection-fix|session-integrity))/.test(path))
+];
+const FIREBASE_BOOTSTRAP=new Set(['app','auth','firestore'].map(name=>
+  'https://www.gstatic.com/firebasejs/13.1.0/firebase-'+name+'-compat.js'
+));
 const VERSIONED_PATH_PATTERN=/(?:v\d+(?:[._-]\d+)+|_v\d+(?:_\d+)+)\.(?:js|css|json|png|webp)$/i;
 
 /* Arquivos cujo conteúdo pode mudar mantendo o mesmo nome físico. */
@@ -88,12 +83,56 @@ function secureResponse(response,{html=false}={}){
   if(html){headers.set('Content-Security-Policy',CSP);headers.set('X-Frame-Options','DENY');headers.set('Cross-Origin-Opener-Policy','same-origin');headers.set('Cache-Control','no-cache, no-store, must-revalidate');}
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
-function fetchWithTimeout(request,timeoutMs=NETWORK_TIMEOUT_MS,init={}){const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);return fetch(request,{...init,signal:controller.signal}).finally(()=>clearTimeout(timer));}
-async function fetchFresh(input,timeoutMs=SHELL_ITEM_TIMEOUT_MS){const request=typeof input==='string'?new Request(scopedUrl(input)):input;return fetchWithTimeout(request,timeoutMs,{cache:'reload'});}
-async function cacheOne(cache,path,timeoutMs=SHELL_ITEM_TIMEOUT_MS){try{const response=await fetchFresh(path,timeoutMs);if(!response.ok)throw new Error(`HTTP ${response.status}: ${path}`);await cache.put(scopedUrl(path),response.clone());return true;}catch(error){console.warn('[Team Bulls] Não foi possível preparar',path,error);return false;}}
-async function cachePathsWithLimit(cache,paths,limit=4,timeoutMs=SHELL_ITEM_TIMEOUT_MS){const queue=Array.from(paths||[]);if(!queue.length)return true;let next=0;const worker=async()=>{while(true){const index=next++;if(index>=queue.length)return;await cacheOne(cache,queue[index],timeoutMs);}};await Promise.all(Array.from({length:Math.min(Math.max(1,limit),queue.length)},worker));return true;}
-async function prepareActivationShell(){const cache=await caches.open(SHELL_CACHE);const results=await Promise.all(ACTIVATION_SHELL.map(path=>cacheOne(cache,path,SHELL_ITEM_TIMEOUT_MS)));const missing=ACTIVATION_SHELL.filter((path,index)=>!results[index]);if(missing.length)throw new Error(`Falha ao preparar o shell de ativação: ${missing.join(', ')}`);return true;}
-async function prepareShell(){const cache=await caches.open(SHELL_CACHE);await cachePathsWithLimit(cache,REQUIRED_SHELL,SHELL_FETCH_CONCURRENCY,SHELL_ITEM_TIMEOUT_MS);cachePathsWithLimit(cache,OPTIONAL_SHELL,OPTIONAL_FETCH_CONCURRENCY,SHELL_ITEM_TIMEOUT_MS).catch(()=>{});return true;}
+function withDeadline(task,timeoutMs,onTimeout){
+  let timer;
+  const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{onTimeout?.();reject(new Error('Tempo limite da conexão.'));},timeoutMs);});
+  return Promise.race([task,deadline]).finally(()=>clearTimeout(timer));
+}
+function fetchWithTimeout(request,timeoutMs=NETWORK_TIMEOUT_MS,init={},consume=response=>response){
+  const controller=new AbortController();
+  const task=fetch(request,{...init,signal:controller.signal}).then(consume);
+  return withDeadline(task,timeoutMs,()=>controller.abort());
+}
+function indexMatchesBuild(html){
+  const meta=html.match(/<meta\b[^>]*\bname\s*=\s*["']team-bulls-build["'][^>]*>/i)?.[0];
+  return Number(meta?.match(/\bcontent\s*=\s*["'](\d+)["']/i)?.[1])===BUILD_REVISION;
+}
+async function cacheOne(cache,path,timeoutMs=SHELL_ITEM_TIMEOUT_MS){
+  try{
+    const url=scopedUrl(path);
+    await fetchWithTimeout(new Request(url),timeoutMs,{cache:'reload'},async response=>{
+      if(!response.ok||path==='./index.html'&&!indexMatchesBuild(await response.clone().text()))throw new Error('Resposta inválida para '+path);
+      if((path.endsWith('.js')||path.includes('.js?'))&&!/(?:javascript|ecmascript)/i.test(response.headers.get('Content-Type')||''))throw new Error('Script inválido: '+path);
+      await cache.put(url,response);
+    });
+    return true;
+  }catch(error){console.warn('[Team Bulls] Não foi possível preparar',path,error);return false;}
+}
+async function cachePathsWithLimit(cache,paths,limit=4,timeoutMs=SHELL_ITEM_TIMEOUT_MS){
+  let index=0,ready=true;
+  const fetchNext=async()=>{
+    while(index<paths.length){
+      if(!(await cacheOne(cache,paths[index++],timeoutMs)))ready=false;
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(limit,paths.length)},fetchNext));
+  return ready;
+}
+async function prepareActivationShell(){
+  const cache=await caches.open(SHELL_CACHE);
+  const [ready]=await Promise.all([
+    cachePathsWithLimit(cache,ACTIVATION_SHELL,SHELL_FETCH_CONCURRENCY),
+    cacheOne(cache,'./team-bulls-desktop-login-stone-v2.png',1400)
+  ]);
+  if(!ready)throw new Error('Shell de ativação incompleto.');
+}
+async function prepareShell(){
+  const cache=await caches.open(SHELL_CACHE);
+  await Promise.all([
+    cachePathsWithLimit(cache,REQUIRED_SHELL.filter(path=>!ACTIVATION_SHELL.includes(path)),SHELL_FETCH_CONCURRENCY),
+    cachePathsWithLimit(cache,OPTIONAL_SHELL,OPTIONAL_FETCH_CONCURRENCY)
+  ]);
+}
 async function broadcast(message){const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});clients.forEach(client=>client.postMessage(message));}
 async function forceRecoveredNavigation(){
   const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true});
@@ -113,10 +152,11 @@ async function forceRecoveredNavigation(){
   }));
 }
 
-self.addEventListener('install',event=>{event.waitUntil((async()=>{await prepareActivationShell().catch(()=>false);await self.skipWaiting();})());});
+self.addEventListener('install',event=>{event.waitUntil((async()=>{await prepareActivationShell();await self.skipWaiting();})());});
 self.addEventListener('activate',event=>{event.waitUntil((async()=>{
   const keys=await caches.keys();
-  const stale=keys.filter(key=>key.startsWith(CACHE_PREFIX)&&![SHELL_CACHE,RUNTIME_CACHE,AUDIO_CACHE_NAME].includes(key));
+  const previous=keys.filter(key=>key.startsWith('team-bulls-shell-')&&key!==SHELL_CACHE).at(-1);
+  const stale=keys.filter(key=>key.startsWith(CACHE_PREFIX)&&![SHELL_CACHE,RUNTIME_CACHE,AUDIO_CACHE_NAME,previous].includes(key));
   await Promise.all(stale.map(key=>caches.delete(key)));
   if(self.registration.navigationPreload)await self.registration.navigationPreload.enable().catch(()=>{});
   await self.clients.claim();
@@ -127,9 +167,13 @@ self.addEventListener('activate',event=>{event.waitUntil((async()=>{
 
 self.addEventListener('message',event=>{
   const type=event.data?.type;
+  if(type==='WARM_PUBLIC_SDK'){
+    event.waitUntil(Promise.all([...FIREBASE_BOOTSTRAP].map(url=>firebaseLibraryResponse(new Request(url)))));
+    return;
+  }
   if(type==='SKIP_WAITING'){event.waitUntil(self.skipWaiting());return;}
   if(type==='GET_VERSION'){event.source?.postMessage?.({type:'TEAM_BULLS_VERSION',version:APP_VERSION,build:BUILD_REVISION,hotfix:CACHE_HOTFIX});return;}
-  if(type==='REFRESH_APP_SHELL'){event.waitUntil((async()=>{const ok=await prepareShell().then(()=>true).catch(()=>false);event.source?.postMessage?.({type:'TEAM_BULLS_REFRESHED',ok,version:APP_VERSION,build:BUILD_REVISION,hotfix:CACHE_HOTFIX});})());return;}
+  if(type==='REFRESH_APP_SHELL'){event.waitUntil((async()=>{const ok=await prepareActivationShell().then(()=>true).catch(()=>false);event.source?.postMessage?.({type:'TEAM_BULLS_REFRESHED',ok,version:APP_VERSION,build:BUILD_REVISION,hotfix:CACHE_HOTFIX});if(ok)await prepareShell();})());return;}
   if(type==='CLEAR_APP_CACHES'){event.waitUntil((async()=>{const keys=await caches.keys();await Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==AUDIO_CACHE_NAME).map(key=>caches.delete(key)));await prepareActivationShell().catch(()=>false);event.source?.postMessage?.({type:'TEAM_BULLS_CACHES_CLEARED',version:APP_VERSION,build:BUILD_REVISION,hotfix:CACHE_HOTFIX});})());return;}
   if(type!=='CACHE_AUDIO')return;
   const raw=String(event.data?.url||'');let url;
@@ -140,31 +184,79 @@ self.addEventListener('message',event=>{
   event.waitUntil((async()=>{const cache=await caches.open(AUDIO_CACHE_NAME);if(await cache.match(asset))return;try{const response=await fetch(asset,{cache:'no-cache'});if(response.ok)await cache.put(asset,response.clone());}catch(error){}})());
 });
 
-async function cacheHtml(response,cacheKey){if(!response?.ok)return response;const type=(response.headers.get('Content-Type')||'').toLowerCase();if(!type.includes('text/html'))return response;const cache=await caches.open(SHELL_CACHE);await cache.put(cacheKey,response.clone()).catch(error=>console.warn('[Team Bulls] HTML atual sem cache:',error));return response;}
+
+async function cacheHtml(response,cache,cacheKey,recovery){
+  if(!response?.ok||!response.headers.get('Content-Type')?.includes('text/html'))return response;
+  const html=await response.clone().text();
+  if(!recovery&&!indexMatchesBuild(html))return response;
+  await cache.put(cacheKey,response.clone()).catch(()=>{});
+  return response;
+}
 async function navigationNetworkFirst(request,event){
   const url=new URL(request.url),recovery=/\/recuperar\.html$/.test(url.pathname),fallback=scopedUrl(recovery?'./recuperar.html':'./index.html');
-  const cache=await caches.open(SHELL_CACHE);
+  const cache=await caches.open(SHELL_CACHE),cached=await cache.match(fallback);
+  if(cached&&self.navigator?.onLine===false)return secureResponse(cached,{html:true});
   try{
-    const preload=await Promise.race([Promise.resolve(event.preloadResponse).catch(()=>null),new Promise(resolve=>setTimeout(()=>resolve(null),800))]);
-    const response=preload?.ok?preload:await fetchWithTimeout(request,NAVIGATION_REFRESH_TIMEOUT_MS,{cache:'no-store'});
-    if(response?.ok)return secureResponse(await cacheHtml(response,fallback),{html:true});
+    const timeout=cached?1400:NAVIGATION_REFRESH_TIMEOUT_MS;
+    const preload=await withDeadline(Promise.resolve(event.preloadResponse),350).catch(()=>null);
+    const prepare=response=>cacheHtml(response,cache,fallback,recovery);
+    const response=preload?.ok?await withDeadline(prepare(preload),timeout):await fetchWithTimeout(request,timeout,{cache:'no-store'},prepare);
+    if(response?.ok)return secureResponse(response,{html:true});
   }catch(error){}
-  const cached=await cache.match(fallback);
-  if(cached)return secureResponse(cached.clone(),{html:true});
+  if(cached)return secureResponse(cached,{html:true});
   return secureResponse(new Response('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Team Bulls</title><body style="background:#0c0c0c;color:#eee;font-family:system-ui;padding:24px"><h1>Team Bulls</h1><p>Sem conexão e sem uma cópia offline disponível. Conecte-se e tente novamente.</p><button onclick="location.reload()">Tentar novamente</button></body>',{status:503,headers:{'Content-Type':'text/html; charset=utf-8'}}),{html:true});
 }
-async function networkFirst(request,{cacheName=RUNTIME_CACHE,timeout=NETWORK_TIMEOUT_MS}={}){const cache=await caches.open(cacheName);try{const response=await fetchWithTimeout(request,timeout,{cache:'no-cache'});if(response?.ok)await cache.put(request,response.clone()).catch(()=>{});return secureResponse(response);}catch(error){const cached=await cache.match(request,{ignoreSearch:false})||await (await caches.open(SHELL_CACHE)).match(request,{ignoreSearch:false});return cached?secureResponse(cached):new Response('',{status:504});}}
-async function cacheFirst(request,{cacheName=SHELL_CACHE}={}){const cache=await caches.open(cacheName),cached=await cache.match(request,{ignoreSearch:false});if(cached)return secureResponse(cached);try{const response=await fetch(request);if(response?.ok)await cache.put(request,response.clone()).catch(()=>{});return secureResponse(response);}catch(error){return new Response('',{status:504});}}
+async function previousShellMatch(request){
+  const keys=(await caches.keys()).filter(key=>key.startsWith('team-bulls-shell-')&&key!==SHELL_CACHE).reverse();
+  for(const key of keys){
+    const cached=await (await caches.open(key)).match(request,{ignoreSearch:false});
+    if(cached)return cached;
+  }
+  return null;
+}
+async function networkFirst(request,{cacheName=RUNTIME_CACHE,timeout=NETWORK_TIMEOUT_MS}={}){
+  const cache=await caches.open(cacheName);
+  let response;
+  try{
+    response=await fetchWithTimeout(request,timeout,{cache:'no-cache'});
+    if(response.ok){await cache.put(request,response.clone()).catch(()=>{});return secureResponse(response);}
+  }catch(error){}
+  const cached=await cache.match(request)||await (await caches.open(SHELL_CACHE)).match(request)||await previousShellMatch(request);
+  return secureResponse(cached||response||new Response('',{status:504}));
+}
+async function cacheFirst(request,{cacheName=SHELL_CACHE}={}){
+  const cache=await caches.open(cacheName),cached=await cache.match(request)||await previousShellMatch(request);
+  if(cached)return secureResponse(cached);
+  try{
+    const response=await fetchWithTimeout(request);
+    if(response.ok)await cache.put(request,response.clone()).catch(()=>{});
+    return secureResponse(response);
+  }catch(error){return new Response('',{status:504});}
+}
+async function firebaseLibraryResponse(request){
+  const cache=await caches.open(SHELL_CACHE),cached=await cache.match(request.url);
+  if(cached)return cached;
+  const previous=await previousShellMatch(request.url);
+  if(previous){await cache.put(request.url,previous.clone()).catch(()=>{});return previous;}
+  try{
+    const response=await fetchWithTimeout(request.url,NETWORK_TIMEOUT_MS,{mode:'cors',credentials:'omit'});
+    if(response.ok)await cache.put(request.url,response.clone()).catch(()=>{});
+    return response;
+  }catch(error){return new Response('',{status:504});}
+}
 async function audioResponse(request,url){const cache=await caches.open(AUDIO_CACHE_NAME),cached=await cache.match(url.href);if(cached&&!request.headers.has('range'))return secureResponse(cached);try{const response=await fetchWithTimeout(request,AUDIO_NETWORK_TIMEOUT_MS);if(response?.ok&&!request.headers.has('range'))await cache.put(url.href,response.clone());return secureResponse(response);}catch(error){return cached?secureResponse(cached):new Response('',{status:504});}}
 
 self.addEventListener('fetch',event=>{
   const request=event.request;if(request.method!=='GET')return;
-  const url=new URL(request.url);if(url.origin!==self.location.origin)return;
+  const url=new URL(request.url);
+  if(request.destination==='script'&&FIREBASE_BOOTSTRAP.has(url.href)){event.respondWith(firebaseLibraryResponse(request));return;}
+  if(url.origin!==self.location.origin)return;
   const relativePath=pathWithinScope(url),fileName=url.pathname.split('/').pop()||'';
   if(AUDIO_NAME_PATTERN.test(fileName)){event.respondWith(audioResponse(request,url));return;}
   if(request.mode==='navigate'){event.respondWith(navigationNetworkFirst(request,event));return;}
   if(relativePath==='/version.json'){event.respondWith(networkFirst(request,{cacheName:SHELL_CACHE,timeout:MUTABLE_NETWORK_TIMEOUT_MS}));return;}
-  /* Ordem intencional: mutáveis ANTES do cache-first genérico de ?v=. */
+  /* Assets com revisão explícita podem ser reutilizados sem depender da rede. */
+  if(MUTABLE_PATHS.has(relativePath)&&url.searchParams.has('v')&&!url.searchParams.has('recover')){event.respondWith(cacheFirst(request,{cacheName:SHELL_CACHE}));return;}
   if(MUTABLE_PATHS.has(relativePath)){event.respondWith(networkFirst(request,{cacheName:SHELL_CACHE,timeout:MUTABLE_NETWORK_TIMEOUT_MS}));return;}
   if(VERSIONED_PATH_PATTERN.test(fileName)||url.searchParams.has('v')){event.respondWith(cacheFirst(request,{cacheName:SHELL_CACHE}));return;}
   event.respondWith(networkFirst(request,{cacheName:RUNTIME_CACHE}));

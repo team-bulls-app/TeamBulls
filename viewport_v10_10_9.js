@@ -161,9 +161,9 @@
     const form=document.getElementById('panel-login');
     const email=document.getElementById('login-email');
     const password=document.getElementById('login-pass');
-    if(form)form.setAttribute('autocomplete','off');
+    if(form)form.setAttribute('autocomplete','on');
     if(email){
-      email.setAttribute('autocomplete','off');email.setAttribute('name','tb_access_identity');
+      email.setAttribute('autocomplete','username');email.setAttribute('name','tb_access_identity');
       if(!email.value.trim())email.value=String(safeGet(LAST_EMAIL_KEY)||profileEmail()||'');
       if(email.dataset.tbCredentialMemory!=='1'){
         email.dataset.tbCredentialMemory='1';
@@ -172,7 +172,7 @@
       }
     }
     if(password){
-      password.setAttribute('autocomplete','off');password.setAttribute('name','tb_access_secret');
+      password.setAttribute('autocomplete','current-password');password.setAttribute('name','tb_access_secret');
     }
     return !!(form&&email&&password);
   }

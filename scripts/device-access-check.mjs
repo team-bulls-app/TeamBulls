@@ -69,7 +69,7 @@ for(let i=0;i<9;i++){const next=user('extra-'+i,'extra'+i+'@example.test');r.mai
 assert.equal(sessions.size,8);assert.equal(r.access.has('extra0@example.test'),false);
 assert.equal(sessions.has('tb-device-v1-extra-0'),false,'Exceder o limite precisa remover também a sessão do SDK.');
 
-// As três camadas devem respeitar a preferência sem religar o autofill Google.
+// As três camadas devem permitir o gerenciador de credenciais do aparelho.
 const viewport=fs.readFileSync('viewport_v10_10_9.js','utf8');
 const update=fs.readFileSync('modules/app-update-v10_10_9.js','utf8');
 const between=(source,start,end)=>source.slice(source.indexOf(start),source.indexOf(end,source.indexOf(start)));
@@ -81,8 +81,10 @@ vm.runInContext(between(viewport,'  function prepareAuthFields()', '\n  function
 vm.runInContext(between(update,'  function prepareAuthAutofill()', '\n  function install('),context);
 for(const method of ['patchAuthAutocomplete','prepareAuthFields','prepareAuthAutofill']){
   vm.runInContext(method+'()',context);
-  assert.equal(form.autocomplete||form.attrs.autocomplete,'off',method);
-  assert.equal(password.autocomplete||password.attrs.autocomplete,'off',method);
+  assert.equal(form.autocomplete||form.attrs.autocomplete,'on',method);
+  assert.equal(password.autocomplete||password.attrs.autocomplete,'current-password',method);
+  assert.equal(email.autocomplete||email.attrs.autocomplete,'username',method);
+  assert.equal(password.value,'',method);
   assert.equal(password.name||password.attrs.name,'tb_access_secret',method);
 }
 console.log('APROVADO — acesso por aparelho: reinício, múltiplas contas, renovação, revogação, offline, cancelamento, remoção e três camadas de formulário.');

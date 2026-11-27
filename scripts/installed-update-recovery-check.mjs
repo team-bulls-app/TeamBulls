@@ -76,9 +76,9 @@ function workerHarness({quota=false,offline=false}={}){
   const writes=[],stored=new Map(),listeners=new Map();let requests=0;
   const cache={match:async key=>stored.get(String(key))?.clone(),put:async(key,response)=>{if(quota)throw new Error('QuotaExceededError');stored.set(String(key),response);writes.push(key);}};
   const self={registration:{scope:'https://example.test/TeamBulls/'},location:{origin:'https://example.test'},addEventListener:(type,fn)=>listeners.set(type,fn)};
-  const context=vm.createContext({self,console:quiet,URL,Request,Response,Headers,AbortController,setTimeout,clearTimeout,caches:{open:async()=>cache},fetch:async()=>{requests++;if(offline)throw new Error('offline');return new Response('NEW HTML',{headers:{'Content-Type':'text/html'}});}});
+  const context=vm.createContext({self,console:quiet,URL,Request,Response,Headers,AbortController,setTimeout,clearTimeout,caches:{open:async()=>cache,keys:async()=>[]},fetch:async()=>{requests++;if(offline)throw new Error('offline');return new Response('NEW HTML',{headers:{'Content-Type':'text/html'}});}});
   vm.runInContext(worker,context);
-  return {context,stored,writes,get requests(){return requests;}};
+  return {context,stored,writes,listeners,get requests(){return requests;}};
 }
 await test('navigation without preload support fetches current HTML',async()=>{
   const h=workerHarness();h.stored.set('https://example.test/TeamBulls/index.html',new Response('OLD HTML'));
@@ -94,6 +94,58 @@ await test('offline navigation retains the existing app copy',async()=>{
   const h=workerHarness({offline:true});h.stored.set('https://example.test/TeamBulls/index.html',new Response('SAVED HTML'));
   const response=await vm.runInContext("navigationNetworkFirst(new Request('https://example.test/TeamBulls/index.html'),{})",h.context);
   assert.equal(await response.text(),'SAVED HTML');
+});
+await test('an unavailable asset uses its exact cached version',async()=>{
+  const h=workerHarness();
+  h.context.fetch=async()=>new Response('Service unavailable',{status:503});
+  const url='https://example.test/TeamBulls/index.html';
+  h.stored.set(url,new Response('SAVED ASSET'));
+  const response=await vm.runInContext("networkFirst('https://example.test/TeamBulls/index.html')",h.context);
+  assert.equal(await response.text(),'SAVED ASSET');
+});
+await test('a stalled response body returns the cached app',async()=>{
+  const h=workerHarness();let body;
+  const partial=new Response(new ReadableStream({start(controller){body=controller;}}),{headers:{'Content-Type':'text/html'}});
+  const url='https://example.test/TeamBulls/index.html';
+  h.stored.set(url,new Response('SAVED HTML'));
+  h.context.preloadResponse=Promise.resolve(partial);
+  try{
+    const response=await vm.runInContext("navigationNetworkFirst(new Request('https://example.test/TeamBulls/index.html'),{preloadResponse})",h.context);
+    assert.equal(await response.text(),'SAVED HTML');
+  }finally{body.close();}
+});
+await test('worker caches the login artwork and activates if the image is unavailable',async()=>{
+  for(const imageAvailable of [true,false]){
+    const h=workerHarness();let activated=false,imageRequested=false;
+    h.context.self.skipWaiting=()=>{activated=true;};
+    const imageUrl='https://example.test/TeamBulls/team-bulls-desktop-login-stone-v2.png';
+    h.context.fetch=async request=>{
+      if(request.url===imageUrl){
+        imageRequested=true;
+        return new Response('Artwork',{status:imageAvailable?200:503,headers:{'Content-Type':'image/png'}});
+      }
+      if(request.url.endsWith('/index.html'))return new Response("<meta name=\"team-bulls-build\" content=\""+release.build+'">',{headers:{'Content-Type':'text/html'}});
+      return new Response('fixture',{headers:{'Content-Type':'application/javascript'}});
+    };
+    let installation;h.listeners.get('install')({waitUntil(value){installation=value;}});
+    await installation;
+    assert.equal(activated,true);
+    assert.equal(imageRequested,true);
+    assert.equal(h.stored.has(imageUrl),imageAvailable);
+  }
+});
+await test('a partial release keeps its current worker out of service',async()=>{
+  const h=workerHarness();let activated=false;
+  h.context.self.skipWaiting=()=>{activated=true;};
+  h.context.fetch=async request=>{
+    const url=new URL(request.url);
+    if(url.pathname.endsWith('/index.html'))return new Response(`<meta name="team-bulls-build" content="${release.build}">`,{headers:{'Content-Type':'text/html'}});
+    if(url.pathname.includes('app_v10_10_9_core.js'))return new Response('File unavailable',{status:503});
+    return new Response('fixture',{headers:{'Content-Type':'application/javascript'}});
+  };
+  let installation;h.listeners.get('install')({waitUntil(value){installation=value;}});
+  await assert.rejects(installation,/Shell de ativação incompleto/);
+  assert.equal(activated,false);
 });
 assert.equal(read('sw_47.js'),worker,'Legacy worker must deliver the same recovery.');
 if(cases.length)process.exitCode=1;

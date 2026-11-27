@@ -1118,32 +1118,6 @@ const fmt=iso=>{
 ══════════════════════════════════════════════════ */
 let db=null,auth=null,storageService=null;
 const SDK_LOAD_PROMISES=new Map();
-function loadSdkOnce(src,globalReady){
-  if(globalReady?.())return Promise.resolve(true);
-  if(SDK_LOAD_PROMISES.has(src))return SDK_LOAD_PROMISES.get(src);
-  const promise=new Promise(resolve=>{
-    let settled=false;
-    const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(!!value);};
-    const timer=setTimeout(()=>finish(!!globalReady?.()),10000);
-    const existing=[...document.scripts].find(script=>script.src===src);
-    if(existing){
-      if(globalReady?.()){finish(true);return;}
-      existing.addEventListener('load',()=>finish(!!globalReady?.()),{once:true});
-      existing.addEventListener('error',()=>finish(false),{once:true});
-      // Um script já concluído não dispara novamente o evento load. Esta
-      // verificação evita espera infinita ao abrir recursos opcionais, como PDF.
-      setTimeout(()=>{if(globalReady?.())finish(true);else if(existing.dataset.tbSdkState==='error')finish(false);},0);
-      return;
-    }
-    const script=document.createElement('script');script.src=src;script.async=true;script.dataset.tbSdkState='loading';
-    script.onload=()=>{script.dataset.tbSdkState='loaded';finish(!!globalReady?.());};
-    script.onerror=()=>{script.dataset.tbSdkState='error';finish(false);};
-    document.head.appendChild(script);
-  });
-  SDK_LOAD_PROMISES.set(src,promise);
-  promise.then(ok=>{if(!ok&&SDK_LOAD_PROMISES.get(src)===promise)SDK_LOAD_PROMISES.delete(src);});
-  return promise;
-}
 async function ensureFirebaseCore(){
   if(typeof firebase!=='undefined'&&typeof firebase.auth==='function'&&typeof firebase.firestore==='function')return true;
   const appOk=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-compat.js',()=>typeof firebase!=='undefined'&&typeof firebase.initializeApp==='function');
@@ -1171,6 +1145,15 @@ async function initOptionalAppCheck(){
   const ok=await loadSdkOnce('https://www.gstatic.com/firebasejs/13.1.0/firebase-app-check-compat.js',()=>typeof firebase.appCheck==='function');
   if(!ok)return false;
   try{firebase.appCheck().activate(key,true);return true;}catch(error){console.warn('App Check não iniciado',error);return false;}
+}
+let appCheckReady=false,appCheckFlight=null;
+function prepareConnectionAttestation(){
+  if(appCheckReady||!CFG.appCheckSiteKey||navigator.onLine===false)return Promise.resolve();
+  if(!appCheckFlight){
+    appCheckFlight=Promise.resolve().then(()=>initOptionalAppCheck()).then(ready=>{appCheckReady=!!ready;})
+      .catch(()=>{}).finally(()=>{appCheckFlight=null;});
+  }
+  return withTimeout(appCheckFlight,2500,'App Check').catch(()=>{});
 }
 function initFirebase(){
   if(auth && db) return true; // já inicializado, não inicializa de novo
@@ -1361,6 +1344,7 @@ async function loginWithSavedDeviceAccount(email){
   const canActivate=()=>document.getElementById('screen-auth')?.classList.contains('active')&&document.getElementById('panel-login')?.classList.contains('active')&&document.getElementById('login-email')?.value.trim().toLowerCase()===selected;
   try{
     if(!auth&&!(await ensureFirebaseReady()))throw Object.assign(new Error('auth unavailable'),{code:'auth/network-request-failed'});
+    await prepareConnectionAttestation();
     startAuthListener();
     AUTH_HANDLED=false;startBootWatchdog();
     await window.TeamBullsDeviceAccess.restore(email,{canActivate});
@@ -1379,7 +1363,7 @@ async function doLogin(){
   clearAuthError('login-error');
   const email=document.getElementById('login-email').value.trim();
   const pass=document.getElementById('login-pass').value;
-  if(email&&!pass&&window.TeamBullsDeviceAccess?.has(email))return loginWithSavedDeviceAccount(email);
+  if(navigator.onLine!==false&&email&&!pass&&window.TeamBullsDeviceAccess?.has(email))return loginWithSavedDeviceAccount(email);
   if(!email||!pass){showAuthError('login-error','Preencha e-mail e senha.');return;}
   const btn=document.getElementById('btn-login');
   if(btn.disabled)return;
@@ -1387,6 +1371,7 @@ async function doLogin(){
   try{
     if(navigator.onLine&&!auth){btn.textContent='CONECTANDO...';await ensureFirebaseReady();}
     if(!navigator.onLine||!auth){await offlineRegisteredLogin(email,pass);return;}
+    await prepareConnectionAttestation();
     startAuthListener();
     AUTH_HANDLED=false;startBootWatchdog();setLoadingMessage('validando acesso...');
     const cred=await withTimeout(auth.signInWithEmailAndPassword(email,pass),12000,'login');
@@ -1636,6 +1621,12 @@ async function handleAuthStateUser(user){
   let cachedShellOpened=false;
   try{
     cachedShellOpened=restoreCachedStudentAccess(user,{code:'team-bulls/fast-session'},{silent:true});
+    if(navigator.onLine===false){
+      if(!cachedShellOpened)bootToAuth('Sem conexão. Entre com uma conta validada neste aparelho para acessar os dados salvos.');
+      return;
+    }
+    await prepareConnectionAttestation();
+    if(!current())return;
     let snap;
     try{snap=await getUserProfileWithRetry(user.uid);}
     catch(profileError){if(!current())return;if(cachedShellOpened||restoreCachedStudentAccess(user,profileError))return;throw profileError;}
@@ -3747,6 +3738,13 @@ async function renderExerciseSubstitutions(exercise,elId){
   const preferred=getPreferredVariant(exercise,group),videoAllowed=canUseCatalogVideos();
   el.innerHTML=`<div class="exercise-substitution-box"><div class="exercise-substitution-head"><div><div class="exercise-substitution-group">GRUPO // ${esc(group.name)}</div><div class="exercise-substitution-title">Substituições disponíveis</div></div></div>${group.items.map(item=>`<div class="sub-option-row"><span class="sub-option-name">${esc(item.name)}</span><button class="${preferred?.id===item.id?'selected':''}" onclick="chooseExerciseVariant(${jsArg(exercise.id)},${jsArg(item.id)})">${preferred?.id===item.id?'SELECIONADO':'USAR'}</button>${item.videoUrl?`<button class="${videoAllowed?'':'locked'}" onclick="${videoAllowed?`openCatalogVideo(${jsArg(item.videoUrl)},${jsArg(item.name)})`:`showToast('Vídeos disponíveis somente para alunos ativos online.',true)`}">▶ VÍDEO</button>`:'<span></span>'}</div>`).join('')}${group.note?`<div class="plan-help">${esc(group.note)}</div>`:''}</div>`;
 }
+function updateSessionExecutionVideo(exercise,item,substituted){
+  const button=document.getElementById('session-execution-video');if(!button)return;
+  const prescribed=!!item&&(normalizedName(item.name)===normalizedName(exercise.name)||item.id===exercise.catalogItemId);
+  const url=substituted&&!prescribed?item?.videoUrl:resolveExerciseVideoUrl(exercise);
+  button.hidden=!(canUseCatalogVideos()&&navigator.onLine!==false&&extractYouTubeId(url));
+  button.onclick=button.hidden?null:()=>openCatalogVideo(url,item?.name||exercise.name);
+}
 async function populateVariantSelect(exercise,selectId,groupWrapId,selectedItemId='',selectedName=''){
   const seq=++VARIANT_LOAD_SEQ,exerciseId=String(exercise?.id||''),owner=String(CURRENT_USER?.uid||LOCAL_OWNER_UID||'guest');
   const wrap=document.getElementById(groupWrapId),select=document.getElementById(selectId);if(!exercise||!wrap||!select?.isConnected)return false;
@@ -3767,10 +3765,11 @@ async function populateVariantSelect(exercise,selectId,groupWrapId,selectedItemI
     select.innerHTML=option('','',exercise.name,'Prescrito — '+exercise.name)+items.map(item=>option(item.id,item.id,item.name)).join('')+(historical?option('__recorded__',requested.id,requested.name,'Realizado — '+requested.name):'');
     select.value=match?.id||(historical?'__recorded__':'');select.disabled=false;wrap.style.display='block';
     hasOptions=items.length>0||!!historical;
+    if(!edit)updateSessionExecutionVideo(exercise,requested.id?match:null,!!requested.id);
     const help=wrap.querySelector('.plan-help');if(help)help.textContent=items.length?'Escolha o exercício realizado. A prescrição e os registros anteriores serão preservados.':loading?'Carregando alternativas. Você pode registrar o exercício prescrito.':'Nenhuma alternativa vinculada a este exercício. Confirme a substituição com seu treinador.';
     return true;
   };
-  select.onchange=()=>{if(!current())return;choice=renderedChoice();const group=findExerciseGroup(exercise),item=(group?.items||[]).find(item=>item.id===select.value);if(item)try{localStorage.setItem(preferredVariantKey(exercise),item.id);}catch{}};
+  select.onchange=()=>{if(!current())return;choice=renderedChoice();const group=findExerciseGroup(exercise),item=(group?.items||[]).find(item=>item.id===select.value);if(item)try{localStorage.setItem(preferredVariantKey(exercise),item.id);}catch{}if(!edit)updateSessionExecutionVideo(exercise,item,!!select.value);};
   render(EXERCISE_OPTIONS.groups?.length?EXERCISE_OPTIONS:cachedExerciseCatalog(),true);
   try{const catalog=await loadExerciseOptions();if(!current())return false;return render(catalog||EXERCISE_OPTIONS);}
   catch(error){if(current())render(EXERCISE_OPTIONS);console.warn('Alternativas do registro indisponíveis',error);return false;}
@@ -5336,7 +5335,7 @@ async function saveExercise(){
 }
 
 // Session
-function openLogSessionModal(){
+function openLogSessionModal(variant){
   SESSION_WID=CUR_WORKOUT;
   SESSION_EID=CUR_EX;
   SESSION_DRAFT_CONTEXT=captureSessionDraftContext(SESSION_WID,SESSION_EID);
@@ -5346,7 +5345,7 @@ function openLogSessionModal(){
   SESSION_EDITOR_WEEK=LAST_SESSION_WEEK;
   document.getElementById('input-session-note').value='';
   populateSessionEditorForWeek(SESSION_EDITOR_WEEK);
-  const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);populateVariantSelect(exercise,'input-session-variant','session-variant-group');
+  const exercise=sessionExerciseForSave(SESSION_WID,SESSION_EID);populateVariantSelect(exercise,'input-session-variant','session-variant-group',variant?.itemId,variant?.name);
   renderOptionalTechniqueMode(exercise);
   resetRestTimer();
   openModal('modal-session');
@@ -7006,16 +7005,20 @@ async function initApp(){
       const chip=document.getElementById('user-chip-name');if(chip)chip.textContent='local';
       updateDebugBar();renderHome();showScreen('screen-home');return;
     }
-    setLoadingMessage('preparando conexão...');
-    const firebaseReady=await withTimeout(ensureFirebaseCore(),6500,'Firebase').catch(()=>false);
+    const offline=navigator.onLine===false;
+    setLoadingMessage(offline?'abrindo dados do aparelho...':'preparando conexão...');
+    const firebaseReady=await withTimeout(ensureFirebaseCore(),offline?1800:6500,offline?'recuperar sessão local':'Firebase').catch(()=>false);
     const firebaseUnavailable=!firebaseReady||typeof firebase==='undefined';
     if(firebaseUnavailable){
       MODE='local';ACCESS_MODE='local-guest';LOCAL_OWNER_UID='';LOCAL_DB={workouts:[]};
-      bootToAuth('Sem acesso ao servidor. Use sua conta offline já validada, o modo local ou tente novamente.');return;
+      bootToAuth(offline?'Sem conexão. Entre com uma conta já validada neste aparelho.':'Sem acesso ao servidor. Use sua conta offline já validada, o modo local ou tente novamente.');return;
     }
     const firebaseOK=initFirebase();
     if(firebaseOK&&CFG.firebase.apiKey!=='COLE_AQUI'){
-      if(CFG.appCheckSiteKey)await withTimeout(initOptionalAppCheck(),2500,'App Check').catch(()=>false);
+      if(!offline){
+        navigator.serviceWorker?.ready?.then(registration=>registration.active?.postMessage({type:'WARM_PUBLIC_SDK'})).catch(()=>{});
+        await prepareConnectionAttestation();
+      }
       setLoadingMessage('verificando sessão...');startAuthListener();
     }
     else bootToAuth('Firebase não configurado. O modo local continua disponível.');
@@ -7590,7 +7593,7 @@ openWorkout=function(id){const w=getW(id);if(w?.startDate)LAST_SESSION_WEEK=v104
 const V104_OPEN_TS_WORKOUT=openTsWorkout;
 openTsWorkout=function(id){const w=VIEW_STUDENT?.workouts?.find(item=>item.id===id);if(w?.startDate)TRAINER_ACTIVE_WEEK=v104CycleWeek(w.startDate,today());return V104_OPEN_TS_WORKOUT(id);};
 const V104_OPEN_LOG_SESSION=openLogSessionModal;
-openLogSessionModal=function(){const w=getW(CUR_WORKOUT);if(w?.startDate)LAST_SESSION_WEEK=v104CycleWeek(w.startDate,today());V104_OPEN_LOG_SESSION();syncSessionWeekFromDate(true);};
+openLogSessionModal=function(){const w=getW(CUR_WORKOUT);if(w?.startDate)LAST_SESSION_WEEK=v104CycleWeek(w.startDate,today());V104_OPEN_LOG_SESSION.apply(this,arguments);syncSessionWeekFromDate(true);};
 function syncSessionWeekFromDate(force=false){
   const w=getW(SESSION_WID||CUR_WORKOUT),date=document.getElementById('input-session-date')?.value;if(!w?.startDate||!validIsoDate(date))return;
   const next=v104CycleWeek(w.startDate,date),select=document.getElementById('input-session-week');if(!select)return;
@@ -8939,32 +8942,34 @@ const V106_SDK_TIMEOUT_MS=9000;
 // firebase-app carrega primeiro; auth e firestore compartilham a segunda etapa.
 const FIREBASE_CORE_TIMEOUT_MS=2*V106_SDK_TIMEOUT_MS+800;
 let V106_FIREBASE_READY_PROMISE=null;
-loadSdkOnce=function(src,globalReady){
+function loadSdkOnce(src,globalReady){
   if(globalReady?.())return Promise.resolve(true);
   if(SDK_LOAD_PROMISES.has(src))return SDK_LOAD_PROMISES.get(src);
   const promise=new Promise(resolve=>{
-    let settled=false,created=false,poll=null,timer=null;
-    const finish=ok=>{
-      if(settled)return;settled=true;
-      if(poll)clearInterval(poll);if(timer)clearTimeout(timer);
-      if(!ok)SDK_LOAD_PROMISES.delete(src);
-      resolve(!!ok);
+    const existing=[...document.scripts].find(node=>node.src===src);
+    const script=existing||document.createElement('script');
+    let settled=false;
+    const finish=value=>{
+      if(settled)return;
+      settled=true;clearTimeout(timer);
+      script.removeEventListener('load',loaded);script.removeEventListener('error',failed);
+      if(!value&&script.dataset.teamBullsSdk)script.remove();
+      resolve(!!value);
     };
-    let script=[...document.scripts].find(item=>item.src===src);
-    if(!script){
-      script=document.createElement('script');script.src=src;script.async=true;script.crossOrigin='anonymous';script.dataset.teamBullsSdk='1';created=true;document.head.appendChild(script);
+    const loaded=()=>{finish(!!globalReady?.());};
+    const failed=()=>{finish(false);};
+    const timer=setTimeout(loaded,V106_SDK_TIMEOUT_MS);
+    script.addEventListener('load',loaded,{once:true});
+    script.addEventListener('error',failed,{once:true});
+    if(!existing){
+      script.src=src;script.async=true;script.crossOrigin='anonymous';script.dataset.teamBullsSdk='1';
+      document.head.appendChild(script);
     }
-    const onLoad=()=>finish(!!globalReady?.());
-    const onError=()=>{if(created&&script.isConnected)script.remove();finish(false);};
-    script.addEventListener('load',onLoad,{once:true});
-    script.addEventListener('error',onError,{once:true});
-    poll=setInterval(()=>{if(globalReady?.())finish(true);},100);
-    timer=setTimeout(()=>{if(created&&script.isConnected&&!globalReady?.())script.remove();finish(!!globalReady?.());},V106_SDK_TIMEOUT_MS);
-    queueMicrotask(()=>{if(globalReady?.())finish(true);});
   });
   SDK_LOAD_PROMISES.set(src,promise);
+  promise.then(ok=>{if(!ok&&SDK_LOAD_PROMISES.get(src)===promise)SDK_LOAD_PROMISES.delete(src);});
   return promise;
-};
+}
 ensureFirebaseReady=function(){
   if(auth&&db)return Promise.resolve(true);
   if(V106_FIREBASE_READY_PROMISE)return V106_FIREBASE_READY_PROMISE;
