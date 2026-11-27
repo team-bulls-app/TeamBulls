@@ -1,9 +1,9 @@
 {
   "version": "10.10.9",
-  "build": 2026112501,
-  "revision": "student-flow-reliability-1",
-  "publishedAt": "2026-11-25T00:00:00Z",
+  "build": 2026112701,
+  "revision": "entry-and-profile-recovery-1",
+  "publishedAt": "2026-11-27T00:00:00Z",
   "minimumCompatibleVersion": "10.10.5",
   "updateMode": "in-app",
-  "message": "Treino guiado com vídeo e substituições, ajuste das porções e retomada mais estável com internet instável ou sem conexão."
+  "message": "Corrige a abertura, o acesso do treinador, a retomada de planos do aluno e a confirmação de leitura das instruções."
 }
