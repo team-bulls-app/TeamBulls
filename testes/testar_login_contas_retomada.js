@@ -84,9 +84,11 @@ loginError.className = 'auth-error show';
 loginError.textContent = 'A restauração da sessão demorou. Você já pode entrar novamente; seus dados continuam preservados.';
 document.elements.set(loginError.id, loginError);
 
-let selectedAccount='';
+let selectedAccount='',offlineLoginCount=0;
+const navigator={onLine:true};
 vm.runInNewContext(boot.slice(start, end), { window, document, localStorage, Event: FakeEvent, MutationObserver: FakeMutationObserver,
-  loginWithSavedDeviceAccount:email=>{selectedAccount=email;}
+  navigator,loginWithSavedDeviceAccount:email=>{selectedAccount=email;},
+  doLogin:()=>{offlineLoginCount++;}
 });
 
 assert.equal(typeof window.TeamBullsKnownAccounts?.render, 'function', 'O seletor precisa existir antes da restauração Firebase.');
@@ -128,6 +130,15 @@ assert.equal(pass.focusCount, 0, 'Escolher uma conta não pode abrir o gerenciad
 assert.equal(pass.value, '', 'Trocar a conta precisa limpar qualquer senha anterior.');
 assert.equal(selectedAccount, 'student.three@example.com', 'O seletor deve tentar o acesso salvo para a conta escolhida.');
 assert.equal(document.getElementById('tb-known-accounts').children[1].children[3].className, 'tb-known-account active');
+
+navigator.onLine=false;
+pass.value='senha-da-conta-atual';
+document.getElementById('tb-known-accounts').children[1].children[3].click();
+assert.equal(offlineLoginCount,1,'A conta atual pode entrar offline com a senha já preenchida.');
+document.getElementById('tb-known-accounts').children[1].children[2].click();
+assert.equal(pass.value,'','A senha da conta anterior também deve ser apagada offline.');
+assert.equal(pass.focusCount,1,'A senha da nova conta precisa ser informada quando o aparelho está offline.');
+assert.equal(offlineLoginCount,1,'Mudar de conta offline não pode usar a senha da conta anterior.');
 
 for (let i = 0; i < 10; i += 1) window.TeamBullsKnownAccounts.remember('new' + i + '@example.com');
 const persisted = JSON.parse(values.get('team_bulls_known_accounts_v1'));

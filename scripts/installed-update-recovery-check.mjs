@@ -114,6 +114,26 @@ await test('a stalled response body returns the cached app',async()=>{
     assert.equal(await response.text(),'SAVED HTML');
   }finally{body.close();}
 });
+await test('worker caches the login artwork and activates if the image is unavailable',async()=>{
+  for(const imageAvailable of [true,false]){
+    const h=workerHarness();let activated=false,imageRequested=false;
+    h.context.self.skipWaiting=()=>{activated=true;};
+    const imageUrl='https://example.test/TeamBulls/team-bulls-desktop-login-stone-v2.png';
+    h.context.fetch=async request=>{
+      if(request.url===imageUrl){
+        imageRequested=true;
+        return new Response('Artwork',{status:imageAvailable?200:503,headers:{'Content-Type':'image/png'}});
+      }
+      if(request.url.endsWith('/index.html'))return new Response("<meta name=\"team-bulls-build\" content=\""+release.build+'">',{headers:{'Content-Type':'text/html'}});
+      return new Response('fixture',{headers:{'Content-Type':'application/javascript'}});
+    };
+    let installation;h.listeners.get('install')({waitUntil(value){installation=value;}});
+    await installation;
+    assert.equal(activated,true);
+    assert.equal(imageRequested,true);
+    assert.equal(h.stored.has(imageUrl),imageAvailable);
+  }
+});
 await test('a partial release keeps its current worker out of service',async()=>{
   const h=workerHarness();let activated=false;
   h.context.self.skipWaiting=()=>{activated=true;};

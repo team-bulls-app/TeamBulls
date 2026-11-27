@@ -42,7 +42,7 @@ assert(worker.includes("request.mode==='navigate'"),'navegação não é interce
 assert(worker.includes('event.respondWith(navigationNetworkFirst(request,event))'),'navegação precisa priorizar o HTML atualizado com timeout limitado.');
 const navigationTimeout=Number(worker.match(/const NAVIGATION_REFRESH_TIMEOUT_MS=(\d+)/)?.[1]||0);
 assert(navigationTimeout>0&&navigationTimeout<=5000,'Atualização de HTML não pode bloquear a abertura indefinidamente.');
-assert(worker.includes('if(cached)return secureResponse(cached.clone(),{html:true})'),'navegação offline precisa recuperar o HTML em cache.');
+assert(/if\(cached\)return secureResponse\(cached(?:\.clone\(\))?,\{html:true\}\)/.test(worker),'navegação offline precisa recuperar o HTML em cache.');
 assert(!worker.includes('navigationCacheFirst(request,event)'),'estratégia antiga não deve substituir atualização de HTML com fallback offline.');
 assert(worker.includes("relativePath==='/version.json'"),'version.json não recebe estratégia fresca');
 const versionedRoute=worker.indexOf("if(VERSIONED_PATH_PATTERN.test(fileName)||url.searchParams.has('v'))");
